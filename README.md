@@ -4,7 +4,10 @@ Code for the Bavarian R2 Builders' BB-8.
 
 Contents:
 
-## BB8
+## Arduino
+Code for BB-8 and the Remote Control, all of these run on Arduino.
+
+### BB8
 Arduino code for running BB-8. Assumes
 * an Arduino MKR Wifi 1010 as basic platform
 * steppers for drive and spot-turn
@@ -13,7 +16,7 @@ Arduino code for running BB-8. Assumes
 
 Edit Config.h to adapt.
 
-## Remote
+### Remote
 Arduino code for running the remote control. Assumes
 * an Arduino MKR Wifi 1010 as basic platform
 * Felix's remote control setup
