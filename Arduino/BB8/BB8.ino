@@ -2,12 +2,12 @@
 #include "WifiServer.h"
 #include "StatePacket.h"
 #include "DCMotor.h"
-#include "wiring_private.h"
+#include <wiring_private.h>
 
 
 WifiServer *server;
 DCMotor *driveMotor, *yawMotor;
-Uart *dynamixelSerial, *dfplayerSerial;
+Uart *dynamixelSerial, *dfplayerSerial, *xbeeSerial;
 
 
 unsigned long last_millis_;
@@ -29,6 +29,7 @@ void setup() {
   yawMotor = NULL;
   dynamixelSerial = NULL;
   dfplayerSerial = NULL;
+  xbeeSerial = NULL;
 
   setupBoardComm();
   setupUDPServer();
@@ -40,8 +41,23 @@ void setup() {
 }
 
 bool setupBoardComm() {
-  dynamixelSerial = new Uart(&sercom3, 1, 0, SERCOM_RX_PAD_1, UART_TX_PAD_0);
-  dfplayerSerial = &Serial1;
+  dynamixelSerial = new Uart(&sercom3, P_DYNAMIXEL_RX, P_DYNAMIXEL_TX, SERCOM_RX_PAD_1, UART_TX_PAD_0);
+  pinPeripheral(P_DYNAMIXEL_RX, PIO_SERCOM);
+  pinPeripheral(P_DYNAMIXEL_TX, PIO_SERCOM);
+  
+  xbeeSerial = &Serial1;
+  
+  dfplayerSerial = new Uart(&sercom1, P_DFPLAYER_RX, P_DFPLAYER_TX, SERCOM_RX_PAD_1, UART_TX_PAD_0);
+  pinPeripheral(P_DFPLAYER_RX, PIO_SERCOM);
+  pinPeripheral(P_DFPLAYER_TX, PIO_SERCOM);
+}
+
+void SERCOM1_Handler() {
+  dfplayerSerial->IrqHandler();
+}
+
+void SERCOM3_Handler() {
+  dynamixelSerial->IrqHandler();
 }
 
 bool setupUDPServer() {
@@ -81,8 +97,10 @@ bool setupUDPServer() {
 
 bool setupMotors() {
   Serial.println("Setting up motors.");
-  driveMotor = new DCMotor(PO_EN_DRIVE, PO_A_DRIVE, PO_B_DRIVE, PO_PWM_DRIVE);
-  yawMotor = new DCMotor(PO_EN_YAW, PO_A_YAW, PO_B_YAW, PO_PWM_YAW);
+  driveMotor = new DCMotor(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM);
+  yawMotor = new DCMotor(P_YAW_A, P_YAW_B, P_YAW_PWM);
+  DCMotor::setEnablePin(P_MOT_EN);
+  DCMotor::setEnabled(true);
   return true;
 }
 
