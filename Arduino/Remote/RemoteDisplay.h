@@ -1,3 +1,4 @@
+
 class RemoteDisplay {
   public:
   RemoteDisplay();

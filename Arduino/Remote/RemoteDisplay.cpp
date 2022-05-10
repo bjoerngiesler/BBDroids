@@ -3,10 +3,11 @@
 #include "Config.h"
 
 RemoteDisplay::RemoteDisplay() {
-  pinMode(PinLEDLeft, OUTPUT);
-  digitalWrite(PinLEDLeft, HIGH);
-  pinMode(PinLEDRight, OUTPUT); 
-  digitalWrite(PinLEDRight, HIGH); 
+  pinMode(PinLEDNeopixel, OUTPUT);
+  digitalWrite(PinLEDNeopixel, HIGH);
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+  
   last_millis_ = millis();
   connected_ = false;
   left_led_state_ = false;
@@ -18,12 +19,12 @@ void RemoteDisplay::update() {
   unsigned long current_millis = millis();
   if(current_millis - last_millis_ > 500) {
     if(connected_) {
-      digitalWrite(PinLEDLeft, LOW);
+      digitalWrite(LED_BUILTIN, LOW);
       left_led_state_ = true;
     }
     else {
       Serial.println("Toggling LED");
-      digitalWrite(PinLEDLeft, left_led_state_);
+      digitalWrite(LED_BUILTIN, left_led_state_);
       left_led_state_ = !left_led_state_;
     }
     last_millis_ = current_millis;

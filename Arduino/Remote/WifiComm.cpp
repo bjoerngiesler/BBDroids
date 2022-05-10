@@ -2,6 +2,7 @@
 #include "Config.h"
 
 WifiComm::WifiComm() {
+  WiFi.setTimeout(2000);
 }
 
 bool WifiComm::tryToConnect() {

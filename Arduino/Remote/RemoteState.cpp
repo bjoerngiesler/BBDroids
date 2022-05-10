@@ -30,8 +30,20 @@ void RemoteState::update() {
   button_top_pcb_right_ = !digitalRead(RemoteStatePinButtonTopPCBRight);
 
   button_joystick_ = !digitalRead(RemoteStatePinJoystickButton);
+
   joystick_horizontal_ = 1024 - analogRead(RemoteStatePinJoystickHorizontal);
+  if(CalibBiasJoystickHorizontal < 0) {
+    if(joystick_horizontal_ > -CalibBiasJoystickHorizontal) joystick_horizontal_ += CalibBiasJoystickHorizontal;
+  } else {
+    if(1024 - joystick_horizontal_ > CalibBiasJoystickHorizontal) joystick_horizontal_ += CalibBiasJoystickHorizontal;
+  }
+  
   joystick_vertical_ = analogRead(RemoteStatePinJoystickVertical);
+  if(CalibBiasJoystickVertical < 0) {
+    if(joystick_vertical_ > -CalibBiasJoystickVertical) joystick_vertical_ += CalibBiasJoystickVertical;
+  } else {
+    if(1024 - joystick_vertical_ > CalibBiasJoystickVertical) joystick_vertical_ += CalibBiasJoystickVertical;
+  }
 }
 
 void RemoteState::printOnSerial() {

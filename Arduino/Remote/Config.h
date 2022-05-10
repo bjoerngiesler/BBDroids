@@ -18,8 +18,10 @@
 #define RemoteStatePinButtonTopPCBRight  9
 #define RemoteStatePinRotaryEncoder      A1
     
-#define PinLEDLeft      7
-#define PinLEDRight     6
+#define PinLEDNeopixel   7
 #define PinDisplayRX    14
 #define PinDisplayTX    13
 #define PinDisplayReset 10
+
+#define CalibBiasJoystickVertical 16
+#define CalibBiasJoystickHorizontal -15 
