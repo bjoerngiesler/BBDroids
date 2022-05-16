@@ -2,13 +2,22 @@
 #include "WifiServer.h"
 #include "StatePacket.h"
 #include "DCMotor.h"
+#include "BB8Sound.h"
+#include "BB8IMU.h"
+#include "BB8SerialTX.h"
 #include <wiring_private.h>
-
+#include <Dynamixel_Servo.h>
+#include <Encoder.h>
 
 WifiServer *server;
 DCMotor *driveMotor, *yawMotor;
-Uart *dynamixelSerial, *dfplayerSerial, *xbeeSerial;
+Uart *dynamixelSerial, *dfplayerSerial, *serialTXSerial;
+int16_t driveTicks;
 
+BB8Sound sound;
+BB8IMU domeIMU, bodyIMU;
+BB8SerialTX serialTX;
+Encoder driveEncoder(P_DRIVEENC_A, P_DRIVEENC_B);
 
 unsigned long last_millis_;
 
@@ -16,24 +25,29 @@ StatePacket packet;
 
 void setup() {
   Serial.begin(115200);
-  Serial.println();
+  while(!Serial);
+  Serial.println(); 
   Serial.println("BB8 Main Board");
   Serial.println("Firmware Version 0.0");
   Serial.println("(c) 2022 Felix Beyer, Björn Giesler");
   Serial.println("===================================");
-
-  pinMode(LED_BUILTIN, OUTPUT);
 
   server = NULL;
   driveMotor = NULL;
   yawMotor = NULL;
   dynamixelSerial = NULL;
   dfplayerSerial = NULL;
-  xbeeSerial = NULL;
+  serialTXSerial = NULL;
+
+  driveTicks = 0;
 
   setupBoardComm();
   setupUDPServer();
   setupMotors();
+  setupDynamixels();
+  setupIMUs();
+  
+  sound.begin(*dfplayerSerial);
 
   last_millis_ = millis();
 
@@ -41,15 +55,21 @@ void setup() {
 }
 
 bool setupBoardComm() {
-  dynamixelSerial = new Uart(&sercom3, P_DYNAMIXEL_RX, P_DYNAMIXEL_TX, SERCOM_RX_PAD_1, UART_TX_PAD_0);
-  pinPeripheral(P_DYNAMIXEL_RX, PIO_SERCOM);
-  pinPeripheral(P_DYNAMIXEL_TX, PIO_SERCOM);
-  
-  xbeeSerial = &Serial1;
+  dynamixelSerial = &Serial1;
+
+  #if 1
+  serialTXSerial = new Uart(&sercom3, P_SERIALTX_RX, P_SERIALTX_TX, SERCOM_RX_PAD_1, UART_TX_PAD_0);
+  pinPeripheral(P_SERIALTX_RX, PIO_SERCOM);
+  pinPeripheral(P_SERIALTX_TX, PIO_SERCOM);
+  #else
+  serialTXSerial = &Serial1;
+  #endif
   
   dfplayerSerial = new Uart(&sercom1, P_DFPLAYER_RX, P_DFPLAYER_TX, SERCOM_RX_PAD_1, UART_TX_PAD_0);
   pinPeripheral(P_DFPLAYER_RX, PIO_SERCOM);
   pinPeripheral(P_DFPLAYER_TX, PIO_SERCOM);
+
+  return serialTX.begin(serialTXSerial);
 }
 
 void SERCOM1_Handler() {
@@ -57,7 +77,7 @@ void SERCOM1_Handler() {
 }
 
 void SERCOM3_Handler() {
-  dynamixelSerial->IrqHandler();
+  serialTXSerial->IrqHandler();
 }
 
 bool setupUDPServer() {
@@ -104,7 +124,56 @@ bool setupMotors() {
   return true;
 }
 
+bool setupDynamixels() {
+  Serial.println("Setting up Dynamixels.");
+
+  servo_init(dynamixelSerial, P_DYNAMIXEL_RTS, SERVO_DEFAULT_BAUD);
+  
+  return true;
+}
+
+bool setupIMUs() {
+  Serial.print("Setting up IMUs - dome... ");
+  bool success = true;
+
+  if(!domeIMU.begin(DOME_IMU_ADDR)) {
+    success = false;
+    Serial.print("failed! ");
+  } else {
+    Serial.print("ok, ");
+  }
+  Serial.print("body... ");
+  if(!bodyIMU.begin(BODY_IMU_ADDR)) {
+    success = false;
+    Serial.print("failed!");
+  } else {
+    Serial.print("ok.");
+  }
+  Serial.println();
+  return success;
+}
+
 void runEverySecond() {
+#if 0
+  static bool on = false;
+  if(on) {
+    Serial.println("On");
+    servo_set(SERVO_BROADCAST_ID, SERVO_REGISTER_LED_IS_ON, 0.0, 100);
+    on = false;
+  } else {
+    Serial.println("Off");
+    servo_set(SERVO_BROADCAST_ID, SERVO_REGISTER_LED_IS_ON, 1.0, 100);
+    on = true; 
+  }
+#endif
+
+  int16_t x, y, z;
+  domeIMU.readVector(x, y, z);
+  Serial.print("Dome IMU: "); Serial.print(x); Serial.print(" "); Serial.print(y); Serial.print(" "); Serial.println(z);
+  bodyIMU.readVector(x, y, z);
+  Serial.print("Body IMU: "); Serial.print(x); Serial.print(" "); Serial.print(y); Serial.print(" "); Serial.println(z);
+
+  Serial.print("Drive Encoder: "); Serial.println(driveEncoder.read());
 }
 
 void setMotorSpeedByJoystickAxis(DCMotor *motor, uint16_t axis) {
@@ -160,6 +229,10 @@ void loop() {
     digitalWrite(LED_BUILTIN, HIGH);
     if(driveMotor->isEnabled()) driveMotor->setEnabled(false);
     if(yawMotor->isEnabled()) yawMotor->setEnabled(false);
+  }
+
+  if(serialTX.available()) {
+    serialTX.read();
   }
 
   delay(1);
