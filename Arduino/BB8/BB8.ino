@@ -1,7 +1,7 @@
-#include "Config.h"
+#include "BB8Config.h"
 #include "WifiServer.h"
-#include "StatePacket.h"
-#include "DCMotor.h"
+#include "BB8StatePacket.h"
+#include "BB8DCMotor.h"
 #include "BB8Sound.h"
 #include "BB8IMU.h"
 #include "BB8SerialTX.h"
@@ -9,19 +9,19 @@
 #include <Dynamixel_Servo.h>
 #include <Encoder.h>
 
-WifiServer *server;
-DCMotor *driveMotor, *yawMotor;
 Uart *dynamixelSerial, *dfplayerSerial, *serialTXSerial;
 int16_t driveTicks;
 
+WifiServer *server;
+BB8DCMotor *driveMotor, *yawMotor;
 BB8Sound sound;
 BB8IMU domeIMU, bodyIMU;
 BB8SerialTX serialTX;
+BB8StatePacket packet;
+
 Encoder driveEncoder(P_DRIVEENC_A, P_DRIVEENC_B);
 
 unsigned long last_millis_;
-
-StatePacket packet;
 
 void setup() {
   Serial.begin(115200);
@@ -117,10 +117,10 @@ bool setupUDPServer() {
 
 bool setupMotors() {
   Serial.println("Setting up motors.");
-  driveMotor = new DCMotor(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM);
-  yawMotor = new DCMotor(P_YAW_A, P_YAW_B, P_YAW_PWM);
-  DCMotor::setEnablePin(P_MOT_EN);
-  DCMotor::setEnabled(true);
+  driveMotor = new BB8DCMotor(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM);
+  yawMotor = new BB8DCMotor(P_YAW_A, P_YAW_B, P_YAW_PWM);
+  BB8DCMotor::setEnablePin(P_MOT_EN);
+  BB8DCMotor::setEnabled(true);
   return true;
 }
 
@@ -176,24 +176,24 @@ void runEverySecond() {
   Serial.print("Drive Encoder: "); Serial.println(driveEncoder.read());
 }
 
-void setMotorSpeedByJoystickAxis(DCMotor *motor, uint16_t axis) {
+void setMotorSpeedByJoystickAxis(BB8DCMotor *motor, uint16_t axis) {
   uint8_t speed;
-  DCMotor::Direction dir;
+  BB8DCMotor::Direction dir;
   
   if(axis >= DEADBAND_MIN && axis <= DEADBAND_MAX) {
-    dir = DCMotor::DCM_IDLE;
+    dir = BB8DCMotor::DCM_IDLE;
     speed = 0;
   } else if(axis < DEADBAND_MIN) {
-    dir = DCMotor::DCM_BACKWARD;
+    dir = BB8DCMotor::DCM_BACKWARD;
     speed = map(axis, 0, 511, 255, 0);
   } else {
-    dir = DCMotor::DCM_FORWARD;
+    dir = BB8DCMotor::DCM_FORWARD;
     speed = map(axis, 512, 1024, 0, 255);
   }
 
   Serial.print("dir: "); Serial.print(dir);
   Serial.print(" speed: "); Serial.println(speed);
-  if(speed == 0) dir = DCMotor::DCM_IDLE;
+  if(speed == 0) dir = BB8DCMotor::DCM_IDLE;
   motor->setDirectionAndSpeed(dir, speed);
 }
 

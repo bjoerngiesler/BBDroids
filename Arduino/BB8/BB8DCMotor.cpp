@@ -1,10 +1,10 @@
-#include "DCMotor.h"
-#include "Config.h"
+#include "BB8DCMotor.h"
+#include "BB8Config.h"
 
-bool DCMotor::en;
-uint8_t DCMotor::pin_en;
+bool BB8DCMotor::en;
+uint8_t BB8DCMotor::pin_en;
 
-DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm) {
+BB8DCMotor::BB8DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm) {
   this->pin_a = pin_a;
   this->pin_b = pin_b;
   this->pin_pwm = pin_pwm;
@@ -20,7 +20,7 @@ DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm) {
   speed = 0;
 }
 
-void DCMotor::setDirectionAndSpeed(DCMotor::Direction dir, uint8_t speed) {
+void BB8DCMotor::setDirectionAndSpeed(BB8DCMotor::Direction dir, uint8_t speed) {
   switch(dir) {
     case DCM_BRAKE:
       digitalWrite(pin_a, HIGH);

@@ -1,8 +1,8 @@
 #include <WiFiUdp.h>
 
-class WifiServer {
+class BB8WifiServer {
   public:
-  WifiServer();
+  BB8WifiServer();
   bool tryToStartAP();
   bool isAPStarted();
   void startUDPServer();

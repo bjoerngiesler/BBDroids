@@ -1,5 +1,5 @@
 #include "BB8SerialTX.h"
-#include "Config.h"
+#include "BB8Config.h"
 
 #if defined(SERIALTX_MODE_SPEKTRUM) && defined(SERIALTX_MODE_XBEE)
 #error Please only uncomment either SERIALTX_MODE_SPEKTRUM or SERIALTX_MODE_XBEE in Config.h!

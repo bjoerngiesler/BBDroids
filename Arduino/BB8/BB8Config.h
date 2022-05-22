@@ -1,5 +1,5 @@
-#if !defined(CONFIG_H)
-#define CONFIG_H
+#if !defined(BB8CONFIG_H)
+#define BB8CONFIG_H
 
 #include <Arduino.h>
 
@@ -42,4 +42,4 @@ const long unsigned int DYNAMIXEL_BPS = 1000000;
 #define SERIALTX_MODE_SPEKTRUM
 //#define SERIALTX_MODE_XBEE
 
-#endif // CONFIG_H
+#endif // BB8CONFIG_H
