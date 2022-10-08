@@ -8,6 +8,7 @@ public:
   BB8IMU();
   bool begin(uint8_t address);
   bool readVector(int16_t& x, int16_t& y, int16_t& z);
+  void printStats(const arduino::String& prefix = "");
 private:  
   bool begun;
   uint8_t address;
