@@ -3,48 +3,77 @@
 
 #include <Arduino.h>
 
+static RemoteState *state = NULL;
+
+void preparePin(int pin, void (*isr)(void)) {
+  pinMode(pin, INPUT);
+  digitalWrite(pin, HIGH);
+  attachInterrupt(digitalPinToInterrupt(pin), isr, CHANGE);
+}
+
+static bool button_right_pinky_ = false;
+void brpISR(void) { button_right_pinky_ = !digitalRead(RemoteStatePinButtonRightPinky); }
+
+static bool button_right_index_ = false;
+void briISR(void) { button_right_index_ = !digitalRead(RemoteStatePinButtonRightIndex); }
+
+static bool button_top_pcb_left_ = false;
+void btplISR(void) { button_top_pcb_left_ = !digitalRead(RemoteStatePinButtonTopPCBLeft); }
+
+static bool button_top_pcb_right_ = false;
+void btprISR(void) { button_top_pcb_right_ = !digitalRead(RemoteStatePinButtonTopPCBRight); }
+
+static bool button_top_left_ = false;
+static bool button_top_right_ = false;
+static bool button_joystick_ = false;
+static float joystick_horizontal_ = 0;
+static float joystick_vertical_ = 0;    
+
+RemoteState* RemoteState::getSharedInstance() {
+  if(state == NULL) state = new RemoteState();
+  return state;
+}
+
 RemoteState::RemoteState() {
+  preparePin(RemoteStatePinButtonRightPinky, brpISR);
+  preparePin(RemoteStatePinButtonRightIndex, briISR);
+  preparePin(RemoteStatePinButtonTopPCBLeft, btplISR);
+  preparePin(RemoteStatePinButtonTopPCBRight, btprISR);
+
 #define PREPARE_PIN(p) { pinMode(p, INPUT); digitalWrite(p, HIGH); }
-  
   PREPARE_PIN(RemoteStatePinButtonTopLeft);
   PREPARE_PIN(RemoteStatePinButtonTopRight);
-  PREPARE_PIN(RemoteStatePinButtonRightPinky);
-  PREPARE_PIN(RemoteStatePinButtonRightIndex);
   PREPARE_PIN(RemoteStatePinJoystickHorizontal);
   PREPARE_PIN(RemoteStatePinJoystickVertical);
-  PREPARE_PIN(RemoteStatePinJoystickButton);
-  PREPARE_PIN(RemoteStatePinButtonTopPCBLeft);
-  PREPARE_PIN(RemoteStatePinButtonTopPCBRight);
+  PREPARE_PIN(RemoteStatePinButtonTopLeft);
   PREPARE_PIN(RemoteStatePinRotaryEncoder);
-
-  PREPARE_PIN(RemoteStatePinJoystickHorizontal);
-  PREPARE_PIN(RemoteStatePinJoystickVertical);
 }
 
 void RemoteState::update() {
   button_top_left_ = !digitalRead(RemoteStatePinButtonTopLeft);
   button_top_right_ = !digitalRead(RemoteStatePinButtonTopRight);
-  button_right_pinky_ = !digitalRead(RemoteStatePinButtonRightPinky);
-  button_right_index_ = !digitalRead(RemoteStatePinButtonRightIndex);
-  button_top_pcb_left_ = !digitalRead(RemoteStatePinButtonTopPCBLeft);
-  button_top_pcb_right_ = !digitalRead(RemoteStatePinButtonTopPCBRight);
+  button_joystick_ = !digitalRead(RemoteStatePinButtonJoystick);
 
-  button_joystick_ = !digitalRead(RemoteStatePinJoystickButton);
-
-  joystick_horizontal_ = 1024 - analogRead(RemoteStatePinJoystickHorizontal);
-  if(CalibBiasJoystickHorizontal < 0) {
-    if(joystick_horizontal_ > -CalibBiasJoystickHorizontal) joystick_horizontal_ += CalibBiasJoystickHorizontal;
-  } else {
-    if(1024 - joystick_horizontal_ > CalibBiasJoystickHorizontal) joystick_horizontal_ += CalibBiasJoystickHorizontal;
-  }
+  joystick_horizontal_ = (float)(512 - analogRead(RemoteStatePinJoystickHorizontal) + CalibBiasJoystickHorizontal) / 512.0f;
+  if(abs(joystick_horizontal_) < JoystickEpsilon) joystick_horizontal_ = 0.0f;
+  else if(joystick_horizontal_ > 1.0f) joystick_horizontal_ = 1.0f;
+  else if(joystick_horizontal_ < -1.0f) joystick_horizontal_ = -1.0f;
   
-  joystick_vertical_ = analogRead(RemoteStatePinJoystickVertical);
-  if(CalibBiasJoystickVertical < 0) {
-    if(joystick_vertical_ > -CalibBiasJoystickVertical) joystick_vertical_ += CalibBiasJoystickVertical;
-  } else {
-    if(1024 - joystick_vertical_ > CalibBiasJoystickVertical) joystick_vertical_ += CalibBiasJoystickVertical;
-  }
-}
+  joystick_vertical_ = (float)(analogRead(RemoteStatePinJoystickVertical) - 512 + CalibBiasJoystickVertical) / 512.0f;
+  if(abs(joystick_vertical_) < JoystickEpsilon) joystick_vertical_ = 0.0f;
+  else if(joystick_vertical_ > 1.0f) joystick_vertical_ = 1.0f;
+  else if(joystick_vertical_ < -1.0f) joystick_vertical_ = -1.0f;
+ }
+
+bool RemoteState::isTopLeftButtonPressed() { return button_top_left_; }
+bool RemoteState::isTopRightButtonPressed() { return button_top_right_; }
+bool RemoteState::isRightPinkyButtonPressed() { return button_right_pinky_; }
+bool RemoteState::isRightIndexButtonPressed() { return button_right_index_; }
+bool RemoteState::isTopPCBLeftButtonPressed() { return button_top_pcb_left_; }
+bool RemoteState::isTopPCBRightButtonPressed() { return button_top_pcb_right_; }
+bool RemoteState::isJoystickButtonPressed() { return button_joystick_; }
+float RemoteState::getJoystickHorizontalAxis() { return joystick_horizontal_; }
+float RemoteState::getJoystickVerticalAxis() { return joystick_vertical_; }
 
 void RemoteState::printOnSerial() {
   Serial.print("TL:");
@@ -63,9 +92,9 @@ void RemoteState::printOnSerial() {
   Serial.print(isJoystickButtonPressed());
 
   Serial.print(" X:");
-  Serial.print(getJoystickHorizontalAxis());
+  Serial.print(getJoystickHorizontalAxis(), 5);
   Serial.print(" Y:");
-  Serial.println(getJoystickVerticalAxis());
+  Serial.println(getJoystickVerticalAxis(), 5);
 }
 
 void RemoteState::fillStatePacket(StatePacket& packet) {
@@ -82,3 +111,4 @@ void RemoteState::fillStatePacket(StatePacket& packet) {
   packet.joystick_horizontal_ = joystick_horizontal_;
   packet.joystick_vertical_ = joystick_vertical_;
 }
+

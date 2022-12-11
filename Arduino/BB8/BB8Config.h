@@ -4,9 +4,18 @@
 #include <Arduino.h>
 
 // Network config
-#define WIFI_SSID   "BB8Server"
-#define WIFI_WPA_KEY "BB8Server"
-#define REMOTE_UDP_PORT 2000
+static const bool  WIFI_AP_MODE  = true;
+static const String WIFI_SSID    = "BB8Server";
+static const String WIFI_WPA_KEY = "BB8ServerKey";
+
+static const uint16_t COMMAND_UDP_PORT = 2000; // BB8 listens on this port for commands (see BB8Packet.h for command structure)
+static const uint16_t STATE_UDP_PORT   = 2001; // BB8 sends running state on this port
+static const uint16_t REPLY_UDP_PORT   = 2002; // This port is used to reply to special commands
+
+// Wow much time we can spend in a cycle, max. 
+// Please note that querying servos etc. takes ~25ms, whole mainloop about ~28ms. Therefore
+// this should not be less than 30.
+static const uint8_t CYCLETIME = 40; 
 
 // Left side pins
 static const uint8_t P_YAW_EN          = 15; // A0
@@ -37,8 +46,7 @@ static const uint8_t P_DYNAMIXEL_TX    = 14;
 static const uint8_t DOME_IMU_ADDR     = 0x18;
 static const uint8_t BODY_IMU_ADDR     = 0x19;
 
-static const uint16_t DEADBAND_MIN     = 510;
-static const uint16_t DEADBAND_MAX     = 512;
+static const uint16_t DEADBAND         = 0.01f;
 
 static const uint8_t STATUSPIXEL_OVERALL = 0;
 static const uint8_t STATUSPIXEL_NETWORK = 1;
@@ -46,7 +54,33 @@ static const uint8_t STATUSPIXEL_MOTORS  = 2;
 
 const long unsigned int DYNAMIXEL_BPS = 57600;
 
-#define SERIALTX_MODE_SPEKTRUM
-//#define SERIALTX_MODE_XBEE
+static const float ROLL_CONTROL_KP = 0.2f;
+static const float ROLL_CONTROL_KI = 0.0f;
+static const float ROLL_CONTROL_KD = 0.0f;
+static const float ROLL_CONTROL_IMAX = 10.0f;
+static const float ROLL_CONTROL_DEADBAND = 0.01f;
+static const float ROLL_CONTROL_IABORT = 1000.0f;
+
+//#define SERIALTX_MODE_SPEKTRUM
+#define SERIALTX_MODE_XBEE
+
+typedef struct {
+  float min, max;
+} ServoLimits;
+
+static ServoLimits servolimits[] = {
+  {0.0f, 360.0f},
+  {90.0f, 270.0f},
+  {90.0f, 270.0f},
+  {150.0f, 210.0f}
+};
+
+typedef enum {
+  PLOT_NONE,
+  PLOT_ROLL_CONTROLLER,
+  PLOT_BODY_IMU
+} PlotMode;
+
+extern PlotMode plotMode;
 
 #endif // BB8CONFIG_H

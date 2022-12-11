@@ -3,17 +3,20 @@
 #include "RemoteDisplay.h"
 #include "WifiComm.h"
 #include "StatePacket.h"
+#include "IMUFilter.h"
+#include "BB8Packet.h"
 
 RemoteState *state;
 RemoteDisplay *disp;
 WifiComm *comm;
+IMUFilter imu;
 
-StatePacket packet;
+uint8_t seqnum = 0;
 
 unsigned long last_millis_;
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(2000000);
   Serial.println();
   Serial.println("BB8 Remote");
   Serial.println("Firmware Version 0.0");
@@ -21,12 +24,11 @@ void setup() {
   Serial.println("===================================");
 
   disp = new RemoteDisplay;
-  state = new RemoteState;
+  state = RemoteState::getSharedInstance();
   comm = new WifiComm;
+  imu.begin();
 
   last_millis_ = millis();
-
-  memset(&packet, 0, sizeof(StatePacket));
 
   Serial.println("Entering main loop.");
 }
@@ -60,19 +62,50 @@ void loop() {
     runEverySecond();
     last_millis_ = millis();
   }
+  
+  state->update();
+  state->printOnSerial();
+
+  if(imu.available()) {
+    float roll, pitch, yaw;
+    imu.update();
+    imu.getRawEulerAngles(roll, pitch, yaw);
+  }
 
   if(comm->isConnected()) {
-    state->update();
-    packet.sequence_num_++;
-    state->fillStatePacket(packet);
-    state->printOnSerial();
+    BB8CommandPacket packet;
+    packet.seqnum = seqnum++;
+    packet.cmd = CMD_SET_ALL_MOTORS_FLAGS_NR;
+    packet.arg.flagFloatListArg.flags = 0;
+      
+    packet.arg.flagFloatListArg.flags |= DRIVE_MOTOR_FLAG;
+    packet.arg.flagFloatListArg.flags |= TURN_MOTOR_FLAG;
+    packet.arg.flagFloatListArg.param[DRIVE_MOTOR_INDEX] = 0.0f;
+    packet.arg.flagFloatListArg.param[TURN_MOTOR_INDEX] = 0.0f;
+    
+    if(state->isTopRightButtonPressed() && !state->isTopLeftButtonPressed()) {
+      Serial.println("Drive config - Forward & Curve");
+      packet.arg.flagFloatListArg.param[DRIVE_MOTOR_INDEX] = state->getJoystickVerticalAxis();
+      packet.arg.flagFloatListArg.flags |= SERVO_4_FLAG;
+      packet.arg.flagFloatListArg.param[SERVO_4_INDEX] = 180.0f + state->getJoystickHorizontalAxis() * 30.0f;
+      Serial.print(packet.arg.flagFloatListArg.param[SERVO_4_INDEX]);
+    } else if(state->isTopLeftButtonPressed() && !state->isTopRightButtonPressed()) {
+      Serial.println("Spot turn");
+      packet.arg.flagFloatListArg.param[TURN_MOTOR_INDEX] = state->getJoystickHorizontalAxis();
+    } else if(state->isTopLeftButtonPressed() && state->isTopRightButtonPressed()) {
+      Serial.println("Servos");
+      packet.arg.flagFloatListArg.flags |= SERVO_3_FLAG;
+      packet.arg.flagFloatListArg.param[SERVO_3_INDEX] = 180.0f + state->getJoystickVerticalAxis() * 30.0f;
+      packet.arg.flagFloatListArg.flags |= SERVO_2_FLAG;
+      packet.arg.flagFloatListArg.param[SERVO_2_INDEX] = 180.0f + state->getJoystickHorizontalAxis() * 30.0f;
+    }
 
     comm->broadcastUDPPacket((uint8_t*)&packet, sizeof(packet));
   } else {
-    connectToUDPServer();
+      connectToUDPServer();
   }
 
   disp->update();
 
-  delay(20);
+  delay(25);
 }

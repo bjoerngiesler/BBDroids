@@ -9,7 +9,7 @@
 
 #include <Dynamixel2Arduino.h>
 
-#define SIMULATION_ONLY
+//#define SIMULATION_ONLY
 #define DXL_BAUDRATE 57600
 #define DXL_PROTOCOL_VERSION 2.0
 
