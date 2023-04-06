@@ -14,9 +14,32 @@ Electronically, the system is built on the basis of Arduinos. Currently, it is u
 
 All three components (two remotes and mainboard) offer command line consoles for deep introspection into system health, setting parameters, stopping and restarting subsystems, etc. The consoles can be accessed via serial port (directly accessible on the remotes) or alternatively via a TCP connection. For this purpose all three components can join infrastructure networks or (default) open their own individual access points, which are identifiable via MAC addresses so they will not clash even in crowded convention situations.
 
-## Concepts
+## Hardware
 
-Contents:
+### Remotes
+
+#### Left
+
+#### Right
+
+### Droid Control Board
+
+#### Motion
+
+#### Motion Control
+
+#### Light
+
+#### Sound
+
+## Software
+
+### Subsystem Concept
+
+### Runloop
+
+### Serial and TCP consoles
+
 
 ## Arduino
 Code for BB-8 and the Remote Control, all of these run on Arduino.
