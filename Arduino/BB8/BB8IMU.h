@@ -1,22 +1,25 @@
 #if !defined(BB8IMU_H)
 #define BB8IMU_H
 
+#include <LibBB.h>
+
 #include <math.h>
 #include <Adafruit_ISM330DHCX.h>
 #include <MadgwickAHRS.h>
 
 #include "BB8Config.h"
 
+using namespace bb;
+
 class BB8BodyIMU {
 public:
   static BB8BodyIMU imu;
 
   bool begin();
-  bool begin(int cycletime);
 
   bool available() { return available_; }
 
-  bool calibrateGyro(int milliseconds = 2000, int step = 10);
+  bool calibrateGyro(ConsoleStream *stream=NULL, int milliseconds = 2000, int step = 10);
 
   bool integrateGyroMeasurement(bool reset = false);
   int getIntegratedGyroMeasurement(float& r, float& p, float& h);

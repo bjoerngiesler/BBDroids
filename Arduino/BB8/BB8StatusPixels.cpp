@@ -17,9 +17,9 @@ bool BB8StatusPixels::begin() {
   statusPixel_ = new Adafruit_NeoPixel(3, P_STATUS_NEOPIXEL, NEO_GRB + NEO_KHZ800);
   statusPixel_->begin();
   statusPixel_->clear();
-  statusPixel_->setPixelColor(STATUSPIXEL_OVERALL, statusPixel_->Color(150, 150, 0));
-  statusPixel_->setPixelColor(STATUSPIXEL_NETWORK, statusPixel_->Color(150, 150, 0));
-  statusPixel_->setPixelColor(STATUSPIXEL_MOTORS, statusPixel_->Color(150, 150, 0));
+  statusPixel_->setPixelColor(STATUSPIXEL_OVERALL, statusPixel_->Color(0, 0, 0));
+  statusPixel_->setPixelColor(STATUSPIXEL_NETWORK, statusPixel_->Color(0, 0, 0));
+  statusPixel_->setPixelColor(STATUSPIXEL_MOTORS, statusPixel_->Color(0, 0, 0));
   statusPixel_->show();
   available_ = true;
   Serial.println("success.");
@@ -29,6 +29,7 @@ bool BB8StatusPixels::begin() {
 bool BB8StatusPixels::setPixel(uint16_t n, uint8_t r, uint8_t g, uint8_t b) {
   statusPixel_->setPixelColor(n, statusPixel_->Color(r, g, b));
   statusPixel_->show();
+  return true;
 }
 
 bool BB8StatusPixels::setPixel(uint16_t n, Status s) {
@@ -43,6 +44,7 @@ bool BB8StatusPixels::setPixel(uint16_t n, Status s) {
     return setPixel(n, 150, 0, 0);
     break;
   }
+  return false;
 }
 
 bool BB8StatusPixels::isAvailable() {

@@ -3,7 +3,6 @@
 #include "BB8Controllers.h"
 #include "BB8IMU.h"
 #include "BB8Servos.h"
-#include "BB8ConfigStorage.h"
 
 BB8BodyIMUControlInput::BB8BodyIMUControlInput(BB8BodyIMUControlInput::ProbeType pt) {
   pt_ = pt;
@@ -34,14 +33,15 @@ BB8ServoControlOutput::BB8ServoControlOutput(uint8_t sn, float offset) {
 }
 
 bool BB8ServoControlOutput::available() {
-  return BB8Servos::servos.available();
+  //return BB8Servos::servos.available();
+  return false;
 }
 
 bool BB8ServoControlOutput::setValue(float value) {
   if(!isEnabled()) return false;
 
   value += BB8Servos::servos.getPresentPosition(sn_);
-  return BB8Servos::servos.setGoalPosition(sn_, value);
+  return BB8Servos::servos.setPosition(sn_, value);
 }
 
 bool BB8ServoControlOutput::enable(bool onoff) {
@@ -73,46 +73,18 @@ BB8PIDController::BB8PIDController() {
   enabled_ = false;
 }
 
-bool BB8PIDController::begin(BB8ConfigStorage::Controller c) {
-  if(takeValuesFromStorage(c) == false) {
-    Serial.print("Unknown controller "); Serial.println(c);
-    return false;
-  }
+bool BB8PIDController::begin() {
+  // FIXME
   input_ = &rollControlInput;
   output_ = &rollControlOutput;
   setpoint_ = input_->getValue();
   enabled_ = false;
-  controller_storage_ = c;
   return true;
 }
 
 bool BB8PIDController::available() {
   if(NULL == output_) return false;
   return output_->available();
-}
-
-bool BB8PIDController::takeValuesFromStorage(BB8ConfigStorage::Controller c) {
-  switch(c) {
-  case BB8ConfigStorage::ROLL_CONTROLLER:
-    BB8ConfigStorage::storage.getControlParams(BB8ConfigStorage::ROLL_CONTROLLER, kp_, ki_, kd_, imax_, iabort_, deadband_);
-    if(kp_ < 0) kp_ = -kp_;
-    if(ki_ < 0) ki_ = -ki_;
-    if(kd_ < 0) kd_ = -kd_;
-    if(imax_ < 0) imax_ = -imax_;
-    if(iabort_ < 0) iabort_ = -iabort_;
-    if(deadband_ < 0) deadband_ = -deadband_;
-    Serial.print("Kp: "); Serial.print(kp_);
-    Serial.print(" Ki: "); Serial.print(ki_);
-    Serial.print(" Kd: "); Serial.print(kd_);
-    Serial.print(" Imax: "); Serial.print(imax_);
-    Serial.print(" Iabort: "); Serial.print(iabort_);
-    Serial.print(" Deadband: "); Serial.println(deadband_);
-    return true;
-    break;
-  default:
-    break;
-  }
-  return false;
 }
 
 void BB8PIDController::setSetpoint(float sp) {
@@ -158,15 +130,13 @@ bool BB8PIDController::step(bool outputForPlot) {
   output_->setValue(cp);
 
   last_e_ = e;
+  return true;
 }
 
 bool BB8PIDController::enable(bool onoff) {
   if(NULL == output_) { Serial.println("No output!"); return false; }
   if(onoff) {
-    if(takeValuesFromStorage(controller_storage_) == false) {
-      Serial.print("Unknown controller "); Serial.println(controller_storage_);
-      return false;
-    }
+    // FIXME
 
     i_ = 0.0f;
     if(!output_->enable(true)) return false;

@@ -12,11 +12,6 @@ static const uint16_t COMMAND_UDP_PORT = 2000; // BB8 listens on this port for c
 static const uint16_t STATE_UDP_PORT   = 2001; // BB8 sends running state on this port
 static const uint16_t REPLY_UDP_PORT   = 2002; // This port is used to reply to special commands
 
-// Wow much time we can spend in a cycle, max. 
-// Please note that querying servos etc. takes ~25ms, whole mainloop about ~28ms. Therefore
-// this should not be less than 30.
-static const uint8_t CYCLETIME = 40; 
-
 // Left side pins
 static const uint8_t P_YAW_EN          = 15; // A0
 static const uint8_t P_YAW_A           = 16; // A1
@@ -43,8 +38,8 @@ static const uint8_t P_I2C_SCL         = 12;  // OK
 static const uint8_t P_DYNAMIXEL_RX    = 13;
 static const uint8_t P_DYNAMIXEL_TX    = 14;
 
-static const uint8_t DOME_IMU_ADDR     = 0x18;
-static const uint8_t BODY_IMU_ADDR     = 0x19;
+//static const uint8_t DOME_IMU_ADDR     = 0x18;
+//static const uint8_t BODY_IMU_ADDR     = 0x19;
 
 static const uint16_t DEADBAND         = 0.01f;
 
@@ -61,19 +56,19 @@ static const float ROLL_CONTROL_IMAX = 10.0f;
 static const float ROLL_CONTROL_DEADBAND = 0.01f;
 static const float ROLL_CONTROL_IABORT = 1000.0f;
 
+static const int DOME_HEADING_SERVO = 1;
+static const int DOME_ROLL_SERVO    = 2;
+static const int DOME_PITCH_SERVO   = 3;
+static const int BODY_ROLL_SERVO    = 4;
+
 //#define SERIALTX_MODE_SPEKTRUM
 #define SERIALTX_MODE_XBEE
 
 typedef struct {
-  float min, max;
+  float min, max, offset, speed;
 } ServoLimits;
 
-static ServoLimits servolimits[] = {
-  {0.0f, 360.0f},
-  {90.0f, 270.0f},
-  {90.0f, 270.0f},
-  {150.0f, 210.0f}
-};
+extern ServoLimits servolimits[];
 
 typedef enum {
   PLOT_NONE,

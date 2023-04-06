@@ -102,6 +102,12 @@ void setup() {
 #else
     if(dxl.setID(fromId, toId)) {
       Serial.println("Successfully changed.");
+      dxl.torqueOn(toId);
+      dxl.setGoalPosition(toId, 0.0, UNIT_DEGREE);
+      delay(1000);
+      dxl.setGoalPosition(toId, 360.0, UNIT_DEGREE);
+      delay(1000);
+      dxl.setGoalPosition(toId, 180.0, UNIT_DEGREE);
     } else {
       Serial.println("ERROR!");
     }

@@ -1,14 +1,13 @@
+#include <LibBB.h>
+
+#include "BB8.h"
 #include "BB8Config.h"
 #include "BB8StatusPixels.h"
-#include "BB8WifiServer.h"
 #include "BB8Packet.h"
 #include "BB8DCMotor.h"
 #include "BB8Sound.h"
 #include "BB8IMU.h"
-#include "BB8SerialTX.h"
-#include "BB8ConfigStorage.h"
 #include "BB8Servos.h"
-#include "BB8SerialCommands.h"
 #include "BB8Controllers.h"
 #include <math.h>
 #include <limits.h>
@@ -20,9 +19,6 @@
 Uart *dynamixelSerial, *dfplayerSerial, *serialTXSerial;
 int16_t driveTicks;
 
-BB8SerialTX serialTX;
-BB8DCMotor driveMotor(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM, P_DRIVE_EN);
-BB8DCMotor yawMotor(P_YAW_A, P_YAW_B, P_YAW_PWM, P_YAW_EN);
 
 bool networkOK;
 PlotMode plotMode;
@@ -30,6 +26,8 @@ PlotMode plotMode;
 Encoder driveEncoder(P_DRIVEENC_A, P_DRIVEENC_B);
 
 unsigned long last_millis_;
+
+using namespace bb;
 
 void setup() {
   Serial.begin(2000000);
@@ -48,22 +46,30 @@ void setup() {
 
   setupBoardComm();
 
-  BB8ConfigStorage::storage.begin();
+  bb::Runloop::runloop.initialize();
+  bb::Console::console.initialize();
+
+  bb::XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, DEFAULT_STATION_DROID, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_BPS, serialTXSerial);
+  bb::WifiServer::server.initialize("BB8-$MAC", DEFAULT_WPAKEY, DEFAULT_APMODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
+  BB8Servos::servos.initialize();
+  BB8::bb8.initialize();
+
+  bb::XBee::xbee.setPacketMode(true);
+  bb::XBee::xbee.addPacketReceiver(&BB8::bb8);
+
+  bb::WifiServer::server.start();
+  bb::XBee::xbee.start();
+  bb::Console::console.start();
+  BB8::bb8.start();
+  BB8Servos::servos.start();
+
   BB8StatusPixels::statusPixels.begin();
   BB8Sound::sound.begin(dfplayerSerial);
-  BB8WifiServer::server.begin();
-  BB8BodyIMU::imu.begin(CYCLETIME);
-  BB8PIDController::rollController.begin(BB8ConfigStorage::ROLL_CONTROLLER);
-  state.servosOK = BB8Servos::servos.begin();
-
+  BB8PIDController::rollController.begin();
   
-  BB8SerialCommands::sercmd.begin();
-
-  //setupDynamixels();
-
   last_millis_ = millis();
 
-  Serial.println("Entering main loop. Enter 'help' for serial commands.");
+  bb::Runloop::runloop.start(); // never returns
 }
 
 bool setupBoardComm() {
@@ -77,7 +83,7 @@ bool setupBoardComm() {
   pinPeripheral(P_DFPLAYER_RX, PIO_SERCOM);
   pinPeripheral(P_DFPLAYER_TX, PIO_SERCOM);
 
-  return serialTX.begin(serialTXSerial);
+  return true;
 }
 
 void SERCOM1_Handler() {
@@ -150,113 +156,13 @@ void setMotorSpeedByJoystickAxis(BB8DCMotor &motor, float axis) {
   motor.setDirectionAndSpeed(dir, speed);
 }
 
-void controlBySerialTX() {
-  if(!driveMotor.isEnabled()) driveMotor.setEnabled(true);
-  if(!yawMotor.isEnabled()) yawMotor.setEnabled(true);
-
-  serialTX.printStatus();
-  for(int i=1; i<=3; i++) {
-    float deg = (float)map(serialTX.channelValue(i), -511, 512, 0, 360);
-    BB8Servos::servos.setGoalPosition(i+1, deg);
-  }
-}
-
-void sendUDPState() {
-  if(!BB8WifiServer::server.isUDPServerStarted()) return;
-
-  if(state.imusOK) {
-    //BB8IMU::dome.readVector(state.domeimuX, state.domeimuY, state.domeimuZ);
-    //BB8IMU::body.readVector(state.bodyimuX, state.bodyimuY, state.bodyimuZ);
-  }
-
-  if(state.servosOK) {
-    for(int i=1; i<=4; i++) {
-      state.servo[i-1] = BB8Servos::servos.getPresentPosition(i);      
-    }
-  }
-
-  if(!BB8WifiServer::server.sendStatePacket(state)) {
-    Serial.println("Sending state failed. Shutting down Wifi.");
-    BB8WifiServer::server.shutdown();
-  }
-  state.seqnum++;
-}
-
-void sendDroidName(const IPAddress& remoteIP) {
-  BB8WifiServer::server.sendCommandReply(remoteIP, (uint8_t*)"Hello", 5);
-}
-
-void handleUDPCommand() {
-  BB8CommandPacket cmd;
-
-  IPAddress remoteIP;
-  digitalWrite(LED_BUILTIN, HIGH);
-  if(!driveMotor.isEnabled()) driveMotor.setEnabled(true);
-  if(!yawMotor.isEnabled()) yawMotor.setEnabled(true);
- 
-  while(BB8WifiServer::server.readCommandPacketIfAvailable(cmd, remoteIP)) {    
-    Serial.print("Packet received! Seqnum: ");
-    Serial.print(cmd.seqnum);
-
-    Serial.print(" Command: ");
-    Serial.println(cmd.cmd);
-
-    switch(cmd.cmd) {
-      case CMD_SET_SERVO_NR:
-        if(state.servosOK) {
-          Serial.print("Setting servo ");
-          Serial.print(cmd.arg.indexedFloatArg.index);
-          Serial.print(" to ");
-          Serial.println(cmd.arg.indexedFloatArg.param);
-          BB8Servos::servos.setGoalPosition(cmd.arg.indexedFloatArg.index+1, cmd.arg.indexedFloatArg.param);
-        }    
-        break;
-
-      case CMD_SET_ALL_MOTORS_FLAGS_NR:
-        if(state.servosOK) {
-          Serial.print("Setting servos and motors... ");
-          for(int i=0; i<4; i++) {
-            if(cmd.arg.flagFloatListArg.flags & (1<<i)) {
-              Serial.print("S"); Serial.print(i+1); Serial.print(": "); Serial.print(cmd.arg.flagFloatListArg.param[i]); Serial.print(" ");                        
-              BB8Servos::servos.setGoalPosition(i+1, cmd.arg.indexedFloatArg.param);
-            }
-          }
-        }
-
-        if(state.motorsOK) {
-          if(cmd.arg.flagFloatListArg.flags & DRIVE_MOTOR_FLAG) {
-            Serial.print("D"); Serial.print(cmd.arg.flagFloatListArg.param[DRIVE_MOTOR_INDEX]); Serial.print(" ");
-            setMotorSpeedByJoystickAxis(driveMotor, cmd.arg.flagFloatListArg.param[DRIVE_MOTOR_INDEX]);
-          }
-          if(cmd.arg.flagFloatListArg.flags & TURN_MOTOR_FLAG) {
-            Serial.print("T"); Serial.print(cmd.arg.flagFloatListArg.param[TURN_MOTOR_INDEX]); Serial.print(" ");
-            setMotorSpeedByJoystickAxis(yawMotor, cmd.arg.flagFloatListArg.param[TURN_MOTOR_INDEX]);
-          }
-        }
-        break;
-
-      case CMD_GET_DROID_NAME:
-        sendDroidName(remoteIP);
-        break;
-    }
-  }
-}
-
 void loop() {
+#if 0
   unsigned long millis_start_loop = millis();
 
-  BB8BodyIMU::imu.step(plotMode == PLOT_BODY_IMU);
-  BB8PIDController::rollController.step(plotMode == PLOT_ROLL_CONTROLLER);
+  //BB8BodyIMU::imu.step(plotMode == PLOT_BODY_IMU);
+  //BB8PIDController::rollController.step(plotMode == PLOT_ROLL_CONTROLLER);
 
-  BB8SerialCommands::sercmd.handleIfAvailable();
-
-  // SerialTX overrides UDP
-  if(serialTX.read()) {
-    controlBySerialTX();
-  } else if(BB8WifiServer::server.isUDPServerStarted()) {
-    handleUDPCommand();
-  } 
-  
   if(millis_start_loop - last_millis_ > 1000) {
     //runEverySecond();
     last_millis_ = millis();
@@ -270,9 +176,11 @@ void loop() {
     looptime = millis_end_loop-millis_start_loop;
   else
     looptime = ULONG_MAX - millis_start_loop + millis_end_loop;
-  if(looptime < CYCLETIME)
+  if(looptime < CYCLETIME) {
+    //Serial.println(looptime);
     delay(CYCLETIME-looptime);
-  else {
+  } else {
     Serial.print(looptime); Serial.println("ms spent in loop - something is wrong!");
   }
+#endif
 }

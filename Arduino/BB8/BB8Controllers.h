@@ -2,7 +2,6 @@
 #define BB8CONTROLLERS_H
 
 #include <sys/types.h>
-#include "BB8ConfigStorage.h"
 #include "BB8Config.h"
 
 class BB8ControlInput {
@@ -49,7 +48,7 @@ class BB8PIDController {
 public:
   static BB8PIDController rollController;
 
-  bool begin(BB8ConfigStorage::Controller c);
+  bool begin();
   bool available();
   void setSetpoint(float sp);
   bool step(bool outputForPlot = false);
@@ -58,7 +57,6 @@ public:
 
 protected:
   BB8PIDController();
-  bool takeValuesFromStorage(BB8ConfigStorage::Controller c);
   BB8ControlInput* input_; 
   BB8ControlOutput* output_;
   float kp_, ki_, kd_;
@@ -67,7 +65,6 @@ protected:
   bool enabled_;
 
   float last_e_, i_;
-  BB8ConfigStorage::Controller controller_storage_;
 };
 
 #endif // BB8CONTROLLERS_H

@@ -1,7 +1,11 @@
 #include "BB8IMU.h"
 
+#include <LibBB.h>
+
 #include <vector>
 #include <limits.h>
+
+using namespace bb;
 
 BB8BodyIMU BB8BodyIMU::imu;
 //BB8IMU BB8IMU::dome;
@@ -13,10 +17,6 @@ BB8BodyIMU::BB8BodyIMU() {
 }
 
 bool BB8BodyIMU::begin() {
-  return begin(CYCLETIME);
-}
-
-bool BB8BodyIMU::begin(int cycletime) {
   if(available_) return true;
   Serial.print("Setting up Body IMU... ");
   if(!imu_.begin_I2C()) {
@@ -40,7 +40,7 @@ bool BB8BodyIMU::begin(int cycletime) {
     return false;
   }
 
-  madgwick_.begin(1000/cycletime);
+  madgwick_.begin(1000/Runloop::runloop.cycleTime());
 
   Serial.println("ok");
   available_ = true;
@@ -63,6 +63,8 @@ bool BB8BodyIMU::step(bool outputForPlot) {
   sensors_event_t g, a;
   gyro_->getEvent(&g);
   accel_->getEvent(&a);
+
+  integrateGyroMeasurement();
 
   madgwick_.updateIMU(g.gyro.roll - calR_, g.gyro.pitch - calP_, g.gyro.heading - calH_, 
                       a.acceleration.x, a.acceleration.y, a.acceleration.z);
@@ -96,7 +98,7 @@ bool BB8BodyIMU::integrateGyroMeasurement(bool reset) {
 
   sensors_event_t g;
   gyro_->getEvent(&g);
-  if(intRunning_ = false || reset == true) {
+  if(intRunning_ == false || reset == true) {
     intR_ = g.gyro.roll; 
     intP_ = g.gyro.pitch;
     intH_ = g.gyro.heading;
@@ -128,7 +130,7 @@ bool BB8BodyIMU::integrateGyroMeasurement(bool reset) {
 int BB8BodyIMU::getIntegratedGyroMeasurement(float& r, float& p, float& h) {
   if(!available_) return false;
 
-  r = intR_; p = intP_; h = intH_;
+  r = intR_*180.0/M_PI; p = intP_*180.0/M_PI; h = intH_*180.0/M_PI;
   return intNum_;
 }
 
@@ -165,7 +167,7 @@ bool BB8BodyIMU::getAccelMeasurement(float &x, float &y, float &z, int32_t &t) {
 }
 
 
-bool BB8BodyIMU::calibrateGyro(int milliseconds, int step) {
+bool BB8BodyIMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
   if(!available_) return false;
 
   double avgTemp = 0.0, avgR = 0.0, avgP = 0.0, avgH = 0.0;
@@ -190,15 +192,10 @@ bool BB8BodyIMU::calibrateGyro(int milliseconds, int step) {
   avgP /= count;
   avgH /= count;
 
-  Serial.print("Gyro calibration finished (");
-  Serial.print(count);
-  Serial.print(" cycles at average temperature of ");
-  Serial.print(avgTemp);
-  Serial.print("°C).");
-
-  Serial.print(" Calib values (rad/s): R="); Serial.print(avgR, 6);
-  Serial.print(" P="); Serial.print(avgP, 6);
-  Serial.print(" H="); Serial.println(avgH, 6);
+  if(stream) {
+    stream->print(String("Gyro calibration finished (") + count + "cycles at average temp " + avgTemp + "°C). ");
+    stream->println(String("Calib values (rad/s): R=") + String(avgR, 6) + " P=" + String(avgP, 6) + " H=" + String(avgH, 6));
+  }
 
   calR_ = -avgR; calP_ = -avgP; calH_ = -avgH;
 
@@ -217,4 +214,5 @@ bool BB8BodyIMU::printGyroMeasurementForPlot() {
   Serial.print(",P:"); Serial.print(p, 10);
   Serial.print(",H:"); Serial.print(h, 10);
   Serial.println();
+  return true;
 }

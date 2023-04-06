@@ -1,29 +1,51 @@
 #include <Arduino.h>
 
-// network config
-#define WifiSSID   "BB8Server"
-#define WifiWPAKey "BB8Server"
+#define LEFT_REMOTE 
 
-#define RemoteToBB8UDPPort 2000
-#define BB8ToRemoteUDPPort 2001 // currently not used
+#if defined(LEFT_REMOTE)
 
-// owned by RemoteState
-#define RemoteStatePinButtonTopLeft      A3
-#define RemoteStatePinButtonTopRight     A2
-#define RemoteStatePinButtonRightPinky   4
-#define RemoteStatePinButtonRightIndex   5
-#define RemoteStatePinJoystickHorizontal A6
-#define RemoteStatePinJoystickVertical   A5
-#define RemoteStatePinButtonJoystick     A4
-#define RemoteStatePinButtonTopPCBLeft   8
-#define RemoteStatePinButtonTopPCBRight  9
-#define RemoteStatePinRotaryEncoder      A1
-    
-#define PinLEDNeopixel   7
-#define PinDisplayRX    14
-#define PinDisplayTX    13
-#define PinDisplayReset 10
+#define P_A_ENC         A0
+#define P_A_BATT_CHECK  A5
+#define P_A_JOY_VER     A2
+#define P_A_JOY_HOR     A3 
 
-#define CalibBiasJoystickVertical 16
-#define CalibBiasJoystickHorizontal -15
-#define JoystickEpsilon 0.01f
+#define P_D_BTN_PINKY   D11
+#define P_D_BTN_INDEX   D9
+#define P_D_BTN_JOY     D5
+#define P_D_BTN_TOP_L   D7
+#define P_D_BTN_TOP_R   D10
+#define P_D_BTN_CONFIRM D8
+#define P_D_NEOPIXEL    D4
+#define P_D_BTN_L       D2
+#define P_D_BTN_R       D3
+
+#define P_NEOPIXEL      D4
+#define P_DISPLAY_RX    D15
+#define P_DISPLAY_TX    D6
+#define P_DISPLAY_RESET D10
+
+#else // defined(LEFT_REMOTE)
+
+#define P_A_POT1        A0
+#define P_A_POT2        A1
+#define P_A_BATT_CHECK  A5
+#define P_A_JOY_VER     A2
+#define P_A_JOY_HOR     A3
+
+#define P_D_BTN_PINKY   D10
+#define P_D_BTN_INDEX   D9
+#define P_D_BTN_JOY     D8
+#define P_D_BTN_TOP_L   D7
+#define P_D_BTN_TOP_R   D6
+#define P_D_BTN_CONFIRM D5
+#define P_D_NEOPIXEL    D4
+#define P_D_BTN_L       D3
+#define P_D_BTN_R       D2
+
+#define P_NEOPIXEL      D4
+
+#endif
+
+#define CalibBiasJoystickVertical   10
+#define CalibBiasJoystickHorizontal -14
+#define JoystickEpsilon             0.01f
