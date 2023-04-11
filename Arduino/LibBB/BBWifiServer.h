@@ -40,6 +40,7 @@ public:
 	
 	virtual Result initialize() { return initialize(DEFAULT_SSID, DEFAULT_WPAKEY, DEFAULT_APMODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT); }
 	virtual Result initialize(const char *ssid, const char *wpakey, bool apmode, uint16_t udpPort, uint16_t tcpPort);
+	virtual Result setOTANameAndPassword(const String& name, const String& password);
 	virtual Result start(ConsoleStream* stream = NULL);
 	virtual Result stop(ConsoleStream* stream = NULL);
 	virtual Result step();
@@ -74,7 +75,8 @@ protected:
 	WiFiServer *tcp_;
 	WiFiClient client_;
 	WiFiConsoleStream consoleStream_;
-	String macStr_;
+	String macStr_, ssid_, wpaKey_;
+	String otaName_, otaPassword_;
 
 	typedef struct {
 		char ssid[MAX_STRLEN+1], wpaKey[MAX_STRLEN+1];

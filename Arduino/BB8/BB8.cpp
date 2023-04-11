@@ -10,9 +10,9 @@ BB8 BB8::bb8;
 
 ServoLimits servolimits[] = {
   {0.0f, 360.0f, 0.0f, 60.0},
-  {90.0f, 270.0f, 0.0f, 60.0},
-  {90.0f, 270.0f, 0.0f, 60.0},
-  {150.0f, 210.0f, 5.0f, 20.0}
+  {120.0f, 240.0f, 0.0f, 60.0},
+  {120.0f, 240.0f, 0.0f, 60.0},
+  {160.0f, 200.0f, 0.0f, 80.0}
 };
 
 //FIXME
@@ -28,7 +28,8 @@ BB8::BB8() {
 "        running_status on|off  Continuously prints status\r\n"\
 "        play_sound <num>       Play sound with given number\r\n"\
 "        calibrate              Calibrate gyro\r\n"\
-"        motor <num>            Set motor speed";
+"        motor <num>            Set drive motor speed\r\n"\
+"        kiosk_mode on|off      Disable all body movement, activate random dome movement";
     started_ = false;
     operationStatus_ = RES_SUBSYS_NOT_STARTED;
 
@@ -88,7 +89,7 @@ Result BB8::initialize() {
     params_.body_roll_servo_max = servolimits[BODY_ROLL_SERVO-1].max;
     params_.body_roll_servo_offset = servolimits[BODY_ROLL_SERVO-1].offset;
     params_.body_roll_servo_speed = servolimits[BODY_ROLL_SERVO-1].speed;
-    params_.body_roll_servo_invert = false;
+    params_.body_roll_servo_invert = true;
     
     params_.dome_pitch_servo_min = servolimits[DOME_PITCH_SERVO-1].min;
     params_.dome_pitch_servo_max = servolimits[DOME_PITCH_SERVO-1].max;
@@ -115,6 +116,7 @@ Result BB8::initialize() {
 Result BB8::start(ConsoleStream *stream) {
   started_ = true;
   runningStatus_ = false;
+  kioskMode_ = false;
   operationStatus_ = RES_OK;
   bb::XBee::xbee.addPacketReceiver(this);
   packetsReceived_ = packetsMissed_ = 0;
@@ -132,8 +134,6 @@ Result BB8::start(ConsoleStream *stream) {
   }
 
   BB8BodyIMU::imu.begin();
-
-  BB8Servos::servos.setSpeed(BODY_ROLL_SERVO, 20.0);
 
   driveMotor.setEnabled(true);
   driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BRAKE, 0);
@@ -154,22 +154,32 @@ Result BB8::step() {
 
   BB8BodyIMU::imu.step(false);
 
-  //BB8PIDController::rollController.step();
-
-#if 0
-  float r, p, h;
-  BB8BodyIMU::imu.getFilteredRPH(r, p, h);
-  // FIXME: Move to "If no packets are incoming" eventually
-  BB8Servos::servos.setSetpoint(DOME_ROLL_SERVO, 180.0+2*r);
-  BB8Servos::servos.setSetpoint(DOME_PITCH_SERVO, 180.0+2*p);
-#endif
-
   if(runningStatus_) {
     printStatus();
     Console::console.printBroadcast("\r");
   }
 
   if(packetTimeout_ > 0) packetTimeout_--;
+
+  if(kioskMode_) {
+    if(kioskDelay_ < BBRUNLOOP_CYCLETIME) {
+      if(random(0, 2) != 0) {
+        BB8Servos::servos.setSpeed(DOME_HEADING_SERVO, (float)random(servolimits[DOME_HEADING_SERVO].speed/2, servolimits[DOME_HEADING_SERVO].speed));      
+        BB8Servos::servos.setSetpoint(DOME_HEADING_SERVO, (float)random(servolimits[DOME_HEADING_SERVO].min, servolimits[DOME_HEADING_SERVO].max));      
+      } else {
+        Serial.println("No motion");
+      }
+      if(random(0, 2) != 0) {
+        BB8Servos::servos.setSpeed(DOME_ROLL_SERVO, (float)random(servolimits[DOME_ROLL_SERVO].speed/2, servolimits[DOME_ROLL_SERVO].speed));      
+        BB8Servos::servos.setSetpoint(DOME_ROLL_SERVO, (float)random(servolimits[DOME_ROLL_SERVO].min, servolimits[DOME_ROLL_SERVO].max));      
+      }
+      if(random(0, 2) != 0) {
+        BB8Servos::servos.setSpeed(DOME_PITCH_SERVO, (float)random(servolimits[DOME_PITCH_SERVO].speed/2, servolimits[DOME_PITCH_SERVO].speed));      
+        BB8Servos::servos.setSetpoint(DOME_PITCH_SERVO, (float)random(servolimits[DOME_PITCH_SERVO].min, servolimits[DOME_PITCH_SERVO].max));
+      }
+      kioskDelay_ = random(2000, 5000);
+    } else kioskDelay_ -= BBRUNLOOP_CYCLETIME;
+  }
 
   return RES_OK;
 }
@@ -180,6 +190,8 @@ Result BB8::incomingPacket(const Packet& packet) {
     return RES_OK;
   }
 
+  if(kioskMode_) return RES_SUBSYS_WRONG_MODE;
+
   if(packet.type != PACKET_TYPE_COMMAND) return RES_SUBSYS_PROTOCOL_ERROR;
 
   packetsReceived_++;
@@ -189,6 +201,7 @@ Result BB8::incomingPacket(const Packet& packet) {
   float r, p, h;
   BB8BodyIMU::imu.getFilteredRPH(r, p, h);
   if(packet.payload.cmd.button2) {
+    //Console::console.printlnBroadcast("Updating servos");
     float axis2, axis3, axis4;
     if(params_.dome_roll_servo_invert)
       axis2 = 180.0 - ((packet.payload.cmd.getAxis(2)*30.0)*4/127.0 - 2*(BB8Servos::servos.getPresentPosition(BODY_ROLL_SERVO)-180.0) + 2*r);
@@ -220,8 +233,9 @@ Result BB8::incomingPacket(const Packet& packet) {
     BB8Servos::servos.setSetpoint(DOME_HEADING_SERVO, 180.0);
   }
 
-  if(packet.payload.cmd.button3) {
+  if(packet.payload.cmd.button1) {
     uint8_t axis1 = packet.payload.cmd.getAxis(1);
+    Serial.println(String("Drive: ") + axis1);
     if(axis1 < 0) driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BACKWARD, -axis1 * params_.drive_speed_factor);
     else driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_FORWARD, axis1 * params_.drive_speed_factor);
 
@@ -279,8 +293,25 @@ Result BB8::handleConsoleCommand(const std::vector<String>& words, ConsoleStream
     driveMotor.setEnabled(true);
     if(num == 0) 
       driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_IDLE, 0);
-    else
+    else if(num > 0)
       driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_FORWARD, num);
+    else if(num < 0)
+      driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BACKWARD, -num);
+  }
+
+  else if(words[0] == "kiosk_mode") {
+    if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    if(words[1] == "on") {
+      kioskMode_ = true;
+      kioskDelay_ = 5000;
+      return RES_OK;
+    } else if(words[1] == "off") {
+      kioskMode_ = false;
+      BB8Servos::servos.setSpeed(DOME_HEADING_SERVO, servolimits[DOME_HEADING_SERVO].speed);
+      BB8Servos::servos.setSpeed(DOME_PITCH_SERVO, servolimits[DOME_PITCH_SERVO].speed);
+      BB8Servos::servos.setSpeed(DOME_ROLL_SERVO, servolimits[DOME_ROLL_SERVO].speed);
+      return RES_OK;
+    } else return RES_CMD_INVALID_ARGUMENT;
   }
 
   return RES_CMD_UNKNOWN_COMMAND;

@@ -59,7 +59,7 @@ The BB8 Arduino sketch expects the following external hardware:
 - one motor driver for the spot-turn drive, connected to motor driver connector B (no encoder on this one)
 - one 6DOF IMU (Adafruit ISM330DHCX) connected to i2c and mounted in the body center rigid to the droid body.
 
-## Software
+## Softwarea
 
 ### Getting started
 

@@ -41,6 +41,8 @@ protected:
   int packetTimeout_;
   size_t packetsReceived_, packetsMissed_;
   bool runningStatus_;
+  bool kioskMode_;
+  unsigned int kioskDelay_;
 };
 
 #endif // BB8_H

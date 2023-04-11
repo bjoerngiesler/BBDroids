@@ -36,11 +36,11 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 			looptime = millis_end_loop-millis_start_loop;
 		else
 			looptime = ULONG_MAX - millis_start_loop + millis_end_loop;
-		//Console::console.printlnBroadcast(String("Elapsed: ") + looptime);
+		//Console::console.printlnBroadcast(String(looptime) + " elapsed in loop");
 		if(looptime < cycleTime_) {
 			delay(cycleTime_-looptime);
-		} else if(stream) {
-			stream->print((int)looptime); stream->println("ms spent in loop - something is wrong!");
+		} else {
+			Console::console.printlnBroadcast(String(looptime) + "ms spent in loop - something is wrong!");
 		}
 	}
 

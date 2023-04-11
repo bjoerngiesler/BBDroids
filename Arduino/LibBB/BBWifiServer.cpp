@@ -1,4 +1,8 @@
 #include <BBWifiServer.h>
+#if !defined(ARDUINO_PICO_VERSION_STR)
+#include <ArduinoOTA.h>
+#endif
+
 
 bb::WifiServer bb::WifiServer::server;
 
@@ -102,52 +106,81 @@ bb::Result bb::WifiServer::initialize(const char *ssid, const char *wpakey, bool
 		params_.tcpPort = tcpPort;
 	}
 
+	setOTANameAndPassword(DEFAULT_SSID, DEFAULT_WPAKEY);
+
 	operationStatus_ = RES_SUBSYS_NOT_STARTED;
 	return Subsystem::initialize();
 }
+
+bb::Result bb::WifiServer::setOTANameAndPassword(const String& name, const String& password) {
+#if !defined(ARDUINO_PICO_VERSION_STR)
+	if(WiFi.status() == WL_NO_MODULE) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+
+	byte mac[6];
+	WiFi.macAddress(mac);
+
+	char tmp[18]; 
+	memset(tmp, 0, sizeof(tmp));
+	sprintf(tmp, "%02x:%02x:%02x:%02x:%02x:%02x", mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
+
+	otaName_ = name;
+	otaName_.replace("$MAC", tmp);
+	otaPassword_ = password;
+	otaPassword_.replace("$MAC", tmp);
+
+	return RES_OK;
+#else
+	return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+#endif
+}
+
 
 bb::WifiServer::~WifiServer() {
 }
 
 bb::Result bb::WifiServer::start(ConsoleStream* stream) {
-	byte mac[6];
-	WiFi.macAddress(mac);
 	if(WiFi.status() == WL_NO_MODULE) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 
+	byte mac[6];
+	WiFi.macAddress(mac);
 
 	char tmp[18]; 
 	memset(tmp, 0, sizeof(tmp));
 	sprintf(tmp, "%02x:%02x:%02x:%02x:%02x:%02x", mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
 	macStr_ = tmp;
 
-	String ssid = params_.ssid;
-	String wpaKey = params_.wpaKey;
-	ssid.replace("$MAC", macStr_);
-	wpaKey.replace("$MAC", macStr_);
+	ssid_ = params_.ssid;
+	wpaKey_ = params_.wpaKey;
+	ssid_.replace("$MAC", macStr_);
+	wpaKey_.replace("$MAC", macStr_);
 
 	if(params_.ap == true) {
 		if(stream) {
-			stream->print("Trying to start Access Point for SSID \""); 
-			stream->print(ssid); 
+			stream->print(ssid_); 
 			stream->print("\"...");
 		}
 
-		uint8_t retval = WiFi.beginAP(ssid.c_str(), wpaKey.c_str());
+		uint8_t retval = WiFi.beginAP(ssid_.c_str(), wpaKey_.c_str(), random(1, 15));
 		if(retval != WL_AP_LISTENING) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 	} else {
 		if(stream) {
 			stream->print("Trying to connect to SSID \""); 
-			stream->print(ssid); 
+			stream->print(ssid_); 
 			stream->print("\"...");
 		}
-		uint8_t retval = WiFi.begin(ssid.c_str(), wpaKey.c_str());
+		uint8_t retval = WiFi.begin(ssid_.c_str(), wpaKey_.c_str());
 		if(retval != WL_CONNECTED) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+
+		if(stream) stream->print("trying to start TCP Server...");
+		if(startTCPServer()) {
+			if(stream) stream->print("success. ");
+		} else if(stream) stream->print("failure. ");
 	}
 
 	if(stream) stream->print("trying to start UDP Server...");
 	if(startUDPServer()) {
 		if(stream) stream->print("success. ");
-	} else if(stream) stream->print("failure. ");		
+	} else if(stream) stream->print("failure. ");
 
 	operationStatus_ = RES_OK;
 	started_ = true;
@@ -200,6 +233,10 @@ bb::Result bb::WifiServer::step() {
 			bb::Console::console.removeConsoleStream(&consoleStream_);
 		}
 	}
+
+#if !defined(ARDUINO_PICO_VERSION_STR)
+	ArduinoOTA.poll();
+#endif
 
 	return RES_OK;
 }
@@ -280,6 +317,10 @@ bool bb::WifiServer::startTCPServer() {
 		return false;
 	tcp_ = new WiFiServer(params_.tcpPort);
 	tcp_->begin();
+#if !defined(ARDUINO_PICO_VERSION_STR)
+	ArduinoOTA.begin(WiFi.localIP(), otaName_.c_str(), otaPassword_.c_str(), InternalStorage);
+#endif
+
 	return true;
 }
 

@@ -110,7 +110,7 @@ Result BB8Servos::start(ConsoleStream *stream) {
       servos_[i].id = i;
       servos_[i].available = true;
       servos_[i].setpoint = servos_[i].current = dxl_.getPresentPosition(i, UNIT_DEGREE);
-      servos_[i].speed = 60.0; // deg/s
+      servos_[i].speed = servolimits[i].speed; // deg/s
 
       servosFound++;
     } else {
@@ -135,7 +135,6 @@ Result BB8Servos::stop(ConsoleStream *stream) {
 
 Result BB8Servos::step() {
   if (!started_ || operationStatus_ != RES_OK) return RES_SUBSYS_NOT_STARTED;
-
   for (int i = 1; i <= 4; i++) {
     if (servos_[i].available) {
       if(servos_[i].current == servos_[i].setpoint) continue;
@@ -335,6 +334,7 @@ Result BB8Servos::moveAllServosToOrigin(bool hard) {
 
 bool BB8Servos::setSpeed(uint8_t servo, float speed) {
   if(servo <= 0 || servo > 4) return false;
+  if(speed > servolimits[servo].speed) speed = servolimits[servo].speed;
   servos_[servo].speed = speed;
 }
   

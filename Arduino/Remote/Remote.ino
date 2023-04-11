@@ -249,12 +249,12 @@ void setup() {
   Runloop::runloop.initialize();
 #if defined(LEFT_REMOTE)
   RemoteDisplay::display.initialize();
-  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_STATION_DROID, DEFAULT_BPS);
+  XBee::xbee.initialize(DEFAULT_CHAN, 0x3333, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_STATION_DROID, DEFAULT_BPS);
 #else 
-  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, DEFAULT_STATION_RIGHT_REMOTE, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_BPS);
+  XBee::xbee.initialize(DEFAULT_CHAN, 0x3333, DEFAULT_STATION_RIGHT_REMOTE, DEFAULT_STATION_DROID, DEFAULT_BPS);
 #endif
   XBee::xbee.setPacketMode(true);
-  WifiServer::server.initialize("BB8Remote-$MAC", DEFAULT_WPAKEY, DEFAULT_APMODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
+  WifiServer::server.initialize("Hogwarts", "1s(h1pu+Bj0rn", false, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
   remote.initialize();
 
 #if defined(LEFT_REMOTE)
