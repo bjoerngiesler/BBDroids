@@ -123,6 +123,11 @@ Result BB8::start(ConsoleStream *stream) {
   memset((uint8_t*)&lastPacket_, 0, sizeof(lastPacket_));
   packetTimeout_ = 0;
 
+  BB8BodyIMU::imu.begin();
+
+  driveMotor.setEnabled(true);
+  driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BRAKE, 0);
+
   if(!BB8Servos::servos.isStarted()) {
     if(BB8Servos::servos.start(stream) != RES_OK) {
       return RES_SUBSYS_HW_DEPENDENCY_MISSING;
@@ -132,11 +137,6 @@ Result BB8::start(ConsoleStream *stream) {
       return RES_SUBSYS_HW_DEPENDENCY_MISSING;
     }
   }
-
-  BB8BodyIMU::imu.begin();
-
-  driveMotor.setEnabled(true);
-  driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BRAKE, 0);
 
   return RES_OK;
 }
@@ -234,8 +234,7 @@ Result BB8::incomingPacket(const Packet& packet) {
   }
 
   if(packet.payload.cmd.button1) {
-    uint8_t axis1 = packet.payload.cmd.getAxis(1);
-    Serial.println(String("Drive: ") + axis1);
+    int8_t axis1 = packet.payload.cmd.getAxis(1);
     if(axis1 < 0) driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BACKWARD, -axis1 * params_.drive_speed_factor);
     else driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_FORWARD, axis1 * params_.drive_speed_factor);
 
@@ -297,6 +296,7 @@ Result BB8::handleConsoleCommand(const std::vector<String>& words, ConsoleStream
       driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_FORWARD, num);
     else if(num < 0)
       driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BACKWARD, -num);
+    return RES_OK;
   }
 
   else if(words[0] == "kiosk_mode") {
