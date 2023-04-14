@@ -1,4 +1,5 @@
 #include <BBWifiServer.h>
+#include <BBRunloop.h>
 #if !defined(ARDUINO_PICO_VERSION_STR)
 #include <ArduinoOTA.h>
 #endif
@@ -166,19 +167,19 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 		if(stream) {
 			stream->print("Trying to connect to SSID \""); 
 			stream->print(ssid_); 
-			stream->print("\"...");
+			stream->print("\"... ");
 		}
 		uint8_t retval = WiFi.begin(ssid_.c_str(), wpaKey_.c_str());
 		if(retval != WL_CONNECTED) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 
-		if(stream) stream->print("trying to start TCP Server...");
-		if(startTCPServer()) {
+		if(stream) stream->print("trying to start TCP Server... ");
+		if(startTCPServer(stream)) {
 			if(stream) stream->print("success. ");
 		} else if(stream) stream->print("failure. ");
 	}
 
-	if(stream) stream->print("trying to start UDP Server...");
-	if(startUDPServer()) {
+	if(stream) stream->print("trying to start UDP Server... ");
+	if(startUDPServer(stream)) {
 		if(stream) stream->print("success. ");
 	} else if(stream) stream->print("failure. ");
 
@@ -211,32 +212,47 @@ bb::Result bb::WifiServer::stop(ConsoleStream* stream) {
 }
 
 bb::Result bb::WifiServer::step() {
-	if(tcp_ != NULL && WiFi.status() != WL_AP_CONNECTED) {
+	unsigned long us = micros();
+	int status = WiFi.status();
+	static int seqnum = 0;
+
+	if(seqnum == 1000/BBRUNLOOP_CYCLETIME) {
+#if !defined(ARDUINO_PICO_VERSION_STR)
+		//Console::console.printlnBroadcast("Polling OTA");
+		ArduinoOTA.poll();
+#endif
+		seqnum = 0;
+		return RES_OK;
+	}
+
+	seqnum++;
+
+	if(tcp_ != NULL && status != WL_AP_CONNECTED && status != WL_CONNECTED) {
 		delete tcp_;
 		tcp_ = NULL;
 		return RES_OK;
 	} 
 
-	if(tcp_ == NULL && WiFi.status() == WL_AP_CONNECTED) {
+	if(tcp_ == NULL && (status == WL_AP_CONNECTED || status == WL_CONNECTED)) {
+		Console::console.printlnBroadcast("Starting TCP server");
 		startTCPServer();
 	}
 
 	if(tcp_ != NULL) {
 		if(client_ == false) {
 			client_ = tcp_->available();
+
 			if(client_ == true) {
+				Console::console.printlnBroadcast("New client connected");
 				consoleStream_.setClient(client_);
 				bb::Console::console.addConsoleStream(&consoleStream_);
 			}
 		} else if(client_.connected() == false || client_.status() == 0) {
+			Console::console.printlnBroadcast("Client disconnected");
 			client_.stop();
 			bb::Console::console.removeConsoleStream(&consoleStream_);
 		}
 	}
-
-#if !defined(ARDUINO_PICO_VERSION_STR)
-	ArduinoOTA.poll();
-#endif
 
 	return RES_OK;
 }
@@ -304,7 +320,7 @@ bool bb::WifiServer::isConnected() {
   return WiFi.status() == WL_CONNECTED;
 }
 
-bool bb::WifiServer::startUDPServer() {
+bool bb::WifiServer::startUDPServer(ConsoleStream *stream) {
 	if(udp_.begin(params_.udpPort)) {
 		udpStarted_ = true;
 		return true;
@@ -312,12 +328,13 @@ bool bb::WifiServer::startUDPServer() {
 	return false;
 }
 
-bool bb::WifiServer::startTCPServer() {
+bool bb::WifiServer::startTCPServer(ConsoleStream *stream) {
 	if(tcp_ != NULL) // already started
 		return false;
 	tcp_ = new WiFiServer(params_.tcpPort);
 	tcp_->begin();
 #if !defined(ARDUINO_PICO_VERSION_STR)
+	if(stream != NULL) stream->print("starting OTA... ");	
 	ArduinoOTA.begin(WiFi.localIP(), otaName_.c_str(), otaPassword_.c_str(), InternalStorage);
 #endif
 

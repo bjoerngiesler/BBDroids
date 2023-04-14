@@ -25,10 +25,13 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 
 		std::vector<Subsystem*> subsys = SubsystemManager::manager.subsystems();
 		for(unsigned int i=0; i<subsys.size(); i++) {
+			unsigned long us = micros();
 			if(subsys[i]->isStarted() && subsys[i]->operationStatus() == RES_OK) {
 				subsys[i]->step();
 			}
+//			Console::console.printBroadcast(subsys[i]->name() + ": " + (micros()-us) + " ");
 		}
+//		Console::console.printlnBroadcast("");
 
 		unsigned long millis_end_loop = millis();
 		unsigned long looptime;

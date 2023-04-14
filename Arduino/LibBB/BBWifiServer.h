@@ -58,8 +58,8 @@ public:
 	bool isAPStarted();
 	bool tryToConnect(const String& ssid, const String& key);
 	bool isConnected();
-	bool startUDPServer();
-	bool startTCPServer();
+	bool startUDPServer(ConsoleStream *stream = NULL);
+	bool startTCPServer(ConsoleStream *stream = NULL);
 
 	bool sendCommandReply(const IPAddress& remoteIP, const uint8_t* buf, uint8_t len);
 
