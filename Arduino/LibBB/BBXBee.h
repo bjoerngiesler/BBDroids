@@ -76,7 +76,7 @@ protected:
 	unsigned long atmode_millis_, atmode_timeout_;
 	bool atmode_, stayInAT_;
 	HardwareSerial* uart_;
-	int currentBPS_;
+	unsigned int currentBPS_;
 
 	typedef struct {
 		uint8_t chan;

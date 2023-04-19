@@ -418,7 +418,7 @@ bb::Result bb::XBee::changeBPSTo(uint32_t bps, ConsoleStream *stream, bool stayI
 
 	String retval = sendStringAndWaitForResponse("ATBD");
 
-	if(retval.toInt() == paramVal) {
+	if((unsigned)retval.toInt() == paramVal) {
 		if(stream) stream->println(String("XBee says it's already running at ") + bps + "bps");
 		return RES_OK;
 	}
