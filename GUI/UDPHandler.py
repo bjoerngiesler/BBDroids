@@ -1,24 +1,8 @@
 import socket
 import struct
 
-CMD_PORTNUM = 2000
-STATE_PORTNUM = 2001
-UNPACK_FORMAT = "B???hhhhhhffff"
-PACK_FORMAT_FLOATARG = "<BBf254x"
-PACK_FORMAT_INDEXEDFLOATARG = "<BBBf250x"
-PACK_FORMAT_FLOATLISTARG = "<BBffff239x"
-PACK_FORMAT_UINT8BUFARG = "<BB255x"
-
-CMD_SET_SERVO_NR             = 0
-CMD_SET_DRIVE_MOTOR_SPEED_NR = 1
-CMD_SET_TURN_MOTOR_SPEED_NR  = 2
-CMD_SET_ALL_SERVOS_NR        = 3
-CMD_GET_DROID_NAME = 32
-CMD_SET_DROID_NAME = 33
-CMD_GET_SOUND_LIST = 34
-
-REPLY_ERROR = 62
-REPLY_OK    = 63
+STATE_PORTNUM = 3000
+UNPACK_FORMAT = "<ffff"
 
 class UDPHandler:
 	def __init__(self):
@@ -59,6 +43,7 @@ class UDPHandler:
 			else:
 				shouldCallCallback = False
 			self.states[address] = struct.unpack(UNPACK_FORMAT, buf[0])
+			print(self.states[address])
 			if shouldCallCallback:
 				self.newDroidDiscoveredCB()
 			if self.address == None:
@@ -95,6 +80,13 @@ class UDPHandler:
 		for key, bytes in self.cmdqueue:
 			self.sock.sendto(bytes, (self.address, CMD_PORTNUM))
 		self.cmdqueue = []
+
+	def getFloatVal(self, index, address = None):
+		if address == None:
+			address = self.address
+		if address not in self.states:
+			return -1
+		return self.states[address][index]
 
 	def getSeqNum(self, address = None):
 		if address == None:

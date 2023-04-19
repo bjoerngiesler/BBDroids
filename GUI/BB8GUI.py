@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
-from UDPHandler import UDPHandler, CMD_SET_SERVO_NR, CMD_SET_ALL_SERVOS_NR, CMD_SET_DRIVE_MOTOR_SPEED_NR
+from UDPHandler import UDPHandler
 from RemoteHandler import RemoteHandler
 from Utilities import vectorToAngles
 import dearpygui.dearpygui as dpg
 import sys
 import time
+
+VAL_DRIVE_GOAL          = 0
+VAL_DRIVE_CURRENT_PWM   = 1
+VAL_DRIVE_CURRENT_SPEED = 2
+VAL_DRIVE_CURRENT_POS   = 3
 
 class BB8DearPyGui:
 	def __init__(self):
@@ -21,14 +26,14 @@ class BB8DearPyGui:
 		self.lastDroidMsgTime = None
 		self.processingTimeIntervals = []
 		self.droidMsgIntervals = []
-		self.domeIMUXData = []
-		self.domeIMUYData = []
-		self.domeIMUZData = []
-		self.bodyIMUXData = []
-		self.bodyIMUYData = []
-		self.bodyIMUZData = []
-		self.imuTimeData = []
+		self.imuXData = []
+		self.imuYData = []
+		self.imuZData = []
+		self.driveCtrlGoalData = []
+		self.driveCtrlCurrentData = []
+		self.timeData = []
 		self.steerByIMU = False
+		self.startTime = time.time()
 
 	def selectDroidCallback(self, appdata, userdata):
 		self.handler.selectAddress(userdata)
@@ -110,15 +115,15 @@ class BB8DearPyGui:
 
 			self.steerByIMUCheckbox = dpg.add_checkbox(label="Use remote IMU", default_value=False, callback=self.steerByIMUCallback)
 
-			with dpg.plot(label="Dome IMU", width=480, height=200):
+			with dpg.plot(label="Drive Control", width=480, height=200):
 				dpg.add_plot_legend()
-				self.domeIMUPlotXAxis = dpg.add_plot_axis(dpg.mvXAxis, label="seqnum")
-				self.domeIMUPlotYAxis = dpg.add_plot_axis(dpg.mvYAxis, label="reading")
-				self.domeIMUXSeries = dpg.add_line_series([], [], label="x", parent=self.domeIMUPlotYAxis)
-				self.domeIMUYSeries = dpg.add_line_series([], [], label="y", parent=self.domeIMUPlotYAxis)
-				self.domeIMUZSeries = dpg.add_line_series([], [], label="z", parent=self.domeIMUPlotYAxis)
+				self.driveCtrlPlotXAxis = dpg.add_plot_axis(dpg.mvXAxis, label="t")
+				dpg.set_axis_limits(self.driveCtrlPlotXAxis, self.startTime, self.startTime+10.24)
+				self.driveCtrlPlotYAxis = dpg.add_plot_axis(dpg.mvYAxis, label="value")
+				self.driveCtrlGoalSeries = dpg.add_line_series([], [], label="goal", parent=self.driveCtrlPlotYAxis)
+				self.driveCtrlCurrentSeries = dpg.add_line_series([], [], label="current", parent=self.driveCtrlPlotYAxis)
 
-			with dpg.plot(label="Body IMU", width=480, height=200):
+			with dpg.plot(label="IMU", width=480, height=200):
 				dpg.add_plot_legend()
 				self.bodyIMUPlotXAxis = dpg.add_plot_axis(dpg.mvXAxis, label="seqnum")
 				self.bodyIMUPlotYAxis = dpg.add_plot_axis(dpg.mvYAxis, label="reading")
@@ -126,8 +131,13 @@ class BB8DearPyGui:
 				self.bodyIMUYSeries = dpg.add_line_series([], [], label="y", parent=self.bodyIMUPlotYAxis)
 				self.bodyIMUZSeries = dpg.add_line_series([], [], label="z", parent=self.bodyIMUPlotYAxis)
 
+
 	def collectData(self):
 		if self.handler.readIfAvailable():
+			self.timeData.append(time.time()-self.startTime)
+			while len(self.timeData) > 256:
+				del self.timeData[0]
+
 			dpg.configure_item(self.seqnumText, default_value="Sequence: %d" % self.handler.getSeqNum())
 			if self.lastSeqnum is not None and self.handler.getSeqNum() != (self.lastSeqnum+1)%256:
 				fd = (self.handler.getSeqNum() - (self.lastSeqnum+1)%256)
@@ -145,85 +155,25 @@ class BB8DearPyGui:
 				self.droidMsgIntervals.append(time.time() - self.lastDroidMsgTime)
 				self.droidMsgHz = 1.0 / (sum(self.droidMsgIntervals) / len(self.droidMsgIntervals))
 
-			self.lastSeqnum = self.handler.getSeqNum()
 			self.lastDroidMsgTime = time.time()
 
+			self.driveCtrlGoalData.append(self.handler.getFloatVal(VAL_DRIVE_GOAL))
+			self.driveCtrlCurrentData.append(self.handler.getFloatVal(VAL_DRIVE_CURRENT_PWM))
+			while len(self.driveCtrlGoalData) > 256:
+				del self.driveCtrlGoalData[0]
+			while len(self.driveCtrlCurrentData) > 256:
+				del self.driveCtrlCurrentData[0]
+
+			dpg.set_value(self.driveCtrlGoalSeries, [self.timeData, self.driveCtrlGoalData])
+			dpg.set_value(self.driveCtrlCurrentSeries, [self.timeData, self.driveCtrlCurrentData])
+			dpg.set_axis_limits(self.driveCtrlPlotXAxis, self.timeData[0], self.timeData[0]+10.24)
+
 			
-			if self.handler.getIMUsOK():
-				dpg.configure_item(self.imusText, color=(0, 255, 0, 255))
-				x, y, z = self.handler.getDomeIMUData()
-				self.domeIMUXData.append(x)
-				self.domeIMUYData.append(y)
-				self.domeIMUZData.append(z)
-				while len(self.domeIMUXData) > 256:
-					del self.domeIMUXData[0]
-				while len(self.domeIMUYData) > 256:
-					del self.domeIMUYData[0]
-				while len(self.domeIMUZData) > 256:
-					del self.domeIMUZData[0]
-				x, y, z = self.handler.getBodyIMUData()
-				self.bodyIMUXData.append(x)
-				self.bodyIMUYData.append(y)
-				self.bodyIMUZData.append(z)
-				while len(self.bodyIMUXData) > 256:
-					del self.bodyIMUXData[0]
-				while len(self.bodyIMUYData) > 256:
-					del self.bodyIMUYData[0]
-				while len(self.bodyIMUZData) > 256:
-					del self.bodyIMUZData[0]
-
-				self.imuTimeData.append(self.handler.getSeqNum())
-				while len(self.imuTimeData) > 256:
-					del self.imuTimeData[0]
-
-				dpg.set_value(self.domeIMUXSeries, [self.imuTimeData, self.domeIMUXData])
-				dpg.set_value(self.domeIMUYSeries, [self.imuTimeData, self.domeIMUYData])
-				dpg.set_value(self.domeIMUZSeries, [self.imuTimeData, self.domeIMUZData])
-				dpg.fit_axis_data(self.domeIMUPlotXAxis)
-				dpg.set_value(self.bodyIMUXSeries, [self.imuTimeData, self.bodyIMUXData])
-				dpg.set_value(self.bodyIMUYSeries, [self.imuTimeData, self.bodyIMUYData])
-				dpg.set_value(self.bodyIMUZSeries, [self.imuTimeData, self.bodyIMUZData])
-				dpg.fit_axis_data(self.bodyIMUPlotYAxis)
-			else:
-				dpg.configure_item(self.imusText, color=(255, 0, 0, 255))
-
 			if self.handler.getMotorsOK():
 					dpg.configure_item(self.motorsText, color=(0, 255, 0, 255))
 			else:
 				dpg.configure_item(self.motorsText, color=(255, 0, 0, 255))
 			
-			if self.handler.getServosOK():
-				dpg.configure_item(self.servosText, color=(0, 255, 0, 255))
-				servodata = self.handler.getServoData()
-				for i in range(len(servodata)):
-					dpg.configure_item(self.servoSliders[i], default_value = servodata[i])
-			else:
-				dpg.configure_item(self.servosText, color=(255, 0, 0, 255))
-
-		if self.remote.isConnected() == True:
-			self.remote.readAndParseLine()
-			self.remote.flush()
-
-		rollData, pitchData, yawData = self.remote.getGyroData()
-		seqnumData = self.remote.getSeqnumData()
-		dpg.set_value(self.rollSeries, [seqnumData, rollData])
-		dpg.set_value(self.pitchSeries, [seqnumData, pitchData])
-		dpg.set_value(self.yawSeries, [seqnumData, yawData])
-		dpg.fit_axis_data(self.plotXAxis)
-
-		while len(self.processingTimeIntervals) > 20:
-			del self.processingTimeIntervals[0]
-		self.processingTimeIntervals.append(time.time() - self.lastProcessingTime)
-		self.guiHz = 1.0 / (sum(self.processingTimeIntervals) / len(self.processingTimeIntervals))
-
-		framedropPercent = 100.0
-		if self.goodFrames:
-			framedropPercent = 100.0*(self.droppedFrames / self.goodFrames)
-			
-		dpg.configure_item(self.hzText, default_value = "GUI: %.1fHz Droid messages: %.2fHz Framedrops: %d (%.0f%%)" % 
-			(self.guiHz, self.droidMsgHz, self.droppedFrames, framedropPercent))
-		self.lastProcessingTime = time.time()
-		self.lastDroidMsgTime = time.time()
 
 	def steerByIMUHandler(self):
 		if self.steerByIMU == False or self.remote.isConnected() == False:
