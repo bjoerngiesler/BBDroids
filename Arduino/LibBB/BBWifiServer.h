@@ -61,7 +61,8 @@ public:
 	bool startUDPServer(ConsoleStream *stream = NULL);
 	bool startTCPServer(ConsoleStream *stream = NULL);
 
-	bool sendCommandReply(const IPAddress& remoteIP, const uint8_t* buf, uint8_t len);
+	bool broadcastUDPPacket(const uint8_t* packet, size_t len);
+	bool sendUDPPacket(const IPAddress& addr, const uint8_t* packet, size_t len);
 
 protected:
 	WifiServer();

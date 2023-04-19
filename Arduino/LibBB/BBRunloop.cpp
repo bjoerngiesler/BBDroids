@@ -9,23 +9,24 @@ bb::Runloop::Runloop() {
 	name_ = "runloop";
 	description_ = "Main runloop";
 	help_ = "This gets started once after all subsystems are added. It runs through all of them, calling their step() function. Its start() never returns directly, but will return if its stop() is called.";
-	cycleTime_ = BBRUNLOOP_CYCLETIME;
+	cycleTime_ = DEFAULT_CYCLETIME;
 }
 
 bb::Result bb::Runloop::start(ConsoleStream* stream) {
+	(void)stream;
 	running_ = true;
 	started_ = true;
 	operationStatus_ = RES_OK;
 	seqnum_ = 0;
 
 	while(running_) {
-		unsigned long millis_start_loop = millis();
+		unsigned long micros_start_loop = micros();
 
 		seqnum_++;
 
 		std::vector<Subsystem*> subsys = SubsystemManager::manager.subsystems();
 		for(unsigned int i=0; i<subsys.size(); i++) {
-			unsigned long us = micros();
+			//unsigned long us = micros();
 			if(subsys[i]->isStarted() && subsys[i]->operationStatus() == RES_OK) {
 				subsys[i]->step();
 			}
@@ -33,17 +34,17 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		}
 //		Console::console.printlnBroadcast("");
 
-		unsigned long millis_end_loop = millis();
+		unsigned long micros_end_loop = micros();
 		unsigned long looptime;
-		if(millis_end_loop >= millis_start_loop)
-			looptime = millis_end_loop-millis_start_loop;
+		if(micros_end_loop >= micros_start_loop)
+			looptime = micros_end_loop - micros_start_loop;
 		else
-			looptime = ULONG_MAX - millis_start_loop + millis_end_loop;
+			looptime = ULONG_MAX - micros_start_loop + micros_end_loop;
 		//Console::console.printlnBroadcast(String(looptime) + " elapsed in loop");
 		if(looptime < cycleTime_) {
-			delay(cycleTime_-looptime);
+			delayMicroseconds(cycleTime_-looptime);
 		} else {
-			Console::console.printlnBroadcast(String(looptime) + "ms spent in loop - something is wrong!");
+			Console::console.printlnBroadcast(String(looptime) + "us spent in loop - something is wrong!");
 		}
 	}
 

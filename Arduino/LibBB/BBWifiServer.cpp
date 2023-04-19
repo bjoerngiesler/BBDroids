@@ -4,6 +4,9 @@
 #include <ArduinoOTA.h>
 #endif
 
+String IPAddressToString(const IPAddress& addr) {
+	return String(addr[0]) + "." + addr[1] + "." + addr[2] + "." + addr[3];
+}
 
 bb::WifiServer bb::WifiServer::server;
 
@@ -212,11 +215,10 @@ bb::Result bb::WifiServer::stop(ConsoleStream* stream) {
 }
 
 bb::Result bb::WifiServer::step() {
-	unsigned long us = micros();
 	int status = WiFi.status();
 	static int seqnum = 0;
 
-	if(seqnum == 1000/BBRUNLOOP_CYCLETIME) {
+	if(seqnum == 1e6/Runloop::runloop.cycleTime()) {
 #if !defined(ARDUINO_PICO_VERSION_STR)
 		//Console::console.printlnBroadcast("Polling OTA");
 		ArduinoOTA.poll();
@@ -321,6 +323,8 @@ bool bb::WifiServer::isConnected() {
 }
 
 bool bb::WifiServer::startUDPServer(ConsoleStream *stream) {
+	(void)stream;
+
 	if(udp_.begin(params_.udpPort)) {
 		udpStarted_ = true;
 		return true;
@@ -341,6 +345,34 @@ bool bb::WifiServer::startTCPServer(ConsoleStream *stream) {
 	return true;
 }
 
+bool bb::WifiServer::broadcastUDPPacket(const uint8_t* packet, size_t len) {
+	IPAddress ip = WiFi.localIP();
+	ip[3] = 0xff;
+
+	return sendUDPPacket(ip, packet, len);
+}
+
+bool bb::WifiServer::sendUDPPacket(const IPAddress& addr, const uint8_t* packet, size_t len) {
+	if(WiFi.status() != WL_CONNECTED && WiFi.status() != WL_AP_CONNECTED) return false;
+	if(!udpStarted_) return false;
+	if(udp_.beginPacket(addr, params_.udpPort) == false) {
+		Console::console.printlnBroadcast("WiFiUDP.beginPacket() failed!");
+		return false;
+	}
+
+	if(udp_.write(packet, len) != len) {
+		Console::console.printlnBroadcast("WiFiUDP.write() failed");
+		return false;
+	}
+
+	if(udp_.endPacket() == false) {
+		Console::console.printlnBroadcast("WiFiUDP.endPacket() failed");
+	}
+
+	return true;
+}
+
+
 unsigned int bb::WifiServer::readDataIfAvailable(uint8_t *buf, unsigned int maxsize, IPAddress& remoteIP) {
 	unsigned int len = udp_.parsePacket();
 	if(!len) return 0;
@@ -360,7 +392,7 @@ void bb::WifiServer::updateDescription() {
 		return;
 	}
 
-	description_ = String("Wifi communication module (MAC ") + macStr_ + ")	, status: ";
+	description_ = String("Wifi module ") + macStr_ + ", status: ";
 	
 	IPAddress ip;
 
@@ -376,8 +408,8 @@ void bb::WifiServer::updateDescription() {
     	break;
     case WL_CONNECTED:
     	description_ += "connected as client, local IP ";
-    	//ip = WiFi.localIP();
-    	//description_ += String(ip[0]) + "." + ip[1] + "." + ip[2] + "." + ip[3];
+    	ip = WiFi.localIP();
+    	description_ += String(ip[0]) + "." + ip[1] + "." + ip[2] + "." + ip[3];
     	break;
     case WL_CONNECT_FAILED:
     	description_ += "connection failed";
@@ -389,12 +421,10 @@ void bb::WifiServer::updateDescription() {
     	description_ += "disconnected";
     	break;
     case WL_AP_LISTENING:
-    	description_ += "AP listening, local IP ";
-    	//ip = WiFi.localIP();
-    	//description_ += String(ip[0]) + "." + ip[1] + "." + ip[2] + "." + ip[3];
+    	description_ += "AP listening";
     	break;
     case WL_AP_CONNECTED:
-    	description_ += "connected as AP, local IP ";
+    	description_ += "connected as AP, local IP " + IPAddressToString(WiFi.localIP());
     	//ip = WiFi.localIP();
     	//description_ += String(ip[0]) + "." + ip[1] + "." + ip[2] + "." + ip[3];
     	break;
@@ -408,16 +438,14 @@ void bb::WifiServer::updateDescription() {
 
 	if(client_ == true) {
 		description_ += ", client ";
-	#if 0
 		ip = client_.remoteIP();
-    	description_ += ip[0];
-    	description_ += ".";
-    	description_ += ip[1];
-    	description_ += ".";
-    	description_ += ip[2];
-    	description_ += ".";
-    	description_ += ip[3];
-    #endif
+  	description_ += ip[0];
+  	description_ += ".";
+  	description_ += ip[1];
+  	description_ += ".";
+  	description_ += ip[2];
+  	description_ += ".";
+  	description_ += ip[3];
 		description_ += " connected";
 	}
 }
