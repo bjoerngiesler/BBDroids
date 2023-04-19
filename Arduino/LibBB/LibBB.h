@@ -10,5 +10,6 @@
 #include "BBConsole.h"
 #include "BBRunloop.h"
 #include "BBConfigStorage.h"
+#include "BBDCMotor.h"
 
 #endif // LIBBB8_H
