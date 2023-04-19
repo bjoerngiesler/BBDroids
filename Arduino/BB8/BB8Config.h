@@ -2,6 +2,7 @@
 #define BB8CONFIG_H
 
 #include <Arduino.h>
+#include <math.h>
 
 // Network config
 static const bool  WIFI_AP_MODE  = true;
@@ -60,6 +61,10 @@ static const int DOME_HEADING_SERVO = 1;
 static const int DOME_ROLL_SERVO    = 2;
 static const int DOME_PITCH_SERVO   = 3;
 static const int BODY_ROLL_SERVO    = 4;
+
+static const float BODY_CIRCUMFERENCE            = 2*M_PI*253.0; // bb8 motor pwm 0
+static const float DRIVE_MOTOR_TICKS_PER_TURN    = 4776.384;
+static const float DRIVE_MOTOR_MAX_SPEED_M_PER_S = 2.0;
 
 //#define SERIALTX_MODE_SPEKTRUM
 #define SERIALTX_MODE_XBEE

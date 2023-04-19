@@ -9,6 +9,19 @@ class BB8: public Subsystem, public PacketReceiver {
 public:
   static BB8 bb8;
 
+  typedef enum {
+    VAL_DRIVE_GOAL          = 0,
+    VAL_DRIVE_CURRENT_PWM   = 1,
+    VAL_DRIVE_CURRENT_SPEED = 2,
+    VAL_DRIVE_CURRENT_POS   = 3
+  } ValueIndex;
+
+  static const unsigned int NUM_VALUES = 4;
+
+  typedef struct {
+    float val[NUM_VALUES];
+  } UDPStatusPacket;
+
   BB8();
   virtual Result initialize();
 	virtual Result start(ConsoleStream *stream = NULL);
@@ -16,6 +29,7 @@ public:
 	virtual Result step();
   virtual Result incomingPacket(const Packet& packet);
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
+  virtual Result fillAndSendStatusPacket();
 
 	virtual Result parameterValue(const String& name, String& value);
 	virtual Result setParameterValue(const String& name, const String& value);

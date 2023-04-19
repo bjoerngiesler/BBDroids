@@ -135,6 +135,8 @@ Result BB8Servos::stop(ConsoleStream *stream) {
 
 Result BB8Servos::step() {
   if (!started_ || operationStatus_ != RES_OK) return RES_SUBSYS_NOT_STARTED;
+  return RES_OK; // disable for now
+  
   for (int i = 1; i <= 4; i++) {
     if (servos_[i].available) {
       if(servos_[i].current == servos_[i].setpoint) continue;
@@ -336,6 +338,7 @@ bool BB8Servos::setSpeed(uint8_t servo, float speed) {
   if(servo <= 0 || servo > 4) return false;
   if(speed > servolimits[servo].speed) speed = servolimits[servo].speed;
   servos_[servo].speed = speed;
+  return true;
 }
   
 bool BB8Servos::setSetpoint(uint8_t servo, float setpoint) {

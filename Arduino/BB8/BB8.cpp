@@ -1,7 +1,6 @@
 #include "BB8.h"
 #include "BB8Config.h"
 #include "BB8Servos.h"
-#include "BB8DCMotor.h"
 #include "BB8StatusPixels.h"
 #include "BB8IMU.h"
 #include "BB8Sound.h"
@@ -15,21 +14,20 @@ ServoLimits servolimits[] = {
   {160.0f, 200.0f, 0.0f, 80.0}
 };
 
-//FIXME
-BB8DCMotor driveMotor(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM, P_DRIVE_EN);
-BB8DCMotor yawMotor(P_YAW_A, P_YAW_B, P_YAW_PWM, P_YAW_EN);
+bb::EncoderMotor driveMotor(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM, P_DRIVE_EN, P_DRIVEENC_A, P_DRIVEENC_B);
+bb::DCMotor yawMotor(P_YAW_A, P_YAW_B, P_YAW_PWM, P_YAW_EN);
 
 BB8::BB8() {
     name_ = "bb8";
     description_ = "BB8 Main System";
     help_ = "BB8 Main System\r\n"\
 "Available commands:\r\n"\
-"        status                 Prints current status (axes, motors, commands, packet loss statistics, etc.)\r\n"\
-"        running_status on|off  Continuously prints status\r\n"\
-"        play_sound <num>       Play sound with given number\r\n"\
-"        calibrate              Calibrate gyro\r\n"\
-"        motor <num>            Set drive motor speed\r\n"\
-"        kiosk_mode on|off      Disable all body movement, activate random dome movement";
+"        status                          Prints current status (axes, motors, commands, packet loss statistics, etc.)\r\n"\
+"        running_status on|off           Continuously prints status\r\n"\
+"        play_sound <num>                Play sound with given number\r\n"\
+"        calibrate                       Calibrate gyro\r\n"\
+"        motor pwm|speed|position <val>  Set drive motor setpoint\r\n"\
+"        kiosk_mode on|off               Disable all body movement, activate random dome movement";
     started_ = false;
     operationStatus_ = RES_SUBSYS_NOT_STARTED;
 
@@ -82,7 +80,7 @@ Result BB8::initialize() {
     servolimits[DOME_HEADING_SERVO-1].offset = params_.dome_heading_servo_offset;
     servolimits[DOME_HEADING_SERVO-1].speed = params_.dome_heading_servo_speed;
   } else {
-    params_.drive_speed_factor = 0.5;
+    params_.drive_speed_factor = 2.0;//0.5;
     params_.turn_speed_factor = 1.0;
     
     params_.body_roll_servo_min = servolimits[BODY_ROLL_SERVO-1].min;
@@ -125,8 +123,11 @@ Result BB8::start(ConsoleStream *stream) {
 
   BB8BodyIMU::imu.begin();
 
+  driveMotor.setDirectionAndSpeed(DCMotor::DCM_BRAKE, 0);
+  driveMotor.setMillimetersPerTick(BODY_CIRCUMFERENCE / DRIVE_MOTOR_TICKS_PER_TURN);
+  driveMotor.setMaxSpeed(DRIVE_MOTOR_MAX_SPEED_M_PER_S);
+  driveMotor.setReverse(true);
   driveMotor.setEnabled(true);
-  driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BRAKE, 0);
 
   if(!BB8Servos::servos.isStarted()) {
     if(BB8Servos::servos.start(stream) != RES_OK) {
@@ -142,6 +143,7 @@ Result BB8::start(ConsoleStream *stream) {
 }
 	
 Result BB8::stop(ConsoleStream *stream) {
+  (void)stream;
   started_ = false;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
   bb::XBee::xbee.removePacketReceiver(this);
@@ -154,6 +156,8 @@ Result BB8::step() {
 
   BB8BodyIMU::imu.step(false);
 
+  driveMotor.update();
+
   if(runningStatus_) {
     printStatus();
     Console::console.printBroadcast("\r");
@@ -162,7 +166,7 @@ Result BB8::step() {
   if(packetTimeout_ > 0) packetTimeout_--;
 
   if(kioskMode_) {
-    if(kioskDelay_ < BBRUNLOOP_CYCLETIME) {
+    if(kioskDelay_ < Runloop::runloop.cycleTime()) {
       if(random(0, 2) != 0) {
         BB8Servos::servos.setSpeed(DOME_HEADING_SERVO, (float)random(servolimits[DOME_HEADING_SERVO].speed/2, servolimits[DOME_HEADING_SERVO].speed));      
         BB8Servos::servos.setSetpoint(DOME_HEADING_SERVO, (float)random(servolimits[DOME_HEADING_SERVO].min, servolimits[DOME_HEADING_SERVO].max));      
@@ -177,9 +181,11 @@ Result BB8::step() {
         BB8Servos::servos.setSpeed(DOME_PITCH_SERVO, (float)random(servolimits[DOME_PITCH_SERVO].speed/2, servolimits[DOME_PITCH_SERVO].speed));      
         BB8Servos::servos.setSetpoint(DOME_PITCH_SERVO, (float)random(servolimits[DOME_PITCH_SERVO].min, servolimits[DOME_PITCH_SERVO].max));
       }
-      kioskDelay_ = random(2000, 5000);
-    } else kioskDelay_ -= BBRUNLOOP_CYCLETIME;
+      kioskDelay_ = random(2000000, 5000000);
+    } else kioskDelay_ -= Runloop::runloop.cycleTime();
   }
+
+  fillAndSendStatusPacket();
 
   return RES_OK;
 }
@@ -200,6 +206,9 @@ Result BB8::incomingPacket(const Packet& packet) {
 
   float r, p, h;
   BB8BodyIMU::imu.getFilteredRPH(r, p, h);
+
+  driveMotor.update();
+
   if(packet.payload.cmd.button2) {
     //Console::console.printlnBroadcast("Updating servos");
     float axis2, axis3, axis4;
@@ -235,8 +244,8 @@ Result BB8::incomingPacket(const Packet& packet) {
 
   if(packet.payload.cmd.button1) {
     int8_t axis1 = packet.payload.cmd.getAxis(1);
-    if(axis1 < 0) driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BACKWARD, -axis1 * params_.drive_speed_factor);
-    else driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_FORWARD, axis1 * params_.drive_speed_factor);
+    if(axis1 < 0) driveMotor.setDirectionAndSpeed(DCMotor::DCM_BACKWARD, -axis1 * params_.drive_speed_factor);
+    else driveMotor.setDirectionAndSpeed(DCMotor::DCM_FORWARD, axis1 * params_.drive_speed_factor);
 
     float axis0;
     if(params_.body_roll_servo_invert)
@@ -245,7 +254,7 @@ Result BB8::incomingPacket(const Packet& packet) {
       axis0 = 180.0 + (packet.payload.cmd.getAxis(0)*20.0)/127.0;
     BB8Servos::servos.setSetpoint(BODY_ROLL_SERVO, axis0);      
   } else {
-    driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_IDLE, 0);
+    driveMotor.setDirectionAndSpeed(DCMotor::DCM_IDLE, 0);
     BB8Servos::servos.setSetpoint(BODY_ROLL_SERVO, 180.0);      
   }
 
@@ -287,15 +296,18 @@ Result BB8::handleConsoleCommand(const std::vector<String>& words, ConsoleStream
   }
 
   else if(words[0] == "motor") {
-    if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
-    int num = words[1].toInt();
+    if(words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    
+    EncoderMotor::ControlMode mode;
+    if(words[1] == "pwm") mode = EncoderMotor::CONTROL_PWM;
+    else if(words[1] == "position") mode = EncoderMotor::CONTROL_POSITION;
+    else if(words[1] == "speed") mode = EncoderMotor::CONTROL_SPEED;
+    else return RES_CMD_INVALID_ARGUMENT;
+
+    float sp = words[2].toFloat();    
+
     driveMotor.setEnabled(true);
-    if(num == 0) 
-      driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_IDLE, 0);
-    else if(num > 0)
-      driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_FORWARD, num);
-    else if(num < 0)
-      driveMotor.setDirectionAndSpeed(BB8DCMotor::DCM_BACKWARD, -num);
+    driveMotor.setGoal(sp, mode);
     return RES_OK;
   }
 
@@ -315,6 +327,18 @@ Result BB8::handleConsoleCommand(const std::vector<String>& words, ConsoleStream
   }
 
   return RES_CMD_UNKNOWN_COMMAND;
+}
+
+Result BB8::fillAndSendStatusPacket() {
+  UDPStatusPacket packet;
+  packet.val[VAL_DRIVE_GOAL] = driveMotor.getGoal();
+  packet.val[VAL_DRIVE_CURRENT_PWM] = driveMotor.getCurrentPWM();
+  packet.val[VAL_DRIVE_CURRENT_SPEED] = driveMotor.getCurrentSpeed();
+  packet.val[VAL_DRIVE_CURRENT_POS] = driveMotor.getCurrentPosition();
+
+  WifiServer::server.broadcastUDPPacket((const uint8_t*)&packet, sizeof(packet));
+
+  return RES_OK;
 }
 
 Result BB8::parameterValue(const String& name, String& value) {
