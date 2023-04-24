@@ -5,10 +5,6 @@
 #include <math.h>
 
 // Network config
-static const bool  WIFI_AP_MODE  = true;
-static const String WIFI_SSID    = "BB8Server";
-static const String WIFI_WPA_KEY = "BB8ServerKey";
-
 static const uint16_t COMMAND_UDP_PORT = 2000; // BB8 listens on this port for commands (see BB8Packet.h for command structure)
 static const uint16_t STATE_UDP_PORT   = 2001; // BB8 sends running state on this port
 static const uint16_t REPLY_UDP_PORT   = 2002; // This port is used to reply to special commands
