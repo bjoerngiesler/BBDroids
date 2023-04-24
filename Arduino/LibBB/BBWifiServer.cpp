@@ -92,7 +92,7 @@ bb::WifiServer::WifiServer() {
 	parameters_.push_back({"remote_port", PARAMETER_UINT, "UDP port for remote control"});
 }
 
-bb::Result bb::WifiServer::initialize(const char *ssid, const char *wpakey, bool apmode, uint16_t udpPort, uint16_t tcpPort) {
+bb::Result bb::WifiServer::initialize(const String& ssid, const String& wpakey, bool apmode, uint16_t udpPort, uint16_t tcpPort) {
 	if(operationStatus_ != RES_SUBSYS_NOT_INITIALIZED) return RES_SUBSYS_ALREADY_INITIALIZED;
 
 	paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
@@ -103,8 +103,8 @@ bb::Result bb::WifiServer::initialize(const char *ssid, const char *wpakey, bool
 	} else {
 		Serial.println("Block invalid, initializing");
 		memset(&params_, 0, sizeof(params_));
-		strncpy(params_.ssid, ssid, MAX_STRLEN);
-		strncpy(params_.wpaKey, wpakey, MAX_STRLEN);
+		strncpy(params_.ssid, ssid.c_str(), MAX_STRLEN);
+		strncpy(params_.wpaKey, wpakey.c_str(), MAX_STRLEN);
 		params_.ap = apmode;
 		params_.udpPort = udpPort;
 		params_.tcpPort = tcpPort;

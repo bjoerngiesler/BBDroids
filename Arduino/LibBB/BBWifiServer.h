@@ -39,7 +39,7 @@ public:
 	static WifiServer server;
 	
 	virtual Result initialize() { return initialize(DEFAULT_SSID, DEFAULT_WPAKEY, DEFAULT_APMODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT); }
-	virtual Result initialize(const char *ssid, const char *wpakey, bool apmode, uint16_t udpPort, uint16_t tcpPort);
+	virtual Result initialize(const String& ssid, const String& wpakey, bool apmode, uint16_t udpPort, uint16_t tcpPort);
 	virtual Result setOTANameAndPassword(const String& name, const String& password);
 	virtual Result start(ConsoleStream* stream = NULL);
 	virtual Result stop(ConsoleStream* stream = NULL);
