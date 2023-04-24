@@ -57,29 +57,15 @@ void BB8BodyIMU::printStats(const String& prefix) {
   gyro_->printSensorDetails();
 }
 
-bool BB8BodyIMU::step(bool outputForPlot) {
+bool BB8BodyIMU::update() {
   if(!available_) return false;
 
-  sensors_event_t g, a;
-  gyro_->getEvent(&g);
-  accel_->getEvent(&a);
+  float x, y, z;
 
-  integrateGyroMeasurement();
+  if(imu_.gyroscopeAvailable()) imu_.readGyroscope(lastR_, lastP_, lastH_);
+  if(imu_.accelerationAvailable()) imu_.readAcceleration(x, y, z);
 
-  madgwick_.updateIMU(g.gyro.roll - calR_, g.gyro.pitch - calP_, g.gyro.heading - calH_, 
-                      a.acceleration.x, a.acceleration.y, a.acceleration.z);
-
-  if(outputForPlot) {
-    Serial.print("R:"); Serial.print(g.gyro.roll - calR_, 5);
-    Serial.print(", P:"); Serial.print(g.gyro.roll - calP_, 5);
-    Serial.print(", H:"); Serial.print(g.gyro.roll - calH_, 5);
-    Serial.print(", AX:"); Serial.print(a.acceleration.x, 5);
-    Serial.print(", AY:"); Serial.print(a.acceleration.y, 5);
-    Serial.print(", AZ:"); Serial.print(a.acceleration.z, 5);
-    Serial.print(", FR:"); Serial.print(madgwick_.getRoll(), 5);
-    Serial.print(", FP:"); Serial.print(madgwick_.getPitch(), 5);
-    Serial.print(", FH:"); Serial.println(madgwick_.getYaw(), 5);
-  }
+  madgwick_.updateIMU(lastR_ + calR_, lastP_ + calP_, lastH_ + calH_, x, y, z);
 
   return true;
 }
@@ -134,16 +120,10 @@ int BB8BodyIMU::getIntegratedGyroMeasurement(float& r, float& p, float& h) {
   return intNum_;
 }
 
-bool BB8BodyIMU::getGyroMeasurement(float& r, float& p, float& h, int32_t& t, bool calibrated) {
+bool BB8BodyIMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
   if(!available_) return false;
 
-  sensors_event_t g;
-  gyro_->getEvent(&g);
-  r = g.gyro.roll;
-  p = g.gyro.pitch;
-  h = g.gyro.heading;
-  t = g.timestamp;
-
+  r = lastR_; p = lastP_; h = lastH_;
   if(calibrated) {
     r += calR_;
     p += calP_;
@@ -173,16 +153,20 @@ bool BB8BodyIMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step
   double avgTemp = 0.0, avgR = 0.0, avgP = 0.0, avgH = 0.0;
   int count = 0;
 
-  sensors_event_t t, g;
+  sensors_event_t t;
 
   for(int ms = milliseconds; ms>0; ms -= step, count++) {
+    float r, p, h;
+    if(imu_.gyroscopeAvailable()) imu_.readGyroscope(r, p, h);
+
     temp_->getEvent(&t);
-    gyro_->getEvent(&g);
 
     avgTemp += t.temperature;
-    avgR += g.gyro.roll;
-    avgP += g.gyro.pitch;
-    avgH += g.gyro.heading;
+    avgR += r;
+    avgP += p;
+    avgH += h;
+
+    if(stream) stream->println(String("R=") + String(r, 6) + " P=" + String(p, 6) + " H=" + String(h, 6));
 
     delay(step);
   }
@@ -205,7 +189,7 @@ bool BB8BodyIMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step
 bool BB8BodyIMU::printGyroMeasurementForPlot() {
   float r, p, h;
   int32_t t;
-  getGyroMeasurement(r, p, h, t, false);
+  getGyroMeasurement(r, p, h, false);
   Serial.print("UR:"); Serial.print(r, 10);
   Serial.print(",UP:"); Serial.print(p, 10);
   Serial.print(",UH:"); Serial.print(h, 10);

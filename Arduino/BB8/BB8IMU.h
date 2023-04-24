@@ -24,10 +24,10 @@ public:
   bool integrateGyroMeasurement(bool reset = false);
   int getIntegratedGyroMeasurement(float& r, float& p, float& h);
 
-  bool getGyroMeasurement(float& r, float& p, float& h, int32_t& timestamp, bool calibrated=true);
+  bool getGyroMeasurement(float& r, float& p, float& h, bool calibrated=true);
   bool getAccelMeasurement(float& x, float& y, float& z, int32_t& timestamp);
 
-  virtual bool step(bool outputForPlot=false);
+  virtual bool update();
   bool getFilteredRPH(float& r, float& p, float& h);
 
   bool printGyroMeasurementForPlot();
@@ -41,6 +41,7 @@ private:
   Adafruit_ISM330DHCX imu_;
   Adafruit_Sensor *temp_, *accel_, *gyro_;
   float calR_, calP_, calH_;
+  float lastR_, lastP_, lastH_;
   float intR_, intP_, intH_;
   int intNum_;
   int32_t intLastTS_;
