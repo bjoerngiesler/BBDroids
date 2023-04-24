@@ -2,7 +2,7 @@ import socket
 import struct
 
 STATE_PORTNUM = 3000
-UNPACK_FORMAT = "<ffff"
+UNPACK_FORMAT = "<" + 15*"f"
 
 class UDPHandler:
 	def __init__(self):
@@ -42,8 +42,8 @@ class UDPHandler:
 				shouldCallCallback = True
 			else:
 				shouldCallCallback = False
-			self.states[address] = struct.unpack(UNPACK_FORMAT, buf[0])
-			print(self.states[address])
+			t = struct.unpack(UNPACK_FORMAT, buf[0])
+			self.states[address] = t
 			if shouldCallCallback:
 				self.newDroidDiscoveredCB()
 			if self.address == None:

@@ -7,10 +7,24 @@ import dearpygui.dearpygui as dpg
 import sys
 import time
 
-VAL_DRIVE_GOAL          = 0
-VAL_DRIVE_CURRENT_PWM   = 1
-VAL_DRIVE_CURRENT_SPEED = 2
-VAL_DRIVE_CURRENT_POS   = 3
+from DataPlot import DataPlot
+
+VAL_TIMESTAMP	    	=  0
+VAL_DRIVE_GOAL          =  1
+VAL_DRIVE_CURRENT_PWM   =  2
+VAL_DRIVE_CURRENT_SPEED =  3
+VAL_DRIVE_CURRENT_POS   =  4
+VAL_CTRL_ERR            =  5
+VAL_CTRL_ERR_I          =  6
+VAL_CTRL_ERR_D          =  7
+VAL_CTRL_CONTROL        =  8
+VAL_IMU_RAW_R           =  9
+VAL_IMU_RAW_P           = 10
+VAL_IMU_RAW_H           = 11
+VAL_IMU_FILTERED_R      = 12
+VAL_IMU_FILTERED_P      = 13
+VAL_IMU_FILTERED_H      = 14
+VAL_LAST                = 15
 
 class BB8DearPyGui:
 	def __init__(self):
@@ -26,14 +40,11 @@ class BB8DearPyGui:
 		self.lastDroidMsgTime = None
 		self.processingTimeIntervals = []
 		self.droidMsgIntervals = []
-		self.imuXData = []
-		self.imuYData = []
-		self.imuZData = []
-		self.driveCtrlGoalData = []
-		self.driveCtrlCurrentData = []
-		self.timeData = []
 		self.steerByIMU = False
 		self.startTime = time.time()
+
+		self.drivePlot = DataPlot(("goal", "current", "err", "errI", "errD", "control"), 1024)
+		self.imuPlot = DataPlot(("raw r", "raw p", "raw h", "filt r", "filt p", "filt h"), 1024)
 
 	def selectDroidCallback(self, appdata, userdata):
 		self.handler.selectAddress(userdata)
@@ -98,15 +109,12 @@ class BB8DearPyGui:
 	def createStatusWindow(self):
 		with dpg.window(label="Status", height=600, width=500, pos=[420, 0]):
 			self.hzText = dpg.add_text("GUI: -Hz Droid messages: -Hz Framedrops: - (-%)")
-			dpg.add_text("Status: ")
-			dpg.add_same_line()
-			self.imusText = dpg.add_text("IMUs")
-			dpg.add_same_line()
-			self.motorsText = dpg.add_text("Motors")
-			dpg.add_same_line()
-			self.servosText = dpg.add_text("Servos")
-			dpg.add_same_line()
-			self.seqnumText = dpg.add_text("Sequence Num: -")
+			with dpg.group(horizontal=True):
+				dpg.add_text("Status: ")
+				self.imusText = dpg.add_text("IMUs")
+				self.motorsText = dpg.add_text("Motors")
+				self.servosText = dpg.add_text("Servos")
+				self.seqnumText = dpg.add_text("Sequence Num: -")
 
 			self.servoSliders = []
 			for num in range(1, 5):
@@ -115,29 +123,15 @@ class BB8DearPyGui:
 
 			self.steerByIMUCheckbox = dpg.add_checkbox(label="Use remote IMU", default_value=False, callback=self.steerByIMUCallback)
 
-			with dpg.plot(label="Drive Control", width=480, height=200):
-				dpg.add_plot_legend()
-				self.driveCtrlPlotXAxis = dpg.add_plot_axis(dpg.mvXAxis, label="t")
-				dpg.set_axis_limits(self.driveCtrlPlotXAxis, self.startTime, self.startTime+10.24)
-				self.driveCtrlPlotYAxis = dpg.add_plot_axis(dpg.mvYAxis, label="value")
-				self.driveCtrlGoalSeries = dpg.add_line_series([], [], label="goal", parent=self.driveCtrlPlotYAxis)
-				self.driveCtrlCurrentSeries = dpg.add_line_series([], [], label="current", parent=self.driveCtrlPlotYAxis)
-
-			with dpg.plot(label="IMU", width=480, height=200):
-				dpg.add_plot_legend()
-				self.bodyIMUPlotXAxis = dpg.add_plot_axis(dpg.mvXAxis, label="seqnum")
-				self.bodyIMUPlotYAxis = dpg.add_plot_axis(dpg.mvYAxis, label="reading")
-				self.bodyIMUXSeries = dpg.add_line_series([], [], label="x", parent=self.bodyIMUPlotYAxis)
-				self.bodyIMUYSeries = dpg.add_line_series([], [], label="y", parent=self.bodyIMUPlotYAxis)
-				self.bodyIMUZSeries = dpg.add_line_series([], [], label="z", parent=self.bodyIMUPlotYAxis)
+			with dpg.tab_bar():	
+				with dpg.tab(label="Drive Control"):
+					self.drivePlot.createGUI(480, 380, "Drive Control")
+				with dpg.tab(label="IMU"):
+					self.imuPlot.createGUI(480, 380, "IMU")
 
 
 	def collectData(self):
-		if self.handler.readIfAvailable():
-			self.timeData.append(time.time()-self.startTime)
-			while len(self.timeData) > 256:
-				del self.timeData[0]
-
+		while self.handler.readIfAvailable():
 			dpg.configure_item(self.seqnumText, default_value="Sequence: %d" % self.handler.getSeqNum())
 			if self.lastSeqnum is not None and self.handler.getSeqNum() != (self.lastSeqnum+1)%256:
 				fd = (self.handler.getSeqNum() - (self.lastSeqnum+1)%256)
@@ -157,20 +151,13 @@ class BB8DearPyGui:
 
 			self.lastDroidMsgTime = time.time()
 
-			self.driveCtrlGoalData.append(self.handler.getFloatVal(VAL_DRIVE_GOAL))
-			self.driveCtrlCurrentData.append(self.handler.getFloatVal(VAL_DRIVE_CURRENT_PWM))
-			while len(self.driveCtrlGoalData) > 256:
-				del self.driveCtrlGoalData[0]
-			while len(self.driveCtrlCurrentData) > 256:
-				del self.driveCtrlCurrentData[0]
-
-			dpg.set_value(self.driveCtrlGoalSeries, [self.timeData, self.driveCtrlGoalData])
-			dpg.set_value(self.driveCtrlCurrentSeries, [self.timeData, self.driveCtrlCurrentData])
-			dpg.set_axis_limits(self.driveCtrlPlotXAxis, self.timeData[0], self.timeData[0]+10.24)
-
+			v = list(map(self.handler.getFloatVal, (VAL_DRIVE_GOAL, VAL_DRIVE_CURRENT_SPEED, VAL_CTRL_ERR, VAL_CTRL_ERR_I, VAL_CTRL_ERR_D, VAL_CTRL_CONTROL)))
+			self.drivePlot.addDataVector(self.handler.getFloatVal(VAL_TIMESTAMP), v)
+			v = list(map(self.handler.getFloatVal, (VAL_IMU_RAW_R, VAL_IMU_RAW_P, VAL_IMU_RAW_H, VAL_IMU_FILTERED_R, VAL_IMU_FILTERED_P, VAL_IMU_FILTERED_H)))
+			self.imuPlot.addDataVector(self.handler.getFloatVal(VAL_TIMESTAMP), v)
 			
 			if self.handler.getMotorsOK():
-					dpg.configure_item(self.motorsText, color=(0, 255, 0, 255))
+				dpg.configure_item(self.motorsText, color=(0, 255, 0, 255))
 			else:
 				dpg.configure_item(self.motorsText, color=(255, 0, 0, 255))
 			
