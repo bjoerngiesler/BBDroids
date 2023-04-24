@@ -18,6 +18,7 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 	started_ = true;
 	operationStatus_ = RES_OK;
 	seqnum_ = 0;
+	startTime_ = millis();
 
 	while(running_) {
 		unsigned long micros_start_loop = micros();
@@ -69,4 +70,8 @@ void bb::Runloop::setCycleTime(uint8_t t) {
 
 uint8_t bb::Runloop::cycleTime() {
 	return cycleTime_;
+}
+
+uint64_t bb::Runloop::millisSinceStart() {
+	return millis() - startTime_;
 }

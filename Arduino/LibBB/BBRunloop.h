@@ -20,11 +20,14 @@ public:
 	void setCycleTime(uint8_t microseconds); // not milli, micro.
 	uint8_t cycleTime();
 
+	uint64_t millisSinceStart();
+
 protected:
 	Runloop();
 	bool running_;
 	uint64_t seqnum_;
 	uint64_t cycleTime_;
+	uint64_t startTime_;
 };
 
 };
