@@ -59,7 +59,10 @@ public:
   ControlMode getControlMode();
 
   void setSpeedControlParameters(float kp, float ki, float kd);
+  void getSpeedControlParameters(float &kp, float &ki, float &kd) { kp = kpSpeed_; ki = kiSpeed_; kd = kdSpeed_; }
+  void getSpeedControlState(float& err, float& errI, float& errD, float& control) { err = errSpeedL_; errI = errSpeedI_; errD = errSpeedD_; control = controlSpeed_; }
   void setPosControlParameters(float kp, float ki, float kd);
+  void getPosControlParameters(float &kp, float &ki, float &kd) { kp = kpPos_; ki = kiPos_; kd = kdPos_; }
   float getCurrentPWM() { return currentPWM_; }
   float getCurrentSpeed(Unit unit = UNIT_MILLIMETERS);
   float getCurrentPosition(Unit unit = UNIT_MILLIMETERS);
@@ -89,6 +92,7 @@ protected:
 
   float kpSpeed_, kiSpeed_, kdSpeed_;
   float errSpeedI_, errSpeedL_;
+  float errSpeedD_, controlSpeed_;
   float kpPos_, kiPos_, kdPos_;
   float errPosI_, errPosL_;
 

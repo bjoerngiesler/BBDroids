@@ -3,7 +3,7 @@
 #include <limits.h>
 #include <math.h>
 
-static unsigned int MIN_PWM_TO_MOVE = 20;
+static unsigned int MIN_PWM_TO_MOVE = 0; // 20;
 
 bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en) {
   pin_a_ = pin_a;
@@ -83,8 +83,8 @@ bb::EncoderMotor::EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, ui
   currentPos_ = 0;
   accel_ = 1;
   
-  kpSpeed_ = 0.005;
-  kiSpeed_ = 0.0;
+  kpSpeed_ = 0.001;
+  kiSpeed_ = 0.0004;
   kdSpeed_ = 0.0;
   errSpeedI_ = 0.0;
 
@@ -163,21 +163,30 @@ void bb::EncoderMotor::pwmControlUpdate() {
 }
   
 void bb::EncoderMotor::speedControlUpdate() {
-  float err, errD, control;
+  float err;
 
   err = goal_ - currentSpeed_;
 
   errSpeedI_ = constrain(errSpeedI_ + err, -255.0, 255.0);
 
-  errD = errSpeedL_ - err; // differentiate
+  errSpeedD_ = errSpeedL_ - err; // differentiate
 
-  control = kpSpeed_ * err + kiSpeed_ * errSpeedI_ + kdSpeed_ * errD;
-  currentPWM_ += control;
+  controlSpeed_ = kpSpeed_ * err + kiSpeed_ * errSpeedI_ + kdSpeed_ * errSpeedD_;
+  currentPWM_ += controlSpeed_;
 
-  //bb::Console::console.printlnBroadcast(String("Current speed: ") + currentSpeed_ + " Goal: " + goal_ + " Err: " + err + " ErrI: " + errSpeedI_ + " ErrD: " + errD + " Control: " + control + " PWM: " + currentPWM_);
+#if 0
+  bb::Console::console.printlnBroadcast(String("Current speed: ") + currentSpeed_ + 
+    " Goal: " + goal_ + " Err: " + err + " ErrI: " + errSpeedI_ + 
+    " ErrD: " + errSpeedD_ + " Control: " + controlSpeed_ + " PWM: " + currentPWM_);
+#endif
 
-  if(currentPWM_ < 0) setDirectionAndSpeed(DCM_BACKWARD, (-currentPWM_ + MIN_PWM_TO_MOVE)); // FIXME MAGIC
-  else setDirectionAndSpeed(DCM_FORWARD, currentPWM_ + MIN_PWM_TO_MOVE);
+  if(currentPWM_ < 0) {
+    float speed = constrain(-currentPWM_ + MIN_PWM_TO_MOVE, 0, 255.0);
+    setDirectionAndSpeed(DCM_BACKWARD, speed);
+  } else {
+    float speed = constrain(currentPWM_ + MIN_PWM_TO_MOVE, 0, 255.0);
+    setDirectionAndSpeed(DCM_FORWARD, speed);
+  } 
 
   errSpeedL_ = err;
 }
@@ -190,12 +199,12 @@ void bb::EncoderMotor::setGoal(float goal, bb::EncoderMotor::ControlMode mode, b
   switch(mode) {
   case CONTROL_SPEED:
     if(unit == UNIT_TICKS) goal_ = goal;
-    else goal_ = goal * mmPT_;
+    else goal_ = goal / mmPT_;
     break;
 
   case CONTROL_POSITION:
     if(unit == UNIT_TICKS) goal_ = goal;
-    else goal_ = goal * mmPT_;
+    else goal_ = goal / mmPT_;
     break;
 
   case CONTROL_PWM:
@@ -228,11 +237,11 @@ void bb::EncoderMotor::setPosControlParameters(float kp, float ki, float kd) {
 
 float bb::EncoderMotor::getCurrentSpeed(bb::EncoderMotor::Unit unit) { 
   if(unit == UNIT_TICKS) return currentSpeed_; 
-  return currentSpeed_ / mmPT_;
+  return currentSpeed_ * mmPT_;
 }
   
 float bb::EncoderMotor::getCurrentPosition(bb::EncoderMotor::Unit unit) { 
   if(unit == UNIT_TICKS) return currentPos_; 
-  return currentPos_ / mmPT_;
+  return currentPos_ * mmPT_;
 }
 
