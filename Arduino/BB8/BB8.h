@@ -10,16 +10,26 @@ public:
   static BB8 bb8;
 
   typedef enum {
-    VAL_DRIVE_GOAL          = 0,
-    VAL_DRIVE_CURRENT_PWM   = 1,
-    VAL_DRIVE_CURRENT_SPEED = 2,
-    VAL_DRIVE_CURRENT_POS   = 3
+    VAL_TIMESTAMP           =  0,
+    VAL_DRIVE_GOAL          =  1,
+    VAL_DRIVE_CURRENT_PWM   =  2,
+    VAL_DRIVE_CURRENT_SPEED =  3,
+    VAL_DRIVE_CURRENT_POS   =  4,
+    VAL_CTRL_ERR            =  5,
+    VAL_CTRL_ERR_I          =  6,
+    VAL_CTRL_ERR_D          =  7,
+    VAL_CTRL_CONTROL        =  8,
+    VAL_IMU_RAW_R           =  9,
+    VAL_IMU_RAW_P           = 10,
+    VAL_IMU_RAW_H           = 11,
+    VAL_IMU_FILTERED_R      = 12,
+    VAL_IMU_FILTERED_P      = 13,
+    VAL_IMU_FILTERED_H      = 14,
+    VAL_LAST                = 15
   } ValueIndex;
 
-  static const unsigned int NUM_VALUES = 4;
-
   typedef struct {
-    float val[NUM_VALUES];
+    float val[VAL_LAST];
   } UDPStatusPacket;
 
   BB8();

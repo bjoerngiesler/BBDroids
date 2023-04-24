@@ -26,11 +26,14 @@ BB8::BB8() {
 "        running_status on|off           Continuously prints status\r\n"\
 "        play_sound <num>                Play sound with given number\r\n"\
 "        calibrate                       Calibrate gyro\r\n"\
-"        motor pwm|speed|position <val>  Set drive motor setpoint\r\n"\
+"        drive pwm|speed|position <val>  Set drive motor setpoint\r\n"\
 "        kiosk_mode on|off               Disable all body movement, activate random dome movement";
     started_ = false;
     operationStatus_ = RES_SUBSYS_NOT_STARTED;
 
+    parameters_.push_back({"drive_speed_kp", PARAMETER_FLOAT, "Proportional constant for the drive speed controller"});
+    parameters_.push_back({"drive_speed_ki", PARAMETER_FLOAT, "Integral constant for the drive speed controller"});
+    parameters_.push_back({"drive_speed_kd", PARAMETER_FLOAT, "Derivative constant for the drive speed controller"});
     parameters_.push_back({"drive_speed_factor", PARAMETER_FLOAT, "Multiplier for drive speed coming from the remote (0.0-2.0)"});
     parameters_.push_back({"turn_speed_factor", PARAMETER_FLOAT, "Multiplier for turn speed coming from the remote (0.0-2.0)"});
     parameters_.push_back({"body_roll_servo_min", PARAMETER_FLOAT, "Minimum angle for body roll servo (degrees, 180.0 is center)"});
@@ -154,8 +157,7 @@ Result BB8::step() {
   if(packetTimeout_ > 0) BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_NETWORK, 0, 255, 0);
   else BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_NETWORK, 255, 0, 0);
 
-  BB8BodyIMU::imu.step(false);
-
+  BB8BodyIMU::imu.update();
   driveMotor.update();
 
   if(runningStatus_) {
@@ -295,7 +297,7 @@ Result BB8::handleConsoleCommand(const std::vector<String>& words, ConsoleStream
     BB8BodyIMU::imu.calibrateGyro(stream);
   }
 
-  else if(words[0] == "motor") {
+  else if(words[0] == "drive") {
     if(words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
     
     EncoderMotor::ControlMode mode;
@@ -331,10 +333,23 @@ Result BB8::handleConsoleCommand(const std::vector<String>& words, ConsoleStream
 
 Result BB8::fillAndSendStatusPacket() {
   UDPStatusPacket packet;
+
+  packet.val[VAL_TIMESTAMP] = Runloop::runloop.millisSinceStart() / 1000.0;
+
   packet.val[VAL_DRIVE_GOAL] = driveMotor.getGoal();
   packet.val[VAL_DRIVE_CURRENT_PWM] = driveMotor.getCurrentPWM();
   packet.val[VAL_DRIVE_CURRENT_SPEED] = driveMotor.getCurrentSpeed();
   packet.val[VAL_DRIVE_CURRENT_POS] = driveMotor.getCurrentPosition();
+
+  float err, errI, errD, control;
+  driveMotor.getSpeedControlState(err, errI, errD, control);
+  packet.val[VAL_CTRL_ERR] = err;
+  packet.val[VAL_CTRL_ERR_I] = errI;
+  packet.val[VAL_CTRL_ERR_D] = errD;
+  packet.val[VAL_CTRL_CONTROL] = control;
+
+  BB8BodyIMU::imu.getGyroMeasurement(packet.val[VAL_IMU_RAW_R], packet.val[VAL_IMU_RAW_P], packet.val[VAL_IMU_RAW_H]);
+  BB8BodyIMU::imu.getFilteredRPH(packet.val[VAL_IMU_FILTERED_R], packet.val[VAL_IMU_FILTERED_P], packet.val[VAL_IMU_FILTERED_H]);
 
   WifiServer::server.broadcastUDPPacket((const uint8_t*)&packet, sizeof(packet));
 
@@ -342,6 +357,9 @@ Result BB8::fillAndSendStatusPacket() {
 }
 
 Result BB8::parameterValue(const String& name, String& value) {
+  if(name == "drive_speed_kp") { float kp, ki, kd; driveMotor.getSpeedControlParameters(kp, ki, kd); value = String(kp, 4); return RES_OK; }
+  if(name == "drive_speed_ki") { float kp, ki, kd; driveMotor.getSpeedControlParameters(kp, ki, kd); value = String(ki, 4); return RES_OK; }
+  if(name == "drive_speed_kd") { float kp, ki, kd; driveMotor.getSpeedControlParameters(kp, ki, kd); value = String(kd, 4); return RES_OK; }
   if(name == "drive_speed_factor") { value = String(params_.drive_speed_factor); return RES_OK; }
   if(name == "turn_speed_factor") { value = String(params_.turn_speed_factor); return RES_OK; }
   if(name == "body_roll_servo_min") { value = String(params_.body_roll_servo_min); return RES_OK; }
@@ -369,6 +387,10 @@ Result BB8::parameterValue(const String& name, String& value) {
 
 Result BB8::setParameterValue(const String& name, const String& value) { 
   Result res; 
+  if(name == "drive_speed_kp") { float kp, ki, kd; driveMotor.getSpeedControlParameters(kp, ki, kd); kp = value.toFloat(); driveMotor.setSpeedControlParameters(kp, ki, kd); return RES_OK; }
+  if(name == "drive_speed_ki") { float kp, ki, kd; driveMotor.getSpeedControlParameters(kp, ki, kd); ki = value.toFloat(); driveMotor.setSpeedControlParameters(kp, ki, kd); return RES_OK; }
+  if(name == "drive_speed_kd") { float kp, ki, kd; driveMotor.getSpeedControlParameters(kp, ki, kd); kd = value.toFloat(); driveMotor.setSpeedControlParameters(kp, ki, kd); return RES_OK; }
+
   if(name == "drive_speed_factor") { float fval = value.toFloat(); if(fval > 2.0) res = RES_PARAM_INVALID_VALUE; params_.drive_speed_factor = fval; res = RES_OK; }
   if(name == "turn_speed_factor") { float fval = value.toFloat(); if(fval > 2.0) res=  RES_PARAM_INVALID_VALUE; params_.turn_speed_factor = fval; res=  RES_OK; }
   if(name == "body_roll_servo_min") { float fval = value.toFloat(); if(fval < 0 || fval > 360.0) res =  RES_PARAM_INVALID_VALUE; params_.body_roll_servo_min = servolimits[BODY_ROLL_SERVO-1].min = fval; res =  RES_OK; }

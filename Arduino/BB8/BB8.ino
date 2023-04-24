@@ -1,10 +1,8 @@
 #include <LibBB.h>
-
 #include "BB8.h"
 #include "BB8Config.h"
+#include "BB8WifiSecrets.h"
 #include "BB8StatusPixels.h"
-#include "BB8Packet.h"
-#include "BB8DCMotor.h"
 #include "BB8Sound.h"
 #include "BB8IMU.h"
 #include "BB8Servos.h"
@@ -17,14 +15,6 @@
 #include <WiFiNINA.h>
 
 Uart *dynamixelSerial, *dfplayerSerial, *serialTXSerial;
-int16_t driveTicks;
-
-bool networkOK;
-PlotMode plotMode;
-
-Encoder driveEncoder(P_DRIVEENC_A, P_DRIVEENC_B);
-
-unsigned long last_millis_;
 
 using namespace bb;
 
@@ -62,17 +52,14 @@ void setup() {
   dfplayerSerial = NULL;
   serialTXSerial = NULL;
 
-  state.seqnum = 0;
-  driveTicks = 0;
-
   setupBoardComm();
 
   Runloop::runloop.initialize();
   Console::console.initialize();
 
-  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, DEFAULT_STATION_DROID, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_BPS, serialTXSerial);
-  WifiServer::server.initialize("BB8-$MAC", DEFAULT_WPAKEY, DEFAULT_APMODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
-  WifiServer::server.setOTANameAndPassword("BB8-$MAC", "");
+  XBee::xbee.initialize(DEFAULT_CHAN, 0x3333, DEFAULT_STATION_DROID, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_BPS, serialTXSerial);
+  WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
+  WifiServer::server.setOTANameAndPassword("BB8-$MAC", "password");
   BB8Servos::servos.initialize();
   BB8::bb8.initialize();
 
@@ -89,8 +76,6 @@ void setup() {
   BB8Sound::sound.begin(dfplayerSerial);
   BB8PIDController::rollController.begin();
   
-  last_millis_ = millis();
-
   Runloop::runloop.start(); // never returns
 }
 
