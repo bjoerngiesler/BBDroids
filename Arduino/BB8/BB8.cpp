@@ -27,7 +27,8 @@ BB8::BB8() {
 "        play_sound <num>                Play sound with given number\r\n"\
 "        calibrate                       Calibrate gyro\r\n"\
 "        drive pwm|speed|position <val>  Set drive motor setpoint\r\n"\
-"        kiosk_mode on|off               Disable all body movement, activate random dome movement";
+"        kiosk_mode on|off               Disable all body movement, activate random dome movement\r\n"\
+"        servo_dome_to_imu on|off        Whether to servo the dome to the IMU";
     started_ = false;
     operationStatus_ = RES_SUBSYS_NOT_STARTED;
 
@@ -118,6 +119,7 @@ Result BB8::start(ConsoleStream *stream) {
   started_ = true;
   runningStatus_ = false;
   kioskMode_ = false;
+  servoDomeToIMU_ = false;
   operationStatus_ = RES_OK;
   bb::XBee::xbee.addPacketReceiver(this);
   packetsReceived_ = packetsMissed_ = 0;
@@ -140,6 +142,8 @@ Result BB8::start(ConsoleStream *stream) {
     if(BB8Servos::servos.moveAllServosToOrigin() != RES_OK) {
       return RES_SUBSYS_HW_DEPENDENCY_MISSING;
     }
+    
+    BB8Servos::servos.switchTorqueAll(true);
   }
 
   return RES_OK;
@@ -159,6 +163,13 @@ Result BB8::step() {
 
   BB8BodyIMU::imu.update();
   driveMotor.update();
+  if(servoDomeToIMU_) {
+    float r, p, h;
+    BB8BodyIMU::imu.getFilteredRPH(r, p, h);
+
+    BB8Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0+2*r);
+    BB8Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0+2*p);
+  }
 
   if(runningStatus_) {
     printStatus();
@@ -170,18 +181,18 @@ Result BB8::step() {
   if(kioskMode_) {
     if(kioskDelay_ < Runloop::runloop.cycleTime()) {
       if(random(0, 2) != 0) {
-        BB8Servos::servos.setSpeed(DOME_HEADING_SERVO, (float)random(servolimits[DOME_HEADING_SERVO].speed/2, servolimits[DOME_HEADING_SERVO].speed));      
-        BB8Servos::servos.setSetpoint(DOME_HEADING_SERVO, (float)random(servolimits[DOME_HEADING_SERVO].min, servolimits[DOME_HEADING_SERVO].max));      
+        //BB8Servos::servos.setSpeed(DOME_HEADING_SERVO, (float)random(servolimits[DOME_HEADING_SERVO].speed/2, servolimits[DOME_HEADING_SERVO].speed));      
+        BB8Servos::servos.setGoal(DOME_HEADING_SERVO, (float)random(servolimits[DOME_HEADING_SERVO].min, servolimits[DOME_HEADING_SERVO].max));      
       } else {
         Serial.println("No motion");
       }
       if(random(0, 2) != 0) {
-        BB8Servos::servos.setSpeed(DOME_ROLL_SERVO, (float)random(servolimits[DOME_ROLL_SERVO].speed/2, servolimits[DOME_ROLL_SERVO].speed));      
-        BB8Servos::servos.setSetpoint(DOME_ROLL_SERVO, (float)random(servolimits[DOME_ROLL_SERVO].min, servolimits[DOME_ROLL_SERVO].max));      
+        //BB8Servos::servos.setSpeed(DOME_ROLL_SERVO, (float)random(servolimits[DOME_ROLL_SERVO].speed/2, servolimits[DOME_ROLL_SERVO].speed));      
+        BB8Servos::servos.setGoal(DOME_ROLL_SERVO, (float)random(servolimits[DOME_ROLL_SERVO].min, servolimits[DOME_ROLL_SERVO].max));      
       }
       if(random(0, 2) != 0) {
-        BB8Servos::servos.setSpeed(DOME_PITCH_SERVO, (float)random(servolimits[DOME_PITCH_SERVO].speed/2, servolimits[DOME_PITCH_SERVO].speed));      
-        BB8Servos::servos.setSetpoint(DOME_PITCH_SERVO, (float)random(servolimits[DOME_PITCH_SERVO].min, servolimits[DOME_PITCH_SERVO].max));
+        //BB8Servos::servos.setSpeed(DOME_PITCH_SERVO, (float)random(servolimits[DOME_PITCH_SERVO].speed/2, servolimits[DOME_PITCH_SERVO].speed));      
+        BB8Servos::servos.setGoal(DOME_PITCH_SERVO, (float)random(servolimits[DOME_PITCH_SERVO].min, servolimits[DOME_PITCH_SERVO].max));
       }
       kioskDelay_ = random(2000000, 5000000);
     } else kioskDelay_ -= Runloop::runloop.cycleTime();
@@ -215,9 +226,9 @@ Result BB8::incomingPacket(const Packet& packet) {
     //Console::console.printlnBroadcast("Updating servos");
     float axis2, axis3, axis4;
     if(params_.dome_roll_servo_invert)
-      axis2 = 180.0 - ((packet.payload.cmd.getAxis(2)*30.0)*4/127.0 - 2*(BB8Servos::servos.getPresentPosition(BODY_ROLL_SERVO)-180.0) + 2*r);
+      axis2 = 180.0 - ((packet.payload.cmd.getAxis(2)*30.0)*4/127.0 - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);
     else 
-      axis2 = 180.0 + ((packet.payload.cmd.getAxis(2)*30.0)*4/127.0 - 2*(BB8Servos::servos.getPresentPosition(BODY_ROLL_SERVO)-180.0) + 2*r);
+      axis2 = 180.0 + ((packet.payload.cmd.getAxis(2)*30.0)*4/127.0 - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);
     if(params_.dome_pitch_servo_invert)
       axis3 = 180.0 - ((packet.payload.cmd.getAxis(3)*30.0)*4/127.0 + 2*p);
     else 
@@ -227,21 +238,21 @@ Result BB8::incomingPacket(const Packet& packet) {
     else
       axis4 = 180.0 + ((packet.payload.cmd.getAxis(4)*30.0)*4/127.0);
       
-    BB8Servos::servos.setSetpoint(DOME_ROLL_SERVO, axis2);
-    BB8Servos::servos.setSetpoint(DOME_PITCH_SERVO, axis3);
-    BB8Servos::servos.setSetpoint(DOME_HEADING_SERVO, axis4);
+    BB8Servos::servos.setGoal(DOME_ROLL_SERVO, axis2);
+    BB8Servos::servos.setGoal(DOME_PITCH_SERVO, axis3);
+    BB8Servos::servos.setGoal(DOME_HEADING_SERVO, axis4);
   } else {
     //BB8Servos::servos.setSetpoint(DOME_ROLL_SERVO, 180.0+2*r);
     if(params_.dome_roll_servo_invert)
-      BB8Servos::servos.setSetpoint(DOME_ROLL_SERVO, 180.0 - (2*r - 2*(BB8Servos::servos.getPresentPosition(BODY_ROLL_SERVO)-180.0)));
+      BB8Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0 - (2*r - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0)));
     else
-      BB8Servos::servos.setSetpoint(DOME_ROLL_SERVO, 180.0 + (2*r - 2*(BB8Servos::servos.getPresentPosition(BODY_ROLL_SERVO)-180.0)));
+      BB8Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0 + (2*r - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0)));
 
     if(params_.dome_pitch_servo_invert)
-      BB8Servos::servos.setSetpoint(DOME_PITCH_SERVO, 180.0-2*p);
+      BB8Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0-2*p);
     else 
-      BB8Servos::servos.setSetpoint(DOME_PITCH_SERVO, 180.0+2*p);
-    BB8Servos::servos.setSetpoint(DOME_HEADING_SERVO, 180.0);
+      BB8Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0+2*p);
+    BB8Servos::servos.setGoal(DOME_HEADING_SERVO, 180.0);
   }
 
   if(packet.payload.cmd.button1) {
@@ -254,10 +265,10 @@ Result BB8::incomingPacket(const Packet& packet) {
       axis0 = 180.0 - (packet.payload.cmd.getAxis(0)*20.0)/127.0;
     else
       axis0 = 180.0 + (packet.payload.cmd.getAxis(0)*20.0)/127.0;
-    BB8Servos::servos.setSetpoint(BODY_ROLL_SERVO, axis0);      
+    BB8Servos::servos.setGoal(BODY_ROLL_SERVO, axis0);      
   } else {
     driveMotor.setDirectionAndSpeed(DCMotor::DCM_IDLE, 0);
-    BB8Servos::servos.setSetpoint(BODY_ROLL_SERVO, 180.0);      
+    BB8Servos::servos.setGoal(BODY_ROLL_SERVO, 180.0);      
   }
 
   packetTimeout_ = 3;
@@ -321,9 +332,23 @@ Result BB8::handleConsoleCommand(const std::vector<String>& words, ConsoleStream
       return RES_OK;
     } else if(words[1] == "off") {
       kioskMode_ = false;
+#if 0
       BB8Servos::servos.setSpeed(DOME_HEADING_SERVO, servolimits[DOME_HEADING_SERVO].speed);
       BB8Servos::servos.setSpeed(DOME_PITCH_SERVO, servolimits[DOME_PITCH_SERVO].speed);
       BB8Servos::servos.setSpeed(DOME_ROLL_SERVO, servolimits[DOME_ROLL_SERVO].speed);
+#endif
+      return RES_OK;
+    } else return RES_CMD_INVALID_ARGUMENT;
+  }
+
+  else if(words[0] == "servo_dome_to_imu") {
+    if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    if(words[1] == "on") {
+      servoDomeToIMU_ = true;
+      BB8Servos::servos.switchTorqueAll(true);
+      return RES_OK;
+    } else if(words[1] == "off") {
+      servoDomeToIMU_ = false;
       return RES_OK;
     } else return RES_CMD_INVALID_ARGUMENT;
   }

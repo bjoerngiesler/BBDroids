@@ -70,7 +70,7 @@ void setup() {
   XBee::xbee.start();
   Console::console.start();
   BB8::bb8.start();
-  BB8Servos::servos.start();
+  //BB8Servos::servos.start();
 
   BB8StatusPixels::statusPixels.begin();
   BB8Sound::sound.begin(dfplayerSerial);

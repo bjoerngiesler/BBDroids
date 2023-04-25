@@ -1,4 +1,3 @@
-#include "actuator.h"
 #if !defined(BB8SERVOS_H)
 #define BB8SERVOS_H
 
@@ -22,7 +21,12 @@ protected:
 };
 
 class BB8Servos: public Subsystem {
-  public:
+public:
+  typedef enum {
+    UNIT_DEGREES,
+    UNIT_RAW
+  } Unit;
+
   static BB8Servos servos;
 
 	virtual Result initialize();
@@ -36,11 +40,12 @@ class BB8Servos: public Subsystem {
   
   void printStatus(ConsoleStream* stream, int id);
   Result moveAllServosToOrigin(bool hard = false);
-  bool setSpeed(uint8_t servo, float speed);
-  bool setSetpoint(uint8_t servo, float setpoint);
-  bool setPosition(uint8_t servo, float goal);
-  float getPresentPosition(uint8_t servo);
-  Result switchTorque(uint8_t servo, bool onoff);
+  
+  bool setGoal(uint8_t id, float goal, Unit unit=UNIT_DEGREES);
+  float goal(uint8_t id, Unit unit=UNIT_DEGREES);
+  float present(uint8_t id, Unit unit=UNIT_DEGREES);
+  
+  Result switchTorque(uint8_t id, bool onoff);
   Result switchTorqueAll(bool onoff);
   bool isTorqueOn(uint8_t servo);
 
@@ -49,14 +54,30 @@ protected:
   DynamixelShield dxl_;
 
   typedef struct {
-    int id;
-    bool available;
-    float speed;
-    float setpoint;
-    float current;
+    uint32_t goal;
+    uint32_t present;
   } Servo;
 
-  Servo servos_[4];
+  std::map<uint8_t,Servo> servos_;
+  DYNAMIXEL::ControlTableItemInfo_t ctrlPresentPos_, ctrlGoalPos_, ctrlGoalVel_;
+  static const uint16_t userPktBufCap = 128;
+  uint8_t userPktBuf[userPktBufCap];
+
+  typedef struct {
+    int32_t presentPos;
+  } __attribute((packed)) srData_t;
+  typedef struct {
+    int32_t goalPos;
+  } __attribute((packed)) swData_t;
+
+  DYNAMIXEL::InfoSyncReadInst_t srInfos;
+  DYNAMIXEL::XELInfoSyncRead_t *infoXelsSr;
+
+  DYNAMIXEL::InfoSyncWriteInst_t swInfos;
+  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSw;
+
+  void setupSyncBuffers();
+  void teardownSyncBuffers();
 };
 
 #endif // BB8SERVOS_H

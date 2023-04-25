@@ -15,6 +15,8 @@ public:
 	virtual Result stop(ConsoleStream* stream = NULL);
 	virtual Result step();
 
+	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
+
 	uint64_t getSequenceNumber() { return seqnum_; }
 
 	void setCycleTime(uint8_t microseconds); // not milli, micro.
@@ -28,6 +30,7 @@ protected:
 	uint64_t seqnum_;
 	uint64_t cycleTime_;
 	uint64_t startTime_;
+	bool runningStatus_;
 };
 
 };

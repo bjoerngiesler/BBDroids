@@ -67,8 +67,13 @@ void BB8ServoPower::writeTo(uint8_t addr, uint8_t reg, uint8_t byte) {
 
 
 BB8Servos BB8Servos::servos;
+static const unsigned int bpsList[] = { 57600, 115200, 1000000 };
+static const unsigned int numBps = 3;
+static const unsigned int goalBps = 1000000;
 
 BB8Servos::BB8Servos() {
+  infoXelsSr = NULL;
+  infoXelsSw = NULL;
 }
 
 Result BB8Servos::initialize() {
@@ -84,7 +89,9 @@ Result BB8Servos::initialize() {
           "\ttest <servo>                    Test <servo>, going from 180 to +x°/-x° in 5° steps, until it fails\r\n"
           "\tpower on|off                    Switch power on or off";
 
-  memset(servos_, 0, sizeof(servos_));
+  ctrlPresentPos_.addr = 0;
+  ctrlGoalPos_.addr = 0;
+  ctrlGoalVel_.addr = 0;
   BB8ServoPower::power.initialize();
   return Subsystem::initialize();
 }
@@ -92,34 +99,91 @@ Result BB8Servos::initialize() {
 Result BB8Servos::start(ConsoleStream *stream) {
   if(isStarted()) return RES_SUBSYS_ALREADY_STARTED;
 
-  int servosFound = 0;
-
   BB8ServoPower::power.switchOnOff(true);
   delay(500);
 
   dxl_.setPortProtocolVersion(2.0);
-  dxl_.begin(DYNAMIXEL_BPS);
-  dxl_.scan();
-  for (int i = 1; i <= 4; i++) {
-    if (dxl_.ping(i)) {
-      if(stream) stream->print(String("#") + i + ": model #" + dxl_.getModelNumber(i) + "...");
-      dxl_.setOperatingMode(i, OP_POSITION);
-      dxl_.writeControlTableItem(ControlTableItem::SHUTDOWN, i, 0x14);  // disable overload shutdown -- potentially dangerous
-      dxl_.torqueOn(i);
+  unsigned int bps = 0;
 
-      servos_[i].id = i;
-      servos_[i].available = true;
-      servos_[i].setpoint = servos_[i].current = dxl_.getPresentPosition(i, UNIT_DEGREE);
-      servos_[i].speed = servolimits[i].speed; // deg/s
+  if(stream) stream->print("Detecting Dynamixels... ");
+  for(unsigned int i=0; i<numBps; i++) {
+    dxl_.begin(bpsList[i]);
+    if(dxl_.scan() == true) {
+      bps = bpsList[i];
+      break;
+    }
+  }
 
-      servosFound++;
-    } else {
-      if(stream) stream->print(String("#") + i + "not found...");
+  if(bps == 0) {
+    if(stream) stream->println("none found.");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
+
+  if(stream) stream->print(String("found at ") + bps + "bps, enumerating...");
+
+  for (uint8_t id = 1; id < 254; id++) {
+    if (dxl_.ping(id)) {
+      uint16_t model = dxl_.getModelNumber(id);
+      if(stream) stream->print(String("#") + id + ": model #" + model + "...");
+
+      Servo servo = {2048, 2048};
+
+      if(ctrlPresentPos_.addr == 0) {
+        ctrlPresentPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
+        ctrlGoalPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
+        ctrlGoalVel_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_VELOCITY);
+      } else {
+        DYNAMIXEL::ControlTableItemInfo_t item;
+        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
+        if(item.addr != ctrlPresentPos_.addr || item.addr_length != ctrlPresentPos_.addr_length) {
+          if(stream) stream->println("Servos use differing control tables, that is not supported currently!");
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
+        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
+        if(item.addr != ctrlGoalPos_.addr || item.addr_length != ctrlGoalPos_.addr_length) {
+          if(stream) stream->println("Servos use differing control tables, that is not supported currently!");
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
+        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_VELOCITY);
+        if(item.addr != ctrlGoalVel_.addr || item.addr_length != ctrlGoalVel_.addr_length) {
+          if(stream) stream->println("Servos use differing control tables, that is not supported currently!");
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
+      }
+      servos_[id] = servo;
     }
   }
   if(stream) stream->println();
 
-  if (servosFound == 0) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  if(servos_.size() != 4) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+
+  // Configure servos
+  for(auto& s: servos_) dxl_.torqueOff(s.first);
+  if(bps != goalBps) {
+    for(auto& s: servos_) dxl_.setBaudrate(s.first, goalBps);
+    dxl_.begin(goalBps);
+    if(dxl_.scan() == false) {
+      if(stream) stream->println(String("Could not rescan after switching to ") + goalBps + "bps!");
+      return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    }
+    bps = goalBps;
+  }
+  for(auto& s: servos_) {
+    dxl_.setOperatingMode(s.first, OP_POSITION);
+    dxl_.writeControlTableItem(ControlTableItem::RETURN_DELAY_TIME, s.first, 10);
+  }
+
+  setupSyncBuffers();
+
+  uint8_t recv_cnt = dxl_.syncRead(&srInfos);
+  if(recv_cnt != servos_.size()) {
+    if(stream) stream->println("Receiving initial position failed!");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
+  for(auto& s: servos_) {
+    if(stream) stream->println(String("Present for #") + s.first + ": " + s.second.present);
+    s.second.goal = s.second.present;
+  }
 
   operationStatus_ = RES_OK;
   started_ = true;
@@ -128,6 +192,14 @@ Result BB8Servos::start(ConsoleStream *stream) {
 
 Result BB8Servos::stop(ConsoleStream *stream) {
   (void)stream;
+
+  teardownSyncBuffers();
+
+  for(auto& s: servos_) {
+    dxl_.torqueOff(s.first);
+  }
+  while(servos_.size()) servos_.erase(servos_.begin());
+
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
   started_ = false;
   return RES_OK;
@@ -135,22 +207,18 @@ Result BB8Servos::stop(ConsoleStream *stream) {
 
 Result BB8Servos::step() {
   if (!started_ || operationStatus_ != RES_OK) return RES_SUBSYS_NOT_STARTED;
-  return RES_OK; // disable for now
   
-  for (int i = 1; i <= 4; i++) {
-    if (servos_[i].available) {
-      if(servos_[i].current == servos_[i].setpoint) continue;
-      float maxstep = servos_[i].speed / (1000 / Runloop::runloop.cycleTime());
-      float delta = servos_[i].setpoint - servos_[i].current;
-      if(fabs(delta) > maxstep) {
-        servos_[i].current += delta<0 ? -maxstep : maxstep;
-        setPosition(i, servos_[i].current);
-      } else {
-        servos_[i].current = servos_[i].setpoint;
-        setPosition(i, servos_[i].current);
-      }
-    }
+  uint8_t num = dxl_.syncRead(&srInfos);
+  if(num != servos_.size()) {
+    Console::console.printlnBroadcast("Receiving servo position failed!");
+    return RES_SUBSYS_COMM_ERROR;
   }
+
+  if(dxl_.syncWrite(&swInfos) == false) {
+    Console::console.printlnBroadcast("Sending servo position failed!");
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
   return RES_OK;
 }
 
@@ -159,22 +227,20 @@ Result BB8Servos::handleConsoleCommand(const std::vector<String> &words, Console
   if (words.size() == 0) return RES_CMD_UNKNOWN_COMMAND;
   if (words[0] == "move") {
     if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
-    int id = words[1].toInt();
-    if (id < 1 || id > 4) return RES_CMD_INVALID_ARGUMENT;
-    if (servos_[id].available == false) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    unsigned int id = words[1].toInt();
+    if (id > servos_.size()) return RES_CMD_INVALID_ARGUMENT;
     float angle = words[2].toFloat();
     if (angle < 0 || angle > 360.0) return RES_CMD_INVALID_ARGUMENT;
-    servos_[id].setpoint = angle;
-    return RES_OK;
+    if(setGoal(id, angle)) return RES_OK;
+    return RES_CMD_INVALID_ARGUMENT;
   } else if (words[0] == "torque") {
     if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
     if (words[1] == "all") {
-      for (int id = 1; id <= 4; id++) switchTorque(id, words[2] == "on" ? true : false);
+      for(auto& s: servos_) switchTorque(s.first, words[2] == "on" ? true : false);
       return RES_OK;
     } else {
       int id = words[1].toInt();
-      if (id < 1 || id > 4) return RES_CMD_INVALID_ARGUMENT;
-      if (servos_[id].available == false) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+      if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
       return switchTorque(id, words[2] == "on" ? true : false);
     }
   } else if (words[0] == "velocity_limit") {
@@ -191,7 +257,6 @@ Result BB8Servos::handleConsoleCommand(const std::vector<String> &words, Console
     if (words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
     int id = words[1].toInt();
     if (id < 1 || id > 4) return RES_CMD_INVALID_ARGUMENT;
-    if (servos_[id].available == false) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
     printStatus(stream, id);
     return RES_OK;
   } else if (words[0] == "test") {
@@ -221,7 +286,7 @@ Result BB8Servos::handleConsoleCommand(const std::vector<String> &words, Console
 Result BB8Servos::handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex idx, const std::vector<String> &words, ConsoleStream *stream) {
   if (words.size() < 2 || words.size() > 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
   int id = words[1].toInt();
-  if (id < 1 || id > 4) return RES_CMD_INVALID_ARGUMENT;
+  if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
   if (words.size() == 2) {
     int val = (int)dxl_.readControlTableItem(idx, id);
     stream->println(words[0] + "=" + val);
@@ -258,25 +323,25 @@ Result BB8Servos::runServoTest(ConsoleStream *stream, int id) {
   return RES_OK;
 }
 
-Result BB8Servos::switchTorque(uint8_t servo, bool onoff) {
-  if (operationStatus_ != RES_OK || servo < 1 || servo > 4) return RES_CMD_INVALID_ARGUMENT;
-  if (onoff) dxl_.torqueOn(servo);
-  else dxl_.torqueOff(servo);
+Result BB8Servos::switchTorque(uint8_t id, bool onoff) {
+  if (operationStatus_ != RES_OK || servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
+  if (onoff) dxl_.torqueOn(id);
+  else dxl_.torqueOff(id);
   return RES_OK;
 }
 
 Result BB8Servos::switchTorqueAll(bool onoff) {
   if(operationStatus_ != RES_OK) return RES_CMD_INVALID_ARGUMENT;
-  for(int i=1; i<=4; i++) {
-    Result retval = switchTorque(i, onoff);
+  for(auto& s: servos_) {
+    Result retval = switchTorque(s.first, onoff);
     if(retval != RES_OK) return retval;
   }
   return RES_OK;
 }
 
-bool BB8Servos::isTorqueOn(uint8_t servo) {
-  if (operationStatus_ != RES_OK || servo < 1 || servo > 4) return false;
-  return dxl_.readControlTableItem(ControlTableItem::TORQUE_ENABLE, servo);
+bool BB8Servos::isTorqueOn(uint8_t id) {
+  if (operationStatus_ != RES_OK || servos_.count(id) == 0) return false;
+  return dxl_.readControlTableItem(ControlTableItem::TORQUE_ENABLE, id);
 }
 
 void BB8Servos::printStatus(ConsoleStream *stream, int id) {
@@ -285,16 +350,11 @@ void BB8Servos::printStatus(ConsoleStream *stream, int id) {
     return;
   }
 
-  stream->print("Servo #");
-  stream->print(id);
-  stream->print(": ");
+  stream->print(String("Servo #") + id + ": ");
   if (dxl_.ping(id)) {
-    stream->print("model #");
-    stream->print(dxl_.getModelNumber(id));
-    stream->print(", ");
-    stream->print("pos: ");
-    stream->print(getPresentPosition(id));
-    stream->print("°, ");
+    stream->print(String("model #") + dxl_.getModelNumber(id) + ", ");
+    stream->print(String("present: ") + present(id) + "deg, ");
+    stream->print(String("goal: ") + goal(id) + "deg, ");
     stream->print("hw err: $");
     stream->print(String(dxl_.readControlTableItem(ControlTableItem::HARDWARE_ERROR_STATUS, id), HEX));
     stream->print(", ");
@@ -326,50 +386,85 @@ void BB8Servos::printStatus(ConsoleStream *stream, int id) {
 Result BB8Servos::moveAllServosToOrigin(bool hard) {
   if (operationStatus_ != RES_OK) return operationStatus_;
 
-  for (int i = 1; i <= 4; i++) {
-    if(hard) dxl_.setGoalPosition(i, 180.0 + servolimits[i - 1].offset, UNIT_DEGREE);
-    else setSetpoint(i, 180.0);
+  for (auto& s: servos_) {
+    if(hard) dxl_.setGoalPosition(s.first, 180.0 + servolimits[s.first - 1].offset, UNIT_DEGREE);
+    else setGoal(s.first, 180.0);
   }
 
   return RES_OK;
 }
 
-bool BB8Servos::setSpeed(uint8_t servo, float speed) {
-  if(servo <= 0 || servo > 4) return false;
-  if(speed > servolimits[servo].speed) speed = servolimits[servo].speed;
-  servos_[servo].speed = speed;
-  return true;
-}
-  
-bool BB8Servos::setSetpoint(uint8_t servo, float setpoint) {
-  if(servo <= 0 || servo > 4) return false;
-  servos_[servo].setpoint = setpoint;
-  return true;
-}
+bool BB8Servos::setGoal(uint8_t id, float goal, Unit unit) {
+  if(servos_.count(id) == 0) return false;
+  if(unit == UNIT_DEGREES) 
+    servos_[id].goal = 4096.0*(goal/360.0);
+  else
+    servos_[id].goal = goal;
+  swInfos.is_info_changed = true;
 
-
-bool BB8Servos::setPosition(uint8_t servo, float goal) {
-  if (operationStatus_ != RES_OK) return false;
-
-  if (servo <= 0 || servo > 4) return false;
-
-  goal += servolimits[servo - 1].offset;
-  if (goal < servolimits[servo - 1].min) goal = servolimits[servo - 1].min;
-  else if (goal > servolimits[servo - 1].max) goal = servolimits[servo - 1].max;
-
-#if 0
-  Serial.print("Setting goal position of servo ");
-  Serial.print(servo);
-  Serial.print(" to ");
-  Serial.println(goal, 2);
-#endif
-  dxl_.setGoalPosition(servo, goal, UNIT_DEGREE);
+    
   return true;
 }
 
-float BB8Servos::getPresentPosition(uint8_t servo) {
+float BB8Servos::goal(uint8_t id, Unit unit) {
+  if(servos_.count(id) == 0) return false;
+  if(unit == UNIT_DEGREES) 
+    return 360.0*(servos_[id].goal/4096.0);
+  else
+    return servos_[id].goal;
+}
+
+float BB8Servos::present(uint8_t id, Unit unit) {
   if (operationStatus_ != RES_OK) return 0.0f;
 
-  if (servo <= 0 || servo > 4) return false;
-  return dxl_.getPresentPosition(servo, UNIT_DEGREE);
+  if(servos_.count(id) == 0) return 0.0f;
+  if(unit == UNIT_DEGREES) return (servos_[id].present / 4096.0) * 360.0;
+  else return servos_[id].present;
+}
+
+void BB8Servos::setupSyncBuffers() {
+  unsigned int i;
+
+  if(!servos_.size()) return;
+  if(infoXelsSr != NULL || infoXelsSw != NULL) return;
+
+  srInfos.packet.p_buf = userPktBuf;
+  srInfos.packet.buf_capacity = userPktBufCap;
+  srInfos.packet.is_completed = false;
+  srInfos.addr = ctrlPresentPos_.addr;
+  srInfos.addr_length = ctrlPresentPos_.addr_length;
+  infoXelsSr = new DYNAMIXEL::XELInfoSyncRead_t[servos_.size()];
+  srInfos.p_xels = infoXelsSr;
+  i=0;
+  for(auto& s: servos_) {
+    infoXelsSr[i].id = s.first;
+    infoXelsSr[i].p_recv_buf = (uint8_t*)&(s.second.present);
+    i++;
+  }
+  srInfos.xel_count = servos_.size();
+  srInfos.is_info_changed = true;
+
+  swInfos.packet.p_buf = NULL;
+  swInfos.packet.is_completed = false;
+  swInfos.addr = ctrlGoalPos_.addr;
+  swInfos.addr_length = ctrlGoalPos_.addr_length;
+  infoXelsSw = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
+  swInfos.p_xels = infoXelsSw;
+  i=0;
+  for(auto& s: servos_) {
+    infoXelsSw[i].id = s.first;
+    infoXelsSw[i].p_data = (uint8_t*)&(s.second.goal);
+    i++;
+  }
+  swInfos.xel_count = servos_.size();
+  swInfos.is_info_changed = true;
+}
+
+void BB8Servos::teardownSyncBuffers() {
+  delete infoXelsSr; infoXelsSr = NULL;
+  delete infoXelsSw; infoXelsSw = NULL;
+  srInfos.p_xels = NULL;
+  srInfos.xel_count = 0;
+  swInfos.p_xels = NULL;
+  swInfos.xel_count = 0;
 }

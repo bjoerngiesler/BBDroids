@@ -66,6 +66,7 @@ protected:
   size_t packetsReceived_, packetsMissed_;
   bool runningStatus_;
   bool kioskMode_;
+  bool servoDomeToIMU_;
   unsigned int kioskDelay_;
 };
 

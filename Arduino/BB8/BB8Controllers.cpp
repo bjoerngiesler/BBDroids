@@ -40,8 +40,8 @@ bool BB8ServoControlOutput::available() {
 bool BB8ServoControlOutput::setValue(float value) {
   if(!isEnabled()) return false;
 
-  value += BB8Servos::servos.getPresentPosition(sn_);
-  return BB8Servos::servos.setPosition(sn_, value);
+  //value += BB8Servos::servos.getPresentPosition(sn_);
+  //return BB8Servos::servos.setPosition(sn_, value);
 }
 
 bool BB8ServoControlOutput::enable(bool onoff) {
