@@ -19,8 +19,8 @@ public:
 
 	uint64_t getSequenceNumber() { return seqnum_; }
 
-	void setCycleTime(uint8_t microseconds); // not milli, micro.
-	uint8_t cycleTime();
+	void setCycleTime(unsigned int microseconds); // not milli, micro.
+	unsigned int cycleTime();
 
 	uint64_t millisSinceStart();
 

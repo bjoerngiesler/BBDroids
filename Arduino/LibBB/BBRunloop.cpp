@@ -75,14 +75,14 @@ bb::Result bb::Runloop::handleConsoleCommand(const std::vector<String>& words, C
 		return RES_OK;
 	}
 
-	return RES_CMD_UNKNOWN_COMMAND;
+	return bb::Subsystem::handleConsoleCommand(words, stream);;
 }
 
-void bb::Runloop::setCycleTime(uint8_t t) {
+void bb::Runloop::setCycleTime(unsigned int t) {
  	cycleTime_ = t;
 }
 
-uint8_t bb::Runloop::cycleTime() {
+unsigned int bb::Runloop::cycleTime() {
 	return cycleTime_;
 }
 
