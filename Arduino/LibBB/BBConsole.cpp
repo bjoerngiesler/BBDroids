@@ -150,125 +150,43 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 	}
 
 	if(words[0] == "help") {
-		if(words.size() == 1) printHelp(stream);
-		else {
-			for(size_t i=1; i<words.size(); i++) {
-				Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[i]);
-				if(subsys == NULL) {
-					stream->print("No subsystem named \""); stream->print(words[i]); stream->println("\".");
-				} else {
-					printHelp(stream, subsys);
-				}
-			}
-		}
-	} else if(words[0] == "status") {
-		if(words.size() == 1) printStatus(stream);
-		else {
-			for(size_t i=1; i<words.size(); i++) {
-				Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[i]);
-				if(subsys == NULL) {
-					stream->print("No subsystem named \""); stream->print(words[i]); stream->println("\".");
-				} else {
-					printStatus(stream, subsys);
-				}
-			}
-		}
-	} else if(words[0] == "start") {
-		if(words.size() == 1) {
-			Serial.println("Starting all stopped subsystems");
-			std::vector<Subsystem*> subsystems = SubsystemManager::manager.subsystems();
-			for(size_t i=0; i<subsystems.size(); i++) {
-				if(!subsystems[i]->isStarted()) {
-					stream->print("Starting ");
-					stream->print(subsystems[i]->name());
-					stream->print("... ");
-					stream->println(errorMessage(subsystems[i]->start(stream)));
-				}
-			}
-		} else {
-			for(size_t i=1; i<words.size(); i++) {
-				Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[i]);
-				if(subsys == NULL) {
-					stream->print("No subsystem named \""); stream->print(words[i]); stream->println("\".");
-				} else {
-					stream->print("Starting ");
-					stream->print(subsys->name());
-					stream->print("... ");
-					stream->println(errorMessage(subsys->start(stream)));
-				}
-			}
-		}
-	} else if(words[0] == "stop") {
-		if(words.size() == 1) {
-			stream->println("Stopping all running subsystems");
-			std::vector<Subsystem*> subsystems = SubsystemManager::manager.subsystems();
-			for(size_t i=0; i<subsystems.size(); i++) {
-				if(subsystems[i]->isStarted()) {
-					stream->print("Stopping ");
-					stream->print(subsystems[i]->name());
-					stream->print("... ");
-					stream->println(errorMessage(subsystems[i]->stop(stream)));
-				}
-			}
-		} else {
-			for(size_t i=1; i<words.size(); i++) {
-				Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[i]);
-				if(subsys == NULL) {
-					stream->print("No subsystem named \""); stream->print(words[i]); stream->println("\".");
-				} else {
-					stream->print("Stopping ");
-					stream->print(subsys->name());
-					stream->print("... ");
-					stream->println(errorMessage(subsys->stop(stream)));
-				}
-			}
-		}
-	} else if(words[0] == "get") {
-		if(words.size() == 1) {
-			stream->println("Missing subsys argument to \"get\".");
-		} else if(words.size() == 2) {
-			Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[1]);
-			if(subsys == NULL) {
-				stream->print("No subsystem named \""); stream->print(words[1]); stream->println("\".");
-			} else {
-				printParameters(stream, subsys);
-			}
-		} else if(words.size() == 3) {
-			Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[1]);
-			if(subsys == NULL) {
-				stream->print("No subsystem named \""); stream->print(words[1]); stream->println("\".");
-			} else {
-				const std::vector<Subsystem::ParameterDescription>& params = subsys->parameters();
-				for(size_t i=0; i<params.size(); i++) {
-					if(params[i].name == words[2]) {
-						printParameter(stream, subsys, params[i]);
-						return;
-					}
-				}
-				stream->print("No parameter named \""); 
-				stream->print(words[2]); 
-				stream->print("\" in subsystem "); 
-				stream->print(words[1]);
-				stream->println(".");
-			}
-		} else {
-			stream->println("Too many arguments to \"get\".");
-		}
-	} else if(words[0] == "set") {
-		if(words.size() != 4) {
-			stream->println("Wrong number of arguments to \"set\".");
-		} else {
-			Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[1]);			
-			if(subsys == NULL) {
-				stream->print("No subsystem named \""); stream->print(words[1]); stream->println("\".");
-				return;
-			} 
+		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
+		printHelpAllSubsystems(stream);
+	} 
 
-			stream->println(errorMessage(subsys->setParameterValue(words[2], words[3])));
+	else if(words[0] == "status") {
+		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
+		printStatusAllSubsystems(stream);
+	} 
+
+	else if(words[0] == "start") {
+		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
+		stream->println("Starting all stopped subsystems");
+		for(auto& s: SubsystemManager::manager.subsystems()) {
+			if(!s->isStarted()) {
+				stream->print(String("Starting ") + s->name() + "... ");
+				stream->println(errorMessage(s->start(stream)));
+			}
 		}
-	} else if(words[0] == "store") {
+	}
+		
+	else if(words[0] == "stop") {
+		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
+		stream->println("Stopping all running subsystems");
+		std::vector<Subsystem*> subsystems = SubsystemManager::manager.subsystems();
+		for(auto& s: SubsystemManager::manager.subsystems()) {
+			if(s->isStarted()) {
+				stream->print(String("Stopping ") + s->name() + "... ");
+				stream->println(errorMessage(s->stop(stream)));
+			}
+		}
+	}
+
+	else if(words[0] == "store") {
 		stream->println(errorMessage(ConfigStorage::storage.store()));
-	} else /*if(words[0].length() > 0) */{
+	} 
+
+	else {
 		Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[0]);
 		if(subsys == NULL) {
 			stream->print("Unknown command \""); stream->print(words[0]); stream->println("\" (and no subsystem with that name either).");
@@ -289,101 +207,27 @@ void bb::Console::printlnBroadcast(const String& val) {
 	for(size_t i = 0; i<streams_.size(); i++) streams_[i]->println(val);
 }
 
-void bb::Console::printHelp(ConsoleStream* stream) {
-	stream->println("The following commands are available:");
-	stream->println("help [<subsys1> ...]                   Print this help text, or help on individual subsystem(s)");
-	stream->println("status [<subsys1> ...]                 Print status on all or individual subsystem(s)");
-	stream->println("start [<subsys1> ...]                  Start all stopped subsystems, or start individual named subsystem(s)");
-	stream->println("stop [<subsys1> ...]                   Stop all started subsystems, or stop individual named subsystem(s)");
-	stream->println("restart [<subsys1> ...]                Restart (stop, then start) all started subsystems or individual named subsystem(s)");
-	stream->println("get <subsys>                           Get all parameters on subsystem");
-	stream->println("get <subsys> [<parameter1> ...]        Get parameter on subsystem (use \"help subsys\" for what's available)");
-	stream->println("set <subsys> <parameter> <value>       Set parameter on subsystem (use \"help subsys\" for what's available)");
-	stream->println("store [<subsys1> ...]                  Store all parameters for all or individual named subsystems to flash");
-	stream->println("store <subsys> [<parameter1> ...]      Store individual parameter(s) for subsystem to flash");
-	stream->println("<subsys> <command> [<parameter1> ...]  Execute subsystem-specific command (use \"help subsys\" for what's available)");
+void bb::Console::printHelpAllSubsystems(ConsoleStream* stream) {
+	stream->println("The following commands are available on top level:");
+	stream->println("    help                    Print this help text (use '<subsys> help' for help on individual subsystem)"); 
+	stream->println("    status                  Print status on all subsystems (use '<subsys> status' for help on individual subsystem)");
+	stream->println("    start                   Start all stopped subsystems (use '<subsys> start' to start individual subsystem)");
+	stream->println("    stop                    Stop all started subsystems (use '<subsys> stop' to stop individual subsystem)");
+	stream->println("    restart                 Restart (stop, then start) all started subsystems");
+	stream->println("    store                   Store all parameters oto flash");
+	stream->println("The following standard commands are supported by all subsystems:");
+	stream->println("    <subsys> help");
+	stream->println("    <subsys> status");
+	stream->println("    <subsys> start");
+	stream->println("    <subsys> stop");
+	stream->println("    <subsys> restart");
+	stream->println("Please use '<subsys> help' for additional commands supported by individual subsystems.");
 }
 
-void bb::Console::printHelp(ConsoleStream* stream, Subsystem* subsys) {
-	stream->print("Help on subsystem "); stream->print(subsys->name()); stream->println(":");
-	stream->println(subsys->help());
-	if(subsys->parameters().size()) {
-		stream->println("Parameters:");
-		printParameters(stream, subsys);
-	} else {
-		stream->println("No parameters.");
-	}
-}
-
-void bb::Console::printParameters(ConsoleStream* stream, Subsystem* subsys) {
-	const std::vector<Subsystem::ParameterDescription>& params = subsys->parameters();
-	if(!params.size()) return;
-	for(size_t i=0; i<params.size(); i++) {
-		printParameter(stream, subsys, params[i]);
-	}	
-}
-
-void bb::Console::printParameter(ConsoleStream* stream, Subsystem* subsys, const bb::Subsystem::ParameterDescription& parameter) {
-	stream->print(parameter.name);
-	stream->print(" = ");
-
-	String val;
-	if(subsys->parameterValue(parameter.name, val) == RES_OK) {
-		if(parameter.type == PARAMETER_STRING) {
-			stream->print("\"");
-			stream->print(val);
-			stream->print("\"");
-		} else {
-			stream->print(val);
-		}
-	} else { 
-		stream->print("ERR");
-	}
-
-	switch(parameter.type) {
-	case PARAMETER_UINT:   stream->print(" (uint)"); break;
-	case PARAMETER_INT:    stream->print(" (int)"); break;
-	case PARAMETER_FLOAT:  stream->print(" (float)"); break;
-	case PARAMETER_STRING: stream->print(" (string)"); break;
-	default: stream->print(" (unknown)"); break;
-	}
-
-	stream->print(" -- ");
-	stream->println(parameter.help);
-}
-
-
-void bb::Console::printStatus(ConsoleStream* stream) {
+void bb::Console::printStatusAllSubsystems(ConsoleStream* stream) {
 	stream->println("System status:");
 	const std::vector<Subsystem*> subsystems = SubsystemManager::manager.subsystems();
-	for(size_t i=0; i<subsystems.size(); i++) printStatus(stream, subsystems[i]);
-}
-
-void bb::Console::printStatus(ConsoleStream* stream, Subsystem* subsys) {
-	stream->print(subsys->name());
-	stream->print(" (");
-	stream->print(subsys->description());
-	stream->print("): ");
-
-	if(subsys->isStarted()) stream->print("started");
-	else stream->print("stopped");
-
-	switch(subsys->operationStatus()) {
-	case RES_OK:
-		stream->print(", operational");
-		break;
-	case RES_SUBSYS_NOT_STARTED:
-		if(subsys->isStarted()) { // this contradicts
-			stream->print(", not operational: ");
-			stream->print(errorMessage(subsys->operationStatus()));
-		}
-		break;
-	default:
-		stream->print(", not operational: ");
-		stream->print(errorMessage(subsys->operationStatus()));
-		break;
-	}
-	stream->println();
+	for(auto& s: subsystems) s->printStatus(stream);
 }
 
 std::vector<String> bb::Console::split(const String& str) {

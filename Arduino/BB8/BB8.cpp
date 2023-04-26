@@ -167,8 +167,12 @@ Result BB8::step() {
     float r, p, h;
     BB8BodyIMU::imu.getFilteredRPH(r, p, h);
 
-    BB8Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0+2*r);
-    BB8Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0+2*p);
+    r = 180.0+2*r;
+    if(fabs(r-BB8Servos::servos.present(DOME_ROLL_SERVO)) > 2.0)
+      BB8Servos::servos.setGoal(DOME_ROLL_SERVO, r);
+    p = 180.0+2*p;
+    if(fabs(p-BB8Servos::servos.present(DOME_PITCH_SERVO)) > 2.0)
+      BB8Servos::servos.setGoal(DOME_PITCH_SERVO, p);
   }
 
   if(runningStatus_) {
@@ -278,6 +282,7 @@ Result BB8::incomingPacket(const Packet& packet) {
 
 Result BB8::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
   if(words.size() == 0) return RES_CMD_UNKNOWN_COMMAND;
+
   if(words[0] == "status") {
     if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
     printStatus(stream);
@@ -353,7 +358,7 @@ Result BB8::handleConsoleCommand(const std::vector<String>& words, ConsoleStream
     } else return RES_CMD_INVALID_ARGUMENT;
   }
 
-  return RES_CMD_UNKNOWN_COMMAND;
+  return bb::Subsystem::handleConsoleCommand(words, stream);
 }
 
 Result BB8::fillAndSendStatusPacket() {

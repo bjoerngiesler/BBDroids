@@ -43,7 +43,7 @@ public:
 	virtual const std::vector<ParameterDescription>& parameters() { return parameters_; }
 	virtual Result parameterValue(const String& name, String& value) { String n = name; String v = value; return RES_PARAM_NO_SUCH_PARAMETER; }
 	virtual Result setParameterValue(const String& name, const String& value) { String n = name; String v = value; return RES_PARAM_NO_SUCH_PARAMETER; }
-	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) { (void)words; (void)stream; return RES_CMD_UNKNOWN_COMMAND; }
+	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
 	virtual Result initialize() { operationStatus_ = RES_SUBSYS_NOT_STARTED; return registerWithManager(); };
 	virtual Result start(ConsoleStream *stream) = 0;
@@ -53,6 +53,11 @@ public:
 	virtual Result operationStatus() { return operationStatus_; }
 
 	virtual Result registerWithManager() { return SubsystemManager::manager.registerSubsystem(this); }
+
+	virtual void printStatus(ConsoleStream *stream);
+	virtual void printHelp(ConsoleStream *stream);
+	virtual void printParameters(ConsoleStream *stream);
+	virtual void printParameter(ConsoleStream *stream, const ParameterDescription& p);
 
 protected:
 	std::vector<ParameterDescription> parameters_;

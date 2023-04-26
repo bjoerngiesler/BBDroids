@@ -58,12 +58,8 @@ public:
 	
 	void printBroadcast(const String& val = "");
 	void printlnBroadcast(const String& val = "");
-	void printHelp(ConsoleStream* stream);
-	void printHelp(ConsoleStream* stream, Subsystem *subsys);
-	void printStatus(ConsoleStream* stream);
-	void printStatus(ConsoleStream* stream, Subsystem* subsys);
-	void printParameters(ConsoleStream* stream, Subsystem* subsys);
-	void printParameter(ConsoleStream* stream, Subsystem* subsys, const bb::Subsystem::ParameterDescription& parameter);
+	void printHelpAllSubsystems(ConsoleStream* stream);
+	void printStatusAllSubsystems(ConsoleStream* stream);
 
 protected:
 	Console();

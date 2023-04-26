@@ -40,7 +40,15 @@ bool BB8BodyIMU::begin() {
     return false;
   }
 
-  madgwick_.begin(1000/Runloop::runloop.cycleTime());
+  lsm6ds_data_rate_t dataRate = imu_.getGyroDataRate();
+  if(dataRate == LSM6DS_RATE_104_HZ) {
+    Runloop::runloop.setCycleTime(1000000/104);
+    madgwick_.begin(104);
+    Serial.print("data rate of 104Hz... ");
+  } else {
+    madgwick_.begin(1000000/Runloop::runloop.cycleTime());
+    Serial.print(String("unknown data rate ") + dataRate);
+  }
 
   Serial.println("ok");
   available_ = true;

@@ -42,6 +42,7 @@ bool BB8ServoControlOutput::setValue(float value) {
 
   //value += BB8Servos::servos.getPresentPosition(sn_);
   //return BB8Servos::servos.setPosition(sn_, value);
+  return true;
 }
 
 bool BB8ServoControlOutput::enable(bool onoff) {

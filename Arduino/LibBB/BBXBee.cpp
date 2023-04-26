@@ -236,12 +236,14 @@ bb::Result bb::XBee::setParameterValue(const String& name, const String& value) 
 }
 
 bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
-	(void)stream;
 	if(words.size() == 0) return RES_CMD_UNKNOWN_COMMAND;
+	
 	if(words[0] == "send") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		return send(words[1]);
-	} else if(words[0] == "send_cmd_packet") {
+	} 
+
+	else if(words[0] == "send_cmd_packet") {
 		if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT;
 
 		Packet packet;
@@ -250,7 +252,9 @@ bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, Cons
 		packet.source = PACKET_SOURCE_TEST_ONLY;
 
 		return send(packet);
-	} else if(words[0] == "continuous") {
+	} 
+
+	else if(words[0] == "continuous") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		else {
 			if(words[1] == "on" || words[1] == "true") {
@@ -264,7 +268,9 @@ bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, Cons
 			}
 			else return RES_CMD_INVALID_ARGUMENT;	
 		}
-	} else if(words[0] == "packet_mode") {
+	} 
+
+	else if(words[0] == "packet_mode") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		else {
 			if(words[1] == "on" || words[1] == "true") {
@@ -278,7 +284,9 @@ bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, Cons
 			}
 			else return RES_CMD_INVALID_ARGUMENT;	
 		}
-	} else return RES_CMD_UNKNOWN_COMMAND;
+	} 
+
+	return bb::Subsystem::handleConsoleCommand(words, stream);
 }
 
 void bb::XBee::setPacketMode(bool onoff) {
