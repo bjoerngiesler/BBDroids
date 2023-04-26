@@ -60,8 +60,8 @@ void setup() {
   XBee::xbee.initialize(DEFAULT_CHAN, 0x3333, DEFAULT_STATION_DROID, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_BPS, serialTXSerial);
   WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
   WifiServer::server.setOTANameAndPassword("BB8-$MAC", "password");
-  BB8Servos::servos.initialize();
   BB8::bb8.initialize();
+  BB8Servos::servos.initialize();
 
   XBee::xbee.setPacketMode(true);
   XBee::xbee.addPacketReceiver(&BB8::bb8);
@@ -69,12 +69,13 @@ void setup() {
   WifiServer::server.start();
   XBee::xbee.start();
   Console::console.start();
-  BB8::bb8.start();
-  //BB8Servos::servos.start();
+  BB8Servos::servos.start();
 
   BB8StatusPixels::statusPixels.begin();
   BB8Sound::sound.begin(dfplayerSerial);
   BB8PIDController::rollController.begin();
+
+  BB8::bb8.start();
   
   Runloop::runloop.start(); // never returns
 }
