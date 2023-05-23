@@ -70,10 +70,10 @@ void setup() {
   XBee::xbee.start();
   Console::console.start();
   BB8Servos::servos.start();
+  if(!WifiServer::server.isStarted()) WifiServer::server.start();
 
   BB8StatusPixels::statusPixels.begin();
   BB8Sound::sound.begin(dfplayerSerial);
-  BB8PIDController::rollController.begin();
 
   BB8::bb8.start();
   

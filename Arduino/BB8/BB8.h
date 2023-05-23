@@ -2,6 +2,7 @@
 #define BB8_H
 
 #include <LibBB.h>
+#include "BB8Controllers.h"
 
 using namespace bb;
 
@@ -15,17 +16,33 @@ public:
     VAL_DRIVE_CURRENT_PWM   =  2,
     VAL_DRIVE_CURRENT_SPEED =  3,
     VAL_DRIVE_CURRENT_POS   =  4,
-    VAL_CTRL_ERR            =  5,
-    VAL_CTRL_ERR_I          =  6,
-    VAL_CTRL_ERR_D          =  7,
-    VAL_CTRL_CONTROL        =  8,
+    VAL_DRIVE_ERR           =  5,
+    VAL_DRIVE_ERR_I         =  6,
+    VAL_DRIVE_ERR_D         =  7,
+    VAL_DRIVE_CONTROL       =  8,
     VAL_IMU_RAW_R           =  9,
     VAL_IMU_RAW_P           = 10,
     VAL_IMU_RAW_H           = 11,
     VAL_IMU_FILTERED_R      = 12,
     VAL_IMU_FILTERED_P      = 13,
     VAL_IMU_FILTERED_H      = 14,
-    VAL_LAST                = 15
+    VAL_REMOTE_L_AXIS0      = 15,
+    VAL_REMOTE_L_AXIS1      = 16,
+    VAL_REMOTE_L_AXIS2      = 17,
+    VAL_REMOTE_L_AXIS3      = 18,
+    VAL_REMOTE_L_AXIS4      = 19,
+    VAL_REMOTE_R_AXIS0      = 20,
+    VAL_REMOTE_R_AXIS1      = 21,
+    VAL_REMOTE_R_AXIS2      = 22,
+    VAL_REMOTE_R_AXIS3      = 23,
+    VAL_REMOTE_R_AXIS4      = 24,
+    VAL_ROLL_GOAL           = 25,
+    VAL_ROLL_CURRENT        = 26,
+    VAL_ROLL_ERR            = 27,
+    VAL_ROLL_ERR_I          = 28,
+    VAL_ROLL_ERR_D          = 29,
+    VAL_ROLL_CONTROL        = 30,
+    VAL_LAST                = 31
   } ValueIndex;
 
   typedef struct {
@@ -44,7 +61,7 @@ public:
 	virtual Result parameterValue(const String& name, String& value);
 	virtual Result setParameterValue(const String& name, const String& value);
 
-  void printStatus(ConsoleStream *stream = NULL);
+  void printCurrentSystemStatus(ConsoleStream *stream = NULL);
 
 protected:
   typedef struct {
@@ -60,14 +77,32 @@ protected:
   } BB8Params;
 
   BB8Params params_;
+
+  float domeRollKp_, domeRollKi_, domeRollKd_;
+  float domePitchKp_, domePitchKi_, domePitchKd_;
+
   ConfigStorage::HANDLE paramsHandle_;
   Packet lastPacket_;
   int packetTimeout_;
   size_t packetsReceived_, packetsMissed_;
   bool runningStatus_;
   bool kioskMode_;
-  bool servoDomeToIMU_;
+
+  typedef enum {
+    DOME_SERVO_NONE,
+    DOME_SERVO_PITCH,
+    DOME_SERVO_ROLL,
+    DOME_SERVO_BOTH
+  } DomeServoType;
+
+  DomeServoType servoDomeToIMU_;
   unsigned int kioskDelay_;
+
+  bool rollControlOn_;
+
+  BB8IMUControlInput rollControlInput_;
+  BB8ServoControlOutput rollControlOutput_;
+  BB8PIDController rollController_;
 };
 
 #endif // BB8_H
