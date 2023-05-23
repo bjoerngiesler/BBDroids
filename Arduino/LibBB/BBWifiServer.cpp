@@ -333,6 +333,7 @@ bool bb::WifiServer::startUDPServer(ConsoleStream *stream) {
 }
 
 bool bb::WifiServer::startTCPServer(ConsoleStream *stream) {
+	(void)stream;
 	if(tcp_ != NULL) // already started
 		return false;
 	tcp_ = new WiFiServer(params_.tcpPort);
@@ -353,6 +354,8 @@ bool bb::WifiServer::broadcastUDPPacket(const uint8_t* packet, size_t len) {
 }
 
 bool bb::WifiServer::sendUDPPacket(const IPAddress& addr, const uint8_t* packet, size_t len) {
+	static unsigned int failures = 0;
+
 	if(WiFi.status() != WL_CONNECTED && WiFi.status() != WL_AP_CONNECTED) return false;
 	if(!udpStarted_) return false;
 	if(udp_.beginPacket(addr, params_.udpPort) == false) {
@@ -366,9 +369,16 @@ bool bb::WifiServer::sendUDPPacket(const IPAddress& addr, const uint8_t* packet,
 	}
 
 	if(udp_.endPacket() == false) {
-		Console::console.printlnBroadcast("WiFiUDP.endPacket() failed");
+		failures++;
+		if(failures > 10) {
+			Console::console.printlnBroadcast(String("WiFiUDP.endPacket() failed ") + failures + " in a row!");
+			failures = 0;
+		}
+
+		return false;
 	}
 
+	failures = 0;
 	return true;
 }
 
