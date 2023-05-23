@@ -13,6 +13,7 @@ bb::Runloop::Runloop() {
 "\trunning_status [on|off]: Print running status on timing";
 	cycleTime_ = DEFAULT_CYCLETIME;
 	runningStatus_ = false;
+	excuseOverrun_ = false;
 }
 
 bb::Result bb::Runloop::start(ConsoleStream* stream) {
@@ -28,14 +29,17 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 
 		seqnum_++;
 
+		std::map<String, unsigned long> timingInfo;
+
 		std::vector<Subsystem*> subsys = SubsystemManager::manager.subsystems();
-		for(unsigned int i=0; i<subsys.size(); i++) {
+		for(auto& s: subsys) {
 			unsigned long us = micros();
-			if(subsys[i]->isStarted() && subsys[i]->operationStatus() == RES_OK) {
-				subsys[i]->step();
+			if(s->isStarted() && s->operationStatus() == RES_OK) {
+				s->step();
 			}
 
-			if(runningStatus_) Console::console.printBroadcast(subsys[i]->name() + ": " + (micros()-us) + "us ");
+			timingInfo[s->name()] = micros()-us;
+			if(runningStatus_) Console::console.printBroadcast(s->name() + ": " + (micros()-us) + "us ");
 		}
 
 		unsigned long micros_end_loop = micros();
@@ -47,9 +51,15 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		if(runningStatus_) Console::console.printlnBroadcast(String("Total: ") + looptime + "us");
 		if(looptime < cycleTime_) {
 			delayMicroseconds(cycleTime_-looptime);
-		} else {
-			Console::console.printlnBroadcast(String(looptime) + "us spent in loop - something is wrong!");
+		} else if(excuseOverrun_ == false) {
+			Console::console.printBroadcast(String(looptime) + "us spent in loop: ");
+			for(auto& t: timingInfo) {
+				Console::console.printBroadcast(t.first + ": " + t.second + "us ");
+			}
+			Console::console.printlnBroadcast("");
 		}
+
+		excuseOverrun_ = false;
 	}
 
 	started_ = false;
@@ -84,6 +94,10 @@ void bb::Runloop::setCycleTime(unsigned int t) {
 
 unsigned int bb::Runloop::cycleTime() {
 	return cycleTime_;
+}
+
+void bb::Runloop::excuseOverrun() {
+	excuseOverrun_ = true;
 }
 
 uint64_t bb::Runloop::millisSinceStart() {

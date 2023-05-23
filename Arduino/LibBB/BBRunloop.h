@@ -22,6 +22,10 @@ public:
 	void setCycleTime(unsigned int microseconds); // not milli, micro.
 	unsigned int cycleTime();
 
+	// Make clear that the current cycle will likely overrun the time budget, and suppress message.
+	// Only valid for the current cycle, flag will be cleared after using.
+	void excuseOverrun();
+
 	uint64_t millisSinceStart();
 
 protected:
@@ -31,6 +35,7 @@ protected:
 	uint64_t cycleTime_;
 	uint64_t startTime_;
 	bool runningStatus_;
+	bool excuseOverrun_;
 };
 
 };
