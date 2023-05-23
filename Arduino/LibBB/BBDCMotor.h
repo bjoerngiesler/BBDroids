@@ -2,7 +2,9 @@
 #define BBDCMOTOR_H
 
 #include <Arduino.h>
+#if defined(ARDUINO_ARCH_SAMD)
 #include <Encoder.h>
+#endif
 
 namespace bb {
 
@@ -31,6 +33,8 @@ protected:
   uint8_t speed_;
   bool en_;
 };
+
+#if defined(ARDUINO_ARCH_SAMD)
 
 class EncoderMotor: public DCMotor {
 public:
@@ -98,6 +102,9 @@ protected:
 
   bool reverse_;
 };
+
+#endif // ARDUINO_ARCH_SAMD
+
 
 }; // namespace bb
 

@@ -3,8 +3,6 @@
 #include <limits.h>
 #include <math.h>
 
-static unsigned int MIN_PWM_TO_MOVE = 0; // 20;
-
 bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en) {
   pin_a_ = pin_a;
   pin_b_ = pin_b;
@@ -71,6 +69,8 @@ void bb::DCMotor::setDirectionAndSpeed(DCMotor::Direction dir, uint8_t speed) {
   dir_ = dir;
   speed_ = speed;
 }
+
+#if defined(ARDUINO_ARCH_SAMD)
 
 bb::EncoderMotor::EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en, uint8_t pin_enc_a, uint8_t pin_enc_b)
   : bb::DCMotor(pin_a, pin_b, pin_pwm, pin_en),
@@ -163,11 +163,24 @@ void bb::EncoderMotor::pwmControlUpdate() {
 }
   
 void bb::EncoderMotor::speedControlUpdate() {
+  #define EPSILON(x,y) (fabs(x-y)<0.01)
+  static unsigned int numZero = 0;
   float err;
 
   err = goal_ - currentSpeed_;
 
-  errSpeedI_ = constrain(errSpeedI_ + err, -255.0, 255.0);
+  if(EPSILON(err, 0) && EPSILON(goal_, 0) && EPSILON(currentSpeed_, 0)) {
+    numZero++;
+  } else {
+    numZero = 0;
+  }
+
+  if(numZero > 100) { // 1s
+    errSpeedI_ = 0;
+    currentPWM_ = 0;
+  } else {
+    errSpeedI_ = constrain(errSpeedI_ + err, -255.0, 255.0);
+  }
 
   errSpeedD_ = errSpeedL_ - err; // differentiate
 
@@ -181,10 +194,10 @@ void bb::EncoderMotor::speedControlUpdate() {
 #endif
 
   if(currentPWM_ < 0) {
-    float speed = constrain(-currentPWM_ + MIN_PWM_TO_MOVE, 0, 255.0);
+    float speed = constrain(-currentPWM_, 0, 255.0);
     setDirectionAndSpeed(DCM_BACKWARD, speed);
   } else {
-    float speed = constrain(currentPWM_ + MIN_PWM_TO_MOVE, 0, 255.0);
+    float speed = constrain(currentPWM_, 0, 255.0);
     setDirectionAndSpeed(DCM_FORWARD, speed);
   } 
 
@@ -245,3 +258,4 @@ float bb::EncoderMotor::getCurrentPosition(bb::EncoderMotor::Unit unit) {
   return currentPos_ * mmPT_;
 }
 
+#endif // ARDUINO_ARCH_SAMD
