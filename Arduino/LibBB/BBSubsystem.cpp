@@ -76,8 +76,8 @@ bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words,
 	}
 
 	else if(words[0] == "set") {
-		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
-		return setParameterValue(words[2], words[3]);
+		if(words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
+		return setParameterValue(words[1], words[2]);
 	}
 
 	return RES_CMD_UNKNOWN_COMMAND;
@@ -90,10 +90,10 @@ void bb::Subsystem::printStatus(ConsoleStream* stream) {
 		stream->print("started, ");
 		switch(operationStatus()) {
 		case RES_OK:
-			stream->println(", operational");
+			stream->println("operational");
 			break;
 		default:
-			stream->print(", not operational: ");
+			stream->print("not operational: ");
 			stream->println(errorMessage(operationStatus()));
 			break;
 		}

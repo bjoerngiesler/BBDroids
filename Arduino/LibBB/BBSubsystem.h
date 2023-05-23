@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <vector>
 #include "BBError.h"
+#include "BBConfigStorage.h"
 
 namespace bb {
 
@@ -34,6 +35,27 @@ public:
 	typedef struct {
 		String name;
 		ParameterType type;
+#if 0
+		union val {
+			struct uintval {
+				unsigned int min, max;
+				unsigned int *valptr;
+			};
+			struct intval {
+				int min, max;
+				int *valptr;
+			};
+			struct floatval {
+				float min, max;
+				float *valptr;
+			};
+			struct stringval {
+				int maxlen;
+				char *valptr;
+			};
+		};
+		bb::ConfigStorage::HANDLE handle;
+#endif
 		String help;
 	} ParameterDescription;
 
