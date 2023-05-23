@@ -6,14 +6,15 @@ bb::Console bb::Console::console;
 bb::SerialConsoleStream::SerialConsoleStream(HardwareSerial& ser): ser_(ser), opened_(false), curStr_("") {
 }
 
-bool bb::SerialConsoleStream::available() { 
-	printGreetingIfOpened();
+bool bb::SerialConsoleStream::available() {
+	if(!opened_ && ser_) {
+		opened_ = true;
+		printGreeting();
+	}
 	return ser_.available(); 
 }
 
 bool bb::SerialConsoleStream::readStringUntil(unsigned char c, String& str) { 
-	printGreetingIfOpened();
-
 	unsigned char input = ser_.read();
 
 	if(input == '\b') {
@@ -35,57 +36,42 @@ bool bb::SerialConsoleStream::readStringUntil(unsigned char c, String& str) {
 }
 
 void bb::SerialConsoleStream::print(size_t val) { 
-	printGreetingIfOpened();
 	ser_.print(val); 
 }
 
 void bb::SerialConsoleStream::print(int val) {
-	printGreetingIfOpened();
 	ser_.print(val); 
 }
 
 void bb::SerialConsoleStream::print(float val)  { 
-	printGreetingIfOpened();
 	ser_.print(val); 
 }
 
 void bb::SerialConsoleStream::print(const String& val)  { 
-	printGreetingIfOpened();
 	if(val.length() >  0)
 		ser_.print(val); 
 }
 
 void bb::SerialConsoleStream::println(int val)  { 
-	printGreetingIfOpened();
 	ser_.println(val); 
-	ser_.print("\n");
 }
 
 void bb::SerialConsoleStream::println(float val) { 
-	printGreetingIfOpened();
 	ser_.println(val); 
-	ser_.print("\n");
 }
 
 void bb::SerialConsoleStream::println(const String& val) { 
-	printGreetingIfOpened();
 	ser_.println(val); 
-	ser_.print("\n");
 }
 
 void bb::SerialConsoleStream::println() { 
-	printGreetingIfOpened();
 	ser_.println(); 
-	ser_.print("\n");
 }
 
-void bb::SerialConsoleStream::printGreetingIfOpened() {
-	if(!opened_ && ser_) {
-		opened_ = true;
-		ser_.println("Console ready. Type \"help\" for instructions.");
-		ser_.print("> ");
-		ser_.flush();
-	}
+void bb::SerialConsoleStream::printGreeting() {
+	ser_.println("Console ready. Type \"help\" for instructions.");
+	ser_.print("> ");
+	ser_.flush();
 }
 
 bb::Console::Console() {

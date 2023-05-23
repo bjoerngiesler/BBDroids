@@ -37,7 +37,7 @@ public:
 	virtual void println(const String& val);
 	virtual void println();
 protected:
-	void printGreetingIfOpened();
+	void printGreeting();
 	HardwareSerial& ser_;
 	bool opened_;
 	String curStr_;
