@@ -4,22 +4,130 @@
 #include "BB8IMU.h"
 #include "BB8Servos.h"
 
-BB8BodyIMUControlInput::BB8BodyIMUControlInput(BB8BodyIMUControlInput::ProbeType pt) {
+BB8PIDController::BB8PIDController() {
+  input_ = NULL;
+  output_ = NULL;
+}
+
+void BB8PIDController::begin(BB8ControlInput* input, BB8ControlOutput* output) {
+  if(begun_) return;
+
+  input_ = input;
+  output_ = output;
+
+  setGoal(input_->current());
+  setControlParameters(0.0f, 0.0f, 0.0f);
+  setIUnbounded();
+  setControlUnbounded();
+  lastErr_ = errI_ = lastErrD_ = lastControl_ = 0.0f;
+
+  begun_ = true;
+}
+
+void BB8PIDController::end() {
+  begun_ = false;
+}
+
+void BB8PIDController::update(void) {
+  if(!begun_) { Console::console.printlnBroadcast("update() without begin()!"); return; }
+
+  float err = goal_ - input_->current();
+
+  errI_ += err;
+  if(iBounded_) {
+    errI_ = constrain(errI_, iMin_, iMax_);
+  }
+
+  lastErrD_ = lastErr_ - err;
+  lastErr_ = err;
+
+  lastControl_ = kp_ * lastErr_ + ki_ * errI_ + kd_ * lastErrD_;
+
+  if(controlBounded_) {
+    lastControl_ = constrain(lastControl_, controlMin_, controlMax_);
+  }
+
+  Console::console.printlnBroadcast(String("Control: Err:") + err + " ErrI:" + errI_ + " ErrD:" + lastErrD_ + " Control:" + lastControl_);
+
+  output_->set(lastControl_);
+}
+  
+void BB8PIDController::setGoal(const float& sp) {
+  goal_ = sp;
+}
+
+float BB8PIDController::goal() {
+  return goal_;
+}
+
+float BB8PIDController::current() {
+  if(!begun_) return 0.0f;
+  return input_->current();
+}
+
+void BB8PIDController::setControlParameters(const float& kp, const float& ki, const float& kd) {
+  kp_ = kp;
+  ki_ = ki;
+  kd_ = kd;
+}
+  
+void BB8PIDController::getControlParameters(float& kp, float& ki, float& kd) {
+  kp = kp_;
+  ki = ki_;
+  kd = kd_;
+}
+  
+void BB8PIDController::getControlState(float& err, float& errI, float& errD, float& control) {
+  err = lastErr_;
+  errI = errI_;
+  errD = lastErrD_;
+  control = lastControl_;
+}
+
+void BB8PIDController::setIBounds(float iMin, float iMax) {
+  iBounded_ = true;
+  iMin_ = iMin; iMax_ = iMax;
+}
+
+void BB8PIDController::setIUnbounded() {
+  iMin_ = iMax_ = 0.0f;
+  iBounded_ = false;
+}
+  
+bool BB8PIDController::isIBounded() {
+  return iBounded_;
+}
+
+void BB8PIDController::setControlBounds(float controlMin, float controlMax) {
+  controlBounded_ = true;
+  controlMin_ = controlMin; controlMax_ = controlMax;
+}
+
+void BB8PIDController::setControlUnbounded() {
+  controlMin_ = controlMax_ = 0.0f;
+  controlBounded_ = false;
+}
+  
+bool BB8PIDController::isControlBounded() {
+  return controlBounded_;
+}
+
+BB8IMUControlInput::BB8IMUControlInput(BB8IMUControlInput::ProbeType pt) {
   pt_ = pt;
 }
 
-float BB8BodyIMUControlInput::getValue() {
+float BB8IMUControlInput::current() {
   float r, p, h;
-  if(BB8BodyIMU::imu.getFilteredRPH(r, p, h) == false) return 0.0f;
+  if(BB8IMU::imu.getFilteredRPH(r, p, h) == false) return 0.0f;
   
   switch(pt_) {
-  case IMU_PROBE_ROLL:
+  case IMU_ROLL:
     return r;
     break;
-  case IMU_PROBE_PITCH:
+  case IMU_PITCH:
     return p;
     break;
-  case IMU_PROBE_HEADING:
+  case IMU_HEADING:
     return h;
     break;
   }
@@ -32,124 +140,10 @@ BB8ServoControlOutput::BB8ServoControlOutput(uint8_t sn, float offset) {
   offset_ = offset;
 }
 
-bool BB8ServoControlOutput::available() {
-  //return BB8Servos::servos.available();
-  return false;
+bool BB8ServoControlOutput::set(float value) {
+  return BB8Servos::servos.setGoal(sn_, BB8Servos::servos.present(sn_) - value);
 }
 
-bool BB8ServoControlOutput::setValue(float value) {
-  if(!isEnabled()) return false;
-
-  //value += BB8Servos::servos.getPresentPosition(sn_);
-  //return BB8Servos::servos.setPosition(sn_, value);
-  return true;
-}
-
-bool BB8ServoControlOutput::enable(bool onoff) {
-  if(onoff && !isEnabled()) {
-    if(BB8Servos::servos.switchTorque(sn_, true) == false) {
-      Serial.println("Couldn't switch torque on");
-      return false;
-    } else return true;
-  } else if(!onoff && isEnabled()) {
-    return BB8Servos::servos.switchTorque(sn_, false);
-  } else return true;
-}
-
-bool BB8ServoControlOutput::isEnabled() {
-  return BB8Servos::servos.isTorqueOn(sn_);
-}
-
-BB8PIDController BB8PIDController::rollController;
-BB8BodyIMUControlInput rollControlInput(BB8BodyIMUControlInput::IMU_PROBE_ROLL);
-BB8ServoControlOutput rollControlOutput(4, 180.0f);
-
-BB8PIDController::BB8PIDController() {
-  input_ = NULL;
-  output_ = NULL;
-  kp_ = ki_ = kd_ = 0.0f;
-  setpoint_ = 0.0f;
-  deadband_ = 0.0f;
-  i_ = 0.0f;
-  enabled_ = false;
-}
-
-bool BB8PIDController::begin() {
-  // FIXME
-  input_ = &rollControlInput;
-  output_ = &rollControlOutput;
-  setpoint_ = input_->getValue();
-  enabled_ = false;
-  return true;
-}
-
-bool BB8PIDController::available() {
-  if(NULL == output_) return false;
-  return output_->available();
-}
-
-void BB8PIDController::setSetpoint(float sp) {
-  setpoint_ = sp;
-}
-
-bool BB8PIDController::step(bool outputForPlot) {
-  if(NULL == input_ || NULL == output_ || enabled_ == false) {
-    return false;
-  }
-  float val = input_->getValue();
-  float e = (setpoint_ - val);
-
-  i_ += e;
-  if(fabs(i_) > fabs(iabort_)) {
-    Serial.print("Integral part "); Serial.print(i_); Serial.print(" > IAbort "); Serial.print(iabort_); Serial.println(". Aborting.");
-    enable(false);
-    return true;
-  }
-
-#if 0
-  float tmp_i_ = i_;
-  if(i_ < -imax_) tmp_i_ = -imax_;
-  else if(i_ > imax_) tmp_i_ = imax_;
-#else
-  if(i_ < -imax_) i_ = -imax_;
-  else if(i_ > imax_) i_ = imax_;
-  float tmp_i_ = i_;
-#endif
-
-  float d = last_e_ == 0.0f ? 0.0f : (last_e_ - e);
-
-  float cp = e * kp_ + tmp_i_ * ki_ + d * kd_;
-  
-  if(outputForPlot) {
-    Serial.print("SP:"); Serial.print(setpoint_);
-    Serial.print(", E:"); Serial.print(e);
-    Serial.print(", I:"); Serial.print(i_);
-    Serial.print(", D:"); Serial.print(d);
-    Serial.print(", CP:"); Serial.println(cp);
-  }
-
-  output_->setValue(cp);
-
-  last_e_ = e;
-  return true;
-}
-
-bool BB8PIDController::enable(bool onoff) {
-  if(NULL == output_) { Serial.println("No output!"); return false; }
-  if(onoff) {
-    // FIXME
-
-    i_ = 0.0f;
-    if(!output_->enable(true)) return false;
-    enabled_ = true;
-  } else {
-    if(!output_->enable(false)) return false;
-    enabled_ = false;
-  }
-  return true;
-}
-
-bool BB8PIDController::isEnabled() {
-  if(NULL == output_) return false;
-  return output_->isEnabled();
+float BB8ServoControlOutput::current() {
+  return BB8Servos::servos.present(sn_);
 }

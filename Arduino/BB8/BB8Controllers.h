@@ -6,65 +6,77 @@
 
 class BB8ControlInput {
 public:
-  virtual float getValue() = 0;
-};
-
-class BB8BodyIMUControlInput: public BB8ControlInput {
-public:
-  typedef enum {
-    IMU_PROBE_ROLL,
-    IMU_PROBE_PITCH,
-    IMU_PROBE_HEADING
-  } ProbeType;
-
-  BB8BodyIMUControlInput(ProbeType pt);
-  float getValue();
-protected:
-  ProbeType pt_;
+  virtual float current() { return 0.0f; }
 };
 
 class BB8ControlOutput {
 public:
-  virtual bool available() = 0;
-  virtual bool setValue(float value) = 0;
-  virtual bool enable(bool onoff) = 0;
-  virtual bool isEnabled() = 0;
-};
-
-class BB8ServoControlOutput: public BB8ControlOutput {
-public:
-  BB8ServoControlOutput(uint8_t servoNum, float offset);
-  bool available();
-  bool setValue(float value);
-  bool enable(bool onoff);
-  bool isEnabled();
-
-protected:
-  uint8_t sn_;
-  float offset_;
+  virtual float current() { return 0.0f; }
+  virtual bool set(float value) { (void)value; return false; }
 };
 
 class BB8PIDController {
 public:
-  static BB8PIDController rollController;
+  BB8PIDController();
 
-  bool begin();
-  bool available();
-  void setSetpoint(float sp);
-  bool step(bool outputForPlot = false);
-  bool enable(bool onoff);
-  bool isEnabled();
+  void begin(BB8ControlInput* input, BB8ControlOutput* output);
+  void end();
+  
+  void update(void);
+
+  void setGoal(const float& sp);
+  void setCurrentAsGoal();
+  float goal();
+  float current();
+
+  void setControlParameters(const float& kp, const float& ki, const float& kd);
+  void getControlParameters(float& kp, float& ki, float& kd);
+  void getControlState(float& err, float& errI, float& errD, float& control);
+
+  void setIBounds(float iMin, float iMax);
+  void setIUnbounded();
+  bool isIBounded();
+
+  void setControlBounds(float controlMin, float controlMax);
+  void setControlUnbounded();
+  bool isControlBounded();
 
 protected:
-  BB8PIDController();
-  BB8ControlInput* input_; 
+  BB8ControlInput* input_;
   BB8ControlOutput* output_;
-  float kp_, ki_, kd_;
-  float imax_, iabort_, deadband_;
-  float setpoint_;
-  bool enabled_;
 
-  float last_e_, i_;
+  bool begun_;
+
+  float kp_, ki_, kd_;
+  float lastErr_, errI_, lastErrD_, lastControl_;
+  float iMin_, iMax_; bool iBounded_;
+  float controlMin_, controlMax_; bool controlBounded_;
+  float goal_;
+};
+
+class BB8IMUControlInput: public BB8ControlInput {
+public:
+  typedef enum {
+    IMU_ROLL,
+    IMU_PITCH,
+    IMU_HEADING
+  } ProbeType;
+
+  BB8IMUControlInput(ProbeType pt);
+  float current();
+protected:
+  ProbeType pt_;
+};
+
+class BB8ServoControlOutput: public BB8ControlOutput {
+public:
+  BB8ServoControlOutput(uint8_t servoNum, float offset=0.0f);
+  float current();
+  bool set(float value);
+
+protected:
+  uint8_t sn_;
+  float offset_;
 };
 
 #endif // BB8CONTROLLERS_H
