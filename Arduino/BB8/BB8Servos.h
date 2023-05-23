@@ -23,11 +23,13 @@ protected:
 class BB8Servos: public Subsystem {
 public:
   typedef enum {
-    UNIT_DEGREES,
-    UNIT_RAW
-  } Unit;
+    VALUE_DEGREE,
+    VALUE_RAW
+  } ValueType;
 
   static BB8Servos servos;
+
+  static const uint8_t ID_ALL = 255;
 
 	virtual Result initialize();
 	virtual Result start(ConsoleStream *stream = NULL);
@@ -39,15 +41,23 @@ public:
   Result runServoTest(ConsoleStream *stream, int id);
   
   void printStatus(ConsoleStream* stream, int id);
-  Result moveAllServosToOrigin(bool hard = false);
+
+  bool setRange(uint8_t id, float min, float max, ValueType t=VALUE_DEGREE);
+  bool setOffset(uint8_t id, float offset, ValueType t=VALUE_DEGREE);
+  bool setInvert(uint8_t id, bool invert);
   
-  bool setGoal(uint8_t id, float goal, Unit unit=UNIT_DEGREES);
-  float goal(uint8_t id, Unit unit=UNIT_DEGREES);
-  float present(uint8_t id, Unit unit=UNIT_DEGREES);
+  bool setGoal(uint8_t id, float goal, ValueType t=VALUE_DEGREE);
+  bool setProfileAcceleration(uint8_t id, uint32_t val);
+  bool setProfileVelocity(uint8_t id, uint32_t val);
+  float goal(uint8_t id, ValueType t=VALUE_DEGREE);
+  float present(uint8_t id, ValueType t=VALUE_DEGREE);
+  uint8_t errorStatus(uint8_t id);
+  Result moveSlow(int id, float goal, ValueType t=VALUE_DEGREE);
   
   Result switchTorque(uint8_t id, bool onoff);
-  Result switchTorqueAll(bool onoff);
-  bool isTorqueOn(uint8_t servo);
+  bool isTorqueOn(uint8_t id);
+
+  uint32_t computeRawValue(float val, ValueType t=VALUE_DEGREE);
 
 protected:
   BB8Servos();
@@ -56,10 +66,13 @@ protected:
   typedef struct {
     uint32_t goal;
     uint32_t present;
+    uint32_t min, max;
+    int32_t offset;
+    bool invert;
   } Servo;
 
   std::map<uint8_t,Servo> servos_;
-  DYNAMIXEL::ControlTableItemInfo_t ctrlPresentPos_, ctrlGoalPos_, ctrlGoalVel_;
+  DYNAMIXEL::ControlTableItemInfo_t ctrlPresentPos_, ctrlGoalPos_, ctrlProfileVel_;
   static const uint16_t userPktBufCap = 128;
   uint8_t userPktBuf[userPktBufCap];
 
