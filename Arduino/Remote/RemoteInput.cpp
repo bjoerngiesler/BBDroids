@@ -63,17 +63,11 @@ bool RemoteInput::begin() {
 void RemoteInput::update() {
   joyH = (float)(analogRead(P_A_JOY_HOR) - 512 + CalibBiasJoystickHorizontal) / 512.0f;
   if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;
-  else if(joyH > 1.0f) joyH = 1.0f;
-  else if(joyH < -1.0f) joyH = -1.0f;
-  if(joyH < 0) joyH = -(joyH * joyH);
-  else joyH = joyH * joyH;
+  joyH = constrain(joyH, -1.0f, 1.0f);
   
   joyV = (float)(analogRead(P_A_JOY_VER) - 512 + CalibBiasJoystickVertical) / 512.0f;
   if(abs(joyV) < JoystickEpsilon) joyV = 0.0f;
-  else if(joyV > 1.0f) joyV = 1.0f;
-  else if(joyV < -1.0f) joyV = -1.0f;
-  if(joyV < 0) joyV = -(joyV * joyV);
-  else joyV = joyV * joyV;
+  joyV = constrain(joyV, -1.0f, 1.0f);
 
   battery = (float)(analogRead(P_A_BATT_CHECK) / 1024.0f);
 #if !defined(LEFT_REMOTE)

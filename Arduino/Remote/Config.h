@@ -1,6 +1,6 @@
 #include <Arduino.h>
 
-#define LEFT_REMOTE 
+//#define LEFT_REMOTE 
 
 #if defined(LEFT_REMOTE)
 
