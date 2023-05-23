@@ -24,7 +24,23 @@ VAL_IMU_RAW_H           = 11
 VAL_IMU_FILTERED_R      = 12
 VAL_IMU_FILTERED_P      = 13
 VAL_IMU_FILTERED_H      = 14
-VAL_LAST                = 15
+VAL_REMOTE_L_AXIS0      = 15
+VAL_REMOTE_L_AXIS1      = 16
+VAL_REMOTE_L_AXIS2      = 17
+VAL_REMOTE_L_AXIS3      = 18
+VAL_REMOTE_L_AXIS4      = 19
+VAL_REMOTE_R_AXIS0      = 20
+VAL_REMOTE_R_AXIS1      = 21
+VAL_REMOTE_R_AXIS2      = 22
+VAL_REMOTE_R_AXIS3      = 23
+VAL_REMOTE_R_AXIS4      = 24
+VAL_ROLL_GOAL           = 25
+VAL_ROLL_CURRENT        = 26
+VAL_ROLL_ERR            = 27
+VAL_ROLL_ERR_I          = 28
+VAL_ROLL_ERR_D          = 29
+VAL_ROLL_CONTROL        = 30
+VAL_LAST                = 31
 
 class BB8DearPyGui:
 	def __init__(self):
@@ -44,7 +60,10 @@ class BB8DearPyGui:
 		self.startTime = time.time()
 
 		self.drivePlot = DataPlot(("goal", "current", "err", "errI", "errD", "control"), 1024)
+		self.rollPlot = DataPlot(("goal", "current", "err", "errI", "errD", "control"), 1024)
 		self.imuPlot = DataPlot(("raw r", "raw p", "raw h", "filt r", "filt p", "filt h"), 1024)
+		self.remoteLPlot = DataPlot(("axis0", "axis1", "axis2", "axis3", "axis4"), 1024)
+		self.remoteRPlot = DataPlot(("axis0", "axis1", "axis2", "axis3", "axis4"), 1024)
 
 	def selectDroidCallback(self, appdata, userdata):
 		self.handler.selectAddress(userdata)
@@ -79,11 +98,12 @@ class BB8DearPyGui:
 			self.steerByIMU = False
 
 	def newDroidDiscoveredCallback(self):
-		discovered = self.handler.addressesDiscovered()
-		dpg.configure_item(self.droidsbox, items=discovered)
-		if len(discovered) == 1:
-			self.handler.selectAddress(discovered[0])
-			dpg.configure_item(self.droidsbox, default_value = discovered[0])
+		pass
+		# discovered = self.handler.addressesDiscovered()
+		# dpg.configure_item(self.droidsbox, items=discovered)
+		# if len(discovered) == 1:
+		# 	self.handler.selectAddress(discovered[0])
+		# 	dpg.configure_item(self.droidsbox, default_value = discovered[0])
 
 	def servoSliderCallback(self, appdata, userdata):
 		for i in range(len(self.servoSliders)):
@@ -107,7 +127,7 @@ class BB8DearPyGui:
 				self.yawSeries = dpg.add_line_series([], [], label="yaw", parent=self.plotYAxis)
 
 	def createStatusWindow(self):
-		with dpg.window(label="Status", height=600, width=500, pos=[420, 0]):
+		with dpg.window(label="Status", tag="Status", height=-1, width=-1):
 			self.hzText = dpg.add_text("GUI: -Hz Droid messages: -Hz Framedrops: - (-%)")
 			with dpg.group(horizontal=True):
 				dpg.add_text("Status: ")
@@ -125,9 +145,16 @@ class BB8DearPyGui:
 
 			with dpg.tab_bar():	
 				with dpg.tab(label="Drive Control"):
-					self.drivePlot.createGUI(480, 380, "Drive Control")
+					self.drivePlot.createGUI(-1, -1)
+				with dpg.tab(label="Roll Control"):
+					self.rollPlot.createGUI(-1, -1)
 				with dpg.tab(label="IMU"):
-					self.imuPlot.createGUI(480, 380, "IMU")
+					self.imuPlot.createGUI(-1, -1)
+				with dpg.tab(label="Remote L"):
+					self.remoteLPlot.createGUI(-1, -1)
+				with dpg.tab(label="Remote R"):
+					self.remoteRPlot.createGUI(-1, -1)
+
 
 
 	def collectData(self):
@@ -153,8 +180,14 @@ class BB8DearPyGui:
 
 			v = list(map(self.handler.getFloatVal, (VAL_DRIVE_GOAL, VAL_DRIVE_CURRENT_SPEED, VAL_CTRL_ERR, VAL_CTRL_ERR_I, VAL_CTRL_ERR_D, VAL_CTRL_CONTROL)))
 			self.drivePlot.addDataVector(self.handler.getFloatVal(VAL_TIMESTAMP), v)
+			v = list(map(self.handler.getFloatVal, (VAL_ROLL_GOAL, VAL_ROLL_CURRENT, VAL_ROLL_ERR, VAL_ROLL_ERR_I, VAL_ROLL_ERR_D, VAL_ROLL_CONTROL)))
+			self.rollPlot.addDataVector(self.handler.getFloatVal(VAL_TIMESTAMP), v)
 			v = list(map(self.handler.getFloatVal, (VAL_IMU_RAW_R, VAL_IMU_RAW_P, VAL_IMU_RAW_H, VAL_IMU_FILTERED_R, VAL_IMU_FILTERED_P, VAL_IMU_FILTERED_H)))
 			self.imuPlot.addDataVector(self.handler.getFloatVal(VAL_TIMESTAMP), v)
+			v = list(map(self.handler.getFloatVal, (VAL_REMOTE_L_AXIS0, VAL_REMOTE_L_AXIS1, VAL_REMOTE_L_AXIS2, VAL_REMOTE_L_AXIS3, VAL_REMOTE_L_AXIS4)))
+			self.remoteLPlot.addDataVector(self.handler.getFloatVal(VAL_TIMESTAMP), v)
+			v = list(map(self.handler.getFloatVal, (VAL_REMOTE_R_AXIS0, VAL_REMOTE_R_AXIS1, VAL_REMOTE_R_AXIS2, VAL_REMOTE_R_AXIS3, VAL_REMOTE_R_AXIS4)))
+			self.remoteRPlot.addDataVector(self.handler.getFloatVal(VAL_TIMESTAMP), v)
 			
 			if self.handler.getMotorsOK():
 				dpg.configure_item(self.motorsText, color=(0, 255, 0, 255))
@@ -181,12 +214,12 @@ class BB8DearPyGui:
 		dpg.create_context()
 		dpg.create_viewport()
 		
-		self.createDroidAndRemoteSelector()	
 		self.createStatusWindow()
-		self.createRemoteWindow()
+		#self.createRemoteWindow()
 
 		dpg.setup_dearpygui()
 		dpg.show_viewport()
+		dpg.set_primary_window("Status", True)
 		while dpg.is_dearpygui_running():
 			self.collectData()
 			if self.steerByIMU:

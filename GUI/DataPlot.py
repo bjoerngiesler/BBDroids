@@ -44,13 +44,13 @@ class DataPlot:
 			dpg.configure_item(self.pauseButton_, label="Continue")
 			self.paused_ = True
 
-	def createGUI(self, width, height, label):
+	def createGUI(self, width, height, label=""):
 		with dpg.group(horizontal=True):
 			self.recordButton_ = dpg.add_button(label="Record", callback=self.recordCallback)
 			self.csvText_ = dpg.add_input_text(label="CSV")
 			self.pauseButton_ = dpg.add_button(label="Pause", callback=self.pauseCallback)
 
-		with dpg.plot(label=label, width=width, height=height-30	):
+		with dpg.plot(label=label, width=width, height=height):
 			dpg.add_plot_legend()
 			self.xAxis_ = dpg.add_plot_axis(dpg.mvXAxis, label="t")
 			self.yAxis_ = dpg.add_plot_axis(dpg.mvYAxis, label="value")

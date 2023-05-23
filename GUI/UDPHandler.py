@@ -2,7 +2,7 @@ import socket
 import struct
 
 STATE_PORTNUM = 3000
-UNPACK_FORMAT = "<" + 15*"f"
+UNPACK_FORMAT = "<" + 31*"f"
 
 class UDPHandler:
 	def __init__(self):
