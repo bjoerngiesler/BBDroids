@@ -11,9 +11,9 @@
 
 using namespace bb;
 
-class BB8BodyIMU {
+class BB8IMU {
 public:
-  static BB8BodyIMU imu;
+  static BB8IMU imu;
 
   bool begin();
 
@@ -34,7 +34,7 @@ public:
 
   void printStats(const arduino::String& prefix = "");
 private:  
-  BB8BodyIMU();
+  BB8IMU();
 
   Madgwick madgwick_;
   bool available_;

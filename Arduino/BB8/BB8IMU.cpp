@@ -7,16 +7,15 @@
 
 using namespace bb;
 
-BB8BodyIMU BB8BodyIMU::imu;
-//BB8IMU BB8IMU::dome;
+BB8IMU BB8IMU::imu;
 
-BB8BodyIMU::BB8BodyIMU() {
+BB8IMU::BB8IMU() {
   available_ = false;
   calR_ = calP_ = calH_ = 0.0f;
   intRunning_ = false;
 }
 
-bool BB8BodyIMU::begin() {
+bool BB8IMU::begin() {
   if(available_) return true;
   Serial.print("Setting up Body IMU... ");
   if(!imu_.begin_I2C()) {
@@ -55,7 +54,7 @@ bool BB8BodyIMU::begin() {
   return true;
 }
 
-void BB8BodyIMU::printStats(const String& prefix) {
+void BB8IMU::printStats(const String& prefix) {
   if(!available_ || NULL == temp_ || NULL == accel_ || NULL == gyro_)
     return;
 
@@ -65,20 +64,21 @@ void BB8BodyIMU::printStats(const String& prefix) {
   gyro_->printSensorDetails();
 }
 
-bool BB8BodyIMU::update() {
+bool BB8IMU::update() {
   if(!available_) return false;
 
   float x, y, z;
-
-  if(imu_.gyroscopeAvailable()) imu_.readGyroscope(lastR_, lastP_, lastH_);
-  if(imu_.accelerationAvailable()) imu_.readAcceleration(x, y, z);
+  if(!imu_.gyroscopeAvailable() || !imu_.accelerationAvailable()) return false;
+  
+  imu_.readGyroscope(lastR_, lastP_, lastH_);
+  imu_.readAcceleration(x, y, z);
 
   madgwick_.updateIMU(lastR_ + calR_, lastP_ + calP_, lastH_ + calH_, x, y, z);
 
   return true;
 }
 
-bool BB8BodyIMU::getFilteredRPH(float &r, float &p, float &h) {
+bool BB8IMU::getFilteredRPH(float &r, float &p, float &h) {
   if(!available_) return false;
 
   r = madgwick_.getRoll();
@@ -87,7 +87,7 @@ bool BB8BodyIMU::getFilteredRPH(float &r, float &p, float &h) {
   return true;
 }
 
-bool BB8BodyIMU::integrateGyroMeasurement(bool reset) {
+bool BB8IMU::integrateGyroMeasurement(bool reset) {
   if(!available_) return false;
 
   sensors_event_t g;
@@ -121,14 +121,14 @@ bool BB8BodyIMU::integrateGyroMeasurement(bool reset) {
   return true;
 }
 
-int BB8BodyIMU::getIntegratedGyroMeasurement(float& r, float& p, float& h) {
+int BB8IMU::getIntegratedGyroMeasurement(float& r, float& p, float& h) {
   if(!available_) return false;
 
   r = intR_*180.0/M_PI; p = intP_*180.0/M_PI; h = intH_*180.0/M_PI;
   return intNum_;
 }
 
-bool BB8BodyIMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
+bool BB8IMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
   if(!available_) return false;
 
   r = lastR_; p = lastP_; h = lastH_;
@@ -141,7 +141,7 @@ bool BB8BodyIMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrate
   return true;
 }
 
-bool BB8BodyIMU::getAccelMeasurement(float &x, float &y, float &z, int32_t &t) {
+bool BB8IMU::getAccelMeasurement(float &x, float &y, float &z, int32_t &t) {
   if(!available_) return false;
 
   sensors_event_t a;
@@ -155,7 +155,7 @@ bool BB8BodyIMU::getAccelMeasurement(float &x, float &y, float &z, int32_t &t) {
 }
 
 
-bool BB8BodyIMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
+bool BB8IMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
   if(!available_) return false;
 
   double avgTemp = 0.0, avgR = 0.0, avgP = 0.0, avgH = 0.0;
@@ -194,7 +194,7 @@ bool BB8BodyIMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step
   return true;
 }
 
-bool BB8BodyIMU::printGyroMeasurementForPlot() {
+bool BB8IMU::printGyroMeasurementForPlot() {
   float r, p, h;
   int32_t t;
   getGyroMeasurement(r, p, h, false);
