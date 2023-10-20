@@ -2,11 +2,15 @@
 #define BBPACKETRECEIVER_H
 
 #include <BBError.h>
+#include <BBDCMotor.h>
 
 namespace bb {
-
-// Command packet struct
-typedef struct {
+/*
+ * REALTIME PROTOCOL
+ *
+ * This is designed to be sent via real-time remote control links.
+ */
+struct CommandPacket {
 	// byte 0
 	bool button0    : 1;
 	bool button1    : 1;
@@ -60,27 +64,27 @@ typedef struct {
 		}
 		return 0;
 	}
-} CommandPacket;     // 9 bytes long, maximum should be <=10
+};     // 7 bytes long, maximum should be <=10
 
-typedef struct {
+struct StatePacket {
 	uint8_t dummy;
-} StatePacket;
+};
 
-typedef enum {
+enum PacketType {
 	PACKET_TYPE_COMMAND = 0,
 	PACKET_TYPE_STATUS  = 1,
 	PACKET_TYPE_UNUSED1 = 2,
 	PACKET_TYPE_UNUSED2 = 3
-} PacketType;
+};
 
-typedef enum {
+enum PacketSource {
 	PACKET_SOURCE_LEFT_REMOTE  = 0,
 	PACKET_SOURCE_RIGHT_REMOTE = 1,
 	PACKET_SOURCE_DROID        = 2,
 	PACKET_SOURCE_TEST_ONLY    = 3
-} PacketSource;
+};
 
-typedef struct {
+struct Packet {
 	PacketType type     : 2;
 	PacketSource source : 2;
 	uint8_t seqnum      : 3; // automatically set by Runloop
@@ -90,21 +94,62 @@ typedef struct {
 		CommandPacket cmd;
 		StatePacket state;
 	} payload;
-} Packet;
+};
 
 static const uint8_t MAX_SEQUENCE_NUMBER = 8;
 
-typedef struct {
+struct PacketFrame {
 	Packet packet;
 	uint8_t crc  : 7;
 	bool highbit : 1;
-} PacketFrame;
+};
 
 uint8_t calculateCRC(const Packet& packet);
 
 class PacketReceiver { 
 public:
 	virtual Result incomingPacket(const Packet& packet) { (void)packet; return RES_OK; } // remote --> droid
+};
+
+/*
+ * STATUS / DIAGNOSTICS PROTOCOL
+ *
+ * This is designed to be sent via a checksummed highspeed protocol, like UDP, where packets can be up to 64kb long,
+ * and not much is lost if a packet is dropped. Do not use over realtime links used for remote control, for example.
+ */
+
+struct __attribute__ ((packed)) IMUState {
+	ErrorState errorState;
+	float r, p, h, dr, dp, dh, ax, ay, az;
+};
+
+struct __attribute__ ((packed)) ServoState {
+	ErrorState errorState;
+	float goal, present, load;
+};
+
+struct __attribute__ ((packed)) BatteryState {
+	ErrorState errorState;
+	float voltage, current;
+};
+
+enum DroidType {
+	DROID_R2    = 0, // differential driven, 360° rotating dome
+	DROID_BB8   = 1, // longitudinal/roll angle driven, 360° rotating dome
+	DROID_DO    = 2, // differential driven, servoed redundant dome
+	DROID_OTHER = 3
+};
+
+struct __attribute__ ((packed)) LargeStatusPacket {
+	float timestamp;
+	uint8_t droidType;
+	char droidName[16];
+
+	bb::EncoderMotor::DriveControlState drive[3];
+	IMUState imu[3];
+	CommandPacket lastCommand[2];
+	ServoState servo[10];
+	BatteryState battery[3];
 };
 
 };
