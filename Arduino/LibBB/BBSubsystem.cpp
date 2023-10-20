@@ -57,7 +57,7 @@ bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words,
 		if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		if(!isStarted()) stream->println(name() + " is not running.");
 		else {
-			stream->print(String("Starting ") + name() + "... ");
+			stream->print(String("Stopping ") + name() + "... ");
 			stream->println(errorMessage(stop(stream)));
 		}
 		return RES_OK;
@@ -65,10 +65,9 @@ bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words,
 
 	else if(words[0] == "get") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
-		const std::vector<Subsystem::ParameterDescription>& params = parameters();
-		for(auto& p: params) {
-			if(p.name == words[1]) {
-				printParameter(stream, p);
+		for(auto& p: parameters_) {
+			if(p.first == words[1]) {
+				printParameter(stream, p.first, p.second);
 				return RES_OK;
 			}
 		}
@@ -102,7 +101,7 @@ void bb::Subsystem::printStatus(ConsoleStream* stream) {
 
 void bb::Subsystem::printHelp(ConsoleStream* stream) {
 	stream->println(help());
-	if(parameters().size()) {
+	if(parameters_.size()) {
 		stream->println("Parameters:");
 		printParameters(stream);
 	} else {
@@ -111,33 +110,47 @@ void bb::Subsystem::printHelp(ConsoleStream* stream) {
 }
 
 void bb::Subsystem::printParameters(ConsoleStream* stream) {
-	const std::vector<Subsystem::ParameterDescription>& params = parameters();
-	if(!params.size()) return;
-	for(auto &p: params) {
-		printParameter(stream, p);
+	for(auto &p: parameters_) {
+		printParameter(stream, p.first, p.second);
 	}	
 }
 
-void bb::Subsystem::printParameter(ConsoleStream* stream, const bb::Subsystem::ParameterDescription& p) {
-	stream->print(p.name + " = ");
+void bb::Subsystem::printParameter(ConsoleStream* stream, const String& name, const Parameter* p) {
+	if(NULL == stream) return;
 
-	String val;
-	if(parameterValue(p.name, val) == RES_OK) {
-		if(p.type == PARAMETER_STRING) stream->print(String("\"") + val + "\"");
-		else stream->print(val);
-	} else { 
-		stream->print("ERR");
-	}
-
-	switch(p.type) {
-	case PARAMETER_UINT:   stream->print(" (uint)"); break;
-	case PARAMETER_INT:    stream->print(" (int)"); break;
-	case PARAMETER_FLOAT:  stream->print(" (float)"); break;
-	case PARAMETER_STRING: stream->print(" (string)"); break;
-	default: stream->print(" (unknown)"); break;
-	}
-
-	stream->print(" -- ");
-	stream->println(p.help);
+	stream->println(name + " = " + p->description());
 }
+
+bb::Result bb::Subsystem::addParameter(const String& name, const String& help, int& val, int min, int max) {
+	if(parameters_.find(name) != parameters_.end()) return RES_COMMON_DUPLICATE_IN_LIST;
+	parameters_[name] = new IntParameter(val, help, min, max);
+	return RES_OK;
+}
+
+bb::Result bb::Subsystem::addParameter(const String& name, const String& help, float& val, float min, float max) {
+	if(parameters_.find(name) != parameters_.end()) return RES_COMMON_DUPLICATE_IN_LIST;
+	parameters_[name] = new FloatParameter(val, help, min, max);
+	return RES_OK;
+}
+
+bb::Result bb::Subsystem::addParameter(const String& name, const String& help, String& val, int maxlen) {
+	if(parameters_.find(name) != parameters_.end()) return RES_COMMON_DUPLICATE_IN_LIST;
+	parameters_[name] = new StringParameter(val, help, maxlen);
+	return RES_OK;
+}
+
+bb::Result bb::Subsystem::addParameter(const String& name, const String& help, bool& val) {
+	if(parameters_.find(name) != parameters_.end()) return RES_COMMON_DUPLICATE_IN_LIST;
+	parameters_[name] = new BoolParameter(val, help);
+	return RES_OK;	
+}
+
+
+bb::Result bb::Subsystem::setParameterValue(const String& name, const String& stringval) {
+	if(parameters_.find(name) == parameters_.end()) return RES_PARAM_NO_SUCH_PARAMETER;
+	Parameter* p = parameters_[name];
+	bb::Result retval = p->fromString(stringval);
+	return retval;
+}
+
 

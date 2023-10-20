@@ -39,42 +39,34 @@ bool bb::WiFiConsoleStream::readStringUntil(unsigned char c, String& str) {
 
 void bb::WiFiConsoleStream::print(size_t val) {
 	client_.print(val);
-	client_.flush();
 }
 
 void bb::WiFiConsoleStream::print(int val) {
 	client_.print(val);
-	client_.flush();
 }
 
 void bb::WiFiConsoleStream::print(float val) {
 	client_.print(val);
-	client_.flush();
 }
 
 void bb::WiFiConsoleStream::print(const String& val) {
 	client_.print(val);
-	client_.flush();
 }
 
 void bb::WiFiConsoleStream::println(int val) {
 	client_.println(val);
-	client_.flush();
 }
 
 void bb::WiFiConsoleStream::println(float val) { 
 	client_.println(val);
-	client_.flush();
 }
 
 void bb::WiFiConsoleStream::println(const String& val) {
 	client_.println(val);
-	client_.flush();
 }
 
 void bb::WiFiConsoleStream::println() {
 	client_.println();
-	client_.flush();
 }
 
 bb::WifiServer::WifiServer() {
@@ -82,14 +74,14 @@ bb::WifiServer::WifiServer() {
 	udpStarted_ = false;
 
 	name_ = "wifi";
-	help_ = "Creates an access point or joins a local network. Starts a TCP server for interactive configuration and a UDP server for remote control.\r\nSSID and WPA Key replacements: $MAC - Mac address (hex format, no colons)";
-	description_ = "Wifi communication module (uninitialized)";
+	help_ = "Creates an AP or joins a network. Starts a shell on TCP.\r\nSSID and WPA Key replacements: $MAC - Mac address";
+	description_ = "Wifi comm module (uninitialized)";
 	
-	parameters_.push_back({"ssid", PARAMETER_STRING, "SSID for the Wifi server (if it contains spaces enclose in \"\")"});
- 	parameters_.push_back({"wpa_key", PARAMETER_STRING, "Password for the Wifi server (if it contains spaces enclose in \"\")"});
-	parameters_.push_back({"ap", PARAMETER_UINT, "Create an access point (1) or try to connect to an existing network (0)"});
-	parameters_.push_back({"terminal_port", PARAMETER_UINT, "TCP port for the terminal server"});
-	parameters_.push_back({"remote_port", PARAMETER_UINT, "UDP port for remote control"});
+	addParameter("ssid", "SSID", ssid_);
+	addParameter("wpa_key", "WPA Key", wpaKey_);
+	addParameter("ap", "Access Point Mode", params_.ap);
+	addParameter("terminal_port", "TCP port to use for terminal access", tcpPort_, 0, 32767);
+	addParameter("remote_port", "UDP port to use for remote packet publishing", udpPort_, 0, 32767);
 }
 
 bb::Result bb::WifiServer::initialize(const String& ssid, const String& wpakey, bool apmode, uint16_t udpPort, uint16_t tcpPort) {
@@ -120,17 +112,16 @@ bb::Result bb::WifiServer::setOTANameAndPassword(const String& name, const Strin
 #if !defined(ARDUINO_PICO_VERSION_STR)
 	if(WiFi.status() == WL_NO_MODULE) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 
+#if 0
 	byte mac[6];
 	WiFi.macAddress(mac);
-
-	char tmp[18]; 
-	memset(tmp, 0, sizeof(tmp));
-	sprintf(tmp, "%02x:%02x:%02x:%02x:%02x:%02x", mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
+	String tmp =	String(mac[5], HEX) + ":" + String(mac[4], HEX) + ":" + String(mac[3], HEX) + ":" + String(mac[2], HEX) + ":" + String(mac[1], HEX) + ":" + String(mac[0], HEX);
+#endif
 
 	otaName_ = name;
-	otaName_.replace("$MAC", tmp);
+//	otaName_.replace("$MAC", tmp);
 	otaPassword_ = password;
-	otaPassword_.replace("$MAC", tmp);
+//	otaPassword_.replace("$MAC", tmp);
 
 	return RES_OK;
 #else
@@ -139,19 +130,19 @@ bb::Result bb::WifiServer::setOTANameAndPassword(const String& name, const Strin
 }
 
 
-bb::WifiServer::~WifiServer() {
-}
-
 bb::Result bb::WifiServer::start(ConsoleStream* stream) {
-	if(WiFi.status() == WL_NO_MODULE) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+	if(WiFi.status() == WL_NO_MODULE) {
+		if(stream) stream->println("WL_NO_MODULE!");
+		return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+	} 
 
+	WiFi.noLowPowerMode();
+
+#if 0
 	byte mac[6];
 	WiFi.macAddress(mac);
-
-	char tmp[18]; 
-	memset(tmp, 0, sizeof(tmp));
-	sprintf(tmp, "%02x:%02x:%02x:%02x:%02x:%02x", mac[5], mac[4], mac[3], mac[2], mac[1], mac[0]);
-	macStr_ = tmp;
+	macStr_ = String(mac[5], HEX) + ":" + String(mac[4], HEX) + ":" + String(mac[3], HEX) + ":" + String(mac[2], HEX) + ":" + String(mac[1], HEX) + ":" + String(mac[0], HEX);
+#endif
 
 	ssid_ = params_.ssid;
 	wpaKey_ = params_.wpaKey;
@@ -218,10 +209,10 @@ bb::Result bb::WifiServer::step() {
 	int status = WiFi.status();
 	static int seqnum = 0;
 
-	if(seqnum == 1e6/Runloop::runloop.cycleTime()) {
+	if(seqnum == (1e6/Runloop::runloop.cycleTime())/2) {
 #if !defined(ARDUINO_PICO_VERSION_STR)
 		//Console::console.printlnBroadcast("Polling OTA");
-		ArduinoOTA.poll();
+		//ArduinoOTA.poll();
 #endif
 		seqnum = 0;
 		return RES_OK;
@@ -359,19 +350,19 @@ bool bb::WifiServer::sendUDPPacket(const IPAddress& addr, const uint8_t* packet,
 	if(WiFi.status() != WL_CONNECTED && WiFi.status() != WL_AP_CONNECTED) return false;
 	if(!udpStarted_) return false;
 	if(udp_.beginPacket(addr, params_.udpPort) == false) {
-		Console::console.printlnBroadcast("WiFiUDP.beginPacket() failed!");
+		Console::console.printlnBroadcast("beginPacket() failed!");
 		return false;
 	}
 
 	if(udp_.write(packet, len) != len) {
-		Console::console.printlnBroadcast("WiFiUDP.write() failed");
+		Console::console.printlnBroadcast("write() failed");
 		return false;
 	}
 
 	if(udp_.endPacket() == false) {
 		failures++;
 		if(failures > 10) {
-			Console::console.printlnBroadcast(String("WiFiUDP.endPacket() failed ") + failures + " in a row!");
+			Console::console.printlnBroadcast(String("endPacket() failed ") + failures + " in a row!");
 			failures = 0;
 		}
 
@@ -398,7 +389,7 @@ unsigned int bb::WifiServer::readDataIfAvailable(uint8_t *buf, unsigned int maxs
 
 void bb::WifiServer::updateDescription() {
 	if(WiFi.status() == WL_NO_MODULE) {
-		description_ = "Wifi communication module, status: no Wifi module installed.";
+		description_ = "No Wifi module installed.";
 		return;
 	}
 
@@ -417,15 +408,15 @@ void bb::WifiServer::updateDescription() {
     	description_ += "scan completed";
     	break;
     case WL_CONNECTED:
-    	description_ += "connected as client, local IP ";
+    	description_ += "connected as client, IP ";
     	ip = WiFi.localIP();
     	description_ += String(ip[0]) + "." + ip[1] + "." + ip[2] + "." + ip[3];
     	break;
     case WL_CONNECT_FAILED:
-    	description_ += "connection failed";
+    	description_ += "conn failed";
     	break;
     case WL_CONNECTION_LOST:
-    	description_ += "connection lost";
+    	description_ += "conn lost";
     	break;
     case WL_DISCONNECTED:
     	description_ += "disconnected";
@@ -434,7 +425,7 @@ void bb::WifiServer::updateDescription() {
     	description_ += "AP listening";
     	break;
     case WL_AP_CONNECTED:
-    	description_ += "connected as AP, local IP " + IPAddressToString(WiFi.localIP());
+    	description_ += "connected as AP, IP " + IPAddressToString(WiFi.localIP());
     	//ip = WiFi.localIP();
     	//description_ += String(ip[0]) + "." + ip[1] + "." + ip[2] + "." + ip[3];
     	break;
@@ -442,7 +433,7 @@ void bb::WifiServer::updateDescription() {
     	description_ += "AP setup failed";
     	break;
     default:
-    	description_ += "unknown status";
+    	description_ += "unknown";
     	break;
 	}
 

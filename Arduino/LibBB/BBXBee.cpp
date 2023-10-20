@@ -30,11 +30,11 @@ bb::XBee::XBee() {
 	"\tcontinuous on|off:  Start or stop sending a continuous stream of numbers (or zero command packets when in packet mode)\r\n"\
 	"\tpacket_mode on|off: Switch to packet mode\r\n";
 
-	parameters_.push_back({"channel", PARAMETER_UINT, "Communication channel (between 11 and 26, usually 12)"});
-	parameters_.push_back({"pan", PARAMETER_UINT, "Personal Area Network ID (16bit, 65535 is broadcast)"});
-	parameters_.push_back({"station", PARAMETER_UINT, "Station ID (MY) for this device (16bit)"});
-	parameters_.push_back({"partner", PARAMETER_UINT, "Partner ID this device should talk to (16bit)"});
-	parameters_.push_back({"bps", PARAMETER_UINT, "Communication bps rate"});
+	addParameter("channel", "Communication channel (between 11 and 26, usually 12)", chan_, 11, 26);
+	addParameter("pan", "Personal Area Network ID (16bit, 65535 is broadcast)", pan_, 0, 65535);
+	addParameter("station", "Station ID (MY) for this device (16bit)", station_, 0, 65535);
+	addParameter("partner", "Partner ID this device should talk to (16bit)", partner_, 0, 65535);
+	addParameter("bps", "Communication bps rate", bps_, 0, 200000);
 
 	paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(XBeeParams));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);

@@ -2,7 +2,9 @@
 #define BBSUBSYSTEM_H
 
 #include <Arduino.h>
+#include <map>
 #include <vector>
+#include <limits.h>
 #include "BBError.h"
 #include "BBConfigStorage.h"
 
@@ -25,46 +27,9 @@ protected:
 
 class Subsystem {
 public:
-	typedef enum {
-		PARAMETER_UINT,
-		PARAMETER_INT,
-		PARAMETER_FLOAT,
-		PARAMETER_STRING
-	} ParameterType;
-
-	typedef struct {
-		String name;
-		ParameterType type;
-#if 0
-		union val {
-			struct uintval {
-				unsigned int min, max;
-				unsigned int *valptr;
-			};
-			struct intval {
-				int min, max;
-				int *valptr;
-			};
-			struct floatval {
-				float min, max;
-				float *valptr;
-			};
-			struct stringval {
-				int maxlen;
-				char *valptr;
-			};
-		};
-		bb::ConfigStorage::HANDLE handle;
-#endif
-		String help;
-	} ParameterDescription;
-
 	virtual const String& name() { return name_; }
 	virtual const String& description() { return description_; }
 	virtual const String& help() { return help_; }
-	virtual const std::vector<ParameterDescription>& parameters() { return parameters_; }
-	virtual Result parameterValue(const String& name, String& value) { String n = name; String v = value; return RES_PARAM_NO_SUCH_PARAMETER; }
-	virtual Result setParameterValue(const String& name, const String& value) { String n = name; String v = value; return RES_PARAM_NO_SUCH_PARAMETER; }
 	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
 	virtual Result initialize() { operationStatus_ = RES_SUBSYS_NOT_STARTED; return registerWithManager(); };
@@ -79,10 +44,122 @@ public:
 	virtual void printStatus(ConsoleStream *stream);
 	virtual void printHelp(ConsoleStream *stream);
 	virtual void printParameters(ConsoleStream *stream);
-	virtual void printParameter(ConsoleStream *stream, const ParameterDescription& p);
+
+	virtual Result addParameter(const String& name, const String& help, int& param, int min = INT_MIN, int max = INT_MAX);
+	virtual Result addParameter(const String& name, const String& help, float& param, float min = INT_MIN, float max = INT_MAX);
+	virtual Result addParameter(const String& name, const String& help, String& param, int maxlen = 0);
+	virtual Result addParameter(const String& name, const String& help, bool& val);
+
+	virtual Result setParameterValue(const String& name, const String& stringVal);
 
 protected:
-	std::vector<ParameterDescription> parameters_;
+	class Parameter {
+	public:
+		virtual Result fromString(const String& str) = 0;
+		virtual String toString() const = 0;
+		virtual String description() const = 0;
+	};
+
+	class IntParameter: public Parameter {
+	public:
+		IntParameter(int& val, String help, int min=INT_MIN, int max=INT_MAX): val_(val), help_(help), min_(min), max_(max) {}
+		virtual Result fromString(const String& str) {
+			int v = str.toInt();
+			if(v<min_ || v>max_) return RES_COMMON_OUT_OF_RANGE;
+			val_ = v;
+			return RES_OK;
+		}
+		virtual String toString() const { return String(val_); }
+		virtual String description() const { 
+			String str = toString() + " [";
+			if(min_==INT_MAX) str+="-inf"; else str+=min_;
+			str += "..";
+			if(max_==INT_MAX) str+="inf"; else str+=max_;
+			str += "]";
+			if(help_.length() != 0) str = str + ": " + help_; 
+			return str;
+		}
+	protected:
+		int& val_;
+		int min_, max_;
+		String help_;
+	};
+
+	class FloatParameter: public Parameter {
+	public:
+		FloatParameter(float& val, String help, float min=INT_MIN, float max=INT_MAX): val_(val), help_(help), min_(min), max_(max) {}
+		virtual Result fromString(const String& str) {
+			float v = str.toFloat();
+			if(v<min_ || v>max_) return RES_COMMON_OUT_OF_RANGE;
+			val_ = v;
+			return RES_OK;
+		}
+		virtual String toString() const { return String(val_, 10); }
+		virtual String description() const { 
+			String str = toString() + " [";
+			if(min_==INT_MAX) str+="-inf"; else str+=min_;
+			str += "..";
+			if(max_==INT_MAX) str+="inf"; else str+=max_;
+			str += "]";
+			if(help_.length() != 0) str = str + ": " + help_; 
+			return str;
+		}
+	protected:
+		float& val_;
+		float min_, max_;
+		String help_;
+	};
+
+	class StringParameter: public Parameter {
+	public:
+		StringParameter(String& val, String help, int maxlen=0): val_(val), help_(help), maxlen_(maxlen) {}
+		virtual Result fromString(const String& str) { 
+			if(maxlen_ > 0 && str.length() <= maxlen_) {
+				val_ = str; 
+				return RES_OK; 
+			} 
+			return RES_COMMON_OUT_OF_RANGE;
+		}
+		virtual String toString() const { return val_; }
+		virtual String description() const { 
+			String str = toString();
+			if(maxlen_ != 0) str = str + " (max length " + maxlen_ + ")";
+			if(help_.length() != 0) str = str + ": " + help_; 
+			return str;
+		}
+	protected:
+		String& val_;
+		int maxlen_;
+		String help_;
+	};	
+
+	class BoolParameter: public Parameter {
+	public:
+		BoolParameter(bool& val, String help): val_(val), help_(help) {}
+		virtual Result fromString(const String& str) { 
+			if(str == "true" || str == "yes" || str == "1") {
+				val_ = true;
+				return RES_OK;
+			} else if(str == "false" || str == "no" || str == "0") {
+				val_ = false;
+				return RES_OK;
+			}
+			return RES_COMMON_OUT_OF_RANGE;
+		}
+		virtual String toString() const { return val_ ? "true" : "false"; }
+		virtual String description() const { 
+			String str = toString();
+			if(help_.length() != 0) str = str + ": " + help_; 
+			return str;
+		}
+	protected:
+		bool& val_;
+		String help_;
+	};
+
+	virtual void printParameter(ConsoleStream *stream, const String& name, const Parameter* p);
+
+	std::map<String, Parameter*> parameters_;
 	bool started_, begun_;
 	Result operationStatus_;
 	String name_, description_, help_;

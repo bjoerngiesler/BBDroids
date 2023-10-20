@@ -66,7 +66,6 @@ public:
 
 protected:
 	WifiServer();
-	~WifiServer();
 
 	unsigned int readDataIfAvailable(uint8_t* buf, unsigned int maxsize, IPAddress& remoteIP);
 	void updateDescription();
@@ -78,6 +77,7 @@ protected:
 	WiFiConsoleStream consoleStream_;
 	String macStr_, ssid_, wpaKey_;
 	String otaName_, otaPassword_;
+	int udpPort_, tcpPort_;
 
 	typedef struct {
 		char ssid[MAX_STRLEN+1], wpaKey[MAX_STRLEN+1];

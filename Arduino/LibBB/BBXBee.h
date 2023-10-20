@@ -78,6 +78,8 @@ protected:
 	HardwareSerial* uart_;
 	unsigned int currentBPS_;
 
+	int chan_, pan_, station_, partner_, bps_;
+
 	typedef struct {
 		uint8_t chan;
 		uint16_t pan, station, partner;
