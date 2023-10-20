@@ -9,8 +9,6 @@ import time
 
 from DataPlot import DataPlot
 
-from PacketIndices import *
-
 class BB8DearPyGui:
 	def __init__(self):
 		self.handler = UDPHandler()
@@ -31,8 +29,9 @@ class BB8DearPyGui:
 		self.drive0Plot = DataPlot(("goal", "current", "err", "errI", "errD", "control"), 1024)
 		self.drive1Plot = DataPlot(("goal", "current", "err", "errI", "errD", "control"), 1024)
 		self.drive2Plot = DataPlot(("goal", "current", "err", "errI", "errD", "control"), 1024)
-		self.imu0Plot = DataPlot(("raw r", "raw p", "raw h", "filt r", "filt p", "filt h"), 1024)
-		self.imu1Plot = DataPlot(("raw r", "raw p", "raw h", "filt r", "filt p", "filt h"), 1024)
+		self.imu0Plot = DataPlot(("r", "p", "h", "dr", "dp", "dh", "ax", "ay", "az"), 1024)
+		self.imu1Plot = DataPlot(("r", "p", "h", "dr", "dp", "dh", "ax", "ay", "az"), 1024)
+		self.imu2Plot = DataPlot(("r", "p", "h", "dr", "dp", "dh", "ax", "ay", "az"), 1024)
 		self.remoteLPlot = DataPlot(("axis0", "axis1", "axis2", "axis3", "axis4"), 1024)
 		self.remoteRPlot = DataPlot(("axis0", "axis1", "axis2", "axis3", "axis4"), 1024)
 		self.battVoltagePlot = DataPlot(("batt1 voltage", "batt2 voltage"), 1024)
@@ -107,6 +106,8 @@ class BB8DearPyGui:
 					self.imu0Plot.createGUI(-1, -1)
 				with dpg.tab(label="IMU 1"):
 					self.imu1Plot.createGUI(-1, -1)
+				with dpg.tab(label="IMU 2"):
+					self.imu2Plot.createGUI(-1, -1)
 				with dpg.tab(label="Remote L"):
 					self.remoteLPlot.createGUI(-1, -1)
 				with dpg.tab(label="Remote R"):
@@ -146,13 +147,26 @@ class BB8DearPyGui:
 
 			# self.lastDroidMsgTime = time.time()
 
-			#v = list(map(self.handler.getFloatVal, (VAL_DRIVE_GOAL, VAL_DRIVE_CURRENT_SPEED, VAL_CTRL_ERR, VAL_CTRL_ERR_I, VAL_CTRL_ERR_D, VAL_CTRL_CONTROL)))
 			d = packet.drive[0]
-			self.drive0Plot.addDataVector(packet.timestamp, (d.goal, d.presentSpeed, d.err, d.errI, d.errD, d.control))
+			if d.errorState == 1:
+				self.drive0Plot.addDataVector(packet.timestamp, (d.goal, d.presentSpeed, d.err, d.errI, d.errD, d.control))
 			d = packet.drive[1]
-			self.drive1Plot.addDataVector(packet.timestamp, (d.goal, d.presentSpeed, d.err, d.errI, d.errD, d.control))
+			if d.errorState == 1:
+				self.drive1Plot.addDataVector(packet.timestamp, (d.goal, d.presentSpeed, d.err, d.errI, d.errD, d.control))
 			d = packet.drive[2]
-			self.drive2Plot.addDataVector(packet.timestamp, (d.goal, d.presentSpeed, d.err, d.errI, d.errD, d.control))
+			if d.errorState == 1:
+				self.drive2Plot.addDataVector(packet.timestamp, (d.goal, d.presentSpeed, d.err, d.errI, d.errD, d.control))
+
+			i = packet.imu[0]
+			if i.errorState == 1:
+				self.imu0Plot.addDataVector(packet.timestamp, (i.r, i.p, i.h, i.dr, i.dp, i.dh, i.ax, i.ay, i.az))
+			i = packet.imu[1]
+			if i.errorState == 1:
+				self.imu1Plot.addDataVector(packet.timestamp, (i.r, i.p, i.h, i.dr, i.dp, i.dh, i.ax, i.ay, i.az))
+			i = packet.imu[2]
+			if i.errorState == 1:
+				self.imu2Plot.addDataVector(packet.timestamp, (i.r, i.p, i.h, i.dr, i.dp, i.dh, i.ax, i.ay, i.az))
+
 			# v = list(map(self.handler.getFloatVal, (VAL_ROLL_GOAL, VAL_ROLL_PRESENT, VAL_ROLL_ERR, VAL_ROLL_ERR_I, VAL_ROLL_ERR_D, VAL_ROLL_CONTROL)))
 			# self.rollPlot.addDataVector(self.handler.getFloatVal(VAL_TIMESTAMP), v)
 			# v = list(map(self.handler.getFloatVal, (VAL_IMU_RAW_R, VAL_IMU_RAW_P, VAL_IMU_RAW_H, VAL_IMU_FILTERED_R, VAL_IMU_FILTERED_P, VAL_IMU_FILTERED_H)))

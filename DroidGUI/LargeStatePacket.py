@@ -60,3 +60,10 @@ class LargeStatePacket:
 		i += DriveControlState.numValues()
 		self.drive.append(DriveControlState(t[i:i+DriveControlState.numValues()]))
 		i += DriveControlState.numValues()
+		self.imu = []
+		self.imu.append(IMUState(t[i:i+IMUState.numValues()]))
+		i += IMUState.numValues()
+		self.imu.append(IMUState(t[i:i+IMUState.numValues()]))
+		i += IMUState.numValues()
+		self.imu.append(IMUState(t[i:i+IMUState.numValues()]))
+		i += IMUState.numValues()

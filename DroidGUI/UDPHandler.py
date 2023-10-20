@@ -1,6 +1,5 @@
 import socket
 
-from PacketIndices import *
 from LargeStatePacket import LargeStatePacket
 
 STATE_PORTNUM = 3000
