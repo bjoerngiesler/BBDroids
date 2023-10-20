@@ -8,7 +8,7 @@ bb::Runloop bb::Runloop::runloop;
 bb::Runloop::Runloop() {
 	name_ = "runloop";
 	description_ = "Main runloop";
-	help_ = "This gets started once after all subsystems are added. It runs through all of them, calling their step() function. Its start() never returns directly, but will return if its stop() is called.\n"\
+	help_ = "Started once after all subsystems are added. Its start() only returns if stop() is called.\n"\
 "Commands:\n"\
 "\trunning_status [on|off]: Print running status on timing";
 	cycleTime_ = DEFAULT_CYCLETIME;
@@ -24,6 +24,7 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 	seqnum_ = 0;
 	startTime_ = millis();
 
+	if(Console::console.isStarted()) Console::console.printGreeting();
 	while(running_) {
 		unsigned long micros_start_loop = micros();
 
