@@ -6,6 +6,17 @@
 namespace bb {
 
 typedef enum {
+	ERROR_NOT_PRESENT = 0x00,
+	ERROR_OK          = 0x01,
+	ERROR_COMM        = 0x02,
+	ERROR_FLAGS       = 0x0f,
+	ERROR_VOLTAGE     = 0x10,
+	ERROR_TEMP        = 0x20,
+	ERROR_OVERLOAD    = 0x40,
+	ERROR_OTHER       = 0x80
+} ErrorState;
+
+typedef enum {
 	RES_OK = 0, // no error :-) 
 	RES_PARAM_NO_SUCH_PARAMETER = 1,
 	RES_PARAM_INVALID_TYPE = 2,
@@ -35,7 +46,8 @@ typedef enum {
 	RES_PACKET_TOO_SHORT = 26,
 	RES_PACKET_TOO_LONG = 27,
 	RES_PACKET_INVALID_PACKET = 28,
-	RES_CMD_FAILURE = 29
+	RES_CMD_FAILURE = 29,
+	RES_COMMON_OUT_OF_RANGE = 30
 } Result;
 
 const String& errorMessage(Result res);

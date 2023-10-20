@@ -30,12 +30,13 @@ static String messages[] = {
 	"Packet too short.", // 26
 	"Packet too long.", // 27
 	"Packet invalid.", // 28
-	"Failure." // 29
+	"Failure.", // 29
+	"Out of range." // 30
 };
 
 static String UnknownError = "Unknown Error";
 
-static size_t numMessages = 30;
+static size_t numMessages = 31;
 
 const String& bb::errorMessage(Result res) {
 	if((size_t)res >= numMessages) return UnknownError;
