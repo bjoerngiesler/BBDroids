@@ -2,6 +2,7 @@
 #define BBDCMOTOR_H
 
 #include <Arduino.h>
+#include <BBError.h>
 #if defined(ARDUINO_ARCH_SAMD)
 #include <Encoder.h>
 #endif
@@ -17,11 +18,23 @@ public:
     DCM_BACKWARD
   } Direction;
 
-  DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en);
+  static const uint8_t PIN_OFF = 255;
+
+  typedef enum {
+    SCHEME_A_B_PWM,
+    SCHEME_PWM_A_PWM_B
+  } Scheme;
+
+  // Use to initialize a motor that has A/B/PWM control scheme
+  DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en = PIN_OFF);
+  // Use to initialize a motor that has PWM_A/PWM_B control scheme
+  DCMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b);
 
   virtual bool begin();
 
   virtual void setDirectionAndSpeed(Direction dir, uint8_t speed);
+  virtual Direction direction() { return dir_; }
+  virtual uint8_t speed() { return speed_; }
   virtual void setEnabled(bool en);
   virtual bool isEnabled() {
     return en_;
@@ -32,24 +45,33 @@ protected:
   Direction dir_;
   uint8_t speed_;
   bool en_;
+  Scheme scheme_;
 };
 
 #if defined(ARDUINO_ARCH_SAMD)
 
 class EncoderMotor: public DCMotor {
 public:
-  typedef enum {
+  enum ControlMode {
     CONTROL_PWM,
     CONTROL_SPEED,
     CONTROL_POSITION
-  } ControlMode;
+  };
 
-  typedef enum {
+  enum Unit {
     UNIT_MILLIMETERS,
     UNIT_TICKS
-  } Unit;
+  };
+
+  struct __attribute__ ((packed)) DriveControlState {
+    ErrorState errorState;
+    ControlMode controlMode;
+    float presentPWM, presentSpeed, presentPos;
+    float goal, err, errI, errD, control; 
+  };
 
   EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en, uint8_t pin_enc_a, uint8_t pin_enc_b);
+  EncoderMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b, uint8_t pin_enc_a, uint8_t pin_enc_b);
 
   void setReverse(bool reverse);
 
@@ -67,18 +89,20 @@ public:
   void getSpeedControlState(float& err, float& errI, float& errD, float& control) { err = errSpeedL_; errI = errSpeedI_; errD = errSpeedD_; control = controlSpeed_; }
   void setPosControlParameters(float kp, float ki, float kd);
   void getPosControlParameters(float &kp, float &ki, float &kd) { kp = kpPos_; ki = kiPos_; kd = kdPos_; }
-  float getCurrentPWM() { return currentPWM_; }
-  float getCurrentSpeed(Unit unit = UNIT_MILLIMETERS);
-  float getCurrentPosition(Unit unit = UNIT_MILLIMETERS);
+  float getPresentPWM() { return presentPWM_; }
+  float getPresentSpeed(Unit unit = UNIT_MILLIMETERS);
+  float getPresentPosition(Unit unit = UNIT_MILLIMETERS);
+
+  DriveControlState getDriveControlState();
 
   void update();
 
   long getLastCycleTicks() { return lastCycleTicks_; }
 
 protected:
-  void pwmControlUpdate();
-  void speedControlUpdate();
-  void positionControlUpdate();
+  void pwmControlUpdate(float dt);
+  void speedControlUpdate(float dt);
+  void positionControlUpdate(float dt);
 
   Encoder enc_;
   float mmPT_;
@@ -89,16 +113,16 @@ protected:
   ControlMode mode_;
 
   float accel_;
+
   float goal_;
-  float currentPWM_;
-  float currentSpeed_; // internally always in encoder ticks per second
-  long currentPos_;    // internally always in encoder ticks
+  float presentPWM_;
+  float presentSpeed_; // internally always in encoder ticks per second
+  long presentPos_;    // internally always in encoder ticks
 
   float kpSpeed_, kiSpeed_, kdSpeed_;
-  float errSpeedI_, errSpeedL_;
-  float errSpeedD_, controlSpeed_;
+  float errSpeedL_, errSpeedI_, errSpeedD_, controlSpeed_;
   float kpPos_, kiPos_, kdPos_;
-  float errPosI_, errPosL_;
+  float errPosL_, errPosI_, errPosD_, controlPos_;
 
   bool reverse_;
 };
