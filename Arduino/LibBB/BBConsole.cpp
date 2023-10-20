@@ -1,5 +1,6 @@
 #include "BBConsole.h"
 #include "BBConfigStorage.h"
+#include "BBRunloop.h"
 
 bb::Console bb::Console::console;
 
@@ -9,7 +10,6 @@ bb::SerialConsoleStream::SerialConsoleStream(HardwareSerial& ser): ser_(ser), op
 bool bb::SerialConsoleStream::available() {
 	if(!opened_ && ser_) {
 		opened_ = true;
-		printGreeting();
 	}
 	return ser_.available(); 
 }
@@ -68,12 +68,6 @@ void bb::SerialConsoleStream::println() {
 	ser_.println(); 
 }
 
-void bb::SerialConsoleStream::printGreeting() {
-	ser_.println("Console ready. Type \"help\" for instructions.");
-	ser_.print("> ");
-	ser_.flush();
-}
-
 bb::Console::Console() {
 	name_ = "console";
 	description_ = "Console interaction facility";
@@ -108,7 +102,6 @@ void bb::Console::addConsoleStream(ConsoleStream* stream) {
 		if(streams_[i] == stream) return; // already have this
 	}
 	streams_.push_back(stream);
-	stream->println("Console ready. Type \"help\" for instructions. Please set your terminal to send LF or CR+LF as line ending.\n> ");
 }
 
 void bb::Console::removeConsoleStream(ConsoleStream* stream) {
@@ -121,7 +114,8 @@ void bb::Console::removeConsoleStream(ConsoleStream* stream) {
 }
 
 void bb::Console::handleStreamInput(ConsoleStream* stream) {
-	if(!stream->available()) return;
+	int avail = stream->available();
+	if(avail == 0) return;
 
 	String str;
 	if(stream->readStringUntil('\n', str) == false) return;
@@ -136,16 +130,19 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 	}
 
 	if(words[0] == "help") {
+		bb::Runloop::runloop.excuseOverrun();
 		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
 		printHelpAllSubsystems(stream);
 	} 
 
 	else if(words[0] == "status") {
+		bb::Runloop::runloop.excuseOverrun();
 		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
 		printStatusAllSubsystems(stream);
 	} 
 
 	else if(words[0] == "start") {
+		bb::Runloop::runloop.excuseOverrun();
 		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
 		stream->println("Starting all stopped subsystems");
 		for(auto& s: SubsystemManager::manager.subsystems()) {
@@ -157,6 +154,7 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 	}
 		
 	else if(words[0] == "stop") {
+		bb::Runloop::runloop.excuseOverrun();
 		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
 		stream->println("Stopping all running subsystems");
 		std::vector<Subsystem*> subsystems = SubsystemManager::manager.subsystems();
@@ -192,6 +190,19 @@ void bb::Console::printBroadcast(const String& val) {
 void bb::Console::printlnBroadcast(const String& val) {
 	for(size_t i = 0; i<streams_.size(); i++) streams_[i]->println(val);
 }
+
+void bb::Console::printGreeting(ConsoleStream* stream) {
+	if(stream != NULL) {
+		stream->println("Console ready. Type \"help\" for instructions.");
+		stream->print("> ");
+	} else {
+		for(auto s: streams_) {
+			s->println("Console ready. Type \"help\" for instructions.");
+			s->print("> ");
+		}
+	}
+}
+
 
 void bb::Console::printHelpAllSubsystems(ConsoleStream* stream) {
 	stream->println("The following commands are available on top level:");

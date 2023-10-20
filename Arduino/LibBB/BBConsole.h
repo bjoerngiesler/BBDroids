@@ -37,7 +37,6 @@ public:
 	virtual void println(const String& val);
 	virtual void println();
 protected:
-	void printGreeting();
 	HardwareSerial& ser_;
 	bool opened_;
 	String curStr_;
@@ -58,6 +57,7 @@ public:
 	
 	void printBroadcast(const String& val = "");
 	void printlnBroadcast(const String& val = "");
+	void printGreeting(ConsoleStream* stream = NULL);
 	void printHelpAllSubsystems(ConsoleStream* stream);
 	void printStatusAllSubsystems(ConsoleStream* stream);
 
