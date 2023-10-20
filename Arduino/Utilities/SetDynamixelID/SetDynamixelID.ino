@@ -53,6 +53,18 @@ void setup() {
         Serial.print(i); 
         Serial.print("\t");
         Serial.println(dxl.getModelNumber(i));
+
+        dxl.torqueOn(i);
+        dxl.setGoalPosition(i, 0.0, UNIT_DEGREE);
+        delay(1000);
+        dxl.setGoalPosition(i, 360.0, UNIT_DEGREE);
+        delay(1000);
+        dxl.setGoalPosition(i, 180.0, UNIT_DEGREE);
+        delay(1000);
+        dxl.torqueOff(i);
+
+        Serial.print("Hardware error status: ");
+        Serial.println(dxl.readControlTableItem(ControlTableItem::HARDWARE_ERROR_STATUS,i), HEX);
       }
     }
     
