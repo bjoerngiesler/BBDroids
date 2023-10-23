@@ -51,6 +51,7 @@ public:
 	virtual Result addParameter(const String& name, const String& help, bool& val);
 
 	virtual Result setParameterValue(const String& name, const String& stringVal);
+	virtual void parameterChangedCallback(const String& name) {} // override if you want to do something if the parameter was changed
 
 protected:
 	class Parameter {
