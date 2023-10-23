@@ -73,3 +73,55 @@ This library (LibBB - Bavarian Builders Lib, *not* LibBB8) encapsulates some asp
 * The *Controller Framework* provides controllers that can be used for motor position, speed, or servo control, together with input / output base classes that can be used to connect a controller to arbitrary system inputs and outputs. (Currently only PID control is supported, but other controller types may follow.)
 * The *DC Motor* class communicates with different types of DC motor hardware, and its *Encoder Motor* class supports encoder position feedback.
 * The *XBee* class provides communication and remote control via XBee / Zigbee modules.
+
+### Example
+
+Here is a simple example on how to construct a droid sketch in Arduino using LibBB:
+
+```
+#include <LibBB.h>
+using namespace bb;
+
+static const String WIFI_SSID = "MySSID";
+static const String WIFI_WPA_KEY = "MyWifiKey";
+static const bool WIFI_AP_MODE = true;
+
+class MyDroidClass: public Subsystem, public PacketReceiver {
+public:
+	static MyDroidClass droid;
+
+	virtual Result initialize() { 
+		// Add your initialization code here
+		return RES_OK;
+	}
+	virtual Result step() {
+		// Add your droid control code here
+		return RES_OK;
+	}
+};
+
+void initializeSubsystems() {
+  Runloop::runloop.initialize();
+  Console::console.initialize();
+  WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE);
+  MyDroid::droid.initialize();
+}
+
+void startSubsystems() {
+  WifiServer::server.start();
+  Console::console.start();
+  MyDroid::droid.start();
+  Runloop::runloop.start(); // never returns; start last!
+}
+
+void setup() {
+  Serial.begin(2000000);
+  Serial.println();
+  Serial.println("My Droid starting up");
+
+  initializeSubsystems();
+  startSubsystems();
+}
+
+void loop() {}
+```
