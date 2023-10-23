@@ -51,7 +51,6 @@ public:
 		return description_;
 	}
 
-	virtual Result parameterValue(const String& name, String& value);
 	virtual Result setParameterValue(const String& name, const String& value);
 
 	bool tryToStartAP(const String& ssid, const String& key);

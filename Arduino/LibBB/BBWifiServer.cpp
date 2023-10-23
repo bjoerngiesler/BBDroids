@@ -250,25 +250,6 @@ bb::Result bb::WifiServer::step() {
 	return RES_OK;
 }
 
-bb::Result bb::WifiServer::parameterValue(const String& name, String& value) {
-	if(name == "ssid") { 
-		value = params_.ssid; return RES_OK; 
-	} else if(name == "wpa_key") {
-		value = params_.wpaKey; return RES_OK;
-	} else if(name == "ap") {
-		if(params_.ap) value = "1"; else value = "0";
-		return RES_OK;
-	} else if(name == "terminal_port") {
-		value = String(params_.tcpPort);
-		return RES_OK;
-	} else if(name == "remote_port") {
-		value = String(params_.udpPort);
-		return RES_OK;
-	} 
-
-	return RES_PARAM_NO_SUCH_PARAMETER;
-}
-
 bb::Result bb::WifiServer::setParameterValue(const String& name, const String& value) {
 	Result res = RES_PARAM_NO_SUCH_PARAMETER;
 
