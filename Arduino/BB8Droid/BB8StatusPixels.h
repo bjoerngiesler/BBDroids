@@ -9,12 +9,12 @@ public:
   static BB8StatusPixels statusPixels;
 
   BB8StatusPixels();
-  ~BB8StatusPixels();
 
   typedef enum {
     STATUS_OK,
     STATUS_WARN,
-    STATUS_FAIL
+    STATUS_FAIL,
+    STATUS_INIT
   } Status;
 
   bool begin();
@@ -24,7 +24,6 @@ public:
 
 protected:
   bool available_;
-  Adafruit_NeoPixel *statusPixel_;
 };
 
 #endif // BB8STATUSPIXELS_H

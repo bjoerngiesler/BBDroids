@@ -1,6 +1,8 @@
 #if !defined(BB8BATTSTATUS_H)
 #define BB8BATTSTATUS_H
 
+#include <LibBB.h>
+
 class BB8BattStatus {
 public:
   static BB8BattStatus batt;
@@ -20,6 +22,8 @@ public:
   float current(Battery batt); 
   // Returns minimum of both voltages if called with BATT_BOTH. Returns -1 if error.
   float voltage(Battery batt);
+
+  bb::BatteryState getBatteryState(Battery batt);
 
 private:
   BB8BattStatus();

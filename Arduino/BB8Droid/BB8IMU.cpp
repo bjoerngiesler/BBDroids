@@ -9,6 +9,29 @@ using namespace bb;
 
 BB8IMU BB8IMU::imu;
 
+BB8IMUControlInput::BB8IMUControlInput(BB8IMUControlInput::ProbeType pt) {
+  pt_ = pt;
+}
+
+float BB8IMUControlInput::present() {
+  float r, p, h;
+  if(BB8IMU::imu.getFilteredRPH(r, p, h) == false) return 0.0f;
+  
+  switch(pt_) {
+  case IMU_ROLL:
+    return r;
+    break;
+  case IMU_PITCH:
+    return p;
+    break;
+  case IMU_HEADING:
+    return h;
+    break;
+  }
+
+  return 0.0f;
+}
+
 BB8IMU::BB8IMU() {
   available_ = false;
   calR_ = calP_ = calH_ = 0.0f;
@@ -25,17 +48,17 @@ bool BB8IMU::begin() {
 
   temp_ = imu_.getTemperatureSensor();
   if(NULL == temp_) {
-    Serial.println("could not get temperature sensor pointer!");
+    Serial.println("could not get temp sensor!");
     return false;
   }
   accel_ = imu_.getAccelerometerSensor();
   if(NULL == accel_) {
-    Serial.println("could not get accel sensor pointer!");
+    Serial.println("could not get accel sensor!");
     return false;
   }
   gyro_ = imu_.getGyroSensor();
   if(NULL == accel_) {
-    Serial.println("could not get gyro sensor pointer!");
+    Serial.println("could not get gyro sensor!");
     return false;
   }
 
@@ -67,13 +90,12 @@ void BB8IMU::printStats(const String& prefix) {
 bool BB8IMU::update() {
   if(!available_) return false;
 
-  float x, y, z;
   if(!imu_.gyroscopeAvailable() || !imu_.accelerationAvailable()) return false;
   
   imu_.readGyroscope(lastR_, lastP_, lastH_);
-  imu_.readAcceleration(x, y, z);
+  imu_.readAcceleration(lastX_, lastY_, lastZ_);
 
-  madgwick_.updateIMU(lastR_ + calR_, lastP_ + calP_, lastH_ + calH_, x, y, z);
+  madgwick_.updateIMU(lastR_ + calR_, lastP_ + calP_, lastH_ + calH_, lastX_, lastY_, lastZ_);
 
   return true;
 }
@@ -109,7 +131,6 @@ bool BB8IMU::integrateGyroMeasurement(bool reset) {
   } else {
     dt = (float)(g.timestamp - intLastTS_) / 1000.0f;
   }
-
 
   intR_ += dt*(g.gyro.roll + calR_);
   intP_ += dt*(g.gyro.pitch + calP_);
@@ -185,8 +206,8 @@ bool BB8IMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
   avgH /= count;
 
   if(stream) {
-    stream->print(String("Gyro calibration finished (") + count + "cycles at average temp " + avgTemp + "°C). ");
-    stream->println(String("Calib values (rad/s): R=") + String(avgR, 6) + " P=" + String(avgP, 6) + " H=" + String(avgH, 6));
+    stream->print(String("Gyro calib finished (") + count + "cycles, avg temp " + avgTemp + "°C). ");
+    stream->println(String("R=") + String(avgR, 6) + " P=" + String(avgP, 6) + " H=" + String(avgH, 6));
   }
 
   calR_ = -avgR; calP_ = -avgP; calH_ = -avgH;
@@ -194,17 +215,23 @@ bool BB8IMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
   return true;
 }
 
-bool BB8IMU::printGyroMeasurementForPlot() {
-  float r, p, h;
-  int32_t t;
-  getGyroMeasurement(r, p, h, false);
-  Serial.print("UR:"); Serial.print(r, 10);
-  Serial.print(",UP:"); Serial.print(p, 10);
-  Serial.print(",UH:"); Serial.print(h, 10);
-  getGyroMeasurement(r, p, h, t);
-  Serial.print(",R:"); Serial.print(r, 10);
-  Serial.print(",P:"); Serial.print(p, 10);
-  Serial.print(",H:"); Serial.print(h, 10);
-  Serial.println();
-  return true;
+bb::IMUState BB8IMU::getIMUState() {
+  bb::IMUState imuState;
+  if(!available_) {
+    imuState.errorState = ERROR_NOT_PRESENT;
+    return imuState;
+  }
+
+  imuState.errorState = ERROR_OK;
+  imuState.r = madgwick_.getRoll();
+  imuState.p = madgwick_.getPitch();
+  imuState.h = madgwick_.getYaw();
+  imuState.dr = lastR_;
+  imuState.dp = lastP_;
+  imuState.dh = lastH_;
+  imuState.ax = lastX_;
+  imuState.ay = lastY_;
+  imuState.az = lastZ_;
+
+  return imuState;
 }

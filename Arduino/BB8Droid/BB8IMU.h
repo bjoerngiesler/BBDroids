@@ -11,6 +11,20 @@
 
 using namespace bb;
 
+class BB8IMUControlInput: public bb::ControlInput {
+public:
+  typedef enum {
+    IMU_ROLL,
+    IMU_PITCH,
+    IMU_HEADING
+  } ProbeType;
+
+  BB8IMUControlInput(ProbeType pt);
+  float present();
+protected:
+  ProbeType pt_;
+};
+
 class BB8IMU {
 public:
   static BB8IMU imu;
@@ -30,8 +44,7 @@ public:
   virtual bool update();
   bool getFilteredRPH(float& r, float& p, float& h);
 
-  bool printGyroMeasurementForPlot();
-
+  IMUState getIMUState();
   void printStats(const arduino::String& prefix = "");
 private:  
   BB8IMU();
@@ -43,6 +56,7 @@ private:
   float calR_, calP_, calH_;
   float lastR_, lastP_, lastH_;
   float intR_, intP_, intH_;
+  float lastX_, lastY_, lastZ_;
   int intNum_;
   int32_t intLastTS_;
   bool intRunning_ = false;

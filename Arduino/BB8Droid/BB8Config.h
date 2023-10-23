@@ -37,6 +37,8 @@ static const uint8_t P_DYNAMIXEL_TX    = 14;
 
 //static const uint8_t DOME_IMU_ADDR     = 0x18;
 //static const uint8_t BODY_IMU_ADDR     = 0x19;
+static const uint8_t BATT1_STATUS_ADDR   = 0x40;
+static const uint8_t BATT2_STATUS_ADDR   = 0x41;
 
 static const uint16_t DEADBAND         = 0.01f;
 
@@ -61,6 +63,20 @@ static const int BODY_ROLL_SERVO    = 4;
 static const float BODY_CIRCUMFERENCE            = 2*M_PI*253.0; // bb8 motor pwm 0
 static const float DRIVE_MOTOR_TICKS_PER_TURN    = 4776.384;
 static const float DRIVE_MOTOR_MAX_SPEED_M_PER_S = 2.0;
+
+static const uint8_t SOUND_FOLDER_SYSTEM  = 99;
+static const uint8_t SOUND_STARTING_UP    = 1;
+static const uint8_t SOUND_XBEE_OK        = 2;
+static const uint8_t SOUND_XBEE_FAILURE   = 3;
+static const uint8_t SOUND_WIFI_OK        = 4;
+static const uint8_t SOUND_WIFI_FAILURE   = 5;
+static const uint8_t SOUND_SERVOS_OK      = 6;
+static const uint8_t SOUND_SERVOS_FAILURE = 7;
+static const uint8_t SOUND_BB8_OK         = 8;
+static const uint8_t SOUND_BB8_FAILURE    = 9;
+static const uint8_t SOUND_MAINLOOP       = 255;
+
+//#define BATT_VOLTAGE_PRECISE // if #defined, this causes BB8BattStatus::updateVoltage() compute the correct voltage from the bus and across the shunt, but it takes twice the time.
 
 //#define SERIALTX_MODE_SPEKTRUM
 #define SERIALTX_MODE_XBEE

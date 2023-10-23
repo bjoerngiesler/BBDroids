@@ -74,3 +74,16 @@ float BB8BattStatus::voltage(BB8BattStatus::Battery batt) {
   if(batt == BATT_BOTH) return min(status_[BATT_1].voltage, status_[BATT_2].voltage);
   return status_[batt].voltage;
 }
+
+bb::BatteryState BB8BattStatus::getBatteryState(BB8BattStatus::Battery batt) {
+  bb::BatteryState batteryState;
+  if(!available(batt)) {
+    batteryState.errorState = bb::ERROR_NOT_PRESENT;
+    return batteryState;
+  }
+
+  batteryState.errorState = bb::ERROR_OK;
+  batteryState.voltage = voltage(batt);
+  batteryState.current = current(batt);;
+  return batteryState;
+}

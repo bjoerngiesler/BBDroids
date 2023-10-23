@@ -1,56 +1,51 @@
 #include "BB8Sound.h"
+#include "BB8Config.h"
 
 BB8Sound BB8Sound::sound;
 
-BB8Sound::BB8Sound(): dfp_(NULL) {
-}
-
-BB8Sound::~BB8Sound() {
-  if(dfp_ != NULL) {
-    DFRobotDFPlayerMini *temp = dfp_; // eliminate race conditions
-    dfp_ = NULL;
-    delete temp;
-  }
+BB8Sound::BB8Sound() {
+  available_ = false;
 }
 
 bool BB8Sound::begin(Uart *ser) {
   if(ser == NULL) {
     Serial.println("Serial is NULL!"); 
+    available_ = false;
     return false;
   } 
-  #if 0
-  if(dfp_ != NULL) {
-    Serial.println("Sound already setup");
-    return false;
-  } 
-  #endif 
 
-  dfp_ = new DFRobotDFPlayerMini();
   Serial.print("Setting up sound... ");
   ser->begin(9600);
-  if(dfp_->begin(*ser)) {
-    dfp_->volume(100);
-    dfp_->play(1);
+  if(dfp_.begin(*ser)) {
+    dfp_.volume(10);
     Serial.println("success.");
+    available_ = true;
     return true;
   } else {
     Serial.print("error code ");
-    Serial.print(dfp_->readType());
+    Serial.print(dfp_.readType());
     Serial.println("... failed!");
-    delete dfp_;
-    dfp_ = NULL;
+    available_ = false;
     return false;
   }
 }
 
-bool BB8Sound::play(int filenumber) {
-  if(NULL == dfp_) return false;
-  dfp_->play(filenumber);
+bool BB8Sound::playFolder(int foldernumber, int filenumber, bool block) {
+  if(!available_) return false;
+
+  dfp_.playFolder(foldernumber, filenumber);
+  if(block) {
+    while(dfp_.readState() > 500) delay(1);
+  }
   return true;
 }
 
+bool BB8Sound::playSystem(int filenumber, bool block) {
+  return playFolder(SOUND_FOLDER_SYSTEM, filenumber, block);
+}
+
 bool BB8Sound::setVolume(uint8_t vol) {
-  if(NULL == dfp_) return false;
-  dfp_->volume(vol);
+  if(!available_) return false;
+  dfp_.volume(vol);
   return true;
 }

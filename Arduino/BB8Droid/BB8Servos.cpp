@@ -3,70 +3,8 @@
 #include "BB8Servos.h"
 #include "BB8Config.h"
 
-static const uint8_t LED_BIT = 0x01;
-static const uint8_t SWITCH_BIT = 0x08;
-static const uint8_t ADDR = 0x38;
-static const uint8_t INPUT_REG = 0x00, OUTPUT_REG = 0x01, INVERT_REG = 0x02, CONFIG_REG = 0x03;
-
 static uint32_t SLOW_VEL = 20;
 static const uint8_t MAX_SERVO_ID = 4;
-
-BB8ServoPower BB8ServoPower::power;
-
-Result BB8ServoPower::initialize() {
-  Wire.begin();
-
-  uint8_t regval;
-
-  // clear LED and switch bit in output register
-  if (!requestFrom(ADDR, OUTPUT_REG, regval)) return RES_SUBSYS_COMM_ERROR;
-  regval &= ~(LED_BIT | SWITCH_BIT);
-  writeTo(ADDR, OUTPUT_REG, regval);
-
-  // set LED and switch as output
-  if (!requestFrom(ADDR, CONFIG_REG, regval)) return RES_SUBSYS_COMM_ERROR;
-  regval &= ~(LED_BIT | SWITCH_BIT);
-  writeTo(ADDR, CONFIG_REG, regval);
-
-  return switchOnOff(false);
-}
-
-bool BB8ServoPower::isOn() {
-  uint8_t regval;
-  if (!requestFrom(ADDR, OUTPUT_REG, regval)) return false;
-  return (regval & SWITCH_BIT) != 0;
-}
-
-Result BB8ServoPower::switchOnOff(bool onoff) {
-  uint8_t regval;
-  if (!requestFrom(ADDR, OUTPUT_REG, regval)) return RES_SUBSYS_COMM_ERROR;
-  if (onoff) {
-    regval |= SWITCH_BIT;
-    regval &= ~LED_BIT;
-  } else {
-    regval &= ~SWITCH_BIT;
-    regval |= LED_BIT;
-  }
-  writeTo(ADDR, OUTPUT_REG, regval);
-  return RES_OK;
-}
-
-bool BB8ServoPower::requestFrom(uint8_t addr, uint8_t reg, uint8_t& byte) {
-  Wire.beginTransmission(addr);
-  Wire.write(reg);
-  Wire.endTransmission(false);
-  Wire.requestFrom(addr, 1, true);
-  if (!Wire.available()) return false;
-  byte = Wire.read();
-  return true;
-}
-
-void BB8ServoPower::writeTo(uint8_t addr, uint8_t reg, uint8_t byte) {
-  Wire.beginTransmission(addr);
-  Wire.write(reg);
-  Wire.write(byte);
-  Wire.endTransmission();
-}
 
 
 BB8Servos BB8Servos::servos;
@@ -74,8 +12,22 @@ static const unsigned int bpsList[] = { 57600, 115200, 1000000 };
 static const unsigned int numBps = 3;
 static const unsigned int goalBps = 1000000;
 
+BB8ServoControlOutput::BB8ServoControlOutput(uint8_t sn, float offset) {
+  sn_ = sn;
+  offset_ = offset;
+}
+
+bool BB8ServoControlOutput::set(float value) {
+  return BB8Servos::servos.setGoal(sn_, value);
+}
+
+float BB8ServoControlOutput::present() {
+  return BB8Servos::servos.present(sn_);
+}
+
 BB8Servos::BB8Servos() {
-  infoXelsSr = NULL;
+  infoXelsSrPresent = NULL;
+  infoXelsSrLoad = NULL;
   infoXelsSw = NULL;
 }
 
@@ -84,29 +36,26 @@ Result BB8Servos::initialize() {
   description_ = "Dynamixel subsystem";
   help_ = "Dynamixel Subsystem\r\n"
           "Available commands:\r\n"
-          "\ttorque <servo>|all on|off           Switch torque of <servo> on or off.\r\n"
-          "\tmove <servo>|all <angle>            <servo> must be a valid servo number. <angle> is in degrees between -180.0 and 180.0.\r\n"
-          "\tmove_slow <servo>|all <angle>       <servo> must be a valid servo number. <angle> is in degrees between -180.0 and 180.0.\r\n"
+          "\ttorque <servo>|all on|off           Switch torque.\r\n"
+          "\tmove <servo>|all <angle>            <angle>: deg [-180.0..180.0].\r\n"
+          "\tmove_slow <servo>|all <angle>       <angle>: deg [-180.0..180.0].\r\n"
           "\torigin <servo>|all                  Move <servo> to origin, slowly.\r\n"
-          "\tinfo <servo>                        <servo> must be a valid servo number.\r\n"
-          "\t<ctrltableitem> <servo>             Return <ctrltableitem>, currently understood: velocity_limit, current_limit, profile_acceleration.\r\n"
-          "\t<ctrltableitem> <servo> <value>     Set <ctrltableitem> to <value>, currently understood: velocity_limit, current_limit, profile_acceleration.\r\n"
+          "\tinfo <servo>                        Get info on <servo>.\r\n"
+          "\t<ctrltableitem> <servo> [<value>]   Get or set, options: velocity_limit, current_limit, profile_acceleration.\r\n"
           "\ttest <servo>                        Test <servo>, going from 180 to +x°/-x° in 5° steps, until it fails\r\n"
-          "\tpower on|off                        Switch power on or off\r\n"
           "\reboot <servo>|all                   Reboot <servo>";
 
   ctrlPresentPos_.addr = 0;
+  ctrlPresentLoad_.addr = 0;
   ctrlGoalPos_.addr = 0;
   ctrlProfileVel_.addr = 0;
-  BB8ServoPower::power.initialize();
   return Subsystem::initialize();
 }
 
 Result BB8Servos::start(ConsoleStream* stream) {
   if (isStarted()) return RES_SUBSYS_ALREADY_STARTED;
 
-  BB8ServoPower::power.switchOnOff(true);
-  delay(500);
+  Runloop::runloop.excuseOverrun();
 
   dxl_.setPortProtocolVersion(2.0);
   unsigned int bps = 0;
@@ -125,12 +74,15 @@ Result BB8Servos::start(ConsoleStream* stream) {
         uint16_t model = dxl_.getModelNumber(id);
         if (stream) stream->print(String("#") + id + ": model #" + model + "...");
 
-        Servo servo = { 2048, 2048, 0, 4096, 0, false };
+        Servo servo = { 2048, 2048, 0, 0, 4096, 0 };
 
         if (ctrlPresentPos_.addr == 0) {
           ctrlPresentPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
           ctrlGoalPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
           ctrlProfileVel_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
+          // PRESENT_LOAD and PRESENT_CURRENT have the same addresses but different names (and units - 0.1% vs mA). Robotis, why do you do this to us?
+          ctrlPresentLoad_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
+          if(ctrlPresentLoad_.addr == 0) ctrlPresentLoad_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT); 
         } else {
           DYNAMIXEL::ControlTableItemInfo_t item;
           item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
@@ -146,6 +98,12 @@ Result BB8Servos::start(ConsoleStream* stream) {
           item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
           if (item.addr != ctrlProfileVel_.addr || item.addr_length != ctrlProfileVel_.addr_length) {
             if (stream) stream->println("Servos use differing control tables, that is not supported currently!");
+            return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+          }
+          item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
+          if(item.addr == 0) item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT);
+          if (item.addr != ctrlPresentLoad_.addr || item.addr_length != ctrlPresentLoad_.addr_length) {
+            if (stream) stream->println(String("Servos use differing control tables, that is not supported currently! (addr ") + item.addr + "!=" + ctrlPresentLoad_.addr + ", length " + item.addr_length + "!=" + ctrlPresentLoad_.addr_length + ")");
             return RES_SUBSYS_HW_DEPENDENCY_MISSING;
           }
         }
@@ -184,7 +142,15 @@ Result BB8Servos::start(ConsoleStream* stream) {
 
   setupSyncBuffers();
 
-  uint8_t recv_cnt = dxl_.syncRead(&srInfos);
+  uint8_t recv_cnt;
+  
+  recv_cnt = dxl_.syncRead(&srPresentInfos);
+  if (recv_cnt != servos_.size()) {
+    if (stream) stream->println("Receiving initial position failed!");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
+
+  recv_cnt = dxl_.syncRead(&srLoadInfos);
   if (recv_cnt != servos_.size()) {
     if (stream) stream->println("Receiving initial position failed!");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
@@ -193,6 +159,7 @@ Result BB8Servos::start(ConsoleStream* stream) {
   for (auto& s : servos_) {
     dxl_.setOperatingMode(s.first, OP_POSITION);
     dxl_.writeControlTableItem(ControlTableItem::RETURN_DELAY_TIME, s.first, 10);
+    dxl_.writeControlTableItem(ControlTableItem::DRIVE_MODE, s.first, 0);
     setGoal(s.first, s.second.present, VALUE_RAW);
     switchTorque(s.first, true);
   }
@@ -229,9 +196,18 @@ Result BB8Servos::step() {
     return RES_SUBSYS_COMM_ERROR;
   }
 
-  uint8_t num = dxl_.syncRead(&srInfos);
+  uint8_t num;
+  
+  num = dxl_.syncRead(&srPresentInfos);
   if (num != servos_.size()) {
     Console::console.printlnBroadcast("Receiving servo position failed!");
+    failcount++;
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
+  num = dxl_.syncRead(&srLoadInfos);
+  if (num != servos_.size()) {
+    Console::console.printlnBroadcast("Receiving servo load failed!");
     failcount++;
     return RES_SUBSYS_COMM_ERROR;
   }
@@ -343,22 +319,6 @@ Result BB8Servos::handleConsoleCommand(const std::vector<String>& words, Console
     return runServoTest(stream, id);
   }
 
-  else if (words[0] == "power") {
-    if (words.size() == 1) {
-      if (BB8ServoPower::power.isOn()) {
-        stream->println("On.");
-        return RES_OK;
-      } else {
-        stream->println("Off.");
-        return RES_OK;
-      }
-    } else if (words.size() == 2) {
-      if (words[1] == "on") return BB8ServoPower::power.switchOnOff(true);
-      else if (words[1] == "off") return BB8ServoPower::power.switchOnOff(false);
-      else return RES_CMD_INVALID_ARGUMENT;
-    } else return RES_CMD_INVALID_ARGUMENT_COUNT;
-  }
-
   else if (words[0] == "reboot") {
     Runloop::runloop.excuseOverrun();
 
@@ -464,7 +424,7 @@ void BB8Servos::printStatus(ConsoleStream* stream, int id) {
     
     stream->print(String("range: [") + servos_[id].min + ".." + servos_[id].max +"], ");
     stream->print(String("offset: ") + servos_[id].offset + ", ");
-    stream->print(String("invert: ") + servos_[id].invert + ", ");
+    stream->print(String("invert: ") + (dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1) + ", ");
 
     stream->print("hw err: $");
     stream->print(String(dxl_.readControlTableItem(ControlTableItem::HARDWARE_ERROR_STATUS, id), HEX));
@@ -577,11 +537,20 @@ bool BB8Servos::setOffset(uint8_t id, float offset, ValueType t) {
   return true;
 }
 
-bool BB8Servos::setInvert(uint8_t id, bool invert) {
+bool BB8Servos::setInverted(uint8_t id, bool invert) {
   if(servos_.count(id) == 0) return false;
 
-  servos_[id].invert = invert;
+  uint8_t dm = dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id);
+  if(invert) dm |= 0x1;
+  else dm &= ~0x1;
+  dxl_.writeControlTableItem(ControlTableItem::DRIVE_MODE, id, dm);
+
   return true;
+}
+
+bool BB8Servos::inverted(uint8_t id) {
+  if(servos_.count(id) == 0) return false;
+  return dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1;
 }
 
 bool BB8Servos::setGoal(uint8_t id, float goal, ValueType t) {
@@ -596,9 +565,6 @@ bool BB8Servos::setGoal(uint8_t id, float goal, ValueType t) {
 
   if (servos_.count(id) == 0) return false;
   uint32_t g = computeRawValue(goal, t) + servos_[id].offset;
-  if(servos_[id].invert) {
-    g = 4096 - g;
-  }
   servos_[id].goal = constrain(g, servos_[id].min, servos_[id].max);
 
   swInfos.is_info_changed = true;
@@ -635,7 +601,6 @@ bool BB8Servos::setProfileVelocity(uint8_t id, uint32_t val) {
   return true;
 }
 
-
 float BB8Servos::goal(uint8_t id, ValueType t) {
   if (servos_.count(id) == 0) return false;
   if (t == VALUE_DEGREE)
@@ -652,33 +617,68 @@ float BB8Servos::present(uint8_t id, ValueType t) {
   else return servos_[id].present;
 }
 
+float BB8Servos::load(uint8_t id) {
+  if (operationStatus_ != RES_OK) return 0.0f;
+
+  if (servos_.count(id) == 0) return 0.0f;
+  return servos_[id].load;
+}
+
 uint8_t BB8Servos::errorStatus(uint8_t id) {
-  if(operationStatus_ != RES_OK) return 0xff;
   if(servos_.count(id) == 0) return 0xff;
   return dxl_.readControlTableItem(ControlTableItem::HARDWARE_ERROR_STATUS, id);
+}
+
+bool BB8Servos::loadShutdownEnabled(uint8_t id) {
+  if(servos_.count(id) == 0) return false;
+  return dxl_.readControlTableItem(ControlTableItem::SHUTDOWN, id) & (1<<5);
+}
+
+void BB8Servos::setLoadShutdownEnabled(uint8_t id, bool yesno) {
+  if(servos_.count(id) == 0) return;
+  uint8_t shutdown = dxl_.readControlTableItem(ControlTableItem::SHUTDOWN, id);
+  if(yesno) shutdown |= (1<<5);
+  else shutdown &= ~(1<<5);
+  dxl_.writeControlTableItem(ControlTableItem::SHUTDOWN, id, shutdown);
 }
 
 void BB8Servos::setupSyncBuffers() {
   unsigned int i;
 
   if (!servos_.size()) return;
-  if (infoXelsSr != NULL || infoXelsSw != NULL) return;
+  if (infoXelsSrPresent != NULL || infoXelsSrLoad != NULL ||  infoXelsSw != NULL) return;
 
-  srInfos.packet.p_buf = userPktBuf;
-  srInfos.packet.buf_capacity = userPktBufCap;
-  srInfos.packet.is_completed = false;
-  srInfos.addr = ctrlPresentPos_.addr;
-  srInfos.addr_length = ctrlPresentPos_.addr_length;
-  infoXelsSr = new DYNAMIXEL::XELInfoSyncRead_t[servos_.size()];
-  srInfos.p_xels = infoXelsSr;
+  srPresentInfos.packet.p_buf = userPktBufPresent;
+  srPresentInfos.packet.buf_capacity = userPktBufCap;
+  srPresentInfos.packet.is_completed = false;
+  srPresentInfos.addr = ctrlPresentPos_.addr;
+  srPresentInfos.addr_length = ctrlPresentPos_.addr_length;
+  infoXelsSrPresent = new DYNAMIXEL::XELInfoSyncRead_t[servos_.size()];
+  srPresentInfos.p_xels = infoXelsSrPresent;
   i = 0;
   for (auto& s : servos_) {
-    infoXelsSr[i].id = s.first;
-    infoXelsSr[i].p_recv_buf = (uint8_t*)&(s.second.present);
+    infoXelsSrPresent[i].id = s.first;
+    infoXelsSrPresent[i].p_recv_buf = (uint8_t*)&(s.second.present);
     i++;
   }
-  srInfos.xel_count = servos_.size();
-  srInfos.is_info_changed = true;
+  srPresentInfos.xel_count = servos_.size();
+  srPresentInfos.is_info_changed = true;
+
+  srLoadInfos.packet.p_buf = userPktBufLoad;
+  srLoadInfos.packet.buf_capacity = userPktBufCap;
+  srLoadInfos.packet.is_completed = false;
+  srLoadInfos.addr = ctrlPresentLoad_.addr;
+  srLoadInfos.addr_length = ctrlPresentLoad_.addr_length;
+  infoXelsSrLoad = new DYNAMIXEL::XELInfoSyncRead_t[servos_.size()];
+  srLoadInfos.p_xels = infoXelsSrLoad;
+  i = 0;
+  for (auto& s : servos_) {
+    infoXelsSrLoad[i].id = s.first;
+    infoXelsSrLoad[i].p_recv_buf = (uint8_t*)&(s.second.load);
+    i++;
+  }
+  srLoadInfos.xel_count = servos_.size();
+  srLoadInfos.is_info_changed = true;
 
   swInfos.packet.p_buf = NULL;
   swInfos.packet.is_completed = false;
@@ -697,12 +697,16 @@ void BB8Servos::setupSyncBuffers() {
 }
 
 void BB8Servos::teardownSyncBuffers() {
-  delete infoXelsSr;
-  infoXelsSr = NULL;
+  delete infoXelsSrPresent;
+  infoXelsSrPresent = NULL;
+  delete infoXelsSrLoad;
+  infoXelsSrLoad = NULL;
   delete infoXelsSw;
   infoXelsSw = NULL;
-  srInfos.p_xels = NULL;
-  srInfos.xel_count = 0;
+  srPresentInfos.p_xels = NULL;
+  srPresentInfos.xel_count = 0;
+  srLoadInfos.p_xels = NULL;
+  srLoadInfos.xel_count = 0;
   swInfos.p_xels = NULL;
   swInfos.xel_count = 0;
 }
