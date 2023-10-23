@@ -2,7 +2,6 @@
 #define BBPACKETRECEIVER_H
 
 #include <BBError.h>
-#include <BBDCMotor.h>
 
 namespace bb {
 /*
@@ -118,9 +117,18 @@ public:
  * and not much is lost if a packet is dropped. Do not use over realtime links used for remote control, for example.
  */
 
+struct __attribute__ ((packed)) DriveControlState {
+    ErrorState errorState;
+    uint8_t controlMode;
+    float presentPWM, presentSpeed, presentPos;
+    float goal, err, errI, errD, control; 
+};
+
 struct __attribute__ ((packed)) IMUState {
 	ErrorState errorState;
-	float r, p, h, dr, dp, dh, ax, ay, az;
+	float r, p, h;    // Integrated / filtered orientation in space (as coming from a Madgwick or Ext Kalman filter)
+	float dr, dp, dh; // Rotation rates (as coming directly from the gyro)
+	float ax, ay, az; // Acceleration values (as coming directly from the accelerometer)
 };
 
 struct __attribute__ ((packed)) ServoState {
@@ -145,7 +153,7 @@ struct __attribute__ ((packed)) LargeStatusPacket {
 	uint8_t droidType;
 	char droidName[16];
 
-	bb::EncoderMotor::DriveControlState drive[3];
+	DriveControlState drive[3];
 	IMUState imu[3];
 	CommandPacket lastCommand[2];
 	ServoState servo[10];
