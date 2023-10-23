@@ -58,3 +58,18 @@ The BB8 Arduino sketch expects the following external hardware:
 - one encoder fitted to the main motor drivier
 - one motor driver for the spot-turn drive, connected to motor driver connector B (no encoder on this one)
 - one 6DOF IMU (Adafruit ISM330DHCX) connected to i2c and mounted in the body center rigid to the droid body.
+
+## Software
+
+### LibBB
+
+This library (LibBB - Bavarian Builders Lib, *not* LibBB8) encapsulates some aspects of a middleware supporting very different droids. It forms the base of the BB8 and D-O code included in the repository, and can be used for your droid project as well. It provides the following concepts:
+
+* *Subsystems* are what a droid is built out of. They can be initialized, started, stopped, and run within the main runloop. The Subsystem base class offers scheduling, parameter handling and console input/output.
+* The *Runloop* (a subsystem) runs and schedules all other subsystems, with configurable update rate.
+* The *Console* (a subsystem) provides command line input and output via the Arduino's Serial port or telnet via Wifi.
+* The *Wifi Server* (a subsystem) lets the Arduino connect to an infrastructure Wifi network or create its own.
+* The *Config Storage* lets you store subsystem parameters in flash or EEPROM.
+* The *Controller Framework* provides controllers that can be used for motor position, speed, or servo control, together with input / output base classes that can be used to connect a controller to arbitrary system inputs and outputs. (Currently only PID control is supported, but other controller types may follow.)
+* The *DC Motor* class communicates with different types of DC motor hardware, and its *Encoder Motor* class supports encoder position feedback.
+* The *XBee* class provides communication and remote control via XBee / Zigbee modules.
