@@ -3,6 +3,9 @@
 
 #include "BBSubsystem.h"
 
+#include <vector>
+#include <functional>
+
 namespace bb {
 
 class Runloop: public Subsystem {
@@ -28,7 +31,21 @@ public:
 
 	uint64_t millisSinceStart();
 
+	virtual void* scheduleTimedCallback(uint64_t ms, std::function<void(void)> cb, bool oneshot = true);
+	virtual Result cancelTimedCallback(void* handle);
+
+
 protected:
+
+	struct TimedCallback {
+		uint64_t triggerMS, deltaMS;
+		bool oneshot;
+		std::function<void()> cb;
+	};
+
+	std::vector<TimedCallback> timedCallbacks_;
+
+
 	Runloop();
 	bool running_;
 	uint64_t seqnum_;

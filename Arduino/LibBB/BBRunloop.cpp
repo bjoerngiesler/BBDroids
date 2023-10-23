@@ -27,9 +27,19 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 	if(Console::console.isStarted()) Console::console.printGreeting();
 	while(running_) {
 		unsigned long micros_start_loop = micros();
-
 		seqnum_++;
 
+		// First of all run any timed callbacks...
+		uint64_t m = millis();
+		for(std::vector<TimedCallback>::iterator iter = timedCallbacks_.begin(); iter != timedCallbacks_.end(); iter++) {
+			if(iter->triggerMS < m) { // FIXME there is highly likely an integer wrap in here...?
+				iter->cb();
+				if(true == iter->oneshot) iter = timedCallbacks_.erase(iter);
+				else iter->triggerMS = m + iter->deltaMS;
+			}
+		}
+
+		// ...then run step() on all subsystems...
 		std::map<String, unsigned long> timingInfo;
 
 		std::vector<Subsystem*> subsys = SubsystemManager::manager.subsystems();
@@ -43,6 +53,7 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 			if(runningStatus_) Console::console.printBroadcast(s->name() + ": " + (micros()-us) + "us ");
 		}
 
+		// ...find out how long we took...
 		unsigned long micros_end_loop = micros();
 		unsigned long looptime;
 		if(micros_end_loop >= micros_start_loop)
@@ -50,7 +61,9 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		else
 			looptime = ULONG_MAX - micros_start_loop + micros_end_loop;
 		if(runningStatus_) Console::console.printlnBroadcast(String("Total: ") + looptime + "us");
-		if(looptime < cycleTime_) {
+
+		// ...and bicker if we overran the allotted time.
+		if(looptime <= cycleTime_) {
 			delayMicroseconds(cycleTime_-looptime);
 		} else if(excuseOverrun_ == false) {
 			Console::console.printBroadcast(String(looptime) + "us spent in loop: ");
@@ -104,3 +117,21 @@ void bb::Runloop::excuseOverrun() {
 uint64_t bb::Runloop::millisSinceStart() {
 	return millis() - startTime_;
 }
+
+void* bb::Runloop::scheduleTimedCallback(uint64_t ms, std::function<void(void)> cb, bool oneshot) {
+	TimedCallback c = {millis() + ms, ms, oneshot, cb};
+	timedCallbacks_.push_back(c);
+	return (void*)&(*timedCallbacks_.end());
+}
+
+bb::Result bb::Runloop::cancelTimedCallback(void* handle) {
+	for(std::vector<TimedCallback>::iterator iter = timedCallbacks_.begin(); iter != timedCallbacks_.end(); iter++) {
+		if(handle == (void*)&(*iter)) {
+			timedCallbacks_.erase(iter);
+			return RES_OK;
+		}
+	}
+	return RES_COMMON_NOT_IN_LIST;
+}
+
+
