@@ -6,6 +6,8 @@
 #if defined(ARDUINO_ARCH_SAMD)
 #include <Encoder.h>
 #endif
+#include <BBPacket.h>
+#include <BBControllers.h>
 
 namespace bb {
 
@@ -48,6 +50,17 @@ protected:
   Scheme scheme_;
 };
 
+class DCMotorControlOutput: public ControlOutput {
+public:
+  DCMotorControlOutput(DCMotor& motor);
+  float present();
+  bool set(float value);
+
+protected:
+  DCMotor& motor_;
+};
+
+
 #if defined(ARDUINO_ARCH_SAMD)
 
 class EncoderMotor: public DCMotor {
@@ -61,13 +74,6 @@ public:
   enum Unit {
     UNIT_MILLIMETERS,
     UNIT_TICKS
-  };
-
-  struct __attribute__ ((packed)) DriveControlState {
-    ErrorState errorState;
-    ControlMode controlMode;
-    float presentPWM, presentSpeed, presentPos;
-    float goal, err, errI, errD, control; 
   };
 
   EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en, uint8_t pin_enc_a, uint8_t pin_enc_b);
@@ -93,7 +99,7 @@ public:
   float getPresentSpeed(Unit unit = UNIT_MILLIMETERS);
   float getPresentPosition(Unit unit = UNIT_MILLIMETERS);
 
-  DriveControlState getDriveControlState();
+  bb::DriveControlState getDriveControlState();
 
   void update();
 

@@ -3,6 +3,34 @@
 #include <limits.h>
 #include <math.h>
 
+bb::DCMotorControlOutput::DCMotorControlOutput(bb::DCMotor& motor): motor_(motor) {
+}
+
+float bb::DCMotorControlOutput::present() {
+  switch(motor_.direction()) {
+  case bb::DCMotor::DCM_BRAKE:
+  case bb::DCMotor::DCM_IDLE:
+    return 0;
+    break;
+  case bb::DCMotor::DCM_BACKWARD:
+    return -motor_.speed();
+    break;
+  case bb::DCMotor::DCM_FORWARD:
+  default:
+    return motor_.speed();
+    break;
+  }
+}
+
+bool bb::DCMotorControlOutput::set(float value) {
+  if(value < 0) {
+    motor_.setDirectionAndSpeed(bb::DCMotor::DCM_BACKWARD, -value);
+  } else {
+    motor_.setDirectionAndSpeed(bb::DCMotor::DCM_FORWARD, value);
+  }
+  return true;
+}
+
 bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en) {
   pin_a_ = pin_a;
   pin_b_ = pin_b;
@@ -345,9 +373,10 @@ float bb::EncoderMotor::getPresentPosition(bb::EncoderMotor::Unit unit) {
   return presentPos_ * mmPT_;
 }
 
-bb::EncoderMotor::DriveControlState bb::EncoderMotor::getDriveControlState() {
-  bb::EncoderMotor::DriveControlState state;
+bb::DriveControlState bb::EncoderMotor::getDriveControlState() {
+  bb::DriveControlState state;
   
+  state.errorState = ERROR_OK;
   state.presentPWM = presentPWM_;
   state.presentSpeed = presentSpeed_;
   state.presentPos = presentPos_;
