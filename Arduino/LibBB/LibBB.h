@@ -10,6 +10,7 @@
 #include "BBConsole.h"
 #include "BBRunloop.h"
 #include "BBConfigStorage.h"
+#include "BBControllers.h"
 
 #if defined(ARDUINO_ARCH_SAMD)
 #include "BBDCMotor.h"
