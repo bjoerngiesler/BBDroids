@@ -11,7 +11,7 @@
 #include "BBRunloop.h"
 #include "BBConfigStorage.h"
 #include "BBControllers.h"
-
+#include "BBLowPassFilter.h"
 #if defined(ARDUINO_ARCH_SAMD)
 #include "BBDCMotor.h"
 #endif

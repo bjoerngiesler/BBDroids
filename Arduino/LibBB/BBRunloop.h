@@ -31,7 +31,11 @@ public:
 
 	uint64_t millisSinceStart();
 
-	virtual void* scheduleTimedCallback(uint64_t ms, std::function<void(void)> cb, bool oneshot = true);
+
+	// Schedule a timed callback (oneshot or recurring). Please note that this is currently only working within
+	// the runloop granularity. E.g. if you're running a runloop with a cycle time of 10,000us or 10ms, timed
+	// callback execution will have a granularity of 10ms. Do not use for high precision events obviously... :-)
+	virtual void* scheduleTimedCallback(uint64_t milliseconds, std::function<void(void)> cb, bool oneshot = true);
 	virtual Result cancelTimedCallback(void* handle);
 
 

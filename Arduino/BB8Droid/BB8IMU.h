@@ -21,6 +21,7 @@ public:
 
   BB8IMUControlInput(ProbeType pt);
   float present();
+  Result update();
 protected:
   ProbeType pt_;
 };

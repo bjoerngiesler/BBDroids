@@ -2,26 +2,25 @@
 #define BBCONTROLLERS_H
 
 #include <sys/types.h>
+#include <BBError.h>
 
 namespace bb {
 
 class ControlInput {
 public:
-  virtual float present() { return 0.0f; }
+  virtual Result update() = 0;
+  virtual float present() = 0;
 };
 
 class ControlOutput {
 public:
-  virtual float present() { return 0.0f; }
-  virtual bool set(float value) { (void)value; return false; }
+  virtual float present() = 0;
+  virtual Result set(float value) = 0;
 };
 
 class PIDController {
 public:
-  PIDController();
-
-  void begin(ControlInput* input, ControlOutput* output);
-  void end();
+  PIDController(ControlInput& input, ControlOutput& output);
 
   void reset(); // reset aggregated errors
   
@@ -45,16 +44,15 @@ public:
   bool isControlBounded();
 
 protected:
-  ControlInput* input_;
-  ControlOutput* output_;
-
-  bool begun_;
+  ControlInput& input_;
+  ControlOutput& output_;
 
   float kp_, ki_, kd_;
   float lastErr_, errI_, lastErrD_, lastControl_;
   float iMin_, iMax_; bool iBounded_;
   float controlMin_, controlMax_; bool controlBounded_;
   float goal_;
+  unsigned long lastCycleUS_;
 };
 
 

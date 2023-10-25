@@ -13,6 +13,12 @@ BB8IMUControlInput::BB8IMUControlInput(BB8IMUControlInput::ProbeType pt) {
   pt_ = pt;
 }
 
+bb::Result BB8IMUControlInput::update() {
+  if(BB8IMU::imu.update() == true) return RES_OK;
+
+  return RES_CMD_FAILURE;
+}
+
 float BB8IMUControlInput::present() {
   float r, p, h;
   if(BB8IMU::imu.getFilteredRPH(r, p, h) == false) return 0.0f;

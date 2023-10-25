@@ -7,28 +7,12 @@ bb::DCMotorControlOutput::DCMotorControlOutput(bb::DCMotor& motor): motor_(motor
 }
 
 float bb::DCMotorControlOutput::present() {
-  switch(motor_.direction()) {
-  case bb::DCMotor::DCM_BRAKE:
-  case bb::DCMotor::DCM_IDLE:
-    return 0;
-    break;
-  case bb::DCMotor::DCM_BACKWARD:
-    return -motor_.speed();
-    break;
-  case bb::DCMotor::DCM_FORWARD:
-  default:
-    return motor_.speed();
-    break;
-  }
+  return motor_.speed();
 }
 
-bool bb::DCMotorControlOutput::set(float value) {
-  if(value < 0) {
-    motor_.setDirectionAndSpeed(bb::DCMotor::DCM_BACKWARD, -value);
-  } else {
-    motor_.setDirectionAndSpeed(bb::DCMotor::DCM_FORWARD, value);
-  }
-  return true;
+bb::Result bb::DCMotorControlOutput::set(float value) {
+  motor_.setSpeed(value);
+  return RES_OK;
 }
 
 bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en) {
@@ -38,11 +22,24 @@ bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_
   pin_en_ = pin_en;
   scheme_ = SCHEME_A_B_PWM;
 
+  pinMode(pin_a_, OUTPUT);
+  pinMode(pin_b_, OUTPUT);
+
+  if(pin_pwm_ != PIN_OFF)
+    pinMode(pin_pwm_, OUTPUT);
   if(pin_en_ != PIN_OFF)
-    en_ = false;
-  else 
-    en_ = true;
-  dir_ = DCM_IDLE;
+    pinMode(pin_en_, OUTPUT);
+
+    digitalWrite(pin_a_, LOW);
+    digitalWrite(pin_b_, LOW);
+    analogWrite(pin_pwm_, 0);
+    if(pin_en_ != PIN_OFF) {
+      digitalWrite(pin_en_, LOW);
+      en_ = false;
+    } else {
+      en_ = true;
+    }
+
   speed_ = 0;
 }
 
@@ -54,11 +51,7 @@ bb::DCMotor::DCMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b) {
   scheme_ = SCHEME_PWM_A_PWM_B;
 
   en_ = true;
-  dir_ = DCM_IDLE;
-  speed_ = 0;
-}
-
-bool bb::DCMotor::begin() {
+  
   pinMode(pin_a_, OUTPUT);
   pinMode(pin_b_, OUTPUT);
 
@@ -66,23 +59,10 @@ bool bb::DCMotor::begin() {
     pinMode(pin_pwm_, OUTPUT);
   if(pin_en_ != PIN_OFF)
     pinMode(pin_en_, OUTPUT);
+  analogWrite(pin_a_, 0);
+  analogWrite(pin_b_, 0);
 
-  if(scheme_ == SCHEME_A_B_PWM) {
-    digitalWrite(pin_a_, LOW);
-    digitalWrite(pin_b_, LOW);
-    analogWrite(pin_pwm_, 0);
-    if(pin_en_ != PIN_OFF) {
-      digitalWrite(pin_en_, LOW);
-      en_ = false;
-    } else {
-      en_ = true;
-    }
-  } else {
-    analogWrite(pin_a_, 0);
-    analogWrite(pin_b_, 0);
-  }
-
-  return true;
+  speed_ = 0;
 }
 
 void bb::DCMotor::setEnabled(bool en) {
@@ -94,68 +74,49 @@ void bb::DCMotor::setEnabled(bool en) {
   en_ = en;
 }
 
-void bb::DCMotor::setDirectionAndSpeed(DCMotor::Direction dir, uint8_t speed) {
+void bb::DCMotor::setSpeed(float speed) {
+  speed = constrain(speed, -255.0, 255.0);
+
   if(scheme_ == SCHEME_A_B_PWM) {
-    switch (dir) {
-      case DCM_BRAKE:
-        digitalWrite(pin_a_, HIGH);
-        digitalWrite(pin_b_, HIGH);
-        speed = 0;
-        analogWrite(pin_pwm_, 0);
-        break;
-
-      case DCM_IDLE:
-        digitalWrite(pin_a_, LOW);
-        digitalWrite(pin_b_, LOW);
-        speed = 0;
-        analogWrite(pin_pwm_, 0);
-        break;
-
-      case DCM_FORWARD:
-        digitalWrite(pin_a_, HIGH);
-        digitalWrite(pin_b_, LOW);
-        analogWrite(pin_pwm_, speed);
-        break;
-
-      case DCM_BACKWARD:
-        digitalWrite(pin_a_, LOW);
-        digitalWrite(pin_b_, HIGH);
-        analogWrite(pin_pwm_, speed);
-        break;
-
-      default:
-        break;
+    if(speed > -1 && speed < 1) { // idle
+      digitalWrite(pin_a_, LOW);
+      digitalWrite(pin_b_, LOW);
+      speed = 0;
+      analogWrite(pin_pwm_, 0);
+    } else if(speed > 0) { // forward
+      digitalWrite(pin_a_, HIGH);
+      digitalWrite(pin_b_, LOW);
+      analogWrite(pin_pwm_, speed);
+    } else { // backward
+      digitalWrite(pin_a_, LOW);
+      digitalWrite(pin_b_, HIGH);
+      analogWrite(pin_pwm_, -speed);
     }
   } else {
-    switch(dir) {
-    case DCM_BRAKE:
-    case DCM_IDLE:
+    if(speed > -1 && speed <1) {
       analogWrite(pin_a_, 0);
       analogWrite(pin_b_, 0);
       speed = 0;
-      break;
-    case DCM_FORWARD:
+    } else if(speed > 0) { // forward
       analogWrite(pin_a_, 0);
       analogWrite(pin_b_, speed);
-      break;
-    case DCM_BACKWARD:
-      analogWrite(pin_a_, speed);
+    } else { // backward
+      analogWrite(pin_a_, -speed);
       analogWrite(pin_b_, 0);
-      break;
-    default:
-      break;
     }
   }
 
-  dir_ = dir;
   speed_ = speed;
 }
 
 #if defined(ARDUINO_ARCH_SAMD)
 
-bb::EncoderMotor::EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en, uint8_t pin_enc_a, uint8_t pin_enc_b)
+//bb::EncoderMotor::EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en, uint8_t pin_enc_a, uint8_t pin_enc_b)
+bb::EncoderMotor::EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en, Encoder& enc)
   : bb::DCMotor(pin_a, pin_b, pin_pwm, pin_en),
-    enc_(pin_enc_a, pin_enc_b) {
+//    enc_(pin_enc_a, pin_enc_b) {
+  enc_(enc) {
+
   mode_ = CONTROL_PWM;
   mmPT_ = 1.0;
   maxSpeed_ = 1.0;
@@ -177,9 +138,11 @@ bb::EncoderMotor::EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, ui
   reverse_ = false;
 }
 
-bb::EncoderMotor::EncoderMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b, uint8_t pin_enc_a, uint8_t pin_enc_b)
+//bb::EncoderMotor::EncoderMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b, uint8_t pin_enc_a, uint8_t pin_enc_b)
+bb::EncoderMotor::EncoderMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b, Encoder& enc)
   : bb::DCMotor(pin_pwm_a, pin_pwm_b),
-    enc_(pin_enc_a, pin_enc_b) {
+//    enc_(pin_enc_a, pin_enc_b) {
+    enc_(enc) {
   mode_ = CONTROL_PWM;
   mmPT_ = 1.0;
   maxSpeed_ = 1.0;
@@ -264,9 +227,7 @@ void bb::EncoderMotor::pwmControlUpdate(float dt) {
   }
 
   presentPWM_ = constrain(presentPWM_, -255.0, 255.0);
-
-  if (presentPWM_ < 0) setDirectionAndSpeed(DCM_BACKWARD, -presentPWM_);
-  else setDirectionAndSpeed(DCM_FORWARD, presentPWM_);
+  setSpeed(presentPWM_);
 }
   
 void bb::EncoderMotor::speedControlUpdate(float dt) {
@@ -285,7 +246,7 @@ void bb::EncoderMotor::speedControlUpdate(float dt) {
   if(numZero > 10) { // 1s
     errSpeedI_ = 0;
     presentPWM_ = 0;
-    setDirectionAndSpeed(DCM_IDLE, 0);
+    setSpeed(0);
     return;
   }
 
@@ -302,16 +263,7 @@ void bb::EncoderMotor::speedControlUpdate(float dt) {
     " ErrD: " + errSpeedD_ + " Control: " + controlSpeed_ + " PWM: " + presentPWM_ + " dt: " + dt);
 #endif
 
-  float bias = 0; // 40;
-  if(EPSILON(presentPWM_, 0)) {
-    setDirectionAndSpeed(DCM_IDLE, 0);
-  } else if(presentPWM_ < 0) {
-    float speed = constrain(-presentPWM_+bias, 0, 255.0);
-    setDirectionAndSpeed(DCM_BACKWARD, speed);
-  } else if(presentPWM_ > 0) {
-    float speed = constrain(presentPWM_+bias, 0, 255.0);
-    setDirectionAndSpeed(DCM_FORWARD, speed);
-  } 
+  setSpeed(presentPWM_);
 
   errSpeedL_ = err;
 }
@@ -400,6 +352,86 @@ bb::DriveControlState bb::EncoderMotor::getDriveControlState() {
   }
 
   return state;
+}
+
+bb::EncoderControlInput::EncoderControlInput(uint8_t pin_enc_a, uint8_t pin_enc_b, InputMode mode, Unit unit): 
+  enc_(pin_enc_a, pin_enc_b),
+  filtSpeed_(25, 100, true), 
+  filtPos_(25, 100, true) {
+  mode_ = mode;
+  unit_ = unit;
+  mmPT_ = 1.0;
+  lastCycleUS_ = micros();
+  presentPos_ = enc_.read();
+}
+
+void bb::EncoderControlInput::setMode(EncoderControlInput::InputMode mode) {
+  mode_ = mode;
+}
+
+void bb::EncoderControlInput::setUnit(EncoderControlInput::Unit unit) {
+  unit_ = unit;
+}
+
+bb::Result bb::EncoderControlInput::update() {
+  unsigned long ticks = enc_.read();
+  lastCycleTicks_ = ticks - presentPos_; // FIXME compensate for wrap?
+  presentPos_ = ticks;
+  presentPosFiltered_ = filtPos_.filter(presentPos_);
+
+  unsigned long us = micros();
+  unsigned long dt;
+  if (us < lastCycleUS_) {
+    dt = (ULONG_MAX - lastCycleUS_) + us;
+  } else {
+    dt = us - lastCycleUS_;
+  }
+  lastCycleUS_ = us;
+
+  presentSpeed_ = ((double)lastCycleTicks_ / (double)dt)*1e6;
+  presentSpeedFiltered_ = filtSpeed_.filter(presentSpeed_);
+
+  return RES_OK;
+}
+
+float bb::EncoderControlInput::present(bb::EncoderControlInput::InputMode mode, bb::EncoderControlInput::Unit unit, bool raw) {
+  float retval;
+  switch(mode) {
+  case INPUT_SPEED:
+    if(raw) retval = presentSpeed_;
+    else retval = presentSpeedFiltered_;
+    break;
+
+  case INPUT_POSITION:
+  default:
+    if(raw) retval = presentPos_;
+    else retval = presentPosFiltered_;
+    break;
+  }
+
+  if(unit == UNIT_TICKS) return retval;
+  else return retval * mmPT_;
+}
+
+  
+float bb::EncoderControlInput::present() {
+  return present(mode_, unit_);
+}
+
+float bb::EncoderControlInput::speedFilterCutoff() {
+  return filtSpeed_.cutoff();
+}
+  
+void bb::EncoderControlInput::setSpeedFilterCutoff(float co) {
+  filtSpeed_.setCutoff(co);
+}
+
+float  bb::EncoderControlInput::positionFilterCutoff() {
+  return filtPos_.cutoff();
+}
+
+void bb::EncoderControlInput::setPositionFilterCutoff(float co) {
+  filtPos_.setCutoff(co);
 }
 
 

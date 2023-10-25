@@ -8,18 +8,14 @@
 #endif
 #include <BBPacket.h>
 #include <BBControllers.h>
+#include <BBLowPassFilter.h>
 
 namespace bb {
 
+class LowPassFilter; // forward declaration
+
 class DCMotor {
 public:
-  typedef enum {
-    DCM_BRAKE,
-    DCM_IDLE,
-    DCM_FORWARD,
-    DCM_BACKWARD
-  } Direction;
-
   static const uint8_t PIN_OFF = 255;
 
   typedef enum {
@@ -32,11 +28,11 @@ public:
   // Use to initialize a motor that has PWM_A/PWM_B control scheme
   DCMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b);
 
-  virtual bool begin();
-
-  virtual void setDirectionAndSpeed(Direction dir, uint8_t speed);
-  virtual Direction direction() { return dir_; }
-  virtual uint8_t speed() { return speed_; }
+  // speed will be constrained to -255.0..255.0. 
+  // Negative numbers run the motor backward. 
+  // Between (-1..1) the motor will idle.
+  virtual void setSpeed(float speed);
+  virtual float speed() { return speed_; }
   virtual void setEnabled(bool en);
   virtual bool isEnabled() {
     return en_;
@@ -44,8 +40,7 @@ public:
 
 protected:
   uint8_t pin_a_, pin_b_, pin_pwm_, pin_en_;
-  Direction dir_;
-  uint8_t speed_;
+  float speed_;
   bool en_;
   Scheme scheme_;
 };
@@ -54,7 +49,7 @@ class DCMotorControlOutput: public ControlOutput {
 public:
   DCMotorControlOutput(DCMotor& motor);
   float present();
-  bool set(float value);
+  Result set(float value);
 
 protected:
   DCMotor& motor_;
@@ -76,8 +71,10 @@ public:
     UNIT_TICKS
   };
 
-  EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en, uint8_t pin_enc_a, uint8_t pin_enc_b);
-  EncoderMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b, uint8_t pin_enc_a, uint8_t pin_enc_b);
+  //EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en, uint8_t pin_enc_a, uint8_t pin_enc_b);
+  //EncoderMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b, uint8_t pin_enc_a, uint8_t pin_enc_b);
+  EncoderMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en, Encoder& enc);
+  EncoderMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b, Encoder& enc);
 
   void setReverse(bool reverse);
 
@@ -110,7 +107,7 @@ protected:
   void speedControlUpdate(float dt);
   void positionControlUpdate(float dt);
 
-  Encoder enc_;
+  Encoder& enc_;
   float mmPT_;
   long lastCycleTicks_;
   unsigned long lastCycleUS_;
@@ -132,6 +129,53 @@ protected:
 
   bool reverse_;
 };
+
+
+class EncoderControlInput: public ControlInput {
+public:
+  enum InputMode {
+    INPUT_SPEED    = 0,
+    INPUT_POSITION = 1
+  };
+
+  enum Unit {
+    UNIT_MILLIMETERS = 0,
+    UNIT_TICKS       = 1
+  };
+
+  EncoderControlInput(uint8_t pin_enc_a, uint8_t pin_enc_b, InputMode mode = INPUT_POSITION, Unit unit = UNIT_TICKS);
+  
+  void setMode(InputMode mode);
+  void setUnit(Unit unit);
+  InputMode mode() { return mode_; }
+  Unit unit() { return unit_; }
+  virtual float present();
+  virtual float present(InputMode mode, Unit unit, bool raw = false);
+  virtual Result update();
+
+  float speedFilterCutoff();
+  void setSpeedFilterCutoff(float co);
+
+  float positionFilterCutoff();
+  void setPositionFilterCutoff(float co);
+
+  void setMillimetersPerTick(float mmPT) { mmPT_ = mmPT; }
+
+protected:
+  InputMode mode_;
+  Unit unit_;
+  Encoder enc_; // FIXME -- since this requires SAMD, possibly replace by own encoder handling?
+  bb::LowPassFilter filtSpeed_, filtPos_;
+
+  float mmPT_;
+  long lastCycleTicks_;
+  unsigned long lastCycleUS_;
+  long presentPos_;    // internally always in encoder ticks
+  long presentPosFiltered_;
+  float presentSpeed_; // internally always in encoder ticks per second
+  float presentSpeedFiltered_;
+};
+
 
 #endif // ARDUINO_ARCH_SAMD
 

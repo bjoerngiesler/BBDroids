@@ -72,11 +72,11 @@ bb::Console::Console() {
 	name_ = "console";
 	description_ = "Console interaction facility";
 	help_ = "No help available";
+	firstResponder_ = this;
 }
 
 bb::Result bb::Console::start(ConsoleStream *stream) {
 	if(stream) stream = stream; // make compiler happy
-	addConsoleStream(new SerialConsoleStream(Serial));
 	started_ = true;
 	operationStatus_ = RES_OK;
 	return RES_OK;
@@ -129,6 +129,14 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 		return;
 	}
 
+	stream->println(errorMessage(firstResponder_->handleConsoleCommand(words, stream)));
+
+	stream->print("> ");
+}
+
+bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {
+	printlnBroadcast("Handling console command in bb::Console");
+
 	if(words[0] == "help") {
 		bb::Runloop::runloop.excuseOverrun();
 		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
@@ -175,12 +183,11 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 		if(subsys == NULL) {
 			stream->print("Unknown command \""); stream->print(words[0]); stream->println("\" (and no subsystem with that name either).");
 		} else {
-			words.erase(words.begin());;
-			stream->println(errorMessage(subsys->handleConsoleCommand(words, stream)));
+			std::vector<String> wordsminusone = words;
+			wordsminusone.erase(wordsminusone.begin());
+			stream->println(errorMessage(subsys->handleConsoleCommand(wordsminusone, stream)));
 		}
 	}
-
-	stream->print("> ");
 }
 
 void bb::Console::printBroadcast(const String& val) {
@@ -280,3 +287,8 @@ std::vector<String> bb::Console::split(const String& str) {
 
   return words;
 }
+
+void bb::Console::setFirstResponder(Subsystem* subsys) {
+	firstResponder_ = subsys;
+}
+

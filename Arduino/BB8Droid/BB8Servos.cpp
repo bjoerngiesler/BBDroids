@@ -17,8 +17,9 @@ BB8ServoControlOutput::BB8ServoControlOutput(uint8_t sn, float offset) {
   offset_ = offset;
 }
 
-bool BB8ServoControlOutput::set(float value) {
-  return BB8Servos::servos.setGoal(sn_, value);
+bb::Result BB8ServoControlOutput::set(float value) {
+  if(BB8Servos::servos.setGoal(sn_, value) == true) return RES_OK;
+  return RES_CMD_FAILURE;
 }
 
 float BB8ServoControlOutput::present() {

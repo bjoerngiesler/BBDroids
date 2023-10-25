@@ -6,42 +6,37 @@
 
 using namespace bb;
 
-bb::PIDController::PIDController() {
-  input_ = NULL;
-  output_ = NULL;
-}
-
-void bb::PIDController::begin(ControlInput* input, ControlOutput* output) {
-  if(begun_) return;
-
-  input_ = input;
-  output_ = output;
-
+bb::PIDController::PIDController(ControlInput& input, ControlOutput& output): input_(input), output_(output) {
   setControlParameters(0.0f, 0.0f, 0.0f);
   setIUnbounded();
   setControlUnbounded();
-  setGoal(input_->present());
+  setGoal(input_.present());
 
   reset();
-
-  begun_ = true;
-}
-
-void bb::PIDController::end() {
-  begun_ = false;
 }
 
 void bb::PIDController::reset() {
   lastErr_ = errI_ = lastErrD_ = lastControl_ = 0.0f;
+  lastCycleUS_ = micros();
 }
 
 void bb::PIDController::update(void) {
-  if(!begun_) { bb::Console::console.printlnBroadcast("update() without begin()!"); return; }
-  float dt = 0.01; // FIXME
+  unsigned long us = micros();
+  unsigned long timediffUS;
+  if (us < lastCycleUS_) {
+    timediffUS = (ULONG_MAX - lastCycleUS_) + us;
+  } else {
+    timediffUS = us - lastCycleUS_;
+  }
+  lastCycleUS_ = us;
+
+  input_.update();
+
+  float dt = timediffUS / 1e6; 
 
   //bb::Runloop::runloop.excuseOverrun();
 
-  float err = goal_ - input_->present();
+  float err = goal_ - input_.present();
 
   errI_ += err * dt;
   if(iBounded_) {
@@ -57,9 +52,10 @@ void bb::PIDController::update(void) {
     lastControl_ = constrain(lastControl_, controlMin_, controlMax_);
   }
 
-  Console::console.printlnBroadcast(String("Control: Goal:") + goal_ + " Cur In:" + input_->present() + " Cur Out:" + output_->present() + " Err:" + err + " ErrI:" + errI_ + " ErrD:" + lastErrD_ + " Control:" + lastControl_);
+//  Console::console.printlnBroadcast(String("Control: Goal:") + goal_ + " Cur In:" + input_.present() + " Cur Out:" + output_.present() + " Err:" + err + " ErrI:" + errI_ + " ErrD:" + lastErrD_ + " Control:" + lastControl_);
+  //Serial.println(String("Control: Goal:") + goal_ + " Cur In:" + input_.present() + " Cur Out:" + output_.present() + " Err:" + err + " ErrI:" + errI_ + " ErrD:" + lastErrD_ + " Control:" + lastControl_);
 
-  output_->set(lastControl_);
+  output_.set(lastControl_);
 }
   
 void bb::PIDController::setGoal(const float& sp) {
@@ -71,8 +67,7 @@ float bb::PIDController::goal() {
 }
 
 float bb::PIDController::present() {
-  if(!begun_) return 0.0f;
-  return input_->present();
+  return input_.present();
 }
 
 void bb::PIDController::setControlParameters(const float& kp, const float& ki, const float& kd) {

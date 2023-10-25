@@ -11,7 +11,7 @@ class BB8ServoControlOutput: public bb::ControlOutput {
 public:
   BB8ServoControlOutput(uint8_t servoNum, float offset=0.0f);
   float present();
-  bool set(float value);
+  bb::Result set(float value);
 
 protected:
   uint8_t sn_;
