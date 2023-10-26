@@ -7,8 +7,12 @@ DODroid DODroid::droid;
 DODroid::Params DODroid::params_;
 
 DODroid::DODroid():
-  leftMotor(P_LEFT_PWMA, P_LEFT_PWMB, P_LEFT_ENCA, P_LEFT_ENCB),
-  rightMotor(P_RIGHT_PWMA, P_RIGHT_PWMB, P_RIGHT_ENCA, P_RIGHT_ENCB) 
+  leftMotor(P_LEFT_PWMA, P_LEFT_PWMB), 
+  leftEncoder(P_LEFT_ENCA, P_LEFT_ENCB, EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_MILLIMETERS),
+  leftController(leftEncoder, leftMotor), 
+  rightMotor(P_RIGHT_PWMA, P_RIGHT_PWMB), 
+  rightEncoder(P_RIGHT_ENCA, P_RIGHT_ENCB, EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_MILLIMETERS),
+  rightController(rightEncoder, rightMotor)
 {
   pinMode(PULL_DOWN_A0, OUTPUT);
   digitalWrite(PULL_DOWN_A0, LOW);
@@ -25,14 +29,20 @@ DODroid::DODroid():
 }
 
 Result DODroid::initialize() {
-  params_.driveKp = 0.001;
-  params_.driveKi = 0.0002; 
-  params_.driveKd = 0;
+  params_.speedKp = 0.013;
+  params_.speedKi = 0.8; 
+  params_.speedKd = 0;
   params_.driveAccel = 1;
+  params_.posKp = 0.05;
+  params_.posKi = 0;
+  params_.posKd = 0;
 
-  addParameter("drive_kp", "Proportional constant for drive PID controller", params_.driveKp, 0, INT_MAX);
-  addParameter("drive_ki", "Integrative constant for drive PID controller", params_.driveKi, 0, INT_MAX);
-  addParameter("drive_kd", "Derivative constant for drive PID controller", params_.driveKd, 0, INT_MAX);
+  addParameter("speed_kp", "Proportional constant for speed PID controller", params_.speedKp, 0, INT_MAX);
+  addParameter("speed_ki", "Integrative constant for speed PID controller", params_.speedKi, 0, INT_MAX);
+  addParameter("speed_kd", "Derivative constant for speed PID controller", params_.speedKd, 0, INT_MAX);
+  addParameter("pos_kp", "Proportional constant for position PID controller", params_.posKp, 0, INT_MAX);
+  addParameter("pos_ki", "Integrative constant for position PID controller", params_.posKi, 0, INT_MAX);
+  addParameter("pos_kd", "Derivative constant for position PID controller", params_.posKd, 0, INT_MAX);
   addParameter("drive_accel", "Acceleration for drive motors", params_.driveAccel, 0, 100);
 
   return Subsystem::initialize();
@@ -45,12 +55,16 @@ Result DODroid::start(ConsoleStream* stream) {
   DOIMU::imu.begin();
   DOBattStatus::batt.begin();
 
-  leftMotor.setDirectionAndSpeed(DCMotor::DCM_IDLE, 0);
-  leftMotor.setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
-  leftMotor.setSpeedControlParameters(params_.driveKp, params_.driveKi, params_.driveKd);
-  rightMotor.setDirectionAndSpeed(DCMotor::DCM_IDLE, 0);
-  rightMotor.setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
-  rightMotor.setSpeedControlParameters(params_.driveKp, params_.driveKi, params_.driveKd);
+  leftMotor.set(0);
+  leftEncoder.setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
+  leftEncoder.setMode(EncoderControlInput::INPUT_SPEED);
+  leftEncoder.setUnit(EncoderControlInput::UNIT_MILLIMETERS);
+  leftController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
+  rightMotor.set(0);
+  rightEncoder.setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
+  rightEncoder.setMode(EncoderControlInput::INPUT_SPEED);
+  rightEncoder.setUnit(EncoderControlInput::UNIT_MILLIMETERS);
+  rightController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
 
   return RES_OK;
 }
@@ -66,8 +80,8 @@ Result DODroid::stop(ConsoleStream* stream) {
 Result DODroid::step() {
   DOIMU::imu.update();
 
-  leftMotor.update();
-  rightMotor.update();
+  leftController.update();
+  rightController.update();
   DOBattStatus::batt.updateCurrent();
   DOBattStatus::batt.updateVoltage();
 
@@ -79,7 +93,7 @@ Result DODroid::step() {
 }
 
 void DODroid::printStatus(ConsoleStream *stream) {
-  Serial.println(String("Encoders: R") + rightMotor.getPresentPosition(EncoderMotor::UNIT_TICKS) + " L" + leftMotor.getPresentPosition(EncoderMotor::UNIT_TICKS));
+  Serial.println(String("Encoders: R") + rightEncoder.presentPosition() + " L" + leftEncoder.presentPosition());
 }
 
 Result DODroid::incomingPacket(const Packet& packet) {
@@ -92,33 +106,36 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
   if(words[0] == "left") {
     if(words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
 
-    EncoderMotor::ControlMode mode;
-    if(words[1] == "pwm") mode = EncoderMotor::CONTROL_PWM;
-    else if(words[1] == "position") mode = EncoderMotor::CONTROL_POSITION;
-    else if(words[1] == "speed") mode = EncoderMotor::CONTROL_SPEED;
-    else return RES_CMD_INVALID_ARGUMENT;
+    if(words[1] == "position") {
+      leftEncoder.setMode(EncoderControlInput::INPUT_POSITION);
+      leftController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
+      leftController.setGoal(words[2].toFloat());
+      return RES_OK;
+    } else if(words[1] == "speed") {
+      leftEncoder.setMode(EncoderControlInput::INPUT_SPEED);
+      leftController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
+      leftController.setGoal(words[2].toFloat());
+      return RES_OK;
+    } 
 
-    float sp = words[2].toFloat();    
-
-    leftMotor.setEnabled(true);
-    leftMotor.setGoal(sp, mode);
-    return RES_OK;
+    return RES_CMD_INVALID_ARGUMENT;
   }
 
   if(words[0] == "right") {
     if(words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
     
-    EncoderMotor::ControlMode mode;
-    if(words[1] == "pwm") mode = EncoderMotor::CONTROL_PWM;
-    else if(words[1] == "position") mode = EncoderMotor::CONTROL_POSITION;
-    else if(words[1] == "speed") mode = EncoderMotor::CONTROL_SPEED;
-    else return RES_CMD_INVALID_ARGUMENT;
-
-    float sp = words[2].toFloat();    
-
-    rightMotor.setEnabled(true);
-    rightMotor.setGoal(sp, mode);
-    return RES_OK;
+    if(words[1] == "position") {
+      leftEncoder.setMode(EncoderControlInput::INPUT_POSITION);
+      leftController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
+      leftController.setGoal(words[2].toFloat());
+      return RES_OK;
+    } else if(words[1] == "speed") {
+      rightEncoder.setMode(EncoderControlInput::INPUT_POSITION);
+      rightController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
+      rightController.setGoal(words[2].toFloat());
+      return RES_OK;
+    }
+    return RES_CMD_INVALID_ARGUMENT;
   }
 
   return bb::Subsystem::handleConsoleCommand(words, stream);
@@ -128,33 +145,60 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
   Result retval = Subsystem::setParameterValue(name, stringVal);
   if(retval != RES_OK) return retval;
 
-  leftMotor.setSpeedControlParameters(params_.driveKp, params_.driveKi, params_.driveKd);
-  leftMotor.setAcceleration(params_.driveAccel, EncoderMotor::UNIT_TICKS);
-  rightMotor.setSpeedControlParameters(params_.driveKp, params_.driveKi, params_.driveKd);
-  rightMotor.setAcceleration(params_.driveAccel, EncoderMotor::UNIT_TICKS);
+  if(leftEncoder.mode() == EncoderControlInput::INPUT_POSITION) {
+    leftController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
+  } else {
+    leftController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
+  }
+  if(rightEncoder.mode() == EncoderControlInput::INPUT_POSITION) {
+    rightController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
+  } else {
+    rightController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
+  }
 }
 
 Result DODroid::fillAndSendStatusPacket() {
-  LargeStatusPacket packet;
+  LargeStatusPacket p;
 
-  packet.timestamp = Runloop::runloop.millisSinceStart() / 1000.0;
-  packet.droidType = DroidType::DROID_DO;
-  strncpy(packet.droidName, DROID_NAME, sizeof(packet.droidName));
+  p.timestamp = Runloop::runloop.millisSinceStart() / 1000.0;
+  p.droidType = DroidType::DROID_DO;
+  strncpy(p.droidName, DROID_NAME, sizeof(p.droidName));
 
-  packet.drive[0] = leftMotor.getDriveControlState();
-  packet.drive[1] = rightMotor.getDriveControlState();
-  packet.drive[2].errorState = ERROR_NOT_PRESENT;
+  float err, errI, errD, control;
 
-  packet.imu[0] = DOIMU::imu.getIMUState();
-  packet.imu[1].errorState = ERROR_NOT_PRESENT;
-  packet.imu[2].errorState = ERROR_NOT_PRESENT;
+  p.drive[0].errorState = ERROR_OK;
+  p.drive[0].controlMode = leftEncoder.mode();
+  p.drive[0].presentPWM = leftMotor.present();
+  p.drive[0].presentPos = leftEncoder.presentPosition();
+  p.drive[0].presentSpeed = leftEncoder.presentSpeed();
+  leftController.getControlState(err, errI, errD, control);
+  p.drive[0].err = err;
+  p.drive[0].errI = errI;
+  p.drive[0].errD = errD;
+  p.drive[0].control = control;
 
-  packet.battery[0] = DOBattStatus::batt.getBatteryState();
-  packet.battery[1].errorState = ERROR_NOT_PRESENT;
-  packet.battery[2].errorState = ERROR_NOT_PRESENT;
+  p.drive[1].errorState = ERROR_OK;
+  p.drive[1].controlMode = rightEncoder.mode();
+  p.drive[1].presentPWM = rightMotor.present();
+  p.drive[1].presentPos = rightEncoder.presentPosition();
+  p.drive[1].presentSpeed = rightEncoder.presentSpeed();
+  rightController.getControlState(err, errI, errD, control);
+  p.drive[1].err = err;
+  p.drive[1].errI = errI;
+  p.drive[1].errD = errD;
+  p.drive[1].control = control;
 
-  WifiServer::server.broadcastUDPPacket((const uint8_t*)&packet, sizeof(packet));
-  //Console::console.printlnBroadcast(String("Sent packet of size ") + sizeof(packet));
+  p.drive[2].errorState = ERROR_NOT_PRESENT;
+
+  p.imu[0] = DOIMU::imu.getIMUState();
+  p.imu[1].errorState = ERROR_NOT_PRESENT;
+  p.imu[2].errorState = ERROR_NOT_PRESENT;
+
+  p.battery[0] = DOBattStatus::batt.getBatteryState();
+  p.battery[1].errorState = ERROR_NOT_PRESENT;
+  p.battery[2].errorState = ERROR_NOT_PRESENT;
+
+  WifiServer::server.broadcastUDPPacket((const uint8_t*)&p, sizeof(p));
 
   return RES_OK;
 }

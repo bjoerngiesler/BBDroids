@@ -4,16 +4,15 @@ using namespace bb;
 
 DCMotor motor[2] = {DCMotor(2, 3), DCMotor(18, 19)};
 EncoderControlInput input[2] = {EncoderControlInput(17, 16), EncoderControlInput(6, 7)};
-DCMotorControlOutput output[2] = {DCMotorControlOutput(motor[0]), DCMotorControlOutput(motor[1])};
-PIDController control[2] = {PIDController(input[0], output[0]), PIDController(input[1], output[1])};
+PIDController control[2] = {PIDController(input[0], motor[0]), PIDController(input[1], motor[1])};
 
 const uint8_t MOTOR_0_FLAG = 1;
 const uint8_t MOTOR_1_FLAG = 2;
 int useMotor = 0;
 
-float speedKp = 0.14, speedKi = 0.8, speedKd = 0.0;
+float speedKp = 0.13, speedKi = 0.8, speedKd = 0.0;
 float speedCutoff = 25;
-float posKp = 0.12, posKi = 0.4, posKd = 0.0;
+float posKp = 0.05, posKi = 0.0, posKd = 0.0;
 float posCutoff = 25;
 float goal = 0.0;
 
@@ -24,7 +23,17 @@ int mode = 0;
 
 const uint8_t OUTPUT_SERIALPLOTTER = 0;
 const uint8_t OUTPUT_SERIALANALYZER = 0;
-int outputMode;
+int outputMode = 0;
+
+const uint8_t UNIT_MM = 0;
+const uint8_t UNIT_TICKS = 1;
+const uint8_t UNIT_FAKE = 2;
+int unit = 1;
+
+// Values for D-O. This gives about 0.13mm per tick.
+static const float WHEEL_CIRCUMFERENCE = 722.566310325652445;
+static const float WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979 ticks per one turn of the drive gear, 18 teeth on the drive gear, 96 teeth on the main gear.
+static const float MM_PER_TICK = WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN;
 
 class DCMotorTest: public bb::Subsystem {
 public:
@@ -38,6 +47,8 @@ public:
 "    help                     Print this help\n"\
 "    start                    Start the test\n"\
 "    stop                     Stop the test\n"\
+"    add_goal <delta>         Add <delta> to current goal\n"\
+"    reset                    Reset controllers\n"\
 "While the test is running, information about controller state will be output in a format suited for\n"\
 "the Arduino serial plotter. While it is running, you can either enter \"stop\" to stop the test, or\n"\
 "enter numerical setpoints.\n";
@@ -45,6 +56,7 @@ public:
     addParameter("useMotor", "0: none, 1: motor 0, 2: motor 1, 3: both", useMotor, 0, 3);
     addParameter("mode", "0: PWM, 1: speed, 2: position", mode, 0, 2);
     addParameter("outputMode", "0: output for Arduino Serial Plotter , 1: output for Curio Res Serial Analyzer", outputMode, 0, 1);
+    addParameter("unit", "0: millimeters, 1: ticks, 2: 'fake' (goal is in ticks, but converted to mm)", unit, 0, 2);
     addParameter("speedKp", "P constant for speed control", speedKp);
     addParameter("speedKi", "I constant for speed control", speedKi);
     addParameter("speedKd", "D constant for speed control", speedKd);
@@ -54,6 +66,9 @@ public:
     addParameter("goal", "PWM, speed, or position goat", goal);
     addParameter("speedCutoff", "Cutoff frequency for speed filter (Hz)", speedCutoff);
     addParameter("posCutoff", "Cutoff frequency for position filter (Hz)", posCutoff);
+
+    input[0].setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
+    input[1].setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
 
     return Subsystem::initialize();    
   }
@@ -69,8 +84,8 @@ public:
   Result stop(ConsoleStream *stream) {
     started_ = false;
     operationStatus_ = RES_SUBSYS_NOT_STARTED;
-    motor[0].setSpeed(0);
-    motor[1].setSpeed(0);
+    motor[0].set(0);
+    motor[1].set(0);
     return RES_OK;
   }
 
@@ -80,81 +95,87 @@ public:
       input[i].setPositionFilterCutoff(posCutoff);
     }
 
+    if(outputMode == OUTPUT_SERIALPLOTTER) {
+      Console::console.printBroadcast(String("Goal:") + goal);
+    } else {
+      Console::console.printBroadcast(String(goal));
+    }
+
     if(mode == MODE_PWM) {
       float g = constrain(goal, -255.0, 255.0);
-      if(outputMode == OUTPUT_SERIALPLOTTER)
-        Console::console.printBroadcast(String("Goal:") + g);
-      if(useMotor & MOTOR_0_FLAG) {
-        motor[0].setSpeed(g);
-        input[0].update();
-        if(outputMode == OUTPUT_SERIALPLOTTER)
-          Console::console.printBroadcast(String(",RawEnc0:") + input[0].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS));
-        else {
-          Console::console.printBroadcast(String(input[0].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS, true)));
-          Console::console.printBroadcast(" ");
-          Console::console.printBroadcast(String(input[0].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS, false)));
-        }
-      }
-      if(useMotor & MOTOR_1_FLAG) {
-        motor[1].setSpeed(g);
-        input[1].update();
-        if(outputMode == OUTPUT_SERIALPLOTTER)
-          Console::console.printBroadcast(String(",RawEnc1:") + input[1].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS));
-        else {
-          //Console::console.printBroadcast(String(input[1].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS)));
-          //Console::console.printBroadcast(" ");
+      for(int i=0; i<2; i++) {
+        if(useMotor & 1<<i) {
+          motor[i].set(g);
+          input[i].update();
+
+          if(outputMode == OUTPUT_SERIALPLOTTER)
+            Console::console.printBroadcast(String(",RawEnc") + i + ":" + input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit));
+          else {
+            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit, true)));
+            Console::console.printBroadcast(" ");
+            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit, false)));
+            Console::console.printBroadcast(" ");
+          }
         }
       }
       Console::console.printlnBroadcast();
     } 
     
     else if(mode == MODE_SPEED) {
-      input[0].setMode(EncoderControlInput::INPUT_SPEED);
-      control[0].setControlParameters(speedKp, speedKi, speedKd);
-      control[0].setGoal(goal);
-      input[1].setMode(EncoderControlInput::INPUT_SPEED);
-      control[1].setControlParameters(speedKp, speedKi, speedKd);
-      control[1].setGoal(goal);
-      if(outputMode == OUTPUT_SERIALPLOTTER) {
-        Console::console.printBroadcast(String("Goal:") + goal);
-      } else {
-        Console::console.printBroadcast(String(goal));
-      }
-      if(useMotor & MOTOR_0_FLAG) {
-        control[0].update();
-        if(outputMode == OUTPUT_SERIALPLOTTER) {
-          Console::console.printBroadcast(String(",RawEnc0:") + input[0].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS));
-        } else {
-          Console::console.printBroadcast(" ");
-          Console::console.printBroadcast(String(input[0].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS, true)));
-          Console::console.printBroadcast(" ");
-          Console::console.printBroadcast(String(input[0].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS)));
+      for(int i=0; i<2; i++) {
+        float g = goal;
+
+        input[i].setMode(EncoderControlInput::INPUT_SPEED);
+        if(unit == UNIT_MM) input[i].setUnit(EncoderControlInput::UNIT_MILLIMETERS);
+        else if(unit == UNIT_TICKS) input[i].setUnit(EncoderControlInput::UNIT_TICKS);
+        else if(unit == UNIT_FAKE) {
+          input[i].setUnit(EncoderControlInput::UNIT_MILLIMETERS);
+          g = goal * MM_PER_TICK;
+        }
+
+        control[i].setControlParameters(speedKp, speedKi, speedKd);
+        control[i].setGoal(g);
+        
+        if(useMotor & 1<<i) {
+          control[i].update();
+
+          if(outputMode == OUTPUT_SERIALPLOTTER) {
+            Console::console.printBroadcast(String(",Speed") + i + ":" + input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit));
+          } else {
+            Console::console.printBroadcast(" ");
+            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit, true)));
+            Console::console.printBroadcast(" ");
+            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit)));
+          }
         }
       }
-      if(useMotor & MOTOR_1_FLAG) {
-        control[1].update();
-        if(outputMode == OUTPUT_SERIALPLOTTER) {
-          Console::console.printBroadcast(String(",RawEnc0:") + input[1].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS));
-        } else {
-          Console::console.printBroadcast(" ");
-          Console::console.printBroadcast(String(input[1].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS, true)));
-          Console::console.printBroadcast(" ");
-          Console::console.printBroadcast(String(input[1].present(EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_TICKS)));
-        }
-      } 
       Console::console.printlnBroadcast();
     } 
     
     else if(mode == MODE_POSITION) {
-      input[0].setMode(EncoderControlInput::INPUT_POSITION);
-      control[0].setControlParameters(posKp, posKi, posKd);
-      control[0].setGoal(goal);
-      input[1].setMode(EncoderControlInput::INPUT_POSITION);
-      control[1].setControlParameters(posKp, posKi, posKd);
-      control[1].setGoal(goal);
-      if(useMotor & MOTOR_0_FLAG) control[0].update();
-      if(useMotor & MOTOR_1_FLAG) control[1].update();
+      if(outputMode == OUTPUT_SERIALPLOTTER)
+        Console::console.printBroadcast(String("Goal:") + goal);
+      for(int i=0; i<2; i++) {
+        input[i].setMode(EncoderControlInput::INPUT_POSITION);
+        input[i].setUnit((bb::EncoderControlInput::Unit)unit);
+        control[i].setControlParameters(posKp, posKi, posKd);
+        control[i].setGoal(goal);
+        if(useMotor & 1<<i) {
+
+          control[i].update();
+          if(outputMode == OUTPUT_SERIALPLOTTER) {
+            Console::console.printBroadcast(String(",Pos:") + input[i].present(EncoderControlInput::INPUT_POSITION, (bb::EncoderControlInput::Unit)unit, true));
+          } else {
+            Console::console.printBroadcast(" ");
+            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_POSITION, (bb::EncoderControlInput::Unit)unit, true)));
+            Console::console.printBroadcast(" ");
+            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_POSITION, (bb::EncoderControlInput::Unit)unit)));
+          }
+        } 
+      }
+      Console::console.printlnBroadcast();
     }
+
     return RES_OK;
   }
   
@@ -174,6 +195,17 @@ public:
 
     if(words[0] == "stop") {
       stop(stream);
+      return RES_OK;
+    }
+
+    if(words[0] == "reset") {
+      for(int i=0; i<2; i++) control[i].reset();
+      return RES_OK;
+    }
+
+    if(words[0] == "add") {
+      if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+      goal += words[1].toFloat();
       return RES_OK;
     }
 

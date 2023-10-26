@@ -3,18 +3,6 @@
 #include <limits.h>
 #include <math.h>
 
-bb::DCMotorControlOutput::DCMotorControlOutput(bb::DCMotor& motor): motor_(motor) {
-}
-
-float bb::DCMotorControlOutput::present() {
-  return motor_.speed();
-}
-
-bb::Result bb::DCMotorControlOutput::set(float value) {
-  motor_.setSpeed(value);
-  return RES_OK;
-}
-
 bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en) {
   pin_a_ = pin_a;
   pin_b_ = pin_b;
@@ -74,7 +62,7 @@ void bb::DCMotor::setEnabled(bool en) {
   en_ = en;
 }
 
-void bb::DCMotor::setSpeed(float speed) {
+bb::Result bb::DCMotor::set(float speed) {
   speed = constrain(speed, -255.0, 255.0);
 
   if(scheme_ == SCHEME_A_B_PWM) {
@@ -107,6 +95,8 @@ void bb::DCMotor::setSpeed(float speed) {
   }
 
   speed_ = speed;
+
+  return RES_OK;
 }
 
 #if defined(ARDUINO_ARCH_SAMD)
@@ -227,7 +217,7 @@ void bb::EncoderMotor::pwmControlUpdate(float dt) {
   }
 
   presentPWM_ = constrain(presentPWM_, -255.0, 255.0);
-  setSpeed(presentPWM_);
+  set(presentPWM_);
 }
   
 void bb::EncoderMotor::speedControlUpdate(float dt) {
@@ -246,7 +236,7 @@ void bb::EncoderMotor::speedControlUpdate(float dt) {
   if(numZero > 10) { // 1s
     errSpeedI_ = 0;
     presentPWM_ = 0;
-    setSpeed(0);
+    set(0);
     return;
   }
 
@@ -263,7 +253,7 @@ void bb::EncoderMotor::speedControlUpdate(float dt) {
     " ErrD: " + errSpeedD_ + " Control: " + controlSpeed_ + " PWM: " + presentPWM_ + " dt: " + dt);
 #endif
 
-  setSpeed(presentPWM_);
+  set(presentPWM_);
 
   errSpeedL_ = err;
 }
@@ -417,6 +407,15 @@ float bb::EncoderControlInput::present(bb::EncoderControlInput::InputMode mode, 
 float bb::EncoderControlInput::present() {
   return present(mode_, unit_);
 }
+
+float bb::EncoderControlInput::presentPosition(Unit unit, bool raw) {
+  return present(INPUT_POSITION, unit, raw);
+}
+
+float bb::EncoderControlInput::presentSpeed(Unit unit, bool raw) {
+  return present(INPUT_SPEED, unit, raw);  
+}
+
 
 float bb::EncoderControlInput::speedFilterCutoff() {
   return filtSpeed_.cutoff();

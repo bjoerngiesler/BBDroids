@@ -39,7 +39,7 @@ static const uint8_t P_DYNAMIXEL_RX    = 13;
 static const uint8_t P_DYNAMIXEL_TX    = 14;
 
 static const float WHEEL_CIRCUMFERENCE = 722.566310325652445;
-static const float WHEEL_TICKS_PER_TURN = 979.2 * (96.0/18.0); // 979 ticks per one turn of the drive gear, 18 teeth on the drive gear, 96 teeth on the main gear.
+static const float WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
 
 static const uint8_t BATT_STATUS_ADDR   = 0x40;
 

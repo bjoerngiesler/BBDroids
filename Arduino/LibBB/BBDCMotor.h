@@ -14,7 +14,7 @@ namespace bb {
 
 class LowPassFilter; // forward declaration
 
-class DCMotor {
+class DCMotor: public ControlOutput {
 public:
   static const uint8_t PIN_OFF = 255;
 
@@ -31,8 +31,8 @@ public:
   // speed will be constrained to -255.0..255.0. 
   // Negative numbers run the motor backward. 
   // Between (-1..1) the motor will idle.
-  virtual void setSpeed(float speed);
-  virtual float speed() { return speed_; }
+  virtual Result set(float speed);
+  virtual float present() { return speed_; }
   virtual void setEnabled(bool en);
   virtual bool isEnabled() {
     return en_;
@@ -44,17 +44,6 @@ protected:
   bool en_;
   Scheme scheme_;
 };
-
-class DCMotorControlOutput: public ControlOutput {
-public:
-  DCMotorControlOutput(DCMotor& motor);
-  float present();
-  Result set(float value);
-
-protected:
-  DCMotor& motor_;
-};
-
 
 #if defined(ARDUINO_ARCH_SAMD)
 
@@ -151,6 +140,8 @@ public:
   Unit unit() { return unit_; }
   virtual float present();
   virtual float present(InputMode mode, Unit unit, bool raw = false);
+  virtual float presentPosition(Unit unit = UNIT_TICKS, bool raw = false);
+  virtual float presentSpeed(Unit unit = UNIT_TICKS, bool raw = false);
   virtual Result update();
 
   float speedFilterCutoff();
@@ -160,6 +151,8 @@ public:
   void setPositionFilterCutoff(float co);
 
   void setMillimetersPerTick(float mmPT) { mmPT_ = mmPT; }
+
+  float controlGain() { if(unit_ == UNIT_TICKS) return 1.0f; else return 1/mmPT_; }
 
 protected:
   InputMode mode_;

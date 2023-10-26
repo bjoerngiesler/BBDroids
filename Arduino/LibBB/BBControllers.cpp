@@ -47,13 +47,13 @@ void bb::PIDController::update(void) {
   lastErr_ = err;
 
   lastControl_ = kp_ * lastErr_ + ki_ * errI_ + kd_ * lastErrD_;
+  lastControl_ *= input_.controlGain();
 
   if(controlBounded_) {
     lastControl_ = constrain(lastControl_, controlMin_, controlMax_);
   }
 
-//  Console::console.printlnBroadcast(String("Control: Goal:") + goal_ + " Cur In:" + input_.present() + " Cur Out:" + output_.present() + " Err:" + err + " ErrI:" + errI_ + " ErrD:" + lastErrD_ + " Control:" + lastControl_);
-  //Serial.println(String("Control: Goal:") + goal_ + " Cur In:" + input_.present() + " Cur Out:" + output_.present() + " Err:" + err + " ErrI:" + errI_ + " ErrD:" + lastErrD_ + " Control:" + lastControl_);
+  //Console::console.printlnBroadcast(String("Control: Goal:") + goal_ + " Cur In:" + input_.present() + " Cur Out:" + output_.present() + " Err:" + err + " ErrI:" + errI_ + " ErrD:" + lastErrD_ + " Control:" + lastControl_);
 
   output_.set(lastControl_);
 }

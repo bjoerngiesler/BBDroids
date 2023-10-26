@@ -10,6 +10,7 @@ class ControlInput {
 public:
   virtual Result update() = 0;
   virtual float present() = 0;
+  virtual float controlGain() { return 1.0f; }
 };
 
 class ControlOutput {

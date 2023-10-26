@@ -10,7 +10,8 @@ public:
   static DODroid droid;
   
   struct Params {
-    float driveKp, driveKi, driveKd;
+    float speedKp, speedKi, speedKd;
+    float posKp, posKi, posKd;
     float driveAccel;
   };
   static Params params_;
@@ -29,7 +30,9 @@ public:
   virtual Result setParameterValue(const String& name, const String& stringVal);
 
 protected:
-  bb::EncoderMotor leftMotor, rightMotor;
+  bb::DCMotor leftMotor, rightMotor;
+  bb::EncoderControlInput leftEncoder, rightEncoder;
+  bb::PIDController leftController, rightController;
 };
 
 #endif
