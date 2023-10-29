@@ -2,8 +2,8 @@
 
 using namespace bb;
 
-DCMotor motor[2] = {DCMotor(2, 3), DCMotor(18, 19)};
-EncoderControlInput input[2] = {EncoderControlInput(17, 16), EncoderControlInput(6, 7)};
+DCMotor motor[2] = {DCMotor(2, 3, 19, 20), DCMotor(255, 255)};
+bb::Encoder input[2] = {bb::Encoder(6, 7), bb::Encoder(255, 255)};
 PIDController control[2] = {PIDController(input[0], motor[0]), PIDController(input[1], motor[1])};
 
 const uint8_t MOTOR_0_FLAG = 1;
@@ -78,6 +78,8 @@ public:
     operationStatus_ = RES_OK;
     control[0].reset();
     control[1].reset();
+    motor[0].setEnabled(true);
+    motor[1].setEnabled(true);
     return RES_OK;
   }
   
@@ -86,6 +88,8 @@ public:
     operationStatus_ = RES_SUBSYS_NOT_STARTED;
     motor[0].set(0);
     motor[1].set(0);
+    motor[0].setEnabled(false);
+    motor[1].setEnabled(false);
     return RES_OK;
   }
 
@@ -109,11 +113,11 @@ public:
           input[i].update();
 
           if(outputMode == OUTPUT_SERIALPLOTTER)
-            Console::console.printBroadcast(String(",RawEnc") + i + ":" + input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit));
+            Console::console.printBroadcast(String(",RawEnc") + i + ":" + input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit));
           else {
-            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit, true)));
+            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit, true)));
             Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit, false)));
+            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit, false)));
             Console::console.printBroadcast(" ");
           }
         }
@@ -125,11 +129,11 @@ public:
       for(int i=0; i<2; i++) {
         float g = goal;
 
-        input[i].setMode(EncoderControlInput::INPUT_SPEED);
-        if(unit == UNIT_MM) input[i].setUnit(EncoderControlInput::UNIT_MILLIMETERS);
-        else if(unit == UNIT_TICKS) input[i].setUnit(EncoderControlInput::UNIT_TICKS);
+        input[i].setMode(bb::Encoder::INPUT_SPEED);
+        if(unit == UNIT_MM) input[i].setUnit(bb::Encoder::UNIT_MILLIMETERS);
+        else if(unit == UNIT_TICKS) input[i].setUnit(bb::Encoder::UNIT_TICKS);
         else if(unit == UNIT_FAKE) {
-          input[i].setUnit(EncoderControlInput::UNIT_MILLIMETERS);
+          input[i].setUnit(bb::Encoder::UNIT_MILLIMETERS);
           g = goal * MM_PER_TICK;
         }
 
@@ -140,12 +144,12 @@ public:
           control[i].update();
 
           if(outputMode == OUTPUT_SERIALPLOTTER) {
-            Console::console.printBroadcast(String(",Speed") + i + ":" + input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit));
+            Console::console.printBroadcast(String(",Speed") + i + ":" + input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit));
           } else {
             Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit, true)));
+            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit, true)));
             Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_SPEED, (bb::EncoderControlInput::Unit)unit)));
+            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit)));
           }
         }
       }
@@ -156,20 +160,20 @@ public:
       if(outputMode == OUTPUT_SERIALPLOTTER)
         Console::console.printBroadcast(String("Goal:") + goal);
       for(int i=0; i<2; i++) {
-        input[i].setMode(EncoderControlInput::INPUT_POSITION);
-        input[i].setUnit((bb::EncoderControlInput::Unit)unit);
+        input[i].setMode(bb::Encoder::INPUT_POSITION);
+        input[i].setUnit((bb::Encoder::Unit)unit);
         control[i].setControlParameters(posKp, posKi, posKd);
         control[i].setGoal(goal);
         if(useMotor & 1<<i) {
 
           control[i].update();
           if(outputMode == OUTPUT_SERIALPLOTTER) {
-            Console::console.printBroadcast(String(",Pos:") + input[i].present(EncoderControlInput::INPUT_POSITION, (bb::EncoderControlInput::Unit)unit, true));
+            Console::console.printBroadcast(String(",Pos:") + input[i].present(bb::Encoder::INPUT_POSITION, (bb::Encoder::Unit)unit, true));
           } else {
             Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_POSITION, (bb::EncoderControlInput::Unit)unit, true)));
+            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_POSITION, (bb::Encoder::Unit)unit, true)));
             Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(EncoderControlInput::INPUT_POSITION, (bb::EncoderControlInput::Unit)unit)));
+            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_POSITION, (bb::Encoder::Unit)unit)));
           }
         } 
       }

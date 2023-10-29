@@ -86,7 +86,6 @@ bb::Result bb::Console::stop(ConsoleStream *stream) {
 	if(stream) stream = stream; // make compiler happy
 	if(!started_) return RES_SUBSYS_NOT_STARTED;
 	return RES_SUBSYS_NOT_STOPPABLE;
-	return RES_OK;
 }
 
 bb::Result bb::Console::step() {
@@ -135,18 +134,19 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 }
 
 bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {
-	printlnBroadcast("Handling console command in bb::Console");
 
 	if(words[0] == "help") {
 		bb::Runloop::runloop.excuseOverrun();
 		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
 		printHelpAllSubsystems(stream);
+		return RES_OK;
 	} 
 
 	else if(words[0] == "status") {
 		bb::Runloop::runloop.excuseOverrun();
 		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
 		printStatusAllSubsystems(stream);
+		return RES_OK;
 	} 
 
 	else if(words[0] == "start") {
@@ -159,6 +159,7 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 				stream->println(errorMessage(s->start(stream)));
 			}
 		}
+		return RES_OK;
 	}
 		
 	else if(words[0] == "stop") {
@@ -172,10 +173,12 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 				stream->println(errorMessage(s->stop(stream)));
 			}
 		}
+		return RES_OK;
 	}
 
 	else if(words[0] == "store") {
 		stream->println(errorMessage(ConfigStorage::storage.store()));
+		return RES_OK;
 	} 
 
 	else {
@@ -187,6 +190,7 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 			wordsminusone.erase(wordsminusone.begin());
 			stream->println(errorMessage(subsys->handleConsoleCommand(wordsminusone, stream)));
 		}
+		return RES_OK;
 	}
 }
 
