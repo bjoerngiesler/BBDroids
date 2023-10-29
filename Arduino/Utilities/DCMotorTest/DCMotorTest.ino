@@ -10,10 +10,6 @@ const uint8_t MOTOR_0_FLAG = 1;
 const uint8_t MOTOR_1_FLAG = 2;
 int useMotor = 0;
 
-float speedKp = 0.13, speedKi = 0.8, speedKd = 0.0;
-float speedCutoff = 25;
-float posKp = 0.05, posKi = 0.0, posKd = 0.0;
-float posCutoff = 25;
 float goal = 0.0;
 
 const uint8_t MODE_PWM = 0;
@@ -30,9 +26,29 @@ const uint8_t UNIT_TICKS = 1;
 const uint8_t UNIT_FAKE = 2;
 int unit = 1;
 
-// Values for D-O. This gives about 0.13mm per tick.
+#define DROID_DO
+#define DROID_BB8
+
+#if defined(DROID_DO)
+// Values for D-O. This gives about 0.14mm per tick.
 static const float WHEEL_CIRCUMFERENCE = 722.566310325652445;
 static const float WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979 ticks per one turn of the drive gear, 18 teeth on the drive gear, 96 teeth on the main gear.
+float speedKp = 0.13, speedKi = 0.8, speedKd = 0.0;
+float speedCutoff = 25;
+float posKp = 0.05, posKi = 0.0, posKd = 0.0;
+float posCutoff = 25;
+#endif
+
+#if defined(DROID_BB8)
+// Values for BB-8. This gives about 0.33mm per tick.
+static const float WHEEL_CIRCUMFERENCE     = 2*M_PI*253.0; // bb8 motor pwm 0
+static const float WHEEL_TICKS_PER_TURN    = 4776.384;
+float speedKp = 0.075, speedKi = 0.2, speedKd = 0.0;
+float posKp = 0.027, posKi = 0.005, posKd = 0.0;
+float speedCutoff = 25;
+float posCutoff = 25;
+#endif
+
 static const float MM_PER_TICK = WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN;
 
 class DCMotorTest: public bb::Subsystem {

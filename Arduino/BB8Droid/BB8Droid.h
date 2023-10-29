@@ -47,16 +47,6 @@ protected:
     float bodyRollKp, bodyRollKi, bodyRollKd;
     float domePitchKp, domePitchKi, domePitchKd;
     float domeRollKp, domeRollKi, domeRollKd;
-
-    float drive_speed_factor, turn_speed_factor;
-    float body_roll_servo_min, body_roll_servo_max, body_roll_servo_offset, body_roll_servo_speed;
-    bool body_roll_servo_invert;
-    float dome_pitch_servo_min, dome_pitch_servo_max, dome_pitch_servo_offset, dome_pitch_servo_speed;
-    bool dome_pitch_servo_invert;
-    float dome_roll_servo_min, dome_roll_servo_max, dome_roll_servo_offset, dome_roll_servo_speed;
-    bool dome_roll_servo_invert;
-    float dome_heading_servo_min, dome_heading_servo_max, dome_heading_servo_offset, dome_heading_servo_speed;
-    bool dome_heading_servo_invert;
   } BB8Params;
 
   static BB8Params params_;

@@ -8,13 +8,6 @@
 
 BB8 BB8::bb8;
 
-static const String driveSpeedKpStr_ = "drive_speed_kp";
-static const String driveSpeedKiStr_ = "drive_speed_ki";
-static const String driveSpeedKdStr_ = "drive_speed_kd";
-static const String bodyRollKpStr_ = "body_roll_kp";
-static const String bodyRollKiStr_ = "body_roll_ki";
-static const String bodyRollKdStr_ = "body_roll_kd";
-
 ServoLimits servolimits[] = {
   { 0.0f, 360.0f, 0.0f, 60.0 },
   { 120.0f, 240.0f, 0.0f, 60.0 },
@@ -31,7 +24,7 @@ BB8::BB8()
   : rollControlInput_(BB8IMUControlInput::IMU_ROLL),
     rollControlOutput_(BODY_ROLL_SERVO, 180.0),
     rollController_(rollControlInput_, rollControlOutput_),
-    driveControlInput_(P_DRIVEENC_A, P_DRIVEENC_B, bb::Encoder::INPUT_POSITION, bb::Encoder::UNIT_MILLIMETERS),
+    driveControlInput_(P_DRIVEENC_A, P_DRIVEENC_B, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
     driveController_(driveControlInput_, driveMotor) {
   name_ = "bb8";
   description_ = "BB8 Main System";
@@ -47,14 +40,14 @@ BB8::BB8()
   started_ = false;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
 
-  addParameter(driveSpeedKpStr_, "Proportional constant for drive speed controller", params_.driveSpeedKp);
-  addParameter(driveSpeedKiStr_, "Integral constant for drive speed controller", params_.driveSpeedKi);
-  addParameter(driveSpeedKdStr_, "Derivative constant for drive speed controller", params_.driveSpeedKd);
+  addParameter("drive_speed_kp", "Proportional constant for drive speed controller", params_.driveSpeedKp);
+  addParameter("drive_speed_ki", "Integral constant for drive speed controller", params_.driveSpeedKi);
+  addParameter("drive_speed_kd", "Derivative constant for drive speed controller", params_.driveSpeedKd);
   addParameter("drive_speed_goal", "Drive speed goal", driveSpeedGoal_);
 
-  addParameter(bodyRollKpStr_, "Proportional constant for body roll controller", params_.bodyRollKp);
-  addParameter(bodyRollKiStr_, "Integral constant for body roll controller", params_.bodyRollKi);
-  addParameter(bodyRollKdStr_, "Derivative constant for body roll controller", params_.bodyRollKd);
+  addParameter("body_roll_kp", "Proportional constant for body roll controller", params_.bodyRollKp);
+  addParameter("body_roll_ki", "Integral constant for body roll controller", params_.bodyRollKi);
+  addParameter("body_roll_kd", "Derivative constant for body roll controller", params_.bodyRollKd);
   addParameter("body_roll_goal", "Body roll goal", bodyRollGoal_);
 
   addParameter("dome_roll_kp", "Proportional constant for dome pitch controller", params_.domePitchKp);
@@ -72,61 +65,17 @@ Result BB8::initialize() {
   paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
   if (ConfigStorage::storage.blockIsValid(paramsHandle_)) {
     ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t *)&params_);
-
-    servolimits[BODY_ROLL_SERVO - 1].min = params_.body_roll_servo_min;
-    servolimits[BODY_ROLL_SERVO - 1].max = params_.body_roll_servo_max;
-    servolimits[BODY_ROLL_SERVO - 1].offset = params_.body_roll_servo_offset;
-    servolimits[BODY_ROLL_SERVO - 1].speed = params_.body_roll_servo_speed;
-
-    servolimits[BODY_ROLL_SERVO - 1].min = params_.dome_pitch_servo_min;
-    servolimits[BODY_ROLL_SERVO - 1].max = params_.dome_pitch_servo_max;
-    servolimits[BODY_ROLL_SERVO - 1].offset = params_.dome_pitch_servo_offset;
-    servolimits[BODY_ROLL_SERVO - 1].speed = params_.dome_pitch_servo_speed;
-
-    servolimits[DOME_ROLL_SERVO - 1].min = params_.dome_roll_servo_min;
-    servolimits[DOME_ROLL_SERVO - 1].max = params_.dome_roll_servo_max;
-    servolimits[DOME_ROLL_SERVO - 1].offset = params_.dome_roll_servo_offset;
-    servolimits[DOME_ROLL_SERVO - 1].speed = params_.dome_roll_servo_speed;
-
-    servolimits[DOME_HEADING_SERVO - 1].min = params_.dome_heading_servo_min;
-    servolimits[DOME_HEADING_SERVO - 1].max = params_.dome_heading_servo_max;
-    servolimits[DOME_HEADING_SERVO - 1].offset = params_.dome_heading_servo_offset;
-    servolimits[DOME_HEADING_SERVO - 1].speed = params_.dome_heading_servo_speed;
   } else {
-    params_.drive_speed_factor = 2.0;  //0.5;
-    params_.turn_speed_factor = 1.0;
-
-    params_.body_roll_servo_min = servolimits[BODY_ROLL_SERVO - 1].min;
-    params_.body_roll_servo_max = servolimits[BODY_ROLL_SERVO - 1].max;
-    params_.body_roll_servo_offset = servolimits[BODY_ROLL_SERVO - 1].offset;
-    params_.body_roll_servo_speed = servolimits[BODY_ROLL_SERVO - 1].speed;
-    params_.body_roll_servo_invert = true;
-
-    params_.dome_pitch_servo_min = servolimits[DOME_PITCH_SERVO - 1].min;
-    params_.dome_pitch_servo_max = servolimits[DOME_PITCH_SERVO - 1].max;
-    params_.dome_pitch_servo_offset = servolimits[DOME_PITCH_SERVO - 1].offset;
-    params_.dome_pitch_servo_speed = servolimits[DOME_PITCH_SERVO - 1].speed;
-    params_.dome_pitch_servo_invert = false;
-
-    params_.dome_roll_servo_min = servolimits[DOME_ROLL_SERVO - 1].min;
-    params_.dome_roll_servo_max = servolimits[DOME_ROLL_SERVO - 1].max;
-    params_.dome_roll_servo_offset = servolimits[DOME_ROLL_SERVO - 1].offset;
-    params_.dome_roll_servo_speed = servolimits[DOME_ROLL_SERVO - 1].speed;
-    params_.dome_roll_servo_invert = false;
-
-    params_.dome_heading_servo_min = servolimits[DOME_HEADING_SERVO - 1].min;
-    params_.dome_heading_servo_max = servolimits[DOME_HEADING_SERVO - 1].max;
-    params_.dome_heading_servo_offset = servolimits[DOME_HEADING_SERVO - 1].offset;
-    params_.dome_heading_servo_speed = servolimits[DOME_HEADING_SERVO - 1].speed;
-    params_.dome_heading_servo_invert = false;
+    params_.driveSpeedKp = 0.075;
+    params_.driveSpeedKi = 0.2;
+    params_.driveSpeedKd = 0.0;
+    params_.domeRollKp = 1.0;
+    params_.domeRollKi = 0.0;
+    params_.domeRollKd = 0.0;
+    params_.domePitchKp = 1.0;
+    params_.domePitchKi = 0.0;
+    params_.domePitchKd = 0.0;
   }
-
-  params_.domeRollKp = 1.0;
-  params_.domeRollKi = 0.0;
-  params_.domeRollKd = 0.0;
-  params_.domePitchKp = 1.0;
-  params_.domePitchKi = 0.0;
-  params_.domePitchKd = 0.0;
 
   return Subsystem::initialize();
 }
@@ -135,7 +84,7 @@ Result BB8::start(ConsoleStream *stream) {
   started_ = true;
   runningStatus_ = false;
   operationStatus_ = RES_OK;
-  mode_ = MODE_OFF;
+  mode_ = MODE_SPEED_ROLL_CONTROL;
   bb::XBee::xbee.addPacketReceiver(this);
   packetsReceived_ = packetsMissed_ = 0;
   memset((uint8_t *)&lastPacket_, 0, sizeof(lastPacket_));
@@ -157,30 +106,14 @@ Result BB8::start(ConsoleStream *stream) {
     }
   }
 
-  BB8Servos::servos.setRange(BODY_ROLL_SERVO, params_.body_roll_servo_min, params_.body_roll_servo_max);
-  BB8Servos::servos.setOffset(BODY_ROLL_SERVO, params_.body_roll_servo_offset);
-  BB8Servos::servos.setInverted(BODY_ROLL_SERVO, params_.body_roll_servo_invert);
-
-  BB8Servos::servos.setRange(DOME_ROLL_SERVO, params_.dome_roll_servo_min, params_.dome_roll_servo_max);
-  BB8Servos::servos.setOffset(DOME_ROLL_SERVO, params_.dome_roll_servo_offset);
-  BB8Servos::servos.setInverted(DOME_ROLL_SERVO, params_.dome_roll_servo_invert);
-
-  BB8Servos::servos.setRange(DOME_PITCH_SERVO, params_.dome_pitch_servo_min, params_.dome_pitch_servo_max);
-  BB8Servos::servos.setOffset(DOME_PITCH_SERVO, params_.dome_pitch_servo_offset);
-  BB8Servos::servos.setInverted(DOME_PITCH_SERVO, params_.dome_pitch_servo_invert);
-
-  BB8Servos::servos.setRange(DOME_HEADING_SERVO, params_.dome_heading_servo_min, params_.dome_heading_servo_max);
-  BB8Servos::servos.setOffset(DOME_HEADING_SERVO, params_.dome_heading_servo_offset);
-  BB8Servos::servos.setInverted(DOME_HEADING_SERVO, params_.dome_heading_servo_invert);
-
   BB8Servos::servos.switchTorque(BB8Servos::ID_ALL, true);
 
-  rollController_.setControlParameters(1.0, 0.0, 0.0);
-  rollController_.setIBounds(-180.0, 180.0);
+  rollController_.setControlParameters(params_.bodyRollKp, params_.bodyRollKi, params_.bodyRollKd);
+  //rollController_.setIBounds(-180.0, 180.0);
   rollController_.setGoal(0.0);
 
-  driveController_.setControlParameters(1.0, 0.0, 0.0);
-  driveController_.setIBounds(-100.0, 100.0);
+  driveController_.setControlParameters(params_.driveSpeedKp, params_.driveSpeedKi, params_.driveSpeedKd);
+  //driveController_.setIBounds(-100.0, 100.0);
   driveController_.setGoal(0);
 
   return RES_OK;
@@ -219,7 +152,7 @@ Result BB8::step() {
     Console::console.printlnBroadcast("stepDriveMotor() failed!");
     return res;
   }
-  res = stepDome();
+//  res = stepDome();
   if (res != RES_OK) {
     Console::console.printlnBroadcast("stepDriveMotor() failed!");
     return res;
@@ -238,12 +171,9 @@ Result BB8::step() {
 }
 
 Result BB8::stepDriveMotor() {
-  if (mode_ == MODE_OFF || mode_ == MODE_ROLL_CONTROL_ONLY || mode_ == MODE_KIOSK) {
-    if (driveMotor.isEnabled()) driveMotor.setEnabled(false);
-    return RES_OK;
-  }
-
   if (mode_ == MODE_SPEED_CONTROL_ONLY || mode_ == MODE_SPEED_ROLL_CONTROL) {
+    if(pwmControl_ == true) return RES_OK;
+
     driveController_.update();
     return RES_OK;
   }
@@ -402,22 +332,30 @@ Result BB8::incomingPacket(const Packet &packet) {
   }
 #endif
 
-  if (packet.payload.cmd.button1) {
-    int8_t axis1 = packet.payload.cmd.getAxis(1);
+  int8_t axis0 = packet.payload.cmd.getAxis(0), axis1 = packet.payload.cmd.getAxis(1);
+  
+  if (packet.payload.cmd.button1) {    
     float speed = (800.0 * axis1 / 127.0);  // magic
+    driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
     driveController_.setGoal(speed);
-    //    if(axis1 < 0) driveMotor.setDirectionAndSpeed(DCMotor::DCM_BACKWARD, -axis1 * params_.drive_speed_factor);
-    //    else driveMotor.setDirectionAndSpeed(DCMotor::DCM_FORWARD, axis1 * params_.drive_speed_factor);
 
-    float axis0;
-    if (params_.body_roll_servo_invert)
-      axis0 = 180.0 + (packet.payload.cmd.getAxis(0) * 20.0) / 127.0;
-    else
-      axis0 = 180.0 - (packet.payload.cmd.getAxis(0) * 20.0) / 127.0;
-    BB8Servos::servos.setGoal(BODY_ROLL_SERVO, axis0);
-  } else {
+    float roll = 180.0 - (axis0 * 20.0) / 127.0;
+    BB8Servos::servos.setGoal(BODY_ROLL_SERVO, roll);
+  } 
+#if 0 // Untested - right now it will go to zero goal at centered joystick position. Needs to pick up actual position as a start point.
+  else if(packet.payload.cmd.button0) {
+    float pos = (800.0 * axis1 / 127.0);  // magic -- yeah same as above, I know
+    driveControlInput_.setMode(bb::Encoder::INPUT_POSITION);
+    driveController_.setGoal(pos);
+
+    float roll = 180.0 - (axis0 * 20.0) / 127.0;
+    BB8Servos::servos.setGoal(BODY_ROLL_SERVO, roll);
+  } 
+#endif
+  else {
+    driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
     driveController_.setGoal(0.0f);
-    //BB8Servos::servos.setGoal(BODY_ROLL_SERVO, 180.0);
+    BB8Servos::servos.setGoal(BODY_ROLL_SERVO, 180.0);
   }
 
   packetTimeout_ = 3;
@@ -477,7 +415,6 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
       pwmControl_ = false;
       driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
       driveController_.setGoal(words[2].toFloat());
-      driveMotor.setEnabled(true);
       return RES_OK;
     } else return RES_CMD_INVALID_ARGUMENT;
   }
@@ -589,12 +526,12 @@ Result BB8::fillAndSendStatusPacket() {
 
 void BB8::parameterChangedCallback(const String &name) {
   Result res;
-  if (name == driveSpeedKpStr_ || name == driveSpeedKiStr_ || name == driveSpeedKdStr_) {
+  if (name == "drive_speed_kp" || name == "drive_speed_ki" || name == "drive_speed_kd") {
     driveController_.setControlParameters(params_.driveSpeedKp, params_.driveSpeedKi, params_.driveSpeedKd);
   } else if (name == "drive_speed_goal") {
     driveController_.setGoal(driveSpeedGoal_);
     driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
-  } else if (name == bodyRollKpStr_ || name == bodyRollKiStr_ || name == bodyRollKdStr_) {
+  } else if (name == "body_roll_kp" || name == "body_roll_ki" || name == "body_roll_kd") {
     rollController_.setControlParameters(params_.driveSpeedKp, params_.driveSpeedKi, params_.driveSpeedKd);
   } else if (name == "body_roll_goal") {
     rollController_.setGoal(bodyRollGoal_);
@@ -605,25 +542,23 @@ void BB8::parameterChangedCallback(const String &name) {
 
 
 void BB8::printCurrentSystemStatus(ConsoleStream *stream) {
-  char buf[255];
-
   float r, p, h;
   BB8IMU::imu.getFilteredRPH(r, p, h);
-  String str = String("Received: ") + packetsReceived_ + "Missed: " + packetsMissed_ + "Seq: " + lastPacket_.seqnum;
-  str += "Buttons: ";
+  String str = String("Received: ") + packetsReceived_ + " Missed: " + packetsMissed_ + " Seq: " + lastPacket_.seqnum;
+  str += " Buttons: ";
   lastPacket_.payload.cmd.button0 ? str += 'X' : str += '_';
   lastPacket_.payload.cmd.button1 ? str += 'X' : str += '_';
   lastPacket_.payload.cmd.button2 ? str += 'X' : str += '_';
   lastPacket_.payload.cmd.button3 ? str += 'X' : str += '_';
   lastPacket_.payload.cmd.button4 ? str += 'X' : str += '_';
-  str += "Axes: ";
+  str += " Axes: ";
   for (int i = 0; i < 5; i++) {
-    str += lastPacket_.payload.cmd.getAxis(0);
+    str += lastPacket_.payload.cmd.getAxis(i);
     str += " ";
   }
 
   str += String("Gyro: R") + r + " P" + p + " H" + h;
 
-  if (stream != NULL) stream->print(buf);
-  else Console::console.printBroadcast(buf);
+  if (stream != NULL) stream->println(str);
+  else Console::console.printlnBroadcast(str);
 }

@@ -64,9 +64,9 @@ void initializeSubsystems() {
   Console::console.initialize();
 
   // Initialize XBee communication.
-  //XBee::xbee.initialize(DEFAULT_CHAN, 0x3333, DEFAULT_STATION_DROID, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_BPS, serialTXSerial);
-  //XBee::xbee.setPacketMode(true);
-  //XBee::xbee.addPacketReceiver(&BB8::bb8);
+  XBee::xbee.initialize(DEFAULT_CHAN, 0x3333, DEFAULT_STATION_DROID, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_BPS, serialTXSerial);
+  XBee::xbee.setPacketMode(true);
+  XBee::xbee.addPacketReceiver(&BB8::bb8);
 
   // Initialize Wifi communication.
   WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
@@ -92,10 +92,10 @@ void startSubsystems() {
   Console::console.start();
   updateStatusPixels();
 
-  //XBee::xbee.start();
-  //updateStatusPixels();
-  //if (XBee::xbee.isStarted()) BB8Sound::sound.playSystem(SOUND_XBEE_OK);
-  //else BB8Sound::sound.playSystem(SOUND_XBEE_FAILURE);
+  XBee::xbee.start();
+  updateStatusPixels();
+  if (XBee::xbee.isStarted()) BB8Sound::sound.playSystem(SOUND_XBEE_OK);
+  else BB8Sound::sound.playSystem(SOUND_XBEE_FAILURE);
 
   //BB8Servos::servos.start();
   updateStatusPixels();
