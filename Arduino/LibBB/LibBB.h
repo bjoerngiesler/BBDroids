@@ -12,8 +12,9 @@
 #include "BBConfigStorage.h"
 #include "BBControllers.h"
 #include "BBLowPassFilter.h"
-#if defined(ARDUINO_ARCH_SAMD)
 #include "BBDCMotor.h"
+#if defined(ARDUINO_ARCH_SAMD)
+#include "BBEncoder.h"
 #endif
 
 #endif // LIBBB8_H

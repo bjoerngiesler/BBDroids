@@ -62,6 +62,7 @@ protected:
   static BB8Params params_;
 
   float driveSpeedGoal_, bodyRollGoal_, domePitchGoal_, domeRollGoal_;
+  bool pwmControl_;
 
   ConfigStorage::HANDLE paramsHandle_;
   Packet lastPacket_;
@@ -85,9 +86,8 @@ protected:
   BB8ServoControlOutput rollControlOutput_;
   bb::PIDController rollController_;
 
-  BB8IMUControlInput accelControlInput_;
-  bb::DCMotorControlOutput accelControlOutput_;
-  bb::PIDController accelController_;
+  bb::Encoder driveControlInput_;
+  bb::PIDController driveController_;
 };
 
 #endif // BB8_H
