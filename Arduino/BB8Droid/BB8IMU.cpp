@@ -96,7 +96,7 @@ void BB8IMU::printStats(const String& prefix) {
 bool BB8IMU::update() {
   if(!available_) return false;
 
-  if(!imu_.gyroscopeAvailable() || !imu_.accelerationAvailable()) return false;
+  //if(!imu_.gyroscopeAvailable() || !imu_.accelerationAvailable()) return false;
   
   imu_.readGyroscope(lastR_, lastP_, lastH_);
   imu_.readAcceleration(lastX_, lastY_, lastZ_);
