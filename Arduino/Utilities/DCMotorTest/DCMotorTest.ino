@@ -2,8 +2,54 @@
 
 using namespace bb;
 
-DCMotor motor[2] = {DCMotor(2, 3, 19, 20), DCMotor(255, 255)};
-bb::Encoder input[2] = {bb::Encoder(6, 7), bb::Encoder(255, 255)};
+static const uint8_t PIN_DISABLE = 255;
+
+// STEP 1
+// Define your motor driver and pins here
+
+#define DIRECTIONPIN_MOTOR_DRIVER
+//#define DUALPWM_MOTOR_DRIVER
+#if defined(USE_DIRECTIONPIN_MOTOR_DRIVER)
+static const uint8_t PIN_DIR_A_1   = 2;
+static const uint8_t PIN_DIR_B_1   = 3;
+static const uint8_t PIN_DIR_PWM_1 = 19;
+static const uint8_t PIN_ENABLE_1  = 20;
+static const uint8_t PIN_DIR_A_2   = PIN_DISABLE;
+static const uint8_t PIN_DIR_B_2   = PIN_DISABLE;
+static const uint8_t PIN_DIR_PWM_2 = PIN_DISABLE;
+static const uint8_t PIN_ENABLE_2  = PIN_DISABLE
+DCMotor motor[2] = {
+  DCMotor(PIN_DIR_A_1, PIN_DIR_B_1, PIN_DIR_PWM_1, PIN_ENABLE_1), 
+  DCMotor(PIN_DIR_A_2, PIN_DIR_B_2, PIN_DIR_PWM_2, PIN_ENABLE_2)
+  };
+#elif defined(DUALPWM_MOTOR_DRIVER)
+static const uint8_t PIN_PWM_A_1   = 2;
+static const uint8_t PIN_PWM_B_1   = 3;
+static const uint8_t PIN_PWM_A_2   = PIN_DISABLE;
+static const uint8_t PIN_PWM_B_2   = PIN_DISABLE;
+DCMotor motor[2] = {
+  DCMotor(PIN_PWM_A_1, PIN_PWM_B_1), 
+  DCMotor(PIN_PWM_A_2, PIN_PWM_B_2)
+  };
+#else
+#error No valid motors defined!
+#endif
+
+// STEP 2
+// Define your encoder pins here
+
+static const uint8_t PIN_ENC_A_1 = 6;
+static const uint8_t PIN_ENC_B_1 = 7;
+static const uint8_t PIN_ENC_A_2 = PIN_DISABLE;
+static const uint8_t PIN_ENC_B_2 = PIN_DISABLE;
+
+bb::Encoder input[2] = {bb::Encoder(PIN_ENC_A_1, PIN_ENC_B_1), bb::Encoder(PIN_ENC_A_2, PIN_ENC_B_2)};
+
+// STEP 3
+// Compile and upload and connect via serial monitor!
+
+// --------------------------------------------------
+
 PIDController control[2] = {PIDController(input[0], motor[0]), PIDController(input[1], motor[1])};
 
 const uint8_t MOTOR_0_FLAG = 1;
