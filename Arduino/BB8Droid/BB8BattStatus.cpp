@@ -19,10 +19,16 @@ BB8BattStatus::BB8BattStatus() {
 }
 
 bool BB8BattStatus::begin() {
-  ina1.begin();
-  status_[0].available = true; 
-  ina2.begin();
-  status_[1].available = true;
+  Wire.beginTransmission(BATT1_STATUS_ADDR);
+  if(Wire.endTransmission() == 0) {
+    ina1.begin();
+    status_[0].available = true;
+  }
+  Wire.beginTransmission(BATT2_STATUS_ADDR);
+  if(Wire.endTransmission() == 0) {
+    ina2.begin();
+    status_[1].available = true;
+  }
   return true;
 }
   
