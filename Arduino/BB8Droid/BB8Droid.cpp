@@ -136,8 +136,8 @@ Result BB8::step() {
   stepcount++;
   if (stepcount == 1 && BB8BattStatus::batt.available(BB8BattStatus::BATT_1)) BB8BattStatus::batt.updateVoltage(BB8BattStatus::BATT_1);
   if (stepcount == 2 && BB8BattStatus::batt.available(BB8BattStatus::BATT_1)) BB8BattStatus::batt.updateCurrent(BB8BattStatus::BATT_1);
-  //if (stepcount == 3 && BB8BattStatus::batt.available(BB8BattStatus::BATT_2)) BB8BattStatus::batt.updateVoltage(BB8BattStatus::BATT_2);
-  //if (stepcount == 4 && BB8BattStatus::batt.available(BB8BattStatus::BATT_2)) BB8BattStatus::batt.updateCurrent(BB8BattStatus::BATT_2);
+  if (stepcount == 3 && BB8BattStatus::batt.available(BB8BattStatus::BATT_2)) BB8BattStatus::batt.updateVoltage(BB8BattStatus::BATT_2);
+  if (stepcount == 4 && BB8BattStatus::batt.available(BB8BattStatus::BATT_2)) BB8BattStatus::batt.updateCurrent(BB8BattStatus::BATT_2);
   if (stepcount == 100) stepcount = 0;
 
   Result res;
@@ -146,6 +146,7 @@ Result BB8::step() {
     Console::console.printlnBroadcast("stepDriveMotor() failed!");
     return res;
   }
+
   res = stepRollMotor();
   if (res != RES_OK) {
     Console::console.printlnBroadcast("stepDriveMotor() failed!");
@@ -170,10 +171,14 @@ Result BB8::step() {
 }
 
 Result BB8::stepDriveMotor() {
+  static int numZeroFrames = 0;
   if (mode_ == MODE_SPEED_CONTROL_ONLY || mode_ == MODE_SPEED_ROLL_CONTROL) {
+    float err, errI, errD, control;
     if(pwmControl_ == true) return RES_OK;
 
     driveController_.update();
+    if(fabs(driveMotor.present()) < 1.0f) numZeroFrames++;
+    if(numZeroFrames > 1000) driveController_.reset();
     return RES_OK;
   }
 
@@ -205,6 +210,7 @@ Result BB8::stepDome() {
   }
 
   else {
+#if 0    
     float r, p, h, gr, gp, gh, goal;
     BB8IMU::imu.getFilteredRPH(r, p, h);
     BB8IMU::imu.getGyroMeasurement(gr, gp, gh);
@@ -226,6 +232,7 @@ Result BB8::stepDome() {
         Console::console.printlnBroadcast(String("Huh? ") + goal + " " + params_.domePitchKp + " " + params_.domePitchKd + " " + p + " " + gp);
       }
     }
+#endif
   }
 
   return RES_OK;
@@ -299,54 +306,19 @@ Result BB8::incomingPacket(const Packet &packet) {
 
   packetsReceived_++;
   if (packet.seqnum != (lastPacket_.seqnum + 1) % MAX_SEQUENCE_NUMBER) packetsMissed_++;  // FIXME not correct - should count based on seqnum
-  lastPacket_ = packet;
 
-  float r, p, h;
-  BB8IMU::imu.getFilteredRPH(r, p, h);
-
-#if 0
-  if(packet.payload.cmd.button2) {
-    //Console::console.printlnBroadcast("Updating servos");
-    float axis2, axis3, axis4;
-    if(params_.dome_roll_servo_invert)
-      axis2 = 180.0 - ((packet.payload.cmd.getAxis(2)*30.0)*4/127.0 - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);
-    else 
-      axis2 = 180.0 + ((packet.payload.cmd.getAxis(2)*30.0)*4/127.0 - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);
-    if(params_.dome_pitch_servo_invert)
-      axis3 = 180.0 - ((packet.payload.cmd.getAxis(3)*30.0)*4/127.0 + 2*p);
-    else 
-      axis3 = 180.0 + ((packet.payload.cmd.getAxis(3)*30.0)*4/127.0 + 2*p);
-    if(params_.dome_heading_servo_invert)
-      axis4 = 180.0 - ((packet.payload.cmd.getAxis(4)*30.0)*4/127.0);
-    else
-      axis4 = 180.0 + ((packet.payload.cmd.getAxis(4)*30.0)*4/127.0);
-      
-    BB8Servos::servos.setGoal(DOME_ROLL_SERVO, axis2);
-    BB8Servos::servos.setGoal(DOME_PITCH_SERVO, axis3);
-    BB8Servos::servos.setGoal(DOME_HEADING_SERVO, axis4);
-  } else {
-    //BB8Servos::servos.setSetpoint(DOME_ROLL_SERVO, 180.0+2*r);
-    if(params_.dome_roll_servo_invert)
-      BB8Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0 - (2*r - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0)));
-    else
-      BB8Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0 + (2*r - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0)));
-
-    if(params_.dome_pitch_servo_invert)
-      BB8Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0-2*p);
-    else 
-      BB8Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0+2*p);
-    BB8Servos::servos.setGoal(DOME_HEADING_SERVO, 180.0);
-  }
-#endif
-
-  int8_t axis0 = packet.payload.cmd.getAxis(0), axis1 = packet.payload.cmd.getAxis(1);
+  float bodyRollInput = packet.payload.cmd.getAxis(0);
+  float velInput = packet.payload.cmd.getAxis(1);
+  float domeRollInput = packet.payload.cmd.getAxis(2);
+  float domePitchInput = packet.payload.cmd.getAxis(3);
+  float domeHeadingInput = packet.payload.cmd.getAxis(4);
   
-  if (packet.payload.cmd.button1) {    
-    float speed = (800.0 * axis1 / 127.0);  // magic
+  if(packet.payload.cmd.button1) {    
+    float vel = (800.0 * velInput / 127.0);  // magic
     driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
-    driveController_.setGoal(speed);
+    driveController_.setGoal(vel);
 
-    float roll = 180.0 - (axis0 * 20.0) / 127.0;
+    float roll = 180.0 - (bodyRollInput * 20.0) / 127.0;
     BB8Servos::servos.setGoal(BODY_ROLL_SERVO, roll);
   } 
 #if 0 // Untested - right now it will go to zero goal at centered joystick position. Needs to pick up actual position as a start point.
@@ -365,7 +337,41 @@ Result BB8::incomingPacket(const Packet &packet) {
     BB8Servos::servos.setGoal(BODY_ROLL_SERVO, 180.0);
   }
 
+  float r, p, h;
+  BB8IMU::imu.getFilteredRPH(r, p, h);
+  static float domeRollZero = 0, domePitchZero = 0, domeHeadingZero = 0;
+
+  if(packet.payload.cmd.button2) {
+    if(!lastPacket_.payload.cmd.button2) { // fresh press - use current values as zero
+      domeRollZero = domeRollInput;
+      domePitchZero = domePitchInput;
+      domeHeadingZero = domeHeadingInput;
+    }
+    domeRollInput -= domeRollZero;
+    domePitchInput -= domePitchZero;
+    domeHeadingInput -= domeHeadingZero;
+
+    //Console::console.printlnBroadcast(String("roll: ") + domeRollInput + " pitch:" + domePitchInput + " heading:" + domeHeadingInput);
+    
+    domeRollInput = 180.0 + ((domeRollInput*30.0)*4/127.0 - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);  
+    domePitchInput = 180.0 + ((domePitchInput*30.0)*4/127.0 + 2*p);
+    domeHeadingInput = 180.0 + ((domeHeadingInput*30.0)*4/127.0);
+      
+    BB8Servos::servos.setGoal(DOME_ROLL_SERVO, domeRollInput);
+    BB8Servos::servos.setGoal(DOME_PITCH_SERVO, domePitchInput);
+    BB8Servos::servos.setGoal(DOME_HEADING_SERVO, domeHeadingInput);
+  } else {
+    BB8Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0);
+    BB8Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0);
+    BB8Servos::servos.setGoal(DOME_HEADING_SERVO, 180.0);
+  }
+
+  BB8Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, 100.0);
+  BB8Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, 100.0);
+  BB8Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, 100.0);
+
   packetTimeout_ = 3;
+  lastPacket_ = packet;
 
   return RES_OK;
 }
