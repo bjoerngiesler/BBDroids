@@ -43,17 +43,17 @@ static const uint8_t BATT2_STATUS_ADDR   = 0x41;
 static const uint16_t DEADBAND         = 0.01f;
 
 static const uint8_t STATUSPIXEL_OVERALL = 0;
-static const uint8_t STATUSPIXEL_NETWORK = 1;
+static const uint8_t STATUSPIXEL_REMOTE  = 1;
 static const uint8_t STATUSPIXEL_MOTORS  = 2;
 
 const long unsigned int DYNAMIXEL_BPS = 57600;
 
-static const float ROLL_CONTROL_KP = 0.2f;
-static const float ROLL_CONTROL_KI = 0.0f;
-static const float ROLL_CONTROL_KD = 0.0f;
-static const float ROLL_CONTROL_IMAX = 10.0f;
-static const float ROLL_CONTROL_DEADBAND = 0.01f;
-static const float ROLL_CONTROL_IABORT = 1000.0f;
+static const float DRIVE_SPEED_KP = 0.075f;
+static const float DRIVE_SPEED_KI = 0.2f;
+static const float DRIVE_SPEED_KD = 0.0f;
+static const float DRIVE_SPEED_IMAX = 10.0f;     // not used yet
+static const float DRIVE_SPEED_DEADBAND = 0.01f; // not used yet
+static const float DRIVE_SPEED_IABORT = 1000.0f; // not used yet
 
 static const int DOME_HEADING_SERVO = 1;
 static const int DOME_ROLL_SERVO    = 2;
