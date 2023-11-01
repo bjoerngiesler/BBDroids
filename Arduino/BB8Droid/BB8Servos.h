@@ -46,8 +46,8 @@ public:
   bool inverted(uint8_t id);
   
   bool setGoal(uint8_t id, float goal, ValueType t=VALUE_DEGREE);
+  bool setProfileVelocity(uint8_t id, float vel, ValueType t=VALUE_DEGREE); // in this case deg/s, while raw value is in rev/min
   bool setProfileAcceleration(uint8_t id, uint32_t val);
-  bool setProfileVelocity(uint8_t id, uint32_t val);
   float goal(uint8_t id, ValueType t=VALUE_DEGREE);
   float present(uint8_t id, ValueType t=VALUE_DEGREE);
   float load(uint8_t id);
@@ -67,6 +67,7 @@ protected:
 
   typedef struct {
     uint32_t goal;
+    uint32_t vel;
     uint32_t present;
     int16_t load;
     uint32_t min, max;
@@ -86,7 +87,10 @@ protected:
   } __attribute((packed)) srDataLoad_t;
   typedef struct {
     int32_t goalPos;
-  } __attribute((packed)) swData_t;
+  } __attribute((packed)) swDataGoal_t;
+  typedef struct {
+    int32_t profileVel;
+  } __attribute((packed)) swDataVel_t;
 
   DYNAMIXEL::InfoSyncReadInst_t srPresentInfos;
   DYNAMIXEL::XELInfoSyncRead_t *infoXelsSrPresent;
@@ -94,8 +98,11 @@ protected:
   DYNAMIXEL::InfoSyncReadInst_t srLoadInfos;
   DYNAMIXEL::XELInfoSyncRead_t *infoXelsSrLoad;
 
-  DYNAMIXEL::InfoSyncWriteInst_t swInfos;
-  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSw;
+  DYNAMIXEL::InfoSyncWriteInst_t swGoalInfos;
+  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSwGoal;
+
+  DYNAMIXEL::InfoSyncWriteInst_t swVelInfos;
+  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSwVel;
 
   void setupSyncBuffers();
   void teardownSyncBuffers();

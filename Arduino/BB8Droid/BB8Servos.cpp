@@ -29,7 +29,8 @@ float BB8ServoControlOutput::present() {
 BB8Servos::BB8Servos() {
   infoXelsSrPresent = NULL;
   infoXelsSrLoad = NULL;
-  infoXelsSw = NULL;
+  infoXelsSwGoal = NULL;
+  infoXelsSwVel = NULL;
 }
 
 Result BB8Servos::initialize() {
@@ -39,6 +40,7 @@ Result BB8Servos::initialize() {
           "Available commands:\r\n"
           "\ttorque <servo>|all on|off           Switch torque.\r\n"
           "\tmove <servo>|all <angle>            <angle>: deg [-180.0..180.0].\r\n"
+          "\tset_vel <servo>|all <val>           <val> in deg/s; 0 is infinite speed.\r\n"
           "\tmove_slow <servo>|all <angle>       <angle>: deg [-180.0..180.0].\r\n"
           "\torigin <servo>|all                  Move <servo> to origin, slowly.\r\n"
           "\tinfo <servo>                        Get info on <servo>.\r\n"
@@ -75,7 +77,7 @@ Result BB8Servos::start(ConsoleStream* stream) {
         uint16_t model = dxl_.getModelNumber(id);
         if (stream) stream->print(String("#") + id + ": model #" + model + "...");
 
-        Servo servo = { 2048, 2048, 0, 0, 4096, 0 };
+        Servo servo = { 2048, 0, 2048, 0, 0, 4096, 0 };
 
         if (ctrlPresentPos_.addr == 0) {
           ctrlPresentPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
@@ -213,8 +215,14 @@ Result BB8Servos::step() {
     return RES_SUBSYS_COMM_ERROR;
   }
 
-  if (dxl_.syncWrite(&swInfos) == false) {
-    Console::console.printlnBroadcast("Sending servo position failed!");
+  if (dxl_.syncWrite(&swGoalInfos) == false) {
+    Console::console.printlnBroadcast("Sending servo position goal failed!");
+    failcount++;
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
+  if (dxl_.syncWrite(&swVelInfos) == false) {
+    Console::console.printlnBroadcast("Sending servo profile velocity failed!");
     failcount++;
     return RES_SUBSYS_COMM_ERROR;
   }
@@ -229,11 +237,21 @@ Result BB8Servos::handleConsoleCommand(const std::vector<String>& words, Console
 
   if (words[0] == "move") {
     if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
-    unsigned int id = words[1].toInt();
+    unsigned int id = words[1] == "all" ? ID_ALL : words[1].toInt();
     if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
     float angle = words[2].toFloat();
     if(angle < 0 || angle > 360.0) return RES_CMD_INVALID_ARGUMENT;
     if(setGoal(id, angle)) return RES_OK;
+    return RES_CMD_INVALID_ARGUMENT;
+  }
+
+  if (words[0] == "set_vel") {
+    if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    unsigned int id = words[1] == "all" ? ID_ALL : words[1].toInt();
+    if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
+    float vel = words[2].toFloat();
+    if(vel < 0) return RES_CMD_INVALID_ARGUMENT;
+    if(setProfileVelocity(id, vel)) return RES_OK;
     return RES_CMD_INVALID_ARGUMENT;
   }
 
@@ -568,7 +586,29 @@ bool BB8Servos::setGoal(uint8_t id, float goal, ValueType t) {
   uint32_t g = computeRawValue(goal, t) + servos_[id].offset;
   servos_[id].goal = constrain(g, servos_[id].min, servos_[id].max);
 
-  swInfos.is_info_changed = true;
+  swGoalInfos.is_info_changed = true;
+
+  return true;
+}
+
+bool BB8Servos::setProfileVelocity(uint8_t id, float vel, ValueType t) {
+  if(isnan(vel) || vel<0) return false;
+
+  if (id == ID_ALL) {
+    for (auto& s : servos_) {
+      if (setProfileVelocity(s.first, vel, t) != true) return false;
+    }
+    return true;
+  }
+
+  if (servos_.count(id) == 0) return false;
+  uint32_t v = vel;
+  if(t == VALUE_DEGREE) {
+    v = (uint32_t)((vel / 6.0f) / 0.229); // deg/s to rev/min, and then multiply with steps of 0.229
+  }
+
+  servos_[id].vel = v;
+  swVelInfos.is_info_changed = true;
 
   return true;
 }
@@ -594,11 +634,6 @@ uint32_t BB8Servos::computeRawValue(float val, ValueType t) {
 
 bool BB8Servos::setProfileAcceleration(uint8_t id, uint32_t val) {
   dxl_.writeControlTableItem(ControlTableItem::PROFILE_ACCELERATION, id, val);
-  return true;
-}
-
-bool BB8Servos::setProfileVelocity(uint8_t id, uint32_t val) {
-  dxl_.writeControlTableItem(ControlTableItem::PROFILE_VELOCITY, id, val);
   return true;
 }
 
@@ -647,7 +682,7 @@ void BB8Servos::setupSyncBuffers() {
   unsigned int i;
 
   if (!servos_.size()) return;
-  if (infoXelsSrPresent != NULL || infoXelsSrLoad != NULL ||  infoXelsSw != NULL) return;
+  if (infoXelsSrPresent != NULL || infoXelsSrLoad != NULL || infoXelsSwGoal != NULL || infoXelsSwVel != NULL) return;
 
   srPresentInfos.packet.p_buf = userPktBufPresent;
   srPresentInfos.packet.buf_capacity = userPktBufCap;
@@ -681,20 +716,35 @@ void BB8Servos::setupSyncBuffers() {
   srLoadInfos.xel_count = servos_.size();
   srLoadInfos.is_info_changed = true;
 
-  swInfos.packet.p_buf = NULL;
-  swInfos.packet.is_completed = false;
-  swInfos.addr = ctrlGoalPos_.addr;
-  swInfos.addr_length = ctrlGoalPos_.addr_length;
-  infoXelsSw = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
-  swInfos.p_xels = infoXelsSw;
+  swGoalInfos.packet.p_buf = NULL;
+  swGoalInfos.packet.is_completed = false;
+  swGoalInfos.addr = ctrlGoalPos_.addr;
+  swGoalInfos.addr_length = ctrlGoalPos_.addr_length;
+  infoXelsSwGoal = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
+  swGoalInfos.p_xels = infoXelsSwGoal;
   i = 0;
   for (auto& s : servos_) {
-    infoXelsSw[i].id = s.first;
-    infoXelsSw[i].p_data = (uint8_t*)&(s.second.goal);
+    infoXelsSwGoal[i].id = s.first;
+    infoXelsSwGoal[i].p_data = (uint8_t*)&(s.second.goal);
     i++;
   }
-  swInfos.xel_count = servos_.size();
-  swInfos.is_info_changed = true;
+  swGoalInfos.xel_count = servos_.size();
+  swGoalInfos.is_info_changed = true;
+
+  swVelInfos.packet.p_buf = NULL;
+  swVelInfos.packet.is_completed = false;
+  swVelInfos.addr = ctrlProfileVel_.addr;
+  swVelInfos.addr_length = ctrlProfileVel_.addr_length;
+  infoXelsSwVel = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
+  swVelInfos.p_xels = infoXelsSwVel;
+  i = 0;
+  for (auto& s : servos_) {
+    infoXelsSwVel[i].id = s.first;
+    infoXelsSwVel[i].p_data = (uint8_t*)&(s.second.vel);
+    i++;
+  }
+  swVelInfos.xel_count = servos_.size();
+  swVelInfos.is_info_changed = true;
 }
 
 void BB8Servos::teardownSyncBuffers() {
@@ -702,12 +752,16 @@ void BB8Servos::teardownSyncBuffers() {
   infoXelsSrPresent = NULL;
   delete infoXelsSrLoad;
   infoXelsSrLoad = NULL;
-  delete infoXelsSw;
-  infoXelsSw = NULL;
+  delete infoXelsSwGoal;
+  infoXelsSwGoal = NULL;
+  delete infoXelsSwVel;
+  infoXelsSwVel = NULL;
   srPresentInfos.p_xels = NULL;
   srPresentInfos.xel_count = 0;
   srLoadInfos.p_xels = NULL;
   srLoadInfos.xel_count = 0;
-  swInfos.p_xels = NULL;
-  swInfos.xel_count = 0;
+  swGoalInfos.p_xels = NULL;
+  swGoalInfos.xel_count = 0;
+  swVelInfos.p_xels = NULL;
+  swVelInfos.xel_count = 0;
 }
