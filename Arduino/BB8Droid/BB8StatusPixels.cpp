@@ -14,7 +14,7 @@ bool BB8StatusPixels::begin() {
   statusPixel_.begin();
   statusPixel_.clear();
   statusPixel_.setPixelColor(STATUSPIXEL_OVERALL, statusPixel_.Color(0, 0, 0));
-  statusPixel_.setPixelColor(STATUSPIXEL_NETWORK, statusPixel_.Color(0, 0, 0));
+  statusPixel_.setPixelColor(STATUSPIXEL_REMOTE, statusPixel_.Color(0, 0, 0));
   statusPixel_.setPixelColor(STATUSPIXEL_MOTORS, statusPixel_.Color(0, 0, 0));
   statusPixel_.show();
   available_ = true;
@@ -23,12 +23,15 @@ bool BB8StatusPixels::begin() {
 }
 
 bool BB8StatusPixels::setPixel(uint16_t n, uint8_t r, uint8_t g, uint8_t b) {
+  if(!available_) return false;
   statusPixel_.setPixelColor(n, statusPixel_.Color(r, g, b));
   statusPixel_.show();
   return true;
 }
 
 bool BB8StatusPixels::setPixel(uint16_t n, Status s) {
+  if(!available_) return false;
+
   switch(s) {
     case STATUS_OK:
     return setPixel(n, 0, 150, 0);
@@ -41,10 +44,50 @@ bool BB8StatusPixels::setPixel(uint16_t n, Status s) {
     break;
     case STATUS_INIT:
     return setPixel(n, 150, 150, 150);
+    case STATUS_ACTIVITY:
+    default:
+    return setPixel(n, 0, 0, 0);
   }
   return false;
 }
 
+bool BB8StatusPixels::overridePixelUntil(uint16_t n, Status s, uint64_t msTimestamp) {
+  setPixel(n, s);
+  overrides_[n] = msTimestamp;
+  return true;
+}
+
+
 bool BB8StatusPixels::isAvailable() {
   return available_;
+}
+
+void BB8StatusPixels::update() {
+  unsigned long ms = millis();
+  for(auto pair: linkedSubsystems_) {
+    if(overrides_.count(pair.first) == 1) {
+      if(overrides_[pair.first] > ms) continue; // skip this pixel
+      overrides_.erase(pair.first);
+    }
+
+    int numStarted = 0;
+    for(auto subsys: pair.second) {
+      if(subsys->isStarted()) numStarted++;
+    }
+    if(numStarted == pair.second.size()) {
+      setPixel(pair.first, BB8StatusPixels::STATUS_OK);
+    } else if(numStarted != 0) {
+      setPixel(pair.first, BB8StatusPixels::STATUS_WARN);
+    } else {
+      setPixel(pair.first, BB8StatusPixels::STATUS_FAIL);
+    }
+  }
+}
+
+void BB8StatusPixels::linkSubsystem(bb::Subsystem* subsys, uint16_t pixel, bool autoupdate) {
+  if(linkedSubsystems_.count(pixel) == 0) {
+    linkedSubsystems_[pixel] = std::vector<bb::Subsystem*>();
+  }
+  linkedSubsystems_[pixel].push_back(subsys);
+  if(autoupdate) update();
 }
