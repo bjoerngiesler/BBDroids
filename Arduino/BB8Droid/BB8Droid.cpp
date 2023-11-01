@@ -36,7 +36,8 @@ BB8::BB8()
           "        calibrate                       Calibrate gyro\r\n"
           "        drive pwm|speed|position <val>  Set drive motor setpoint\r\n"
           "        mode off|roll|speed|speed_roll|pos|kiosk|calib  Set drive mode\r\n"
-          "        set_pixel <num> <r> <g> <b>     Set Neopixel <num> (1-3) to rgb color";
+          "        set_pixel <num> <r> <g> <b>     Set Neopixel <num> (1-3) to rgb color\r\n"
+          "        scan_i2c                        Scan the i2c bus";
   started_ = false;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
 
@@ -66,9 +67,9 @@ Result BB8::initialize() {
   if (ConfigStorage::storage.blockIsValid(paramsHandle_)) {
     ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t *)&params_);
   } else {
-    params_.driveSpeedKp = 0.075;
-    params_.driveSpeedKi = 0.2;
-    params_.driveSpeedKd = 0.0;
+    params_.driveSpeedKp = DRIVE_SPEED_KP;
+    params_.driveSpeedKi = DRIVE_SPEED_KI;
+    params_.driveSpeedKd = DRIVE_SPEED_KD;
     params_.domeRollKp = 1.0;
     params_.domeRollKi = 0.0;
     params_.domeRollKd = 0.0;
@@ -129,8 +130,6 @@ Result BB8::stop(ConsoleStream *stream) {
 
 Result BB8::step() {
   static int stepcount = 0;
-  if (packetTimeout_ > 0) BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_NETWORK, 0, 255, 0);
-  else BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_NETWORK, 0, 0, 150);
 
   BB8IMU::imu.update();
 
@@ -288,7 +287,15 @@ Result BB8::incomingPacket(const Packet &packet) {
     return RES_OK;
   }
 
-  if (packet.type != PACKET_TYPE_COMMAND) return RES_SUBSYS_PROTOCOL_ERROR;
+  if (packet.type != PACKET_TYPE_COMMAND) {
+    BB8StatusPixels::statusPixels.overridePixelUntil(STATUSPIXEL_REMOTE, BB8StatusPixels::STATUS_FAIL, millis()+100);
+    return RES_SUBSYS_PROTOCOL_ERROR;
+  }
+
+  if(packet.seqnum % 2)
+    BB8StatusPixels::statusPixels.overridePixelUntil(STATUSPIXEL_REMOTE, BB8StatusPixels::STATUS_ACTIVITY, millis()+100);
+  else
+    BB8StatusPixels::statusPixels.overridePixelUntil(STATUSPIXEL_REMOTE, BB8StatusPixels::STATUS_OK, millis()+100);
 
   packetsReceived_++;
   if (packet.seqnum != (lastPacket_.seqnum + 1) % MAX_SEQUENCE_NUMBER) packetsMissed_++;  // FIXME not correct - should count based on seqnum
@@ -483,6 +490,16 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
     b = words[4].toInt();
 
     BB8StatusPixels::statusPixels.setPixel(p, r, g, b);
+    return RES_OK;
+  }
+
+  else if(words[0] == "scan_i2c") {
+    bb::Runloop::runloop.excuseOverrun();
+    for(uint addr=0x8; addr<=0x77; addr++) {
+      Wire.beginTransmission(addr);
+      uint8_t result = Wire.endTransmission();
+      if(result == 0) stream->println(String("Found device at ") + String(addr, HEX));
+    }
     return RES_OK;
   }
 

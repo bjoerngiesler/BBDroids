@@ -36,25 +36,6 @@ void SERCOM3_Handler() {
   serialTXSerial->IrqHandler();
 }
 
-void updateStatusPixels() {
-  if (XBee::xbee.isStarted() && WifiServer::server.isStarted())
-    BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_NETWORK, BB8StatusPixels::STATUS_OK);
-  else if (!XBee::xbee.isStarted())
-    BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_NETWORK, BB8StatusPixels::STATUS_FAIL);
-  else
-    BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_NETWORK, BB8StatusPixels::STATUS_WARN);
-
-  if (BB8Servos::servos.isStarted())
-    BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_MOTORS, BB8StatusPixels::STATUS_OK);
-  else
-    BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_MOTORS, BB8StatusPixels::STATUS_FAIL);
-
-  if (BB8Sound::sound.available() && BB8::bb8.isStarted())
-    BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_OVERALL, BB8StatusPixels::STATUS_OK);
-  else
-    BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_OVERALL, BB8StatusPixels::STATUS_WARN);
-}
-
 void initializeSubsystems() {
   // Initialize runloop
   // This can currently go anywhere but just in case that changes, it should be initialized before any other subsystems are.
@@ -67,43 +48,45 @@ void initializeSubsystems() {
   XBee::xbee.initialize(DEFAULT_CHAN, 0x3333, DEFAULT_STATION_DROID, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_BPS, serialTXSerial);
   XBee::xbee.setPacketMode(true);
   XBee::xbee.addPacketReceiver(&BB8::bb8);
+  BB8StatusPixels::statusPixels.linkSubsystem(&XBee::xbee, STATUSPIXEL_REMOTE);
 
   // Initialize Wifi communication.
   WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
   WifiServer::server.setOTANameAndPassword("BB8-$MAC", "password");
+  BB8StatusPixels::statusPixels.linkSubsystem(&WifiServer::server, STATUSPIXEL_OVERALL);
 
   // Initialize the main droid controller.
   BB8::bb8.initialize();
+  BB8StatusPixels::statusPixels.linkSubsystem(&BB8::bb8, STATUSPIXEL_OVERALL);
 
   // Initialize the servos subsystem.
   BB8Servos::servos.initialize();
-
-  updateStatusPixels();
+  BB8StatusPixels::statusPixels.linkSubsystem(&BB8Servos::servos, STATUSPIXEL_MOTORS);
 }
 
 void startSubsystems() {
   WifiServer::server.start();
   // for whatever reason this often fails the first time around, so do it again immediately.
   if (!WifiServer::server.isStarted()) WifiServer::server.start();
-  updateStatusPixels();
+  BB8StatusPixels::statusPixels.update();
   if (WifiServer::server.isStarted()) BB8Sound::sound.playSystem(SOUND_WIFI_OK);
   else BB8Sound::sound.playSystem(SOUND_WIFI_FAILURE);
 
   Console::console.start();
-  updateStatusPixels();
+  BB8StatusPixels::statusPixels.update();
 
   XBee::xbee.start();
-  updateStatusPixels();
+  BB8StatusPixels::statusPixels.update();
   if (XBee::xbee.isStarted()) BB8Sound::sound.playSystem(SOUND_XBEE_OK);
   else BB8Sound::sound.playSystem(SOUND_XBEE_FAILURE);
 
-  //BB8Servos::servos.start();
-  updateStatusPixels();
-  //if (BB8Servos::servos.isStarted()) BB8Sound::sound.playSystem(SOUND_SERVOS_OK);
-  //else BB8Sound::sound.playSystem(SOUND_SERVOS_FAILURE);
+  BB8Servos::servos.start();
+  BB8StatusPixels::statusPixels.update();
+  if (BB8Servos::servos.isStarted()) BB8Sound::sound.playSystem(SOUND_SERVOS_OK);
+  else BB8Sound::sound.playSystem(SOUND_SERVOS_FAILURE);
 
   BB8::bb8.start();
-  updateStatusPixels();
+  BB8StatusPixels::statusPixels.update();
   if (BB8::bb8.isStarted()) BB8Sound::sound.playSystem(SOUND_BB8_OK);
   else BB8Sound::sound.playSystem(SOUND_BB8_FAILURE);
 }
@@ -126,12 +109,12 @@ void setup() {
   // Set up status pixels first, these are our most basic diagnostics.
   BB8StatusPixels::statusPixels.begin();
   BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_OVERALL, BB8StatusPixels::STATUS_INIT);
-  BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_NETWORK, BB8StatusPixels::STATUS_INIT);
+  BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_REMOTE, BB8StatusPixels::STATUS_INIT);
   BB8StatusPixels::statusPixels.setPixel(STATUSPIXEL_MOTORS, BB8StatusPixels::STATUS_INIT);
 
   // Next up, sound, so that we can play diagnostics
   BB8Sound::sound.begin(dfplayerSerial);
-  updateStatusPixels();
+  BB8StatusPixels::statusPixels.update();
   if (BB8Sound::sound.available()) BB8Sound::sound.playSystem(SOUND_STARTING_UP);
 
   initializeSubsystems();
