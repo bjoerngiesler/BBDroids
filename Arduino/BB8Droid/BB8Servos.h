@@ -36,6 +36,8 @@ public:
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   Result handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex idx, const std::vector<String>& words, ConsoleStream *stream);
 
+  Result homeServos(float vel, ConsoleStream* stream = NULL);
+
   Result runServoTest(ConsoleStream *stream, int id);
   
   void printStatus(ConsoleStream* stream, int id);
@@ -106,6 +108,8 @@ protected:
 
   void setupSyncBuffers();
   void teardownSyncBuffers();
+  Result syncReadInfo(ConsoleStream *stream = NULL);
+  Result syncWriteInfo(ConsoleStream *stream = NULL);
 };
 
 #endif // BB8SERVOS_H

@@ -112,7 +112,7 @@ Result BB8Servos::start(ConsoleStream* stream) {
         }
         servos_[id] = servo;
       }
-    }
+    } 
 
     if (stream) stream->println();
   }
@@ -144,28 +144,18 @@ Result BB8Servos::start(ConsoleStream* stream) {
   }
 
   setupSyncBuffers();
-
-  uint8_t recv_cnt;
-  
-  recv_cnt = dxl_.syncRead(&srPresentInfos);
-  if (recv_cnt != servos_.size()) {
-    if (stream) stream->println("Receiving initial position failed!");
-    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  }
-
-  recv_cnt = dxl_.syncRead(&srLoadInfos);
-  if (recv_cnt != servos_.size()) {
-    if (stream) stream->println("Receiving initial position failed!");
-    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  }
+  Result res = syncReadInfo(stream);
+  if(res != RES_OK) return res;
 
   for (auto& s : servos_) {
     dxl_.setOperatingMode(s.first, OP_POSITION);
     dxl_.writeControlTableItem(ControlTableItem::RETURN_DELAY_TIME, s.first, 10);
     dxl_.writeControlTableItem(ControlTableItem::DRIVE_MODE, s.first, 0);
-    setGoal(s.first, s.second.present, VALUE_RAW);
     switchTorque(s.first, true);
   }
+
+  res = homeServos(40.0f, stream);
+
 
   operationStatus_ = RES_OK;
   started_ = true;
@@ -199,30 +189,14 @@ Result BB8Servos::step() {
     return RES_SUBSYS_COMM_ERROR;
   }
 
-  uint8_t num;
-  
-  num = dxl_.syncRead(&srPresentInfos);
-  if (num != servos_.size()) {
-    Console::console.printlnBroadcast("Receiving servo position failed!");
+  Result res = syncReadInfo();
+  if(res!=RES_OK) {
     failcount++;
     return RES_SUBSYS_COMM_ERROR;
   }
 
-  num = dxl_.syncRead(&srLoadInfos);
-  if (num != servos_.size()) {
-    Console::console.printlnBroadcast("Receiving servo load failed!");
-    failcount++;
-    return RES_SUBSYS_COMM_ERROR;
-  }
-
-  if (dxl_.syncWrite(&swGoalInfos) == false) {
-    Console::console.printlnBroadcast("Sending servo position goal failed!");
-    failcount++;
-    return RES_SUBSYS_COMM_ERROR;
-  }
-
-  if (dxl_.syncWrite(&swVelInfos) == false) {
-    Console::console.printlnBroadcast("Sending servo profile velocity failed!");
+  res = syncWriteInfo();
+  if(res!=RES_OK) {
     failcount++;
     return RES_SUBSYS_COMM_ERROR;
   }
@@ -379,6 +353,54 @@ Result BB8Servos::handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex
   }
   return RES_OK;
 }
+
+Result BB8Servos::homeServos(float vel, ConsoleStream* stream) {
+  if(stream) stream->println("Homing servos...");
+
+  Result res;
+  float maxoffs = 0;
+  
+  res = syncReadInfo();
+  if(res != RES_OK) return res;
+
+  for(auto& s: servos_) {
+    int goal = (s.second.max - s.second.min)/2;
+    int offs = s.second.present - goal;
+    if(offs < 0) offs = -offs;
+    if(offs > maxoffs) maxoffs = offs;
+    setProfileVelocity(s.first, vel, VALUE_DEGREE);
+    setGoal(s.first, goal, VALUE_RAW);
+  }
+  maxoffs = (maxoffs / 4096.0)*360.0;
+  
+  res = syncWriteInfo();
+  if(res != RES_OK) return res;
+
+  int d = (int)((maxoffs / vel)*1100);
+  while(d > 0) {
+    res = syncReadInfo();
+    if(res != RES_OK) return res;
+    for(auto& s: servos_) {
+      if(stream) {
+        stream->print(String("Servo ") + s.first + ": Pos" + s.second.present + " Load" + s.second.load + " ");
+      }
+    }
+    if(stream) stream->println();
+    delay(1000);
+    d-=1000;
+  }
+  if(stream) {
+    stream->print("Final: ");
+    for(auto& s: servos_) {
+      if(stream) {
+        stream->print(String("Servo ") + s.first + ": Pos" + s.second.present + " Load" + s.second.load + " ");
+      }
+    }
+  }
+
+  return RES_OK;
+}
+
 
 Result BB8Servos::runServoTest(ConsoleStream* stream, int id) {
   dxl_.torqueOn(id);
@@ -764,4 +786,40 @@ void BB8Servos::teardownSyncBuffers() {
   swGoalInfos.xel_count = 0;
   swVelInfos.p_xels = NULL;
   swVelInfos.xel_count = 0;
+}
+
+Result BB8Servos::syncReadInfo(ConsoleStream *stream) {
+  uint8_t recv_cnt;
+  
+  recv_cnt = dxl_.syncRead(&srPresentInfos);
+  if (recv_cnt != servos_.size()) {
+    if (stream) stream->println("Receiving position failed!");
+    else Console::console.printlnBroadcast("Receiving position failed!");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
+
+  recv_cnt = dxl_.syncRead(&srLoadInfos);
+  if (recv_cnt != servos_.size()) {
+    if (stream) stream->println("Receiving initial load failed!");
+    else Console::console.printlnBroadcast("Receiving initial load failed!");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
+
+  return RES_OK;
+}
+
+Result BB8Servos::syncWriteInfo(ConsoleStream* stream) {
+  if(dxl_.syncWrite(&swGoalInfos) == false) {
+    if(stream) stream->println("Sending servo position goal failed!");
+    else Console::console.printlnBroadcast("Sending servo position goal failed!");
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
+  if(dxl_.syncWrite(&swVelInfos) == false) {
+    if(stream) stream->println("Sending servo profile velocity failed!");
+    else Console::console.printlnBroadcast("Sending servo profile velocity failed!");
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
+  return RES_OK;
 }
