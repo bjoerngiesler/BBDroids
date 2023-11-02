@@ -156,7 +156,6 @@ Result BB8Servos::start(ConsoleStream* stream) {
 
   res = homeServos(40.0f, stream);
 
-
   operationStatus_ = RES_OK;
   started_ = true;
   return RES_OK;
@@ -792,15 +791,15 @@ Result BB8Servos::syncReadInfo(ConsoleStream *stream) {
   uint8_t recv_cnt;
   
   recv_cnt = dxl_.syncRead(&srPresentInfos);
-  if (recv_cnt != servos_.size()) {
-    if (stream) stream->println("Receiving position failed!");
+  if(recv_cnt != servos_.size()) {
+    if(stream) stream->println("Receiving position failed!");
     else Console::console.printlnBroadcast("Receiving position failed!");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
   recv_cnt = dxl_.syncRead(&srLoadInfos);
-  if (recv_cnt != servos_.size()) {
-    if (stream) stream->println("Receiving initial load failed!");
+  if(recv_cnt != servos_.size()) {
+    if(stream) stream->println("Receiving initial load failed!");
     else Console::console.printlnBroadcast("Receiving initial load failed!");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }

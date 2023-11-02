@@ -314,20 +314,21 @@ Result BB8::incomingPacket(const Packet &packet) {
   float domeHeadingInput = packet.payload.cmd.getAxis(4);
   
   if(packet.payload.cmd.button1) {    
-    float vel = (800.0 * velInput / 127.0);  // magic
+    float vel = (800.0 * velInput / AXIS_MAX);  // magic
     driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
+    Serial.println(String("Setting controller to ") + vel);
     driveController_.setGoal(vel);
 
-    float roll = 180.0 - (bodyRollInput * 20.0) / 127.0;
+    float roll = 180.0 - (bodyRollInput * 20.0) / AXIS_MAX;
     BB8Servos::servos.setGoal(BODY_ROLL_SERVO, roll);
   } 
 #if 0 // Untested - right now it will go to zero goal at centered joystick position. Needs to pick up actual position as a start point.
   else if(packet.payload.cmd.button0) {
-    float pos = (800.0 * axis1 / 127.0);  // magic -- yeah same as above, I know
+    float pos = (800.0 * axis1 / AXIS_MAX);  // magic -- yeah same as above, I know
     driveControlInput_.setMode(bb::Encoder::INPUT_POSITION);
     driveController_.setGoal(pos);
 
-    float roll = 180.0 - (axis0 * 20.0) / 127.0;
+    float roll = 180.0 - (axis0 * 20.0) / AXIS_MAX;
     BB8Servos::servos.setGoal(BODY_ROLL_SERVO, roll);
   } 
 #endif
@@ -353,9 +354,9 @@ Result BB8::incomingPacket(const Packet &packet) {
 
     //Console::console.printlnBroadcast(String("roll: ") + domeRollInput + " pitch:" + domePitchInput + " heading:" + domeHeadingInput);
     
-    domeRollInput = 180.0 + ((domeRollInput*30.0)*4/127.0 - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);  
-    domePitchInput = 180.0 + ((domePitchInput*30.0)*4/127.0 + 2*p);
-    domeHeadingInput = 180.0 + ((domeHeadingInput*30.0)*4/127.0);
+    domeRollInput = 180.0 + ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);  
+    domePitchInput = 180.0 + ((domePitchInput*30.0)*4/AXIS_MAX + 2*p);
+    domeHeadingInput = 180.0 + ((domeHeadingInput*30.0)*4/AXIS_MAX);
       
     BB8Servos::servos.setGoal(DOME_ROLL_SERVO, domeRollInput);
     BB8Servos::servos.setGoal(DOME_PITCH_SERVO, domePitchInput);
@@ -367,8 +368,8 @@ Result BB8::incomingPacket(const Packet &packet) {
   }
 
   BB8Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, 100.0);
-  BB8Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, 100.0);
-  BB8Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, 100.0);
+  BB8Servos::servos.setProfileVelocity(DOME_PITCH_SERVO, 100.0);
+  BB8Servos::servos.setProfileVelocity(DOME_HEADING_SERVO, 100.0);
 
   packetTimeout_ = 3;
   lastPacket_ = packet;

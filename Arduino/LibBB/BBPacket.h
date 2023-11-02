@@ -3,6 +3,9 @@
 
 #include <BBError.h>
 
+#define AXIS_MIN -256
+#define AXIS_MAX 256
+
 namespace bb {
 /*
  * REALTIME PROTOCOL
@@ -38,27 +41,37 @@ struct CommandPacket {
 	uint8_t         : 0; // next byte
 	uint8_t axis4   : 7;
 	uint8_t         : 0; // next byte
+	bool    axish0  : 1;
+	bool    axish1  : 1;
+	bool    axish2  : 1;
+	bool    axish3  : 1;
+	bool    axish4  : 1;
+	bool    axish5  : 1;
+	bool    axish6  : 1;
+	uint8_t         : 0; // next byte
 
-	void setAxis(uint8_t num, int8_t value) {
+	void setAxis(uint8_t num, int16_t value) {
+		value = constrain(value, AXIS_MIN, AXIS_MAX);
 		bool sign = value < 0 ? true : false;
 		if(sign) value = -value;
 		switch(num) {
-		case 0: sign_axis0 = sign; axis0 = value; break;
-		case 1: sign_axis1 = sign; axis1 = value; break;
-		case 2: sign_axis2 = sign; axis2 = value; break;
-		case 3: sign_axis3 = sign; axis3 = value; break;
-		case 4: sign_axis4 = sign; axis4 = value; break;
+		case 0: sign_axis0 = sign; axis0 = (value&0x7f); axish0 = (value>=128); break;
+		case 1: sign_axis1 = sign; axis1 = (value&0x7f); axish1 = (value>=128); break;
+		case 2: sign_axis2 = sign; axis2 = (value&0x7f); axish2 = (value>=128); break;
+		case 3: sign_axis3 = sign; axis3 = (value&0x7f); axish3 = (value>=128); break;
+		case 4: sign_axis4 = sign; axis4 = (value&0x7f); axish4 = (value>=128); break;
 		default: break;
 		}
 	}
 
-	int8_t getAxis(uint8_t num) const {
+	int16_t getAxis(uint8_t num) const {
+		int sign = 1;
 		switch(num) {
-		case 0: if(sign_axis0) return -axis0; else return axis0; break;
-		case 1: if(sign_axis1) return -axis1; else return axis1; break;
-		case 2: if(sign_axis2) return -axis2; else return axis2; break;
-		case 3: if(sign_axis3) return -axis3; else return axis3; break;
-		case 4: if(sign_axis4) return -axis4; else return axis4; break;
+		case 0: if(sign_axis0) sign=-1; return sign*(axis0 | (axish0?0x80:0)); break;
+		case 1: if(sign_axis1) sign=-1; return sign*(axis1 | (axish1?0x80:0)); break;
+		case 2: if(sign_axis2) sign=-1; return sign*(axis2 | (axish2?0x80:0)); break;
+		case 3: if(sign_axis3) sign=-1; return sign*(axis3 | (axish3?0x80:0)); break;
+		case 4: if(sign_axis4) sign=-1; return sign*(axis4 | (axish4?0x80:0)); break;
 		default: break;
 		}
 		return 0;

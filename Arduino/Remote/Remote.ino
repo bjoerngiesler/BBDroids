@@ -65,6 +65,9 @@ public:
   }
 	
   Result step() {
+    bb::Runloop::runloop.excuseOverrun();
+    unsigned long m = micros();
+
     bool allOK = true;
     std::vector<Subsystem*> subsys = SubsystemManager::manager.subsystems();
     for(size_t i=0; i<subsys.size(); i++) {
@@ -72,6 +75,11 @@ public:
         allOK = false;
       }
     }
+
+    int i=0;
+    Serial.print(String(i++) + (micros()-m) + " ");
+    m = micros();
+
     if(allOK) {
       digitalWrite(LEDR, LOW);
       digitalWrite(LEDG, HIGH);
@@ -85,7 +93,11 @@ public:
     if(!started_) return RES_SUBSYS_NOT_STARTED;
     //if(!bb::XBee::xbee.isStarted()) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 
+    //Serial.print(String(i++) + (micros()-m) + " ");
+    //m = micros();
     RemoteInput::input.update();
+    //Serial.print(String(i++) + (micros()-m) + " ");
+    //m = micros();
     
     Packet packet;
 
@@ -104,8 +116,11 @@ public:
     packet.payload.cmd.button3 = RemoteInput::input.btnR;
     packet.payload.cmd.button4 = RemoteInput::input.btnJoy;
 
-    packet.payload.cmd.setAxis(0, RemoteInput::input.joyH * 127.0);
-    packet.payload.cmd.setAxis(1, RemoteInput::input.joyV * 127.0);
+    packet.payload.cmd.setAxis(0, RemoteInput::input.joyH * AXIS_MAX);
+    packet.payload.cmd.setAxis(1, RemoteInput::input.joyV * AXIS_MAX);
+
+    //Serial.print(String(i++) + (micros()-m) + " ");
+    //m = micros();
 
     if (IMUFilter::imu.available()) {
       float roll, pitch, heading;
@@ -118,10 +133,14 @@ public:
         deltaR_ = roll; deltaP_ = pitch; deltaH_ = heading;
       }
 
-      packet.payload.cmd.setAxis(2, 0.7 * (roll-deltaR_)); // 0.7 = 127.0 / 180.0
-      packet.payload.cmd.setAxis(3, 0.7 * (pitch-deltaP_));
-      packet.payload.cmd.setAxis(4, 0.7 * (heading-deltaH_));
+      float d = AXIS_MAX / 180.0;
+      packet.payload.cmd.setAxis(2, d * (roll-deltaR_)); 
+      Serial.println(String("Roll:") + (roll-deltaR_) + " " + d * (roll-deltaR_) + " " + packet.payload.cmd.getAxis(2));
+      packet.payload.cmd.setAxis(3, d * (pitch-deltaP_));
+      packet.payload.cmd.setAxis(4, d * (heading-deltaH_));
     }
+    //Serial.print(String(i++) + (micros()-m) + " ");
+    //m = micros();
 
     if(runningStatus_) {
       printStatus();
@@ -135,9 +154,15 @@ public:
     
     if(onInitScreen_ == false) RemoteDisplay::display.update();
 #endif // LEFT_REMOTE
+    //Serial.print(String(i++) + (micros()-m) + " ");
+    //m = micros();
 
     lastPacketSent_ = packet;
     Result retval = bb::XBee::xbee.send(packet);
+    //Serial.print(String(i++) + (micros()-m) + " ");
+    //m = micros();
+    //Serial.println();
+
     //if(retval != RES_OK) Console::console.printlnBroadcast(String("Error sending packet! ") + errorMessage(retval));
     return retval;
   }

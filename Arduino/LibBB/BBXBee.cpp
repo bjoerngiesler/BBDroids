@@ -12,7 +12,7 @@ static std::vector<int> baudRatesToTry = { 115200, 9600, 19200, 28800, 38400, 57
 
 bb::XBee::XBee() {
 	uart_ = &Serial1;
-	debug_ = (XBee::DebugFlags)(DEBUG_PROTOCOL | DEBUG_XBEE_COMM);
+	debug_ = (XBee::DebugFlags)(DEBUG_PROTOCOL);
 	timeout_ = 1000;
 	atmode_ = false;
 	atmode_millis_ = 0;
@@ -185,8 +185,8 @@ bb::Result bb::XBee::step() {
 			return send(packet);
 		} else {
 			String str(continuous_++);
-			bb::Console::console.printBroadcast("Sending ");
-			bb::Console::console.printlnBroadcast(str);
+//			bb::Console::console.printBroadcast("Sending ");
+//			bb::Console::console.printlnBroadcast(str);
 			send(str);			
 		}
 	}
