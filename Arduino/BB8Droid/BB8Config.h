@@ -40,25 +40,30 @@ static const uint8_t P_DYNAMIXEL_TX    = 14;
 static const uint8_t BATT1_STATUS_ADDR   = 0x40;
 static const uint8_t BATT2_STATUS_ADDR   = 0x41;
 
-static const uint16_t DEADBAND         = 0.01f;
-
 static const uint8_t STATUSPIXEL_OVERALL = 0;
 static const uint8_t STATUSPIXEL_REMOTE  = 1;
 static const uint8_t STATUSPIXEL_MOTORS  = 2;
 
 const long unsigned int DYNAMIXEL_BPS = 57600;
 
-static const float DRIVE_SPEED_KP = 0.075f;
-static const float DRIVE_SPEED_KI = 0.2f;
-static const float DRIVE_SPEED_KD = 0.0f;
-static const float DRIVE_SPEED_IMAX = 10.0f;     // not used yet
+static const float DRIVE_SPEED_KP       = 0.075f;
+static const float DRIVE_SPEED_KI       = 0.2f;
+static const float DRIVE_SPEED_KD       = 0.0f;
+static const float DRIVE_SPEED_IMAX     = 10.0f;     // not used yet
 static const float DRIVE_SPEED_DEADBAND = 0.01f; // not used yet
-static const float DRIVE_SPEED_IABORT = 1000.0f; // not used yet
+static const float DRIVE_SPEED_IABORT   = 1000.0f; // not used yet
+static const float DRIVE_SPEED_MAX      = 1600.0f;
 
-static const int DOME_HEADING_SERVO = 1;
-static const int DOME_ROLL_SERVO    = 2;
-static const int DOME_PITCH_SERVO   = 3;
-static const int BODY_ROLL_SERVO    = 4;
+static const int DOME_HEADING_SERVO  = 1;
+static const int DOME_ROLL_SERVO     = 2;
+static const int DOME_PITCH_SERVO    = 3;
+static const int BODY_ROLL_SERVO     = 4;
+static const float DOME_MAX_VELOCITY = 130; // degrees per second
+
+static const bool DOME_HEADING_SERVO_REVERSE = false;
+static const bool DOME_ROLL_SERVO_REVERSE    = false;
+static const bool DOME_PITCH_SERVO_REVERSE   = false;
+static const bool BODY_ROLL_SERVO_REVERSE    = true;
 
 static const float BODY_CIRCUMFERENCE            = 2*M_PI*253.0; // bb8 motor pwm 0
 static const float DRIVE_MOTOR_TICKS_PER_TURN    = 4776.384;

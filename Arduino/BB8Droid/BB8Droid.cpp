@@ -314,7 +314,7 @@ Result BB8::incomingPacket(const Packet &packet) {
   float domeHeadingInput = packet.payload.cmd.getAxis(4);
   
   if(packet.payload.cmd.button1) {    
-    float vel = (800.0 * velInput / AXIS_MAX);  // magic
+    float vel = (DRIVE_SPEED_MAX * velInput / AXIS_MAX);  // magic
     driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
     Serial.println(String("Setting controller to ") + vel);
     driveController_.setGoal(vel);
@@ -372,9 +372,9 @@ Result BB8::incomingPacket(const Packet &packet) {
     BB8Servos::servos.setGoal(DOME_HEADING_SERVO, 180.0);
   }
 
-  BB8Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, 100.0);
-  BB8Servos::servos.setProfileVelocity(DOME_PITCH_SERVO, 100.0);
-  BB8Servos::servos.setProfileVelocity(DOME_HEADING_SERVO, 100.0);
+  BB8Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, DOME_MAX_VELOCITY);
+  BB8Servos::servos.setProfileVelocity(DOME_PITCH_SERVO, DOME_MAX_VELOCITY);
+  BB8Servos::servos.setProfileVelocity(DOME_HEADING_SERVO, DOME_MAX_VELOCITY);
 
   packetTimeout_ = 3;
   lastPacket_ = packet;
