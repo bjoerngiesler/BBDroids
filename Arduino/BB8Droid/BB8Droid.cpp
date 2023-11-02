@@ -356,10 +356,10 @@ Result BB8::incomingPacket(const Packet &packet) {
 
     //Console::console.printlnBroadcast(String("roll: ") + domeRollInput + " pitch:" + domePitchInput + " heading:" + domeHeadingInput);
     
-    if(DOME_ROLL_SERVO_REVERSE) domeRollInput = 180.0 - ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);  
-    else domeRollInput = 180.0 + ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);  
-    if(DOME_PITCH_SERVO_REVERSE) domePitchInput = 180.0 - ((domePitchInput*30.0)*4/AXIS_MAX + 2*p);
-    else domePitchInput = 180.0 + ((domePitchInput*30.0)*4/AXIS_MAX + 2*p);
+    if(DOME_ROLL_SERVO_REVERSE) domeRollInput = 180.0 - ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0));
+    else domeRollInput = 180.0 + ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0));
+    if(DOME_PITCH_SERVO_REVERSE) domePitchInput = 180.0 - ((domePitchInput*30.0)*4/AXIS_MAX);
+    else domePitchInput = 180.0 + ((domePitchInput*30.0)*4/AXIS_MAX);
     if(DOME_HEADING_SERVO_REVERSE) domeHeadingInput = 180.0 - ((domeHeadingInput*30.0)*4/AXIS_MAX);
     else domeHeadingInput = 180.0 + ((domeHeadingInput*30.0)*4/AXIS_MAX);
       

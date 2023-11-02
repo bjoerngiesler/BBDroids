@@ -3,8 +3,8 @@
 
 #include <BBError.h>
 
-#define AXIS_MIN -256
-#define AXIS_MAX 256
+#define AXIS_MIN -255
+#define AXIS_MAX 255
 
 namespace bb {
 /*
