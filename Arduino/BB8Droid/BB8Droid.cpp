@@ -319,7 +319,9 @@ Result BB8::incomingPacket(const Packet &packet) {
     Serial.println(String("Setting controller to ") + vel);
     driveController_.setGoal(vel);
 
-    float roll = 180.0 - (bodyRollInput * 20.0) / AXIS_MAX;
+    float roll;
+    if(BODY_ROLL_SERVO_REVERSE) roll = 180.0 - (bodyRollInput * 20.0) / AXIS_MAX;
+    else roll = 180.0 + (bodyRollInput * 20.0) / AXIS_MAX;
     BB8Servos::servos.setGoal(BODY_ROLL_SERVO, roll);
   } 
 #if 0 // Untested - right now it will go to zero goal at centered joystick position. Needs to pick up actual position as a start point.
@@ -354,9 +356,12 @@ Result BB8::incomingPacket(const Packet &packet) {
 
     //Console::console.printlnBroadcast(String("roll: ") + domeRollInput + " pitch:" + domePitchInput + " heading:" + domeHeadingInput);
     
-    domeRollInput = 180.0 + ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);  
-    domePitchInput = 180.0 + ((domePitchInput*30.0)*4/AXIS_MAX + 2*p);
-    domeHeadingInput = 180.0 + ((domeHeadingInput*30.0)*4/AXIS_MAX);
+    if(DOME_ROLL_SERVO_REVERSE) domeRollInput = 180.0 - ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);  
+    else domeRollInput = 180.0 + ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0) + 2*r);  
+    if(DOME_PITCH_SERVO_REVERSE) domePitchInput = 180.0 - ((domePitchInput*30.0)*4/AXIS_MAX + 2*p);
+    else domePitchInput = 180.0 + ((domePitchInput*30.0)*4/AXIS_MAX + 2*p);
+    if(DOME_HEADING_SERVO_REVERSE) domeHeadingInput = 180.0 - ((domeHeadingInput*30.0)*4/AXIS_MAX);
+    else domeHeadingInput = 180.0 + ((domeHeadingInput*30.0)*4/AXIS_MAX);
       
     BB8Servos::servos.setGoal(DOME_ROLL_SERVO, domeRollInput);
     BB8Servos::servos.setGoal(DOME_PITCH_SERVO, domePitchInput);
