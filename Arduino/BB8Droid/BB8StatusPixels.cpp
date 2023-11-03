@@ -4,6 +4,15 @@
 BB8StatusPixels BB8StatusPixels::statusPixels;
 
 Adafruit_NeoPixel statusPixel_(3, P_STATUS_NEOPIXEL, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ball1Pixel_(5, P_BALL1_NEOPIXEL, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel ball2Pixel_(5, P_BALL2_NEOPIXEL, NEO_GRB + NEO_KHZ800);
+
+struct RGB {
+  uint8_t r, g, b;
+};
+
+RGB altColors_[] = {{150, 0, 0}, {0, 150, 0}, {0, 0, 150}, {150, 150, 0}, {150, 0, 150}, {0, 150, 150}};
+static const unsigned int numAltColors_ = 6;
 
 BB8StatusPixels::BB8StatusPixels() {
   available_ = false;
@@ -17,6 +26,21 @@ bool BB8StatusPixels::begin() {
   statusPixel_.setPixelColor(STATUSPIXEL_REMOTE, statusPixel_.Color(0, 0, 0));
   statusPixel_.setPixelColor(STATUSPIXEL_MOTORS, statusPixel_.Color(0, 0, 0));
   statusPixel_.show();
+
+  ball1Pixel_.begin();
+  ball1Pixel_.clear();
+  for(int i=0; i<numAltColors_; i++) {
+    ball1Pixel_.setPixelColor(i, ball1Pixel_.Color(altColors_[i].r, altColors_[i].g, altColors_[i].b));    
+  }
+  ball1Pixel_.show();
+
+  ball2Pixel_.begin();
+  ball2Pixel_.clear();
+  for(int i=0; i<numAltColors_; i++) {
+    ball2Pixel_.setPixelColor(i, ball2Pixel_.Color(altColors_[i].r, altColors_[i].g, altColors_[i].b));
+  }
+  ball2Pixel_.show();
+
   available_ = true;
   Serial.println("success.");
   return true;
