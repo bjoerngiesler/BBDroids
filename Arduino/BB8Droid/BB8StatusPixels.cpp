@@ -29,15 +29,17 @@ bool BB8StatusPixels::begin() {
 
   ball1Pixel_.begin();
   ball1Pixel_.clear();
-  for(int i=0; i<numAltColors_; i++) {
-    ball1Pixel_.setPixelColor(i, ball1Pixel_.Color(altColors_[i].r, altColors_[i].g, altColors_[i].b));    
+  for(int i=0; i<BALL1_NEOPIXEL_COUNT; i++) {
+    int j = i % numAltColors_;
+    ball1Pixel_.setPixelColor(i, ball1Pixel_.Color(altColors_[j].r, altColors_[j].g, altColors_[j].b));    
   }
   ball1Pixel_.show();
 
   ball2Pixel_.begin();
   ball2Pixel_.clear();
-  for(int i=0; i<numAltColors_; i++) {
-    ball2Pixel_.setPixelColor(i, ball2Pixel_.Color(altColors_[i].r, altColors_[i].g, altColors_[i].b));
+  for(int i=0; i<BALL2_NEOPIXEL_COUNT; i++) {
+    int j = i % numAltColors_;
+    ball2Pixel_.setPixelColor(i, ball2Pixel_.Color(altColors_[j].r, altColors_[j].g, altColors_[j].b));
   }
   ball2Pixel_.show();
 

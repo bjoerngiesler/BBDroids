@@ -77,8 +77,8 @@ public:
     }
 
     int i=0;
-    Serial.print(String(i++) + (micros()-m) + " ");
-    m = micros();
+    //Serial.print(String(i++) + (micros()-m) + " ");
+    //m = micros();
 
     if(allOK) {
       digitalWrite(LEDR, LOW);
@@ -135,7 +135,6 @@ public:
 
       float d = AXIS_MAX / 180.0;
       packet.payload.cmd.setAxis(2, d * (roll-deltaR_)); 
-      Serial.println(String("Roll:") + (roll-deltaR_) + " " + d * (roll-deltaR_) + " " + packet.payload.cmd.getAxis(2));
       packet.payload.cmd.setAxis(3, d * (pitch-deltaP_));
       packet.payload.cmd.setAxis(4, d * (heading-deltaH_));
     }

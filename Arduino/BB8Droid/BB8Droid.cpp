@@ -132,6 +132,7 @@ Result BB8::step() {
   static int stepcount = 0;
 
   BB8IMU::imu.update();
+  BB8StatusPixels::statusPixels.update();
 
   stepcount++;
   if (stepcount == 1 && BB8BattStatus::batt.available(BB8BattStatus::BATT_1)) BB8BattStatus::batt.updateVoltage(BB8BattStatus::BATT_1);
@@ -210,11 +211,11 @@ Result BB8::stepDome() {
   }
 
   else {
-#if 0    
     float r, p, h, gr, gp, gh, goal;
     BB8IMU::imu.getFilteredRPH(r, p, h);
     BB8IMU::imu.getGyroMeasurement(gr, gp, gh);
 
+#if 0
     goal = params_.domeRollKp * 2 * r + params_.domeRollKd * gr + 180.0;
     if (goal < 0 || goal > 360.0) {
       Console::console.printlnBroadcast(String("Roll out of range (") + goal + ")");
@@ -223,6 +224,7 @@ Result BB8::stepDome() {
         Console::console.printlnBroadcast(String("Huh? ") + r + " " + params_.domeRollKp + " " + params_.domeRollKd + " " + r + " " + gr);
       }
     }
+#endif
 
     goal = params_.domePitchKp * 2 * p + params_.domePitchKd * gr + 180.0;
     if (goal < 0 || goal > 360.0) {
@@ -232,7 +234,6 @@ Result BB8::stepDome() {
         Console::console.printlnBroadcast(String("Huh? ") + goal + " " + params_.domePitchKp + " " + params_.domePitchKd + " " + p + " " + gp);
       }
     }
-#endif
   }
 
   return RES_OK;

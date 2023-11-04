@@ -44,6 +44,9 @@ static const uint8_t STATUSPIXEL_OVERALL = 0;
 static const uint8_t STATUSPIXEL_REMOTE  = 1;
 static const uint8_t STATUSPIXEL_MOTORS  = 2;
 
+static const uint8_t BALL1_NEOPIXEL_COUNT = 10;
+static const uint8_t BALL2_NEOPIXEL_COUNT = 10;
+
 const long unsigned int DYNAMIXEL_BPS = 57600;
 
 static const float DRIVE_SPEED_KP       = 0.075f;
