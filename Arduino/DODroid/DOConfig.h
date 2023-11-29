@@ -43,4 +43,11 @@ static const float WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979 ticks per 
 
 static const uint8_t BATT_STATUS_ADDR   = 0x40;
 
+static const float SPEED_KP = 0.013;
+static const float SPEED_KI = 0.8; 
+static const float SPEED_KD = 0;
+static const float POS_KP = 0.05;
+static const float POS_KI = 0;
+static const float POS_KD = 0;
+
 #endif // DOCONFIG_H

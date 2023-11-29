@@ -4,14 +4,22 @@
 #include "DOBattStatus.h"
 
 DODroid DODroid::droid;
-DODroid::Params DODroid::params_;
+DODroid::Params DODroid::params_ = {
+  .speedKp = SPEED_KP,
+  .speedKi = SPEED_KI,
+  .speedKd = SPEED_KD,
+  .posKp = POS_KP,
+  .posKi = POS_KI,
+  .posKd = POS_KD,
+  .driveAccel = 1
+};
 
 DODroid::DODroid():
   leftMotor(P_LEFT_PWMA, P_LEFT_PWMB), 
-  leftEncoder(P_LEFT_ENCA, P_LEFT_ENCB, EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_MILLIMETERS),
+  leftEncoder(P_LEFT_ENCA, P_LEFT_ENCB, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
   leftController(leftEncoder, leftMotor), 
   rightMotor(P_RIGHT_PWMA, P_RIGHT_PWMB), 
-  rightEncoder(P_RIGHT_ENCA, P_RIGHT_ENCB, EncoderControlInput::INPUT_SPEED, EncoderControlInput::UNIT_MILLIMETERS),
+  rightEncoder(P_RIGHT_ENCA, P_RIGHT_ENCB, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
   rightController(rightEncoder, rightMotor)
 {
   pinMode(PULL_DOWN_A0, OUTPUT);
@@ -29,14 +37,6 @@ DODroid::DODroid():
 }
 
 Result DODroid::initialize() {
-  params_.speedKp = 0.013;
-  params_.speedKi = 0.8; 
-  params_.speedKd = 0;
-  params_.driveAccel = 1;
-  params_.posKp = 0.05;
-  params_.posKi = 0;
-  params_.posKd = 0;
-
   addParameter("speed_kp", "Proportional constant for speed PID controller", params_.speedKp, 0, INT_MAX);
   addParameter("speed_ki", "Integrative constant for speed PID controller", params_.speedKi, 0, INT_MAX);
   addParameter("speed_kd", "Derivative constant for speed PID controller", params_.speedKd, 0, INT_MAX);
@@ -57,13 +57,13 @@ Result DODroid::start(ConsoleStream* stream) {
 
   leftMotor.set(0);
   leftEncoder.setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
-  leftEncoder.setMode(EncoderControlInput::INPUT_SPEED);
-  leftEncoder.setUnit(EncoderControlInput::UNIT_MILLIMETERS);
+  leftEncoder.setMode(bb::Encoder::INPUT_SPEED);
+  leftEncoder.setUnit(bb::Encoder::UNIT_MILLIMETERS);
   leftController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
   rightMotor.set(0);
   rightEncoder.setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
-  rightEncoder.setMode(EncoderControlInput::INPUT_SPEED);
-  rightEncoder.setUnit(EncoderControlInput::UNIT_MILLIMETERS);
+  rightEncoder.setMode(bb::Encoder::INPUT_SPEED);
+  rightEncoder.setUnit(bb::Encoder::UNIT_MILLIMETERS);
   rightController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
 
   return RES_OK;
@@ -85,8 +85,6 @@ Result DODroid::step() {
   DOBattStatus::batt.updateCurrent();
   DOBattStatus::batt.updateVoltage();
 
-  Serial.println(String("Voltage: ") + DOBattStatus::batt.voltage());
-  
   fillAndSendStatusPacket();
   
   return RES_OK;
@@ -107,12 +105,12 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
     if(words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
 
     if(words[1] == "position") {
-      leftEncoder.setMode(EncoderControlInput::INPUT_POSITION);
+      leftEncoder.setMode(bb::Encoder::INPUT_POSITION);
       leftController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
       leftController.setGoal(words[2].toFloat());
       return RES_OK;
     } else if(words[1] == "speed") {
-      leftEncoder.setMode(EncoderControlInput::INPUT_SPEED);
+      leftEncoder.setMode(bb::Encoder::INPUT_SPEED);
       leftController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
       leftController.setGoal(words[2].toFloat());
       return RES_OK;
@@ -125,12 +123,12 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
     if(words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
     
     if(words[1] == "position") {
-      leftEncoder.setMode(EncoderControlInput::INPUT_POSITION);
+      leftEncoder.setMode(bb::Encoder::INPUT_POSITION);
       leftController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
       leftController.setGoal(words[2].toFloat());
       return RES_OK;
     } else if(words[1] == "speed") {
-      rightEncoder.setMode(EncoderControlInput::INPUT_POSITION);
+      rightEncoder.setMode(bb::Encoder::INPUT_POSITION);
       rightController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
       rightController.setGoal(words[2].toFloat());
       return RES_OK;
@@ -145,12 +143,12 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
   Result retval = Subsystem::setParameterValue(name, stringVal);
   if(retval != RES_OK) return retval;
 
-  if(leftEncoder.mode() == EncoderControlInput::INPUT_POSITION) {
+  if(leftEncoder.mode() == bb::Encoder::INPUT_POSITION) {
     leftController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
   } else {
     leftController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
   }
-  if(rightEncoder.mode() == EncoderControlInput::INPUT_POSITION) {
+  if(rightEncoder.mode() == bb::Encoder::INPUT_POSITION) {
     rightController.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
   } else {
     rightController.setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);

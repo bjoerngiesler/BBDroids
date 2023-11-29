@@ -31,7 +31,7 @@ public:
 
 protected:
   bb::DCMotor leftMotor, rightMotor;
-  bb::EncoderControlInput leftEncoder, rightEncoder;
+  bb::Encoder leftEncoder, rightEncoder;
   bb::PIDController leftController, rightController;
 };
 
