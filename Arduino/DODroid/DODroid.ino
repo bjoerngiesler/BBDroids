@@ -1,6 +1,8 @@
 #include <LibBB.h>
+#include <Wire.h>
 
 #include "DODroid.h"
+#include "DOServos.h"
 #include "DOConfig.h"
 #include "DOWifiSecrets.h"
 
@@ -34,13 +36,19 @@ void initializeSubsystems() {
   Runloop::runloop.initialize();
   Console::console.initialize();
   WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
+  WifiServer::server.setOTANameAndPassword("D-O", "OTA");
+  DOServos::servos.initialize();
+  DOServos::servos.setRequiredIds(std::vector<uint8_t>{SERVO_NECK}); // Rest of the head servos may be disconnected
   DODroid::droid.initialize();
 }
 
 void startSubsystems() {
   WifiServer::server.start();
   Console::console.start();
+  DOServos::servos.start();
   DODroid::droid.start();
+  // sometimes this doesn't work on the first try for whatever reason
+  if(WifiServer::server.isStarted() == false) WifiServer::server.start(); 
 }
 
 void setup() {
@@ -50,6 +58,8 @@ void setup() {
   Serial.println("Firmware version 0.0");
   Serial.println("(c) 2023 Björn Giesler");
   Serial.println("======================");
+
+  Wire.begin();
 
   setupBoardComm();
 

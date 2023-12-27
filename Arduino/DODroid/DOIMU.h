@@ -11,6 +11,28 @@
 
 using namespace bb;
 
+class DOIMUControlInput: public bb::ControlInput {
+public:
+  typedef enum {
+    IMU_ROLL,
+    IMU_PITCH,
+    IMU_HEADING
+  } ProbeType;
+
+  DOIMUControlInput(ProbeType pt);
+  float present();
+  Result update();
+
+  void setFilterFrequency(float frequency);
+  void setBias(float bias) { bias_ = bias; }
+  void setDeadband(float deadband) { deadband_ = deadband; }
+protected:
+  ProbeType pt_;
+  bb::LowPassFilter filter_;
+  float bias_, deadband_;
+};
+
+
 class DOIMU {
 public:
   static DOIMU imu;
@@ -24,8 +46,8 @@ public:
   bool integrateGyroMeasurement(bool reset = false);
   int getIntegratedGyroMeasurement(float& r, float& p, float& h);
 
-  bool getGyroMeasurement(float& r, float& p, float& h, bool calibrated=true);
-  bool getAccelMeasurement(float& x, float& y, float& z, int32_t& timestamp);
+  bool getGyroMeasurement(float& dr, float& dp, float& dh, bool calibrated=true);
+  bool getAccelMeasurement(float& ax, float& ay, float& az, int32_t& timestamp);
 
   virtual bool update();
   bool getFilteredRPH(float& r, float& p, float& h);

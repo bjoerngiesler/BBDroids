@@ -42,12 +42,35 @@ static const float WHEEL_CIRCUMFERENCE = 722.566310325652445;
 static const float WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
 
 static const uint8_t BATT_STATUS_ADDR   = 0x40;
+static const uint8_t IMU_ADDR           = 0x6a;
 
 static const float SPEED_KP = 0.013;
-static const float SPEED_KI = 0.8; 
+static const float SPEED_KI = 1.0; //0.8; 
 static const float SPEED_KD = 0;
 static const float POS_KP = 0.05;
 static const float POS_KI = 0;
 static const float POS_KD = 0;
+static const float BAL_KP = 1;
+static const float BAL_KI = 0;
+static const float BAL_KD = 0;
+static const float PITCH_BIAS = 1.35;
+static const float PITCH_DEADBAND = .5;
+
+
+static const uint8_t SERVO_NECK         = 1;
+static const uint8_t SERVO_HEAD_PITCH   = 2;
+static const uint8_t SERVO_HEAD_HEADING = 3;
+static const uint8_t SERVO_HEAD_ROLL    = 4;
+
+static const float NECK_RANGE         = 20.0;
+static const float HEAD_PITCH_RANGE   = 20.0;
+static const float HEAD_HEADING_RANGE = 20.0;
+static const float HEAD_ROLL_RANGE    = 20.0;
+
+static const float GYRO_PITCH_DEADBAND = 1.0;
+
+static const float POWER_BATT_NONE = 5.0;  // Everything under this means we're connected to USB.
+static const float POWER_BATT_MIN  = 14.2; // Minimum voltage - below this, everything switches off to save the LiPos.
+static const float POWER_BATT_MAX  = 16.0; // Maximum voltage - above this, we're overvolting and will probably breal stuff.
 
 #endif // DOCONFIG_H

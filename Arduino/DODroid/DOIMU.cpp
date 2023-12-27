@@ -9,6 +9,46 @@ using namespace bb;
 
 DOIMU DOIMU::imu;
 
+DOIMUControlInput::DOIMUControlInput(DOIMUControlInput::ProbeType pt): filter_(2.0f) {
+  pt_ = pt;
+  bias_ = 0;
+  deadband_ = 0;
+}
+
+bb::Result DOIMUControlInput::update() {
+  if(DOIMU::imu.update() == true) return RES_OK;
+
+  return RES_CMD_FAILURE;
+}
+
+float DOIMUControlInput::present() {
+  float r, p, h;
+  if(DOIMU::imu.getFilteredRPH(r, p, h) == false) return 0.0f;
+  
+  float retval;
+
+  switch(pt_) {
+  case IMU_ROLL:
+    retval = filter_.filter(r-bias_);
+    break;
+  case IMU_PITCH:
+    retval = filter_.filter(p-bias_);
+    break;
+  case IMU_HEADING:
+    retval = filter_.filter(h-bias_);
+    break;
+  }
+
+  if(fabs(retval) < fabs(deadband_)) return 0.0f;
+  return retval;
+
+  return 0.0f;
+}
+
+void DOIMUControlInput::setFilterFrequency(float frequency) {
+  filter_.setSampleFrequency(frequency);
+}
+
 DOIMU::DOIMU() {
   available_ = false;
   calR_ = calP_ = calH_ = 0.0f;
@@ -18,6 +58,17 @@ DOIMU::DOIMU() {
 bool DOIMU::begin() {
   if(available_) return true;
   Serial.print("Setting up Body IMU... ");
+
+  // Check whether we exist
+  int err;
+  Wire.beginTransmission(IMU_ADDR);
+  err = Wire.endTransmission();
+  if(err != 0) {
+    bb::Console::console.printlnBroadcast(String("Wire.endTransmission() returns error ") + err + " while detecting IMU at " + String(IMU_ADDR, HEX));
+    available_ = false;
+    return false;
+  }
+
   if(!imu_.begin_I2C()) {
     Serial.println("failed!");
     return false;
@@ -41,11 +92,11 @@ bool DOIMU::begin() {
 
   lsm6ds_data_rate_t dataRate = imu_.getGyroDataRate();
   if(dataRate == LSM6DS_RATE_104_HZ) {
-    Runloop::runloop.setCycleTime(1000000/104);
+    Runloop::runloop.setCycleTimeMicros(1000000/104);
     madgwick_.begin(104);
     Serial.print("data rate of 104Hz... ");
   } else {
-    madgwick_.begin(1000000/Runloop::runloop.cycleTime());
+    madgwick_.begin(1000000/Runloop::runloop.cycleTimeMicros());
     Serial.print(String("unknown data rate ") + dataRate);
   }
 

@@ -13,6 +13,16 @@ DOBattStatus::DOBattStatus() {
 }
 
 bool DOBattStatus::begin() {
+  // Check whether we exist
+  int err;
+  Wire.beginTransmission(BATT_STATUS_ADDR);
+  err = Wire.endTransmission();
+  if(err != 0) {
+    bb::Console::console.printlnBroadcast(String("Wire.endTransmission() returns error ") + err + " while detecting battery monitor at " + String(BATT_STATUS_ADDR, HEX));
+    available_ = false;
+    return false;
+  }
+
   ina.begin();
   available_ = true;
   return true;
