@@ -12,7 +12,7 @@ namespace bb {
  *
  * This is designed to be sent via real-time remote control links.
  */
-struct CommandPacket {
+struct __attribute__ ((packed)) CommandPacket {
 	// byte 0
 	bool button0    : 1;
 	bool button1    : 1;
@@ -76,7 +76,7 @@ struct CommandPacket {
 		}
 		return 0;
 	}
-};     // 7 bytes long, maximum should be <=10
+};     // 8 bytes long, maximum should be <=10
 
 struct StatePacket {
 	uint8_t dummy;

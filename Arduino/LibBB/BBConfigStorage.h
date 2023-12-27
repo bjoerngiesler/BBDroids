@@ -1,7 +1,7 @@
 #if !defined(BBCONFIGSTORAGE_H)
 #define BBCONFIGSTORAGE_H
 
-#include <map>
+#include <vector>
 
 #include "BBError.h"
 
@@ -23,7 +23,11 @@ protected:
 	ConfigStorage();
 	bool initialize();
 
-	std::map<HANDLE, size_t> blocks_;
+	struct Block {
+		HANDLE handle;
+		size_t size;
+	};
+	std::vector<Block> blocks_;
 	bool initialized_;
 	HANDLE nextHandle_;
 	size_t maxSize_;

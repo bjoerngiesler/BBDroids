@@ -22,8 +22,9 @@ public:
 
 	uint64_t getSequenceNumber() { return seqnum_; }
 
-	void setCycleTime(unsigned int microseconds); // not milli, micro.
-	unsigned int cycleTime();
+	void setCycleTimeMicros(unsigned int microseconds); // not milli, micro.
+	unsigned int cycleTimeMicros();
+	float cycleTimeSeconds() { return ((float)cycleTimeMicros())/1e6; }
 
 	// Make clear that the current cycle will likely overrun the time budget, and suppress message.
 	// Only valid for the current cycle, flag will be cleared after using.

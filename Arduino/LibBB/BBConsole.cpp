@@ -11,7 +11,12 @@ bool bb::SerialConsoleStream::available() {
 	if(!opened_ && ser_) {
 		opened_ = true;
 	}
-	return ser_.available(); 
+
+	if(opened_) {
+		return ser_.available(); 
+	} else {
+		return false;
+	} 
 }
 
 bool bb::SerialConsoleStream::readStringUntil(unsigned char c, String& str) { 

@@ -19,18 +19,19 @@ public:
   virtual Result set(float value) = 0;
 };
 
-class PIDController {
+class PIDController: public ControlOutput {
 public:
   PIDController(ControlInput& input, ControlOutput& output);
 
   void reset(); // reset aggregated errors
   
-  void update(void);
+  virtual void update(void);
 
   void setGoal(const float& sp);
   void setCurrentAsGoal();
   float goal();
-  float present();
+  virtual Result set(float value) { setGoal(value); return RES_OK; }
+  virtual float present();
 
   void setControlParameters(const float& kp, const float& ki, const float& kd);
   void getControlParameters(float& kp, float& ki, float& kd);
@@ -45,6 +46,9 @@ public:
   bool isControlBounded();
 
 protected:
+  //! Overwrite this if you want to modify the pure control output with something.
+  virtual Result setControlOutput(float value) { return output_.set(value); } 
+
   ControlInput& input_;
   ControlOutput& output_;
 

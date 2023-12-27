@@ -32,7 +32,7 @@ bool bb::WiFiConsoleStream::readStringUntil(unsigned char c, String& str) {
 		} else {
 			delay(1);
 			timeout++;
-			if(timeout >= 1000) return false;
+			if(timeout >= 10) return false;
 		}
 	}
 }
@@ -102,6 +102,10 @@ bb::Result bb::WifiServer::initialize(const String& ssid, const String& wpakey, 
 		params_.tcpPort = tcpPort;
 	}
 
+	byte mac[6];
+	WiFi.macAddress(mac);
+	macStr_ = String(mac[5], HEX) + ":" + String(mac[4], HEX) + ":" + String(mac[3], HEX) + ":" + String(mac[2], HEX) + ":" + String(mac[1], HEX) + ":" + String(mac[0], HEX);
+
 	setOTANameAndPassword(DEFAULT_SSID, DEFAULT_WPAKEY);
 
 	operationStatus_ = RES_SUBSYS_NOT_STARTED;
@@ -112,16 +116,10 @@ bb::Result bb::WifiServer::setOTANameAndPassword(const String& name, const Strin
 #if !defined(ARDUINO_PICO_VERSION_STR)
 	if(WiFi.status() == WL_NO_MODULE) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 
-#if 0
-	byte mac[6];
-	WiFi.macAddress(mac);
-	String tmp =	String(mac[5], HEX) + ":" + String(mac[4], HEX) + ":" + String(mac[3], HEX) + ":" + String(mac[2], HEX) + ":" + String(mac[1], HEX) + ":" + String(mac[0], HEX);
-#endif
-
 	otaName_ = name;
-//	otaName_.replace("$MAC", tmp);
+	otaName_.replace("$MAC", macStr_);
 	otaPassword_ = password;
-//	otaPassword_.replace("$MAC", tmp);
+	otaPassword_.replace("$MAC", macStr_);
 
 	return RES_OK;
 #else
@@ -138,44 +136,50 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 
 	WiFi.noLowPowerMode();
 
-#if 0
-	byte mac[6];
-	WiFi.macAddress(mac);
-	macStr_ = String(mac[5], HEX) + ":" + String(mac[4], HEX) + ":" + String(mac[3], HEX) + ":" + String(mac[2], HEX) + ":" + String(mac[1], HEX) + ":" + String(mac[0], HEX);
-#endif
-
 	ssid_ = params_.ssid;
 	wpaKey_ = params_.wpaKey;
 	ssid_.replace("$MAC", macStr_);
 	wpaKey_.replace("$MAC", macStr_);
 
-	if(params_.ap == true) {
+	if(params_.ap == true) { // Start Access Point
 		if(stream) {
-			stream->print(ssid_); 
-			stream->print("\"...");
+			stream->print(String("Start AP \"") + ssid_ + "\"... ");
 		}
 
 		uint8_t retval = WiFi.beginAP(ssid_.c_str(), wpaKey_.c_str(), random(1, 15));
-		if(retval != WL_AP_LISTENING) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
-	} else {
-		if(stream) {
-			stream->print("Trying to connect to SSID \""); 
-			stream->print(ssid_); 
-			stream->print("\"... ");
-		}
-		uint8_t retval = WiFi.begin(ssid_.c_str(), wpaKey_.c_str());
-		if(retval != WL_CONNECTED) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
-
-		if(stream) stream->print("trying to start TCP Server... ");
-		if(startTCPServer(stream)) {
+		if(retval == WL_AP_LISTENING) {
 			if(stream) stream->print("success. ");
-		} else if(stream) stream->print("failure. ");
+		} else {
+			if(stream) stream->println("failure.");
+			return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+		}
+	} else { // Connect as client
+		if(stream) { 
+			stream->print(String("Connect to \"") + ssid_ + "\"... ");
+		}
+
+		uint8_t retval = WiFi.begin(ssid_.c_str(), wpaKey_.c_str());
+		if(retval == WL_CONNECTED) {
+			if(stream) stream->print("success. ");
+		} else {
+			if(stream) stream->println("failure.");
+			return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+		}
 	}
 
-	if(stream) stream->print("trying to start UDP Server... ");
+	if(stream) stream->print("TCP Server... ");
+	if(startTCPServer(stream)) {
+		if(stream) stream->print("started. ");
+	} else {
+		if(stream) stream->print("failure. ");
+	}
+
+	if(stream) stream->print("UDP Server... ");
 	if(startUDPServer(stream)) {
-		if(stream) stream->print("success. ");
-	} else if(stream) stream->print("failure. ");
+		if(stream) stream->print("started. ");
+	} else {
+		if(stream) stream->println("failure. ");
+	}
 
 	operationStatus_ = RES_OK;
 	started_ = true;
@@ -209,13 +213,12 @@ bb::Result bb::WifiServer::step() {
 	int status = WiFi.status();
 	static int seqnum = 0;
 
-	if(seqnum == (1e6/Runloop::runloop.cycleTime())/2) {
+	if(seqnum == (1e6/Runloop::runloop.cycleTimeMicros())/4) {
 #if !defined(ARDUINO_PICO_VERSION_STR)
-		//Console::console.printlnBroadcast("Polling OTA");
-		//ArduinoOTA.poll();
+//		Console::console.printlnBroadcast("Polling OTA");
+		ArduinoOTA.poll();
 #endif
 		seqnum = 0;
-		return RES_OK;
 	}
 
 	seqnum++;
@@ -389,9 +392,7 @@ void bb::WifiServer::updateDescription() {
     	description_ += "scan completed";
     	break;
     case WL_CONNECTED:
-    	description_ += "connected as client, IP ";
-    	ip = WiFi.localIP();
-    	description_ += String(ip[0]) + "." + ip[1] + "." + ip[2] + "." + ip[3];
+    	description_ += "connected as client, IP " + IPAddressToString(WiFi.localIP());
     	break;
     case WL_CONNECT_FAILED:
     	description_ += "conn failed";
@@ -407,8 +408,6 @@ void bb::WifiServer::updateDescription() {
     	break;
     case WL_AP_CONNECTED:
     	description_ += "connected as AP, IP " + IPAddressToString(WiFi.localIP());
-    	//ip = WiFi.localIP();
-    	//description_ += String(ip[0]) + "." + ip[1] + "." + ip[2] + "." + ip[3];
     	break;
     case WL_AP_FAILED:
     	description_ += "AP setup failed";

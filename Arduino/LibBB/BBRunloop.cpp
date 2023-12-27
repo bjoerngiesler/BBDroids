@@ -40,7 +40,7 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		}
 
 		// ...then run step() on all subsystems...
-		std::map<String, unsigned long> timingInfo;
+		std::vector<String> timingInfo;
 
 		std::vector<Subsystem*> subsys = SubsystemManager::manager.subsystems();
 		for(auto& s: subsys) {
@@ -48,9 +48,9 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 			if(s->isStarted() && s->operationStatus() == RES_OK) {
 				s->step();
 			}
-
-			timingInfo[s->name()] = micros()-us;
-			if(runningStatus_) Console::console.printBroadcast(s->name() + ": " + (micros()-us) + "us ");
+			String str = s->name()  + ": " + (micros()-us) + "us ";
+			timingInfo.push_back(str);
+			if(runningStatus_) Console::console.printBroadcast(str);
 		}
 
 		// ...find out how long we took...
@@ -68,7 +68,7 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		} else if(excuseOverrun_ == false) {
 			Console::console.printBroadcast(String(looptime) + "us spent in loop: ");
 			for(auto& t: timingInfo) {
-				Console::console.printBroadcast(t.first + ": " + t.second + "us ");
+				Console::console.printBroadcast(t + " ");
 			}
 			Console::console.printlnBroadcast("");
 		}
@@ -102,11 +102,11 @@ bb::Result bb::Runloop::handleConsoleCommand(const std::vector<String>& words, C
 	return bb::Subsystem::handleConsoleCommand(words, stream);;
 }
 
-void bb::Runloop::setCycleTime(unsigned int t) {
+void bb::Runloop::setCycleTimeMicros(unsigned int t) {
  	cycleTime_ = t;
 }
 
-unsigned int bb::Runloop::cycleTime() {
+unsigned int bb::Runloop::cycleTimeMicros() {
 	return cycleTime_;
 }
 

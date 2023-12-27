@@ -18,20 +18,17 @@ bb::ConfigStorage::HANDLE bb::ConfigStorage::reserveBlock(size_t size) {
 
 	if(nextHandle_ + 1 + size > maxSize_) return 0;
 
-	HANDLE retval = nextHandle_ + 1;
-	blocks_[retval] = size;
+	Block block = {nextHandle_+1, size};
+	blocks_.push_back(block);
 	nextHandle_ = nextHandle_ + size + 1;
-	return retval;
+	return block.handle;
 }
 
 bb::Result bb::ConfigStorage::writeBlock(HANDLE handle, uint8_t* data) {
 	if(!initialized_) return RES_CONFIG_INVALID_HANDLE;
-	std::map<HANDLE, size_t>::iterator it = blocks_.begin();
- 	
- 	// Iterate through the map and print the elements
-  	while (it != blocks_.end()) {
-  		if(it->first == handle) {
-  			size_t size = it->second;
+	for(auto block: blocks_) {
+  		if(block.handle == handle) {
+  			size_t size = block.size;
   			Serial.print("Storing "); Serial.print(size); Serial.print(" bytes of data at address "); Serial.println(handle, HEX);
   			for(size_t i=0; i<size; i++) {
   				Serial.print(handle+i);
@@ -43,40 +40,31 @@ bb::Result bb::ConfigStorage::writeBlock(HANDLE handle, uint8_t* data) {
   			Serial.println("Done.");
   			return RES_OK;
   		}
-    	++it;
   	}
   	return RES_CONFIG_INVALID_HANDLE;
 }
 
 bb::Result bb::ConfigStorage::readBlock(HANDLE handle, uint8_t* data) {
 	if(!initialized_) return RES_CONFIG_INVALID_HANDLE;
-	std::map<HANDLE, size_t>::iterator it = blocks_.begin();
- 	
- 	// Iterate through the map and print the elements
-  	while (it != blocks_.end()) {
-  		if(it->first == handle) {
-  			size_t size = it->second;
+	for(auto block: blocks_) {
+  		if(block.handle == handle) {
+  			size_t size = block.size;
   			for(size_t i=0; i<size; i++) {
   				data[i] = EEPROM.read(handle+i);
   			} 
   			return RES_OK;
   		}
-    	++it;
   	}
   	return RES_CONFIG_INVALID_HANDLE;
 }
 
 bool bb::ConfigStorage::blockIsValid(HANDLE handle) {
 	if(handle == 0 || !initialized_) return false;
-	std::map<HANDLE, size_t>::iterator it = blocks_.begin();
- 	
- 	// Iterate through the map and print the elements
-  	while (it != blocks_.end()) {
-  		if(it->first == handle) {
+	for(auto& block: blocks_) {
+  		if(block.handle  == handle) {
   			if(EEPROM.read(handle-1) == 1) return true;
   			else return false;
 		} 
-    	++it;
 	}
   	return false;
 }

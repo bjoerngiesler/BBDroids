@@ -1,6 +1,7 @@
 #if defined(ARDUINO_ARCH_SAMD)
 
 #include <BBEncoder.h>
+#include <BBConsole.h>
 
 bb::Encoder::Encoder(uint8_t pin_enc_a, uint8_t pin_enc_b, InputMode mode, Unit unit): 
   enc_(pin_enc_a, pin_enc_b),

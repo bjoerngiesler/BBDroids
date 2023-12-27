@@ -43,7 +43,7 @@ void bb::PIDController::update(void) {
     errI_ = constrain(errI_, iMin_, iMax_);
   }
 
-  lastErrD_ = (lastErr_ - err)/dt;
+  lastErrD_ = (err - lastErr_)/dt;
   lastErr_ = err;
 
   lastControl_ = kp_ * lastErr_ + ki_ * errI_ + kd_ * lastErrD_;
@@ -55,7 +55,7 @@ void bb::PIDController::update(void) {
 
   //Console::console.printlnBroadcast(String("Control: Goal:") + goal_ + " Cur In:" + input_.present() + " Cur Out:" + output_.present() + " Err:" + err + " ErrI:" + errI_ + " ErrD:" + lastErrD_ + " Control:" + lastControl_);
 
-  output_.set(lastControl_);
+  setControlOutput(lastControl_);
 }
   
 void bb::PIDController::setGoal(const float& sp) {

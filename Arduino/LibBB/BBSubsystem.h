@@ -59,11 +59,18 @@ protected:
 		virtual Result fromString(const String& str) = 0;
 		virtual String toString() const = 0;
 		virtual String description() const = 0;
+		virtual const String& name() const { return name_; }
+		virtual const void print(ConsoleStream* stream);
+	protected:
+		String name_;
 	};
+
+	virtual Parameter* findParameter(const String& name);
 
 	class IntParameter: public Parameter {
 	public:
-		IntParameter(int& val, String help, int min=INT_MIN, int max=INT_MAX): val_(val), help_(help), min_(min), max_(max) {}
+		IntParameter(const String& name, int& val, String help, int min=INT_MIN, int max=INT_MAX): 
+			val_(val), help_(help), min_(min), max_(max) {name_ = name;}
 		virtual Result fromString(const String& str) {
 			int v = str.toInt();
 			if(v<min_ || v>max_) return RES_COMMON_OUT_OF_RANGE;
@@ -88,7 +95,8 @@ protected:
 
 	class FloatParameter: public Parameter {
 	public:
-		FloatParameter(float& val, String help, float min=INT_MIN, float max=INT_MAX): val_(val), help_(help), min_(min), max_(max) {}
+		FloatParameter(const String& name, float& val, String help, float min=INT_MIN, float max=INT_MAX): 
+			val_(val), help_(help), min_(min), max_(max) {name_ = name;}
 		virtual Result fromString(const String& str) {
 			float v = str.toFloat();
 			if(v<min_ || v>max_) return RES_COMMON_OUT_OF_RANGE;
@@ -113,7 +121,7 @@ protected:
 
 	class StringParameter: public Parameter {
 	public:
-		StringParameter(String& val, String help, int maxlen=0): val_(val), help_(help), maxlen_(maxlen) {}
+		StringParameter(const String& name, String& val, String help, int maxlen=0): val_(val), help_(help), maxlen_(maxlen) {name_ = name;}
 		virtual Result fromString(const String& str) { 
 			if(maxlen_ > 0 && str.length() <= maxlen_) {
 				val_ = str; 
@@ -136,7 +144,7 @@ protected:
 
 	class BoolParameter: public Parameter {
 	public:
-		BoolParameter(bool& val, String help): val_(val), help_(help) {}
+		BoolParameter(const String& name, bool& val, String help): val_(val), help_(help) {name_ = name;}
 		virtual Result fromString(const String& str) { 
 			if(str == "true" || str == "yes" || str == "1") {
 				val_ = true;
@@ -158,9 +166,7 @@ protected:
 		String help_;
 	};
 
-	virtual void printParameter(ConsoleStream *stream, const String& name, const Parameter* p);
-
-	std::map<String, Parameter*> parameters_;
+	std::vector<Parameter*> parameters_;
 	bool started_, begun_;
 	Result operationStatus_;
 	String name_, description_, help_;

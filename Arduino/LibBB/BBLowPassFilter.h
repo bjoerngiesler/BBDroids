@@ -8,7 +8,7 @@ namespace bb {
 // This realizes a 2nd order Butterworth low pass filter with configurable cutoff frequency.
 class LowPassFilter {
 public:
-	LowPassFilter(float cutoff, float sampleFreq, bool adaptive);
+	LowPassFilter(float cutoff=100.0, float sampleFreq=0.1, bool adaptive=false);
 
 	float cutoff() { return cutoff_; }
 	void setCutoff(float cutoff);
