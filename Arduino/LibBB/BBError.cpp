@@ -1,6 +1,6 @@
 #include "BBError.h"
 
-static String messages[] = {
+static const char* messages[] = {
 	"OK.", // 0
 	"No such parameter.", // 1
 	"Invalid parameter type.", // 2
@@ -34,11 +34,11 @@ static String messages[] = {
 	"Out of range." // 30
 };
 
-static String UnknownError = "Unknown Error";
+static const char* UnknownError = "Unknown Error";
 
 static size_t numMessages = 31;
 
-const String& bb::errorMessage(Result res) {
+const char* bb::errorMessage(Result res) {
 	if((size_t)res >= numMessages) return UnknownError;
 	else return messages[(size_t)res];
 }

@@ -50,7 +50,7 @@ typedef enum {
 	RES_COMMON_OUT_OF_RANGE = 30
 } Result;
 
-const String& errorMessage(Result res);
+const char* errorMessage(Result res);
 
 };
 
