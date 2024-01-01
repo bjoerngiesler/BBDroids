@@ -10,19 +10,23 @@ String IPAddressToString(const IPAddress& addr) {
 
 bb::WifiServer bb::WifiServer::server;
 
-
-bb::WiFiConsoleStream::WiFiConsoleStream() {
+bb::WifiConsoleStream::WifiConsoleStream() {
 }
 
-void bb::WiFiConsoleStream::setClient(const WiFiClient& client) {
+void bb::WifiConsoleStream::setClient(const WiFiClient& client) {
 	client_ = client;
+	printGreeting();
 }
 
-bool bb::WiFiConsoleStream::available() {
-	return client_.available();
+bool bb::WifiConsoleStream::available() {
+	if(client_.available()) {
+		return true;
+	} else {
+		return false;
+	}
 }
 
-bool bb::WiFiConsoleStream::readStringUntil(unsigned char c, String& str) {
+bool bb::WifiConsoleStream::readStringUntil(unsigned char c, String& str) {
 	int timeout = 0;
 	while(true) {
 		if(client_.available()) {
@@ -32,47 +36,48 @@ bool bb::WiFiConsoleStream::readStringUntil(unsigned char c, String& str) {
 		} else {
 			delay(1);
 			timeout++;
-			if(timeout >= 10) return false;
+			if(timeout >= 2) return false;
 		}
 	}
 }
 
-void bb::WiFiConsoleStream::print(size_t val) {
+void bb::WifiConsoleStream::printfFinal(const char* str) {
+	client_.print(str);
+}
+
+void bb::WifiConsoleStream::print(size_t val) {
 	client_.print(val);
 }
 
-void bb::WiFiConsoleStream::print(int val) {
+void bb::WifiConsoleStream::print(int val) {
 	client_.print(val);
 }
 
-void bb::WiFiConsoleStream::print(float val) {
+void bb::WifiConsoleStream::print(float val) {
 	client_.print(val);
 }
 
-void bb::WiFiConsoleStream::print(const String& val) {
+void bb::WifiConsoleStream::print(const String& val) {
 	client_.print(val);
 }
 
-void bb::WiFiConsoleStream::println(int val) {
+void bb::WifiConsoleStream::println(int val) {
 	client_.println(val);
 }
 
-void bb::WiFiConsoleStream::println(float val) { 
+void bb::WifiConsoleStream::println(float val) { 
 	client_.println(val);
 }
 
-void bb::WiFiConsoleStream::println(const String& val) {
+void bb::WifiConsoleStream::println(const String& val) {
 	client_.println(val);
 }
 
-void bb::WiFiConsoleStream::println() {
+void bb::WifiConsoleStream::println() {
 	client_.println();
 }
 
-bb::WifiServer::WifiServer() {
-	tcp_ = NULL;
-	udpStarted_ = false;
-
+bb::WifiServer::WifiServer(): tcp_(DEFAULT_TCP_PORT) {
 	name_ = "wifi";
 	help_ = "Creates an AP or joins a network. Starts a shell on TCP.\r\nSSID and WPA Key replacements: $MAC - Mac address";
 	description_ = "Wifi comm module (uninitialized)";
@@ -80,8 +85,8 @@ bb::WifiServer::WifiServer() {
 	addParameter("ssid", "SSID", ssid_);
 	addParameter("wpa_key", "WPA Key", wpaKey_);
 	addParameter("ap", "Access Point Mode", params_.ap);
-	addParameter("terminal_port", "TCP port to use for terminal access", tcpPort_, 0, 32767);
-	addParameter("remote_port", "UDP port to use for remote packet publishing", udpPort_, 0, 32767);
+	addParameter("terminal_port", "TCP port to use for terminal access", params_.tcpPort, 0, 32767);
+	addParameter("remote_port", "UDP port to use for remote packet publishing", params_.udpPort, 0, 32767);
 }
 
 bb::Result bb::WifiServer::initialize(const String& ssid, const String& wpakey, bool apmode, uint16_t udpPort, uint16_t tcpPort) {
@@ -106,7 +111,7 @@ bb::Result bb::WifiServer::initialize(const String& ssid, const String& wpakey, 
 	WiFi.macAddress(mac);
 	macStr_ = String(mac[5], HEX) + ":" + String(mac[4], HEX) + ":" + String(mac[3], HEX) + ":" + String(mac[2], HEX) + ":" + String(mac[1], HEX) + ":" + String(mac[0], HEX);
 
-	setOTANameAndPassword(DEFAULT_SSID, DEFAULT_WPAKEY);
+	setOTANameAndPassword(ssid, wpakey);
 
 	operationStatus_ = RES_SUBSYS_NOT_STARTED;
 	return Subsystem::initialize();
@@ -146,7 +151,7 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 			stream->print(String("Start AP \"") + ssid_ + "\"... ");
 		}
 
-		uint8_t retval = WiFi.beginAP(ssid_.c_str(), wpaKey_.c_str(), random(1, 15));
+		uint8_t retval = WiFi.beginAP(ssid_.c_str(), wpaKey_.c_str());
 		if(retval == WL_AP_LISTENING) {
 			if(stream) stream->print("success. ");
 		} else {
@@ -167,19 +172,10 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 		}
 	}
 
-	if(stream) stream->print("TCP Server... ");
-	if(startTCPServer(stream)) {
-		if(stream) stream->print("started. ");
-	} else {
-		if(stream) stream->print("failure. ");
-	}
-
-	if(stream) stream->print("UDP Server... ");
-	if(startUDPServer(stream)) {
-		if(stream) stream->print("started. ");
-	} else {
-		if(stream) stream->println("failure. ");
-	}
+	ArduinoOTA.begin(WiFi.localIP(), otaName_.c_str(), otaPassword_.c_str(), InternalStorage);
+	tcp_ = WiFiServer(params_.tcpPort);
+	tcp_.begin();
+	udp_.begin(params_.udpPort);
 
 	operationStatus_ = RES_OK;
 	started_ = true;
@@ -190,18 +186,12 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 bb::Result bb::WifiServer::stop(ConsoleStream* stream) {
 	if(stream) stream = stream; // make compiler happy
 
-	if(client_) {
-		client_.stop();
-		bb::Console::console.removeConsoleStream(&consoleStream_);
-	}
+	WiFiClient client = tcp_.available();
+	client.stop();
+	bb::Console::console.removeConsoleStream(&consoleStream_);
 
-	if(tcp_) {
-		delete tcp_;
-		tcp_ = NULL;
-	}
-
-	if(udpStarted_) udp_.stop();
-	udpStarted_ = false;
+	udp_.stop();
+	ArduinoOTA.end();
 	WiFi.end();
 
 	started_ = false;
@@ -212,10 +202,11 @@ bb::Result bb::WifiServer::stop(ConsoleStream* stream) {
 bb::Result bb::WifiServer::step() {
 	int status = WiFi.status();
 	static int seqnum = 0;
+	static int dummy = 0;
 
 	if(seqnum == (1e6/Runloop::runloop.cycleTimeMicros())/4) {
 #if !defined(ARDUINO_PICO_VERSION_STR)
-//		Console::console.printlnBroadcast("Polling OTA");
+		unsigned long m = micros();
 		ArduinoOTA.poll();
 #endif
 		seqnum = 0;
@@ -223,31 +214,17 @@ bb::Result bb::WifiServer::step() {
 
 	seqnum++;
 
-	if(tcp_ != NULL && status != WL_AP_CONNECTED && status != WL_CONNECTED) {
-		delete tcp_;
-		tcp_ = NULL;
-		return RES_OK;
-	} 
-
-	if(tcp_ == NULL && (status == WL_AP_CONNECTED || status == WL_CONNECTED)) {
-		Console::console.printlnBroadcast("Starting TCP server");
-		startTCPServer();
+	if(client_ == true && client_.status() == 0) {
+		client_.stop();
+		consoleStream_.setClient(client_);
+		Console::console.removeConsoleStream(&consoleStream_);
 	}
 
-	if(tcp_ != NULL) {
-		if(client_ == false) {
-			client_ = tcp_->available();
-
-			if(client_ == true) {
-				Console::console.printlnBroadcast("New client connected");
-				consoleStream_.setClient(client_);
-				bb::Console::console.addConsoleStream(&consoleStream_);
-			}
-		} else if(client_.connected() == false || client_.status() == 0) {
-			Console::console.printlnBroadcast("Client disconnected");
-			client_.stop();
-			bb::Console::console.removeConsoleStream(&consoleStream_);
-		}
+	WiFiClient c = tcp_.available();
+	if(client_ == false && c == true) {
+		client_ = c;
+		consoleStream_.setClient(client_);
+		Console::console.addConsoleStream(&consoleStream_);
 	}
 
 	return RES_OK;
@@ -285,8 +262,7 @@ bb::Result bb::WifiServer::setParameterValue(const String& name, const String& v
 
 bb::Result bb::WifiServer::operationStatus() {
 	if(!started_) return RES_SUBSYS_NOT_STARTED;
-	if(udpStarted_) return RES_OK;
-	return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+	return RES_OK;
 }
 
 bool bb::WifiServer::isAPStarted() {
@@ -295,30 +271,6 @@ bool bb::WifiServer::isAPStarted() {
 
 bool bb::WifiServer::isConnected() {
   return WiFi.status() == WL_CONNECTED;
-}
-
-bool bb::WifiServer::startUDPServer(ConsoleStream *stream) {
-	(void)stream;
-
-	if(udp_.begin(params_.udpPort)) {
-		udpStarted_ = true;
-		return true;
-	}
-	return false;
-}
-
-bool bb::WifiServer::startTCPServer(ConsoleStream *stream) {
-	(void)stream;
-	if(tcp_ != NULL) // already started
-		return false;
-	tcp_ = new WiFiServer(params_.tcpPort);
-	tcp_->begin();
-#if !defined(ARDUINO_PICO_VERSION_STR)
-	if(stream != NULL) stream->print("starting OTA... ");	
-	ArduinoOTA.begin(WiFi.localIP(), otaName_.c_str(), otaPassword_.c_str(), InternalStorage);
-#endif
-
-	return true;
 }
 
 bool bb::WifiServer::broadcastUDPPacket(const uint8_t* packet, size_t len) {
@@ -332,7 +284,6 @@ bool bb::WifiServer::sendUDPPacket(const IPAddress& addr, const uint8_t* packet,
 	static unsigned int failures = 0;
 
 	if(WiFi.status() != WL_CONNECTED && WiFi.status() != WL_AP_CONNECTED) return false;
-	if(!udpStarted_) return false;
 	if(udp_.beginPacket(addr, params_.udpPort) == false) {
 		Console::console.printlnBroadcast("beginPacket() failed!");
 		return false;
@@ -417,6 +368,7 @@ void bb::WifiServer::updateDescription() {
     	break;
 	}
 
+#if 0
 	if(client_ == true) {
 		description_ += ", client ";
 		ip = client_.remoteIP();
@@ -429,4 +381,5 @@ void bb::WifiServer::updateDescription() {
   	description_ += ip[3];
 		description_ += " connected";
 	}
+#endif
 }

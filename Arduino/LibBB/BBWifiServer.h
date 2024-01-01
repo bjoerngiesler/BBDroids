@@ -12,16 +12,17 @@
 #define MAX_STRLEN        31
 #define DEFAULT_APMODE    true
 #define DEFAULT_UDP_PORT  3000
-#define DEFAULT_TCP_PORT  3000
+#define DEFAULT_TCP_PORT  23
 
 namespace bb {
 
-class WiFiConsoleStream: public ConsoleStream {
+class WifiConsoleStream: public ConsoleStream {
 public:
-	WiFiConsoleStream();
+	WifiConsoleStream();
 	void setClient(const WiFiClient& client);
 	virtual bool available();
 	virtual bool readStringUntil(unsigned char c, String& str);
+	virtual void printfFinal(const char* str);
 	virtual void print(size_t val);
 	virtual void print(int val);
 	virtual void print(float val);
@@ -57,8 +58,6 @@ public:
 	bool isAPStarted();
 	bool tryToConnect(const String& ssid, const String& key);
 	bool isConnected();
-	bool startUDPServer(ConsoleStream *stream = NULL);
-	bool startTCPServer(ConsoleStream *stream = NULL);
 
 	bool broadcastUDPPacket(const uint8_t* packet, size_t len);
 	bool sendUDPPacket(const IPAddress& addr, const uint8_t* packet, size_t len);
@@ -70,18 +69,18 @@ protected:
 	void updateDescription();
 
 	WiFiUDP udp_;
-	bool udpStarted_;
-	WiFiServer *tcp_;
+	WiFiServer tcp_;
 	WiFiClient client_;
-	WiFiConsoleStream consoleStream_;
+
+	WifiConsoleStream consoleStream_;
+
 	String macStr_, ssid_, wpaKey_;
 	String otaName_, otaPassword_;
-	int udpPort_, tcpPort_;
 
 	typedef struct {
 		char ssid[MAX_STRLEN+1], wpaKey[MAX_STRLEN+1];
 		bool ap;
-		uint16_t udpPort, tcpPort;
+		int udpPort, tcpPort;
 	} WifiServerParams;
 	WifiServerParams params_;
 	ConfigStorage::HANDLE paramsHandle_;
