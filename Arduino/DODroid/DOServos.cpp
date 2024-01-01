@@ -17,14 +17,14 @@ struct StrToCtrlTable {
 };
 
 static const StrToCtrlTable strToCtrlTable_[] = {
-  {"velocity_limit", ControlTableItem::VELOCITY_LIMIT},
+  {"vel_limit", ControlTableItem::VELOCITY_LIMIT},
   {"current_limit", ControlTableItem::CURRENT_LIMIT},
-  {"profile_acceleration", ControlTableItem::PROFILE_ACCELERATION},
-  {"profile_velocity", ControlTableItem::PROFILE_VELOCITY},
+  {"profile_acc", ControlTableItem::PROFILE_ACCELERATION},
+  {"profile_vel", ControlTableItem::PROFILE_VELOCITY},
   {"operating_mode", ControlTableItem::OPERATING_MODE},
-  {"position_p_gain", ControlTableItem::POSITION_P_GAIN},
-  {"position_i_gain", ControlTableItem::POSITION_I_GAIN},
-  {"position_d_gain", ControlTableItem::POSITION_D_GAIN}
+  {"pos_p_gain", ControlTableItem::POSITION_P_GAIN},
+  {"pos_i_gain", ControlTableItem::POSITION_I_GAIN},
+  {"pos_d_gain", ControlTableItem::POSITION_D_GAIN}
 };
 
 static const int strToCtrlTableLen_ = 8;
@@ -58,11 +58,9 @@ Result DOServos::initialize() {
           "\ttorque <servo>|all on|off           Switch torque.\r\n"
           "\tmove <servo>|all <angle>            <angle>: deg [-180.0..180.0].\r\n"
           "\tset_vel <servo>|all <val>           <val> in deg/s; 0 is infinite speed.\r\n"
-          "\tmove_slow <servo>|all <angle>       <angle>: deg [-180.0..180.0].\r\n"
-          "\torigin <servo>|all                  Move <servo> to origin, slowly.\r\n"
+          "\thome                                Home all servos, slowly.\r\n"
           "\tinfo <servo>                        Get info on <servo>.\r\n"
-          "\t<ctrltableitem> <servo> [<value>]   Get or set, options: velocity_limit, current_limit, profile_acceleration.\r\n"
-          "\ttest <servo>                        Test <servo>, going from 180 to +x°/-x° in 5° steps, until it fails\r\n"
+          "\t<ctrltableitem> <servo> [<value>]   Get or set, options: vel_limit, current_limit, profile_acc.\r\n"
           "\reboot <servo>|all                   Reboot <servo>";
 
   ctrlPresentPos_.addr = 0;
@@ -94,9 +92,15 @@ Result DOServos::start(ConsoleStream* stream) {
         uint16_t model = dxl_.getModelNumber(id);
         if(stream) stream->print(String("#") + id + ": model #" + model + "...");
 
-        Servo servo = { 2048, 0, 2048, 0, 0, 4096, 0 };
-
+        Servo servo;
+        servo.id = id;
         servo.goal = dxl_.getPresentPosition(id);
+        servo.profileVel = dxl_.readControlTableItem(ControlTableItem::PROFILE_VELOCITY, id);
+        servo.present = dxl_.getPresentPosition(id); 
+        servo.load = dxl_.readControlTableItem(ControlTableItem::PRESENT_LOAD, id);
+        servo.min = dxl_.readControlTableItem(ControlTableItem::MIN_POSITION_LIMIT, id);
+        servo.max = dxl_.readControlTableItem(ControlTableItem::MAX_POSITION_LIMIT, id);
+        servos_.push_back(servo);
 
         if (ctrlPresentPos_.addr == 0) {
           ctrlPresentPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
@@ -129,7 +133,6 @@ Result DOServos::start(ConsoleStream* stream) {
             return RES_SUBSYS_HW_DEPENDENCY_MISSING;
           }
         }
-        servos_[id] = servo;
       }
     } 
 
@@ -137,7 +140,7 @@ Result DOServos::start(ConsoleStream* stream) {
   }
 
   for(auto id: requiredIds_) {
-    if(servos_.find(id) == servos_.end()) {
+    if(servoWithID(id) == NULL) {
       if (stream) stream->println(String("Required servo ID  ") + id + " not found!");
       return RES_SUBSYS_HW_DEPENDENCY_MISSING;
     }
@@ -145,9 +148,9 @@ Result DOServos::start(ConsoleStream* stream) {
 
   if(stream) {
     for(auto& s: servos_) {
-      uint8_t err = errorStatus(s.first);
+      uint8_t err = errorStatus(s.id);
       if(err != 0x0) {
-        stream->print(String("Servo #") + s.first + " reports error " + String(err, HEX) + ". Consider rebooting it.");
+        stream->print(String("Servo #") + s.id + " reports error " + String(err, HEX) + ". Consider rebooting it.");
       }
     }
   }
@@ -155,8 +158,8 @@ Result DOServos::start(ConsoleStream* stream) {
   // Configure servos
   if (bps != goalBps) {
     for (auto& s : servos_) {
-      dxl_.torqueOff(s.first);
-      if(dxl_.setBaudrate(s.first, goalBps) == false) Console::console.printlnBroadcast(String("Faled to set baud rate on #") + s.first + " to " + goalBps);
+      dxl_.torqueOff(s.id);
+      if(dxl_.setBaudrate(s.id, goalBps) == false) Console::console.printlnBroadcast(String("Faled to set baud rate on #") + s.id + " to " + goalBps);
     }
     delay(30);
     dxl_.begin(goalBps);
@@ -172,11 +175,10 @@ Result DOServos::start(ConsoleStream* stream) {
   if(res != RES_OK) return res;
 
   for (auto& s : servos_) {
-    dxl_.setOperatingMode(s.first, OP_POSITION);
-    dxl_.writeControlTableItem(ControlTableItem::RETURN_DELAY_TIME, s.first, 10);
-    dxl_.writeControlTableItem(ControlTableItem::DRIVE_MODE, s.first, 0);
-    bb::Console::console.printlnBroadcast(String("Switching torque on for servo #") + s.first);
-    dxl_.torqueOn(s.first);
+    dxl_.setOperatingMode(s.id, OP_POSITION);
+    dxl_.writeControlTableItem(ControlTableItem::RETURN_DELAY_TIME, s.id, 10);
+    dxl_.writeControlTableItem(ControlTableItem::DRIVE_MODE, s.id, 0);
+    dxl_.torqueOn(s.id);
   }
 
   operationStatus_ = RES_OK;
@@ -190,7 +192,7 @@ Result DOServos::stop(ConsoleStream* stream) {
   teardownSyncBuffers();
 
   for (auto& s : servos_) {
-    dxl_.torqueOff(s.first);
+    dxl_.torqueOff(s.id);
   }
   while (servos_.size()) servos_.erase(servos_.begin());
 
@@ -234,7 +236,6 @@ Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleS
   if (words[0] == "move") {
     if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
     unsigned int id = words[1] == "all" ? ID_ALL : words[1].toInt();
-    if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
     float angle = words[2].toFloat();
     if(angle < 0 || angle > 360.0) return RES_CMD_INVALID_ARGUMENT;
     if(setGoal(id, angle)) return RES_OK;
@@ -244,33 +245,16 @@ Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleS
   else if (words[0] == "set_vel") {
     if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
     unsigned int id = words[1] == "all" ? ID_ALL : words[1].toInt();
-    if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
     float vel = words[2].toFloat();
     if(vel < 0) return RES_CMD_INVALID_ARGUMENT;
     if(setProfileVelocity(id, vel)) return RES_OK;
     return RES_CMD_INVALID_ARGUMENT;
   }
 
-  else if (words[0] == "move_slow") {
-    if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
-    unsigned int id = words[1].toInt();
-    if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
-    float angle = words[2].toFloat();
-    if(angle < 0 || angle > 360.0) return RES_CMD_INVALID_ARGUMENT;
-    return moveSlow(id, angle);
-  }
+  else if (words[0] == "home") {
+    if (words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
 
-  else if (words[0] == "origin") {
-    if (words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
-
-    uint8_t id;
-    if (words[1] == "all") id = ID_ALL;
-    else {
-      id = words[1].toInt();
-      if (servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
-    }
-
-    return moveSlow(id, 180.0);
+    return home(10.0, stream);
   }
 
   else if (words[0] == "torque") {
@@ -286,20 +270,12 @@ Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleS
 
     if (words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
     if(words[1] == "all") {
-      for(auto& s: servos_) printStatus(stream, s.first);
+      for(auto& s: servos_) printStatus(stream, s.id);
       return RES_OK;
     }
     int id = words[1].toInt();
-    if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
     printStatus(stream, id);
     return RES_OK;
-  }
-
-  else if (words[0] == "test") {
-    if (words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
-    int id = words[1].toInt();
-    if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
-    return runServoTest(stream, id);
   }
 
   else if (words[0] == "reboot") {
@@ -309,13 +285,13 @@ Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleS
     if(words[1] == "all") {
       for (auto& s : servos_) {
         if (stream) {
-          stream->println(String("Rebooting ") + s.first + "... ");
+          stream->println(String("Rebooting ") + s.id + "... ");
         }
-        dxl_.reboot(s.first);
+        dxl_.reboot(s.id);
       }
     } else {
       uint8_t id = words[1].toInt();
-      if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
+      if(servoWithID(id) == NULL) return RES_CMD_INVALID_ARGUMENT;
       dxl_.reboot(id);
     }
 
@@ -338,7 +314,6 @@ Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleS
 Result DOServos::handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex idx, const std::vector<String>& words, ConsoleStream* stream) {
   if (words.size() < 2 || words.size() > 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
   int id = words[1].toInt();
-  if (servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
   if (words.size() == 2) {
     int val = (int)dxl_.readControlTableItem(idx, id);
     if(stream) stream->println(words[0] + "=" + val);
@@ -352,7 +327,7 @@ Result DOServos::handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex 
   return RES_OK;
 }
 
-Result DOServos::homeServos(float vel, ConsoleStream* stream) {
+Result DOServos::home(float vel, ConsoleStream* stream) {
   if(stream) stream->println("Homing servos...");
 
   Result res;
@@ -361,12 +336,11 @@ Result DOServos::homeServos(float vel, ConsoleStream* stream) {
   res = syncReadInfo();
   if(res != RES_OK) return res;
 
-  std::map<uint8_t, uint32_t> oldVelocities;
-  
-  // store profile velocities and set new
+  uint32_t rawVel = computeRawValue(vel);
+
   for(auto& s: servos_) {
-    oldVelocities[s.first] = s.second.vel;
-    setProfileVelocity(s.first, vel, VALUE_DEGREE);
+    s.lastVel = s.profileVel;
+    s.profileVel = rawVel;
   }
 
   res = syncWriteInfo();
@@ -374,11 +348,10 @@ Result DOServos::homeServos(float vel, ConsoleStream* stream) {
 
   // home servos
   for(auto& s: servos_) {
-    int goal = (s.second.max - s.second.min)/2;
-    int offs = s.second.present - goal;
+    s.goal = (s.max - s.min)/2; // FIXME Maybe home pos is not in the middle?
+    int offs = s.present - s.goal;
     if(offs < 0) offs = -offs;
     if(offs > maxoffs) maxoffs = offs;
-    setGoal(s.first, goal, VALUE_RAW);
   }
   maxoffs = (maxoffs / 4096.0)*360.0;
   
@@ -391,7 +364,7 @@ Result DOServos::homeServos(float vel, ConsoleStream* stream) {
     if(res != RES_OK) return res;
     for(auto& s: servos_) {
       if(stream) {
-        stream->print(String("Servo ") + s.first + ": Pos" + s.second.present + " Load" + s.second.load + " ");
+        stream->print(String("Servo ") + s.id + ": Pos" + s.present + " Load" + s.load + " ");
       }
     }
     if(stream) stream->println();
@@ -402,14 +375,14 @@ Result DOServos::homeServos(float vel, ConsoleStream* stream) {
     stream->print("Final: ");
     for(auto& s: servos_) {
       if(stream) {
-        stream->print(String("Servo ") + s.first + ": Pos" + s.second.present + " Load" + s.second.load + " ");
+        stream->print(String("Servo ") + s.id + ": Pos" + s.present + " Load" + s.load + " ");
       }
     }
   }
 
   // restore old profile velocities
-  for(auto& s: oldVelocities) {
-    setProfileVelocity(s.first, s.second, VALUE_RAW);
+  for(auto& s: servos_) {
+    s.profileVel = s.lastVel;
   }
   res = syncWriteInfo();
   if(res != RES_OK) return res;
@@ -418,47 +391,22 @@ Result DOServos::homeServos(float vel, ConsoleStream* stream) {
 }
 
 
-Result DOServos::runServoTest(ConsoleStream* stream, int id) {
-  dxl_.torqueOn(id);
-  dxl_.setGoalPosition(id, 180.0, UNIT_DEGREE);
-  delay(1000);
-
-  for (float f = 5.0; f < 90.0; f += 5.0) {
-    stream->println(String("Moving to ") + (180.0 + f) + "...");
-    dxl_.setGoalPosition(id, 180.0 + f, UNIT_DEGREE);
-    delay((int)50 * f);
-    stream->println("Moving to origin");
-    dxl_.setGoalPosition(id, 180.0, UNIT_DEGREE);
-    delay((int)50 * f);
-    stream->println(String("Moving to ") + (180.0 - f) + "...");
-    dxl_.setGoalPosition(id, 180.0 - f, UNIT_DEGREE);
-    delay((int)50 * f);
-    stream->println("Moving to origin");
-    dxl_.setGoalPosition(id, 180.0, UNIT_DEGREE);
-    delay((int)50 * f);
-  }
-
-  return RES_OK;
-}
-
 Result DOServos::switchTorque(uint8_t id, bool onoff) {
   if (operationStatus_ != RES_OK) return operationStatus_;
   if(id == ID_ALL) {
     for(auto& s: servos_) {
-      Result res = switchTorque(s.first, onoff);
-      if(res != RES_OK) return res;
+      if(onoff) dxl_.torqueOn(s.id);
+      else dxl_.torqueOff(s.id);
     }
-    return RES_OK;
-  } 
+  } else {
+    if(onoff) dxl_.torqueOn(id);
+    else dxl_.torqueOff(id);
+  }
   
-  if(servos_.count(id) == 0) return RES_CMD_INVALID_ARGUMENT;
-  if(onoff) dxl_.torqueOn(id);
-  else dxl_.torqueOff(id);
   return RES_OK;
 }
 
 bool DOServos::isTorqueOn(uint8_t id) {
-  if (operationStatus_ != RES_OK || servos_.count(id) == 0) return false;
   return dxl_.readControlTableItem(ControlTableItem::TORQUE_ENABLE, id);
 }
 
@@ -468,7 +416,8 @@ void DOServos::printStatus(ConsoleStream* stream, int id) {
     return;
   }
 
-  if(servos_.count(id) == 0) {
+  Servo *s = servoWithID(id);
+  if(s == NULL) {
     stream->println(String("Servo #") + id + "does not exist.");
     return;
   }
@@ -476,11 +425,11 @@ void DOServos::printStatus(ConsoleStream* stream, int id) {
   stream->print(String("Servo #") + id + ": ");
   if (dxl_.ping(id)) {
     stream->print(String("model #") + dxl_.getModelNumber(id) + ", ");
-    stream->print(String("present: ") + present(id) + "deg (" + (int)present(id, VALUE_RAW) + "), ");
-    stream->print(String("goal: ") + goal(id) + "deg (" + (int)goal(id, VALUE_RAW) + "), ");
+    stream->print(String("present: ") + present(id) + "deg (" + s->present + "), ");
+    stream->print(String("goal: ") + goal(id) + "deg (" + s->goal + "), ");
     
-    stream->print(String("range: [") + servos_[id].min + ".." + servos_[id].max +"], ");
-    stream->print(String("offset: ") + servos_[id].offset + ", ");
+    stream->print(String("range: [") + s->min + ".." + s->max +"], ");
+    stream->print(String("offset: ") + s->offset + ", ");
     stream->print(String("invert: ") + (dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1) + ", ");
 
     stream->print("hw err: $");
@@ -507,70 +456,9 @@ void DOServos::printStatus(ConsoleStream* stream, int id) {
   }
 }
 
-Result DOServos::moveSlow(int id, float goal, ValueType t) {
-  if (operationStatus_ != RES_OK) return operationStatus_;
-  if (isnan(goal)) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-
-  goal = computeRawValue(goal, t);
-
-  float msPerTick = (1000/(SLOW_VEL*15.63));
-  float present, delta;
-  unsigned int d=0;
-
-  if (id == ID_ALL) {
-    for (auto& s : servos_) {
-      present = dxl_.getPresentPosition(s.first);
-      delta = fabs(present - goal);
-      d = max(d, delta*msPerTick);
-
-      dxl_.writeControlTableItem(ControlTableItem::PROFILE_VELOCITY, s.first, SLOW_VEL);
-      dxl_.setGoalPosition(s.first, goal);
-      setGoal(s.first, goal, VALUE_RAW);
-    }
-
-    delay(d+100);
-    
-    for (auto& s : servos_) {
-      dxl_.writeControlTableItem(ControlTableItem::PROFILE_VELOCITY, s.first, 0);
-    }
-
-    for (auto& s : servos_) {
-      present = dxl_.getPresentPosition(s.first);
-      delta = computeRawValue(1.5, VALUE_DEGREE);
-      if (fabs(present - goal) > delta) {
-        Console::console.printlnBroadcast(String("Servo ") + s.first + " didn't move to " + goal + ", stuck at " + present);
-        return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-      }
-    }
-
-    return RES_OK;
-  }
-
-  if (servos_.count(id) == 0) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  present = dxl_.getPresentPosition(id);
-  delta = fabs(present - goal);
-  d = delta * msPerTick;
-
-  dxl_.writeControlTableItem(ControlTableItem::PROFILE_VELOCITY, id, SLOW_VEL);
-  dxl_.setGoalPosition(id, goal);
-  setGoal(id, goal, VALUE_RAW);
-
-  delay(d+100);
-
-  dxl_.writeControlTableItem(ControlTableItem::PROFILE_VELOCITY, id, 0);
-
-  present = dxl_.getPresentPosition(id);
-  delta = computeRawValue(1.5, VALUE_DEGREE);
-  if (fabs(present - goal) > delta) {
-    Console::console.printlnBroadcast(String("Servo ") + id + " didn't move to " + goal + ", stuck at " + present);
-    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  }
-
-  return RES_OK;
-}
-
 bool DOServos::setRange(uint8_t id, float min, float max, ValueType t) {
-  if(servos_.count(id) == 0) return false;
+  Servo *s = servoWithID(id);
+  if(s == NULL) return false;
   
   if(min > max) {
     float t = min;
@@ -578,27 +466,26 @@ bool DOServos::setRange(uint8_t id, float min, float max, ValueType t) {
     min = t;
   }
 
-  servos_[id].min = computeRawValue(min, t);
-  servos_[id].max = computeRawValue(max, t);
-  if(goal(id, VALUE_RAW) < servos_[id].min) setGoal(id, servos_[id].min, VALUE_RAW);
-  if(goal(id, VALUE_RAW) > servos_[id].max) setGoal(id, servos_[id].max, VALUE_RAW);
+  s->min = computeRawValue(min, t);
+  s->max = computeRawValue(max, t);
+  s->goal = constrain(s->goal, s->min, s->max);
+
   return true;
 }
 
 bool DOServos::setOffset(uint8_t id, float offset, ValueType t) {
-  if(servos_.count(id) == 0) return false;
+  Servo *s = servoWithID(id);
+  if(s == NULL) return false;
 
   if(t == VALUE_DEGREE) {
-    servos_[id].offset = (offset * 4096.0) / 360.0;
+    s->offset = (offset * 4096.0) / 360.0;
   } else {
-    servos_[id].offset = offset;
+    s->offset = offset;
   }
   return true;
 }
 
 bool DOServos::setInverted(uint8_t id, bool invert) {
-  if(servos_.count(id) == 0) return false;
-
   uint8_t dm = dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id);
   if(invert) dm |= 0x1;
   else dm &= ~0x1;
@@ -608,7 +495,6 @@ bool DOServos::setInverted(uint8_t id, bool invert) {
 }
 
 bool DOServos::inverted(uint8_t id) {
-  if(servos_.count(id) == 0) return false;
   return dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1;
 }
 
@@ -617,14 +503,15 @@ bool DOServos::setGoal(uint8_t id, float goal, ValueType t) {
 
   if (id == ID_ALL) {
     for (auto& s : servos_) {
-      if (setGoal(s.first, goal, t) != true) return false;
+      if (setGoal(s.id, goal, t) != true) return false;
     }
     return true;
   }
 
-  if (servos_.count(id) == 0) return false;
-  uint32_t g = computeRawValue(goal, t) + servos_[id].offset;
-  servos_[id].goal = constrain(g, servos_[id].min, servos_[id].max);
+  Servo *s = servoWithID(id);
+  if (s == NULL) return false;
+  uint32_t g = computeRawValue(goal, t) + s->offset;
+  s->goal = constrain(g, s->min, s->max);
 
   swGoalInfos.is_info_changed = true;
 
@@ -636,19 +523,20 @@ bool DOServos::setProfileVelocity(uint8_t id, float vel, ValueType t) {
 
   if (id == ID_ALL) {
     for (auto& s : servos_) {
-      if (setProfileVelocity(s.first, vel, t) != true) return false;
+      if (setProfileVelocity(s.id, vel, t) != true) return false;
     }
     return true;
   }
 
-  if (servos_.count(id) == 0) return false;
+  Servo *s = servoWithID(id);
+  if(s == NULL) return false;
   uint32_t v = vel;
   if(t == VALUE_DEGREE) {
     v = (uint32_t)((vel / 6.0f) / 0.229); // deg/s to rev/min, and then multiply with steps of 0.229
   }
 
   Console::console.printlnBroadcast(String("Setting profile velocity to ") + v);
-  servos_[id].vel = v;
+  s->profileVel = v;
   swVelInfos.is_info_changed = true;
 
   return true;
@@ -679,44 +567,50 @@ bool DOServos::setProfileAcceleration(uint8_t id, uint32_t val) {
 }
 
 float DOServos::goal(uint8_t id, ValueType t) {
-  if (servos_.count(id) == 0) return false;
+  Servo *s = servoWithID(id);
+  if (s == NULL) return 0.0f;
+
   if (t == VALUE_DEGREE)
-    return 360.0 * (servos_[id].goal / 4096.0);
+    return 360.0 * (s->goal / 4096.0);
   else
-    return servos_[id].goal;
+    return s->goal;
 }
 
 float DOServos::present(uint8_t id, ValueType t) {
-  if (operationStatus_ != RES_OK) return 0.0f;
-
-  if (servos_.count(id) == 0) return 0.0f;
-  if (t == VALUE_DEGREE) return (servos_[id].present / 4096.0) * 360.0;
-  else return servos_[id].present;
+  Servo *s = servoWithID(id);
+  if (s == NULL) return 0.0f;
+  if (t == VALUE_DEGREE) return (s->present / 4096.0) * 360.0;
+  else return s->present;
 }
 
 float DOServos::load(uint8_t id) {
   if (operationStatus_ != RES_OK) return 0.0f;
 
-  if (servos_.count(id) == 0) return 0.0f;
-  return servos_[id].load;
+  Servo *s = servoWithID(id);
+  if (s == NULL) return 0.0f;
+  return s->load;
 }
 
 uint8_t DOServos::errorStatus(uint8_t id) {
-  if(servos_.count(id) == 0) return 0xff;
   return dxl_.readControlTableItem(ControlTableItem::HARDWARE_ERROR_STATUS, id);
 }
 
 bool DOServos::loadShutdownEnabled(uint8_t id) {
-  if(servos_.count(id) == 0) return false;
   return dxl_.readControlTableItem(ControlTableItem::SHUTDOWN, id) & (1<<5);
 }
 
 void DOServos::setLoadShutdownEnabled(uint8_t id, bool yesno) {
-  if(servos_.count(id) == 0) return;
   uint8_t shutdown = dxl_.readControlTableItem(ControlTableItem::SHUTDOWN, id);
   if(yesno) shutdown |= (1<<5);
   else shutdown &= ~(1<<5);
   dxl_.writeControlTableItem(ControlTableItem::SHUTDOWN, id, shutdown);
+}
+
+DOServos::Servo* DOServos::servoWithID(uint8_t id) {
+  for(auto& s: servos_) {
+    if(s.id == id) return &s;
+  }
+  return NULL;
 }
 
 void DOServos::setupSyncBuffers() {
@@ -734,8 +628,8 @@ void DOServos::setupSyncBuffers() {
   srPresentInfos.p_xels = infoXelsSrPresent;
   i = 0;
   for (auto& s : servos_) {
-    infoXelsSrPresent[i].id = s.first;
-    infoXelsSrPresent[i].p_recv_buf = (uint8_t*)&(s.second.present);
+    infoXelsSrPresent[i].id = s.id;
+    infoXelsSrPresent[i].p_recv_buf = (uint8_t*)&(s.present);
     i++;
   }
   srPresentInfos.xel_count = servos_.size();
@@ -750,8 +644,8 @@ void DOServos::setupSyncBuffers() {
   srLoadInfos.p_xels = infoXelsSrLoad;
   i = 0;
   for (auto& s : servos_) {
-    infoXelsSrLoad[i].id = s.first;
-    infoXelsSrLoad[i].p_recv_buf = (uint8_t*)&(s.second.load);
+    infoXelsSrLoad[i].id = s.id;
+    infoXelsSrLoad[i].p_recv_buf = (uint8_t*)&(s.load);
     i++;
   }
   srLoadInfos.xel_count = servos_.size();
@@ -765,8 +659,8 @@ void DOServos::setupSyncBuffers() {
   swGoalInfos.p_xels = infoXelsSwGoal;
   i = 0;
   for (auto& s : servos_) {
-    infoXelsSwGoal[i].id = s.first;
-    infoXelsSwGoal[i].p_data = (uint8_t*)&(s.second.goal);
+    infoXelsSwGoal[i].id = s.id;
+    infoXelsSwGoal[i].p_data = (uint8_t*)&(s.goal);
     i++;
   }
   swGoalInfos.xel_count = servos_.size();
@@ -780,8 +674,8 @@ void DOServos::setupSyncBuffers() {
   swVelInfos.p_xels = infoXelsSwVel;
   i = 0;
   for (auto& s : servos_) {
-    infoXelsSwVel[i].id = s.first;
-    infoXelsSwVel[i].p_data = (uint8_t*)&(s.second.vel);
+    infoXelsSwVel[i].id = s.id;
+    infoXelsSwVel[i].p_data = (uint8_t*)&(s.profileVel);
     i++;
   }
   swVelInfos.xel_count = servos_.size();

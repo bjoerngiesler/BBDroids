@@ -38,10 +38,8 @@ public:
 
   void setRequiredIds(const std::vector<uint8_t>& ids) { requiredIds_ = ids; }
 
-  Result homeServos(float vel, ConsoleStream* stream = NULL);
+  Result home(float vel, ConsoleStream* stream = NULL);
 
-  Result runServoTest(ConsoleStream *stream, int id);
-  
   void printStatus(ConsoleStream* stream, int id);
 
   bool setRange(uint8_t id, float min, float max, ValueType t=VALUE_DEGREE);
@@ -58,7 +56,6 @@ public:
   uint8_t errorStatus(uint8_t id);
   bool loadShutdownEnabled(uint8_t id);
   void setLoadShutdownEnabled(uint8_t id, bool yesno);
-  Result moveSlow(int id, float goal, ValueType t=VALUE_DEGREE);
   
   Result switchTorque(uint8_t id, bool onoff);
   bool isTorqueOn(uint8_t id);
@@ -70,15 +67,20 @@ protected:
   DynamixelShield dxl_;
 
   struct Servo {
+    uint8_t id;
     uint32_t goal;
-    uint32_t vel;
+    uint32_t profileVel;
     uint32_t present;
     int16_t load;
     uint32_t min, max;
     int32_t offset;
+    uint32_t lastVel;
   };
 
-  std::map<uint8_t,Servo> servos_;
+  //std::map<uint8_t,Servo> servos_;
+  std::vector<Servo> servos_;
+  Servo *servoWithID(uint8_t id);
+
   std::vector<uint8_t> requiredIds_;
   DYNAMIXEL::ControlTableItemInfo_t ctrlPresentPos_, ctrlGoalPos_, ctrlProfileVel_, ctrlPresentLoad_;
   static const uint16_t userPktBufCap = 128;
