@@ -34,8 +34,8 @@ class BB8DearPyGui:
 		self.imu2Plot = DataPlot(("r", "p", "h", "dr", "dp", "dh", "ax", "ay", "az"), 1024)
 		self.remoteLPlot = DataPlot(("axis0", "axis1", "axis2", "axis3", "axis4"), 1024)
 		self.remoteRPlot = DataPlot(("axis0", "axis1", "axis2", "axis3", "axis4"), 1024)
-		self.battVoltagePlot = DataPlot(("batt1 voltage", "batt2 voltage"), 1024)
-		self.battCurrentPlot = DataPlot(("batt1 current [mA]", "batt2 current [mA]"), 1024)
+		self.batt1Plot = DataPlot(("batt1 voltage", "batt1 current"), 1024)
+		self.batt2Plot = DataPlot(("batt2 voltage", "batt2 current"), 1024)
 		self.servoLoadPlot = DataPlot(("servo load 1 [.1[]", "servo load 2 [.1[]", "servo load 3 [.1[]", "servo load 4 [.1[]"), 1024)
 
 	def selectDroidCallback(self, appdata, userdata):
@@ -112,10 +112,10 @@ class BB8DearPyGui:
 					self.remoteLPlot.createGUI(-1, -1)
 				with dpg.tab(label="Remote R"):
 					self.remoteRPlot.createGUI(-1, -1)
-				with dpg.tab(label="Battery Voltage"):
-					self.battVoltagePlot.createGUI(-1, -1)
-				with dpg.tab(label="Battery Current"):
-					self.battCurrentPlot.createGUI(-1, -1)
+				with dpg.tab(label="Battery 1"):
+					self.batt1Plot.createGUI(-1, -1)
+				with dpg.tab(label="Battery 2"):
+					self.batt2Plot.createGUI(-1, -1)
 				with dpg.tab(label="Servo Load"):
 					self.servoLoadPlot.createGUI(-1, -1)
 
@@ -166,6 +166,13 @@ class BB8DearPyGui:
 			i = packet.imu[2]
 			if i.errorState == 1:
 				self.imu2Plot.addDataVector(packet.timestamp, (i.r, i.p, i.h, i.dr, i.dp, i.dh, i.ax, i.ay, i.az))
+
+			b = packet.batt[0]
+			if b.errorState == 1:
+				self.batt1Plot.addDataVector(packet.timestamp, (b.voltage, b.current))
+			b = packet.batt[1]
+			if b.errorState == 1:
+				self.batt2Plot.addDataVector(packet.timestamp, (b.voltage, b.current))
 
 			# v = list(map(self.handler.getFloatVal, (VAL_ROLL_GOAL, VAL_ROLL_PRESENT, VAL_ROLL_ERR, VAL_ROLL_ERR_I, VAL_ROLL_ERR_D, VAL_ROLL_CONTROL)))
 			# self.rollPlot.addDataVector(self.handler.getFloatVal(VAL_TIMESTAMP), v)
