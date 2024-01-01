@@ -24,7 +24,6 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 	seqnum_ = 0;
 	startTime_ = millis();
 
-	if(Console::console.isStarted()) Console::console.printGreeting();
 	while(running_) {
 		unsigned long micros_start_loop = micros();
 		seqnum_++;
