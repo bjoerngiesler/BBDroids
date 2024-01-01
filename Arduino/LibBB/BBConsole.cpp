@@ -1,33 +1,52 @@
 #include "BBConsole.h"
 #include "BBConfigStorage.h"
 #include "BBRunloop.h"
+#include <cstdarg>
 
 bb::Console bb::Console::console;
 
 bb::SerialConsoleStream::SerialConsoleStream(HardwareSerial& ser): ser_(ser), opened_(false), curStr_("") {
+	lastCheck_ = micros();
+	checkInterval_ = 1000000;
+	if(ser_) {
+		opened_ = true;
+	}
+}
+
+bool bb::SerialConsoleStream::checkIfOpened() {
+	if(!opened_ && ser_) {
+		opened_ = true;
+		printGreeting();
+	} else if(opened_ && !ser_) {
+		opened_ = false;
+	}
+
+	lastCheck_ = micros();
+
+	return opened_;
 }
 
 bool bb::SerialConsoleStream::available() {
-	if(!opened_ && ser_) {
-		opened_ = true;
+	if(opened_ == false) {
+		if((micros() - lastCheck_) > checkInterval_)
+			checkIfOpened();
 	}
 
-	if(opened_) {
-		return ser_.available(); 
-	} else {
-		return false;
-	} 
+	if(!opened_) return 0;
+	return ser_.available();
 }
 
 bool bb::SerialConsoleStream::readStringUntil(unsigned char c, String& str) { 
+	if(!opened_) return false;
+
 	unsigned char input = ser_.read();
 
 	if(input == '\b') {
 		if(curStr_.length() > 0) curStr_.remove(curStr_.length()-1);
-		ser_.print("\r"); ser_.print("> "); ser_.print(curStr_); ser_.print(" \b");
+		ser_.print(String("\r> ") + curStr_ + " \b");
 	} else {
 		curStr_ += (char)input;
-		ser_.print("\r"); ser_.print("> "); ser_.print(curStr_);
+		ser_.print(String("\r> ") + curStr_);
 	}
 
 	ser_.flush();
@@ -40,37 +59,49 @@ bool bb::SerialConsoleStream::readStringUntil(unsigned char c, String& str) {
 	return false;
 }
 
+void bb::SerialConsoleStream::printfFinal(const char* buf) {
+	if(opened_)
+		ser_.print(buf);
+}
+
 void bb::SerialConsoleStream::print(size_t val) { 
-	ser_.print(val); 
+	if(opened_)
+		ser_.print(val);
 }
 
 void bb::SerialConsoleStream::print(int val) {
-	ser_.print(val); 
+	if(opened_)
+		ser_.print(val);
 }
 
 void bb::SerialConsoleStream::print(float val)  { 
-	ser_.print(val); 
+	if(opened_)
+		ser_.print(val);
 }
 
 void bb::SerialConsoleStream::print(const String& val)  { 
-	if(val.length() >  0)
-		ser_.print(val); 
+	if(opened_)
+		ser_.print(val);
 }
 
 void bb::SerialConsoleStream::println(int val)  { 
-	ser_.println(val); 
+	if(opened_)
+		ser_.println(val);
 }
 
 void bb::SerialConsoleStream::println(float val) { 
-	ser_.println(val); 
+	if(opened_)
+		ser_.println(val);
 }
 
 void bb::SerialConsoleStream::println(const String& val) { 
-	ser_.println(val); 
+	if(opened_)
+		ser_.println(val);
 }
 
 void bb::SerialConsoleStream::println() { 
-	ser_.println(); 
+	if(opened_)
+		ser_.println();
 }
 
 bb::Console::Console() {
@@ -96,7 +127,10 @@ bb::Result bb::Console::stop(ConsoleStream *stream) {
 bb::Result bb::Console::step() {
 	if(!started_) return RES_SUBSYS_NOT_STARTED;
 
-	for(size_t i=0; i<streams_.size(); i++) handleStreamInput(streams_[i]);
+	for(size_t i=0; i<streams_.size(); i++) {
+		unsigned long m = micros();
+		handleStreamInput(streams_[i]);
+	}
 
 	return RES_OK;
 }
@@ -118,50 +152,58 @@ void bb::Console::removeConsoleStream(ConsoleStream* stream) {
 }
 
 void bb::Console::handleStreamInput(ConsoleStream* stream) {
-	int avail = stream->available();
-	if(avail == 0) return;
+	if(stream->available() == 0) return;
 
 	String str;
 	if(stream->readStringUntil('\n', str) == false) return;
 
-	stream->print("\r");
+	stream->printf("\r");
 	str.trim();
 	std::vector<String> words = split(str);
 
 	if(words.size() == 0) {
-		stream->print("> ");
+		stream->printf("> ");
 		return;
 	}
 
-	stream->println(errorMessage(firstResponder_->handleConsoleCommand(words, stream)));
-
-	stream->print("> ");
+	stream->printf(errorMessage(firstResponder_->handleConsoleCommand(words, stream)));
+	stream->printf("\n> ");
 }
 
 bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {
 
 	if(words[0] == "help") {
 		bb::Runloop::runloop.excuseOverrun();
-		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
+		if(words.size() != 1) {
+			return RES_CMD_INVALID_ARGUMENT_COUNT;
+		}
+
 		printHelpAllSubsystems(stream);
 		return RES_OK;
 	} 
 
 	else if(words[0] == "status") {
 		bb::Runloop::runloop.excuseOverrun();
-		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
+		if(words.size() != 1) {
+			return RES_CMD_INVALID_ARGUMENT_COUNT;
+		}
+	
 		printStatusAllSubsystems(stream);
 		return RES_OK;
 	} 
 
 	else if(words[0] == "start") {
 		bb::Runloop::runloop.excuseOverrun();
-		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
-		stream->println("Starting all stopped subsystems");
+		if(words.size() != 1) {
+			return RES_CMD_INVALID_ARGUMENT_COUNT;
+		} 
+
+		stream->printf("Starting all stopped subsystems\n");
 		for(auto& s: SubsystemManager::manager.subsystems()) {
 			if(!s->isStarted()) {
-				stream->print(String("Starting ") + s->name() + "... ");
-				stream->println(errorMessage(s->start(stream)));
+				stream->printf("Starting %s... ", s->name().c_str());
+				stream->printf(errorMessage(s->start(stream)));
+				stream->printf("\n");
 			}
 		}
 		return RES_OK;
@@ -169,76 +211,80 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 		
 	else if(words[0] == "stop") {
 		bb::Runloop::runloop.excuseOverrun();
-		if(words.size() != 1) stream->println(errorMessage(RES_CMD_INVALID_ARGUMENT_COUNT));
-		stream->println("Stopping all running subsystems");
+		if(words.size() != 1) {
+			return RES_CMD_INVALID_ARGUMENT_COUNT;
+		}
+
+		stream->printf("Stopping all running subsystems\n");
 		std::vector<Subsystem*> subsystems = SubsystemManager::manager.subsystems();
 		for(auto& s: SubsystemManager::manager.subsystems()) {
 			if(s->isStarted()) {
-				stream->print(String("Stopping ") + s->name() + "... ");
-				stream->println(errorMessage(s->stop(stream)));
+				stream->printf("Stopping %s... ", s->name().c_str());
+				stream->printf(errorMessage(s->stop(stream)));
+				stream->printf("\n");
 			}
 		}
 		return RES_OK;
 	}
 
 	else if(words[0] == "store") {
-		stream->println(errorMessage(ConfigStorage::storage.store()));
-		return RES_OK;
+		return ConfigStorage::storage.store();
 	} 
 
 	else {
 		Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[0]);
 		if(subsys == NULL) {
-			stream->print("Unknown command \""); stream->print(words[0]); stream->println("\" (and no subsystem with that name either).");
+			return RES_CMD_UNKNOWN_COMMAND;
 		} else {
 			std::vector<String> wordsminusone = words;
 			wordsminusone.erase(wordsminusone.begin());
-			stream->println(errorMessage(subsys->handleConsoleCommand(wordsminusone, stream)));
+			stream->printf(errorMessage(subsys->handleConsoleCommand(wordsminusone, stream)));
+			stream->printf("\n");
 		}
 		return RES_OK;
 	}
 }
 
 void bb::Console::printBroadcast(const String& val) {
-	for(size_t i = 0; i<streams_.size(); i++) streams_[i]->print(val);
+	for(auto& s: streams_) s->print(val);
 }
 
 void bb::Console::printlnBroadcast(const String& val) {
-	for(size_t i = 0; i<streams_.size(); i++) streams_[i]->println(val);
+	for(auto& s: streams_) s->println(val);
 }
 
-void bb::Console::printGreeting(ConsoleStream* stream) {
-	if(stream != NULL) {
-		stream->println("Console ready. Type \"help\" for instructions.");
-		stream->print("> ");
-	} else {
-		for(auto s: streams_) {
-			s->println("Console ready. Type \"help\" for instructions.");
-			s->print("> ");
-		}
+void bb::Console::printfBroadcast(const char* format, ...) {
+	va_list args;
+	va_start(args, format);
+	int len = vsnprintf(NULL, 0, format, args)+1;
+	char *str = new char[len];
+	vsnprintf(str, len, format, args);
+	va_end(args);
+	for(auto& s: streams_) {
+		s->print(str);
 	}
+	delete str;
 }
-
 
 void bb::Console::printHelpAllSubsystems(ConsoleStream* stream) {
-	stream->println("The following commands are available on top level:");
-	stream->println("    help                    Print this help text (use '<subsys> help' for help on individual subsystem)"); 
-	stream->println("    status                  Print status on all subsystems (use '<subsys> status' for help on individual subsystem)");
-	stream->println("    start                   Start all stopped subsystems (use '<subsys> start' to start individual subsystem)");
-	stream->println("    stop                    Stop all started subsystems (use '<subsys> stop' to stop individual subsystem)");
-	stream->println("    restart                 Restart (stop, then start) all started subsystems");
-	stream->println("    store                   Store all parameters oto flash");
-	stream->println("The following standard commands are supported by all subsystems:");
-	stream->println("    <subsys> help");
-	stream->println("    <subsys> status");
-	stream->println("    <subsys> start");
-	stream->println("    <subsys> stop");
-	stream->println("    <subsys> restart");
-	stream->println("Please use '<subsys> help' for additional commands supported by individual subsystems.");
+	stream->printf("The following commands are available on top level:\n");
+	stream->printf("    help                    Print this help text (use '<subsys> help' for help on individual subsystem)\n"); 
+	stream->printf("    status                  Print status on all subsystems (use '<subsys> status' for help on individual subsystem)\n");
+	stream->printf("    start                   Start all stopped subsystems (use '<subsys> start' to start individual subsystem)\n");
+	stream->printf("    stop                    Stop all started subsystems (use '<subsys> stop' to stop individual subsystem)\n");
+	stream->printf("    restart                 Restart (stop, then start) all started subsystems\n");
+	stream->printf("    store                   Store all parameters oto flash\n");
+	stream->printf("The following standard commands are supported by all subsystems:\n");
+	stream->printf("    <subsys> help\n");
+	stream->printf("    <subsys> status\n");
+	stream->printf("    <subsys> start\n");
+	stream->printf("    <subsys> stop\n");
+	stream->printf("    <subsys> restart\n");
+	stream->printf("Please use '<subsys> help' for additional commands supported by individual subsystems.\n");
 }
 
 void bb::Console::printStatusAllSubsystems(ConsoleStream* stream) {
-	stream->println("System status:");
+	stream->printf("System status:\n");
 	const std::vector<Subsystem*> subsystems = SubsystemManager::manager.subsystems();
 	for(auto& s: subsystems) s->printStatus(stream);
 }
@@ -285,14 +331,6 @@ std::vector<String> bb::Console::split(const String& str) {
       } 
     }
   }
-
-#ifdef SERIALCOMMANDS_DEBUG
-  Serial.print("Split: ");
-  for(int i=0; i<words.size(); i++) {
-    Serial.print("'"); Serial.print(words[i]); Serial.print("' ");
-  }
-  Serial.println();
-#endif
 
   return words;
 }
