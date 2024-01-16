@@ -23,14 +23,6 @@ public:
 	virtual bool available();
 	virtual bool readStringUntil(unsigned char c, String& str);
 	virtual void printfFinal(const char* str);
-	virtual void print(size_t val);
-	virtual void print(int val);
-	virtual void print(float val);
-	virtual void print(const String& val);
-	virtual void println(int val);
-	virtual void println(float val);
-	virtual void println(const String& val);
-	virtual void println();
 protected:
 	WiFiClient client_;
 };
@@ -47,10 +39,7 @@ public:
 	virtual Result step();
 	virtual Result operationStatus();
 
-	virtual const String& description() {
-		updateDescription();
-		return description_;
-	}
+	virtual void printStatus(ConsoleStream *stream);
 
 	virtual Result setParameterValue(const String& name, const String& value);
 
@@ -66,7 +55,6 @@ protected:
 	WifiServer();
 
 	unsigned int readDataIfAvailable(uint8_t* buf, unsigned int maxsize, IPAddress& remoteIP);
-	void updateDescription();
 
 	WiFiUDP udp_;
 	WiFiServer tcp_;

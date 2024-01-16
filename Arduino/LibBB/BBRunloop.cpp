@@ -47,9 +47,9 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 			if(s->isStarted() && s->operationStatus() == RES_OK) {
 				s->step();
 			}
-			String str = s->name()  + ": " + (micros()-us) + "us ";
+			String str = String(s->name())  + ": " + (micros()-us) + "us ";
 			timingInfo.push_back(str);
-			if(runningStatus_) Console::console.printBroadcast(str);
+			if(runningStatus_) Console::console.printfBroadcast(str.c_str());
 		}
 
 		// ...find out how long we took...
@@ -59,17 +59,18 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 			looptime = micros_end_loop - micros_start_loop;
 		else
 			looptime = ULONG_MAX - micros_start_loop + micros_end_loop;
-		if(runningStatus_) Console::console.printlnBroadcast(String("Total: ") + looptime + "us");
+		if(runningStatus_) Console::console.printfBroadcast("Total: %dus", looptime);
 
 		// ...and bicker if we overran the allotted time.
 		if(looptime <= cycleTime_) {
 			delayMicroseconds(cycleTime_-looptime);
 		} else if(excuseOverrun_ == false) {
-			Console::console.printBroadcast(String(looptime) + "us spent in loop: ");
+			Console::console.printfBroadcast("%dus spent in loop: ", looptime);
 			for(auto& t: timingInfo) {
-				Console::console.printBroadcast(t + " ");
+				Console::console.printfBroadcast(t.c_str());
+				Console::console.printfBroadcast(" ");
 			}
-			Console::console.printlnBroadcast("");
+			Console::console.printfBroadcast("\n");
 		}
 
 		excuseOverrun_ = false;
@@ -91,7 +92,6 @@ bb::Result bb::Runloop::step() {
 }
 
 bb::Result bb::Runloop::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
-	stream->println(String("Command: ") + words[0]);
 	if(words[0] == "running_status") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		runningStatus_ = words[1] == "on" ? true : false;

@@ -45,20 +45,22 @@ bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words,
 
 	else if(words[0] == "start") {
 		if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
-		if(isStarted()) stream->println(name() + "is already running.");
+		if(isStarted()) stream->printf("%s is already running.", name());
 		else {
-			stream->print(String("Starting ") + name() + "... ");
-			stream->println(errorMessage(start(stream)));
+			stream->printf("Starting %s...", name());
+			stream->printf(errorMessage(start(stream)));
+			stream->printf("\n");
 		}
 		return RES_OK;
 	} 
 
 	else if(words[0] == "stop") {
 		if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
-		if(!isStarted()) stream->println(name() + " is not running.");
+		if(!isStarted()) stream->printf("%s is not running.", name());
 		else {
-			stream->print(String("Stopping ") + name() + "... ");
-			stream->println(errorMessage(stop(stream)));
+			stream->printf("Stopping %s...", name());
+			stream->printf(errorMessage(stop(stream)));
+			stream->printf("\n");
 		}
 		return RES_OK;
 	} 
@@ -83,29 +85,30 @@ bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words,
 }
 
 void bb::Subsystem::printStatus(ConsoleStream* stream) {
-	stream->print(name() + " (" + description() + "): ");
+	stream->printf("%s (%s): ", name(), description());
 
 	if(isStarted()) {
-		stream->print("started, ");
+		stream->printf("started, ");
 		switch(operationStatus()) {
 		case RES_OK:
-			stream->println("operational");
+			stream->printf("operational\n");
 			break;
 		default:
-			stream->print("not operational: ");
-			stream->println(errorMessage(operationStatus()));
+			stream->printf("not operational: ");
+			stream->printf(errorMessage(operationStatus()));
+			stream->printf("\n");
 			break;
 		}
-	} else stream->println("stopped");
+	} else stream->printf("stopped\n");
 }
 
 void bb::Subsystem::printHelp(ConsoleStream* stream) {
-	stream->println(help());
+	stream->printf(help());
 	if(parameters_.size()) {
-		stream->println("Parameters:");
+		stream->printf("Parameters:\n");
 		printParameters(stream);
 	} else {
-		stream->println("No parameters.");
+		stream->printf("No parameters.\n");
 	}
 }
 
@@ -157,6 +160,6 @@ bb::Result bb::Subsystem::setParameterValue(const String& name, const String& st
 }
 
 const void bb::Subsystem::Parameter::print(ConsoleStream* stream) {
-	if(stream) stream->print(name_ + ": " + description());
+	if(stream) stream->printf("%s: %s\n", name_.c_str(), description().c_str());
 }
 

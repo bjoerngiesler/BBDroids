@@ -64,46 +64,6 @@ void bb::SerialConsoleStream::printfFinal(const char* buf) {
 		ser_.print(buf);
 }
 
-void bb::SerialConsoleStream::print(size_t val) { 
-	if(opened_)
-		ser_.print(val);
-}
-
-void bb::SerialConsoleStream::print(int val) {
-	if(opened_)
-		ser_.print(val);
-}
-
-void bb::SerialConsoleStream::print(float val)  { 
-	if(opened_)
-		ser_.print(val);
-}
-
-void bb::SerialConsoleStream::print(const String& val)  { 
-	if(opened_)
-		ser_.print(val);
-}
-
-void bb::SerialConsoleStream::println(int val)  { 
-	if(opened_)
-		ser_.println(val);
-}
-
-void bb::SerialConsoleStream::println(float val) { 
-	if(opened_)
-		ser_.println(val);
-}
-
-void bb::SerialConsoleStream::println(const String& val) { 
-	if(opened_)
-		ser_.println(val);
-}
-
-void bb::SerialConsoleStream::println() { 
-	if(opened_)
-		ser_.println();
-}
-
 bb::Console::Console() {
 	name_ = "console";
 	description_ = "Console interaction facility";
@@ -187,7 +147,7 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 		if(words.size() != 1) {
 			return RES_CMD_INVALID_ARGUMENT_COUNT;
 		}
-	
+
 		printStatusAllSubsystems(stream);
 		return RES_OK;
 	} 
@@ -201,7 +161,7 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 		stream->printf("Starting all stopped subsystems\n");
 		for(auto& s: SubsystemManager::manager.subsystems()) {
 			if(!s->isStarted()) {
-				stream->printf("Starting %s... ", s->name().c_str());
+				stream->printf("Starting %s... ", s->name());
 				stream->printf(errorMessage(s->start(stream)));
 				stream->printf("\n");
 			}
@@ -219,7 +179,7 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 		std::vector<Subsystem*> subsystems = SubsystemManager::manager.subsystems();
 		for(auto& s: SubsystemManager::manager.subsystems()) {
 			if(s->isStarted()) {
-				stream->printf("Stopping %s... ", s->name().c_str());
+				stream->printf("Stopping %s... ", s->name());
 				stream->printf(errorMessage(s->stop(stream)));
 				stream->printf("\n");
 			}
@@ -245,14 +205,6 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 	}
 }
 
-void bb::Console::printBroadcast(const String& val) {
-	for(auto& s: streams_) s->print(val);
-}
-
-void bb::Console::printlnBroadcast(const String& val) {
-	for(auto& s: streams_) s->println(val);
-}
-
 void bb::Console::printfBroadcast(const char* format, ...) {
 	va_list args;
 	va_start(args, format);
@@ -261,7 +213,7 @@ void bb::Console::printfBroadcast(const char* format, ...) {
 	vsnprintf(str, len, format, args);
 	va_end(args);
 	for(auto& s: streams_) {
-		s->print(str);
+		s->printf(str);
 	}
 	delete str;
 }

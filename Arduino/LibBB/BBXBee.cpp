@@ -1,4 +1,5 @@
 #include <limits.h> // for ULONG_MAX
+#include <inttypes.h> // for uint64_t format string
 #include <vector>
 
 #include "BBXBee.h"
@@ -47,12 +48,9 @@ bb::Result bb::XBee::initialize(uint8_t chan, uint16_t pan, uint16_t station, ui
 	if(operationStatus_ != RES_SUBSYS_NOT_INITIALIZED) return RES_SUBSYS_ALREADY_INITIALIZED;
 
 	paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
-	//Console::console.printBroadcast(String("Handle: ") + String(paramsHandle_, HEX));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
-		//Console::console.printlnBroadcast("Block valid, reading config");
 		ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
 	} else {
-		//Console::console.printlnBroadcast("Block invalid, initializing");
 		memset(&params_, 0, sizeof(params_));
 		params_.chan = chan;
 		params_.pan = pan;
@@ -73,12 +71,11 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 
 	currentBPS_ = 0;
 	if(currentBPS_ == 0) {
-		if(stream) stream->print("auto-detecting BPS... ");
+		if(stream) stream->printf("auto-detecting BPS... ");
 		
 		for(size_t i=0; i<baudRatesToTry.size(); i++) {
 			if(stream) {
-				stream->print(baudRatesToTry[i]); 
-				stream->print("... ");
+				stream->printf("%d...", baudRatesToTry[i]); 
 			}
 			
 			uart_->begin(baudRatesToTry[i]);
@@ -89,12 +86,12 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 			}
 		}
 		if(currentBPS_ == 0) {
-			if(stream) stream->println("failed.");
+			if(stream) stream->printf("failed.\n");
 			operationStatus_ = RES_SUBSYS_HW_DEPENDENCY_MISSING;
 			return RES_SUBSYS_HW_DEPENDENCY_MISSING;
 		}
 	} else {
-		if(stream) stream->print(String("Using ") + currentBPS_ + "bps.");
+		if(stream) stream->printf("Using %dbps.", currentBPS_);
 		uart_->begin(currentBPS_);
 		if(enterATModeIfNecessary() != RES_OK) {
 			operationStatus_ = RES_SUBSYS_HW_DEPENDENCY_MISSING;
@@ -108,19 +105,17 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 	if(addrH == "" || addrL == "" || fw == "") return RES_SUBSYS_COMM_ERROR;
 
 	if(stream) {
-		stream->print("Found XBee at address: "); stream->print(addrH);
-		stream->print(":"); stream->print(addrL);
-		stream->print(" Firmware version: "); stream->println(fw);
+		stream->printf("Found XBee at address: %s:%s Firmware version: %s\n", addrH.c_str(), addrL.c_str(), fw.c_str());
 	}
 
 	String retval = sendStringAndWaitForResponse("ATCT"); 
 	if(retval != "") {
 		atmode_timeout_ = strtol(retval.c_str(), 0, 16) * 100;
-		if(stream!=NULL) stream->println(String("Command timeout: ") + atmode_timeout_);
+		if(stream!=NULL) stream->printf("Command timeout: %d\n", atmode_timeout_);
 	}
 	if(atmode_timeout_ != 1000) {
 		if(sendStringAndWaitForOK("ATCT=a") == false) {
-			if(stream) stream->println("Couldn't set AT Mode Timeout");
+			if(stream) stream->printf("Couldn't set AT Mode Timeout\n");
 			return RES_SUBSYS_COMM_ERROR;
 		}
 
@@ -130,22 +125,33 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 		atmode_timeout_ = 1000;
 	}
 
-	if(setConnectionInfo(params_.chan, params_.pan, params_.station,params_.partner, true) != RES_OK) {
-		if(stream) stream->println("Setting connection info failed.");
+	if(setConnectionInfo(params_.chan, params_.pan, params_.station, params_.partner, true) != RES_OK) {
+		if(stream) stream->printf("Setting connection info failed.\n");
 		return RES_SUBSYS_COMM_ERROR;
 	} else {
-		if(stream) stream->println("Setting connection info successful.");
+		if(stream) stream->printf("Setting connection info successful.\n");
 	}
+
+	String str = String("ATNI") + params_.name;
+	if(sendStringAndWaitForOK(str) == false) {
+		Console::console.printfBroadcast("Error setting name\n");
+		return RES_SUBSYS_COMM_ERROR;
+	} 
+
+	if(sendStringAndWaitForOK("ATNT=64") == false) {
+		Console::console.printfBroadcast("Error setting node discovery timeout\n");
+		return RES_SUBSYS_COMM_ERROR;
+	} 
 
 	if(params_.bps != currentBPS_) {
 		if(changeBPSTo(params_.bps, stream, true) != RES_OK) {
-			if(stream) stream->println("Setting BPS failed.");
+			if(stream) stream->printf("Setting BPS failed.\n");
 			return RES_SUBSYS_COMM_ERROR;
 		}
 	}
 
 	if(sendStringAndWaitForOK("ATWR") == false) {
-		if(stream) stream->println("Couldn't write config!");
+		if(stream) stream->printf("Couldn't write config!\n");
 		return RES_SUBSYS_COMM_ERROR;
 	}
 
@@ -170,7 +176,7 @@ bb::Result bb::XBee::step() {
 			Result retval = receiveAndHandlePacket();
 			if(retval != RES_OK) return retval;
 		} else {
-			bb::Console::console.printlnBroadcast(receive());
+			bb::Console::console.printfBroadcast("%s\n", receive().c_str());
 		}
 	}
 
@@ -185,8 +191,6 @@ bb::Result bb::XBee::step() {
 			return send(packet);
 		} else {
 			String str(continuous_++);
-//			bb::Console::console.printBroadcast("Sending ");
-//			bb::Console::console.printlnBroadcast(str);
 			send(str);			
 		}
 	}
@@ -310,14 +314,15 @@ bb::Result bb::XBee::removePacketReceiver(PacketReceiver *receiver) {
 	return RES_COMMON_NOT_IN_LIST;
 }
 
+
 bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 	if(isInATMode()) {
 		return RES_OK;
 	}
 
 	if(debug_ && stream!=NULL) {
-		stream->println("Entering AT mode.");
-		stream->print("Wait 1s... ");
+		stream->printf("Entering AT mode.\n");
+		stream->printf("Wait 1s... ");
 	}
 
 	int numDiscardedBytes = 0;
@@ -331,7 +336,7 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 	}
 
 	if(debug_ && stream!=NULL) 
-		stream->println("Sending +++... ");
+		stream->printf("Sending +++... \n");
 
 	uart_->write("+++");
 
@@ -364,10 +369,10 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 
 	if(success) {
 		if(debug_ && stream!=NULL) {
-			stream->println("Successfully entered AT Mode");
+			stream->printf("Successfully entered AT Mode\n");
 		}
 		if(numDiscardedBytes) {
-			Console::console.printBroadcast(String("Discarded ") + numDiscardedBytes + " bytes while entering AT mode.");
+			Console::console.printfBroadcast("Discarded %d bytes while entering AT mode.\n", numDiscardedBytes);
 		}
 		atmode_millis_ = millis();
 		atmode_ = true;
@@ -375,7 +380,7 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 		return RES_OK;
 	}
 
-	if(debug_ && stream!=NULL) stream->println("no response to +++");
+	if(debug_ && stream!=NULL) stream->printf("no response to +++\n");
 	return RES_COMM_TIMEOUT;
 }
 
@@ -395,15 +400,15 @@ bb::Result bb::XBee::leaveATMode(ConsoleStream *stream) {
 	if(!isInATMode()) {
 		return RES_OK;
 	}
-	if((debug_ & DEBUG_PROTOCOL) && stream!=NULL) stream->println("Sending ATCN to leave AT Mode");
+	if((debug_ & DEBUG_PROTOCOL) && stream!=NULL) stream->printf("Sending ATCN to leave AT Mode\n");
 	if(sendStringAndWaitForOK("ATCN") == true) {
-		if((debug_ & DEBUG_PROTOCOL) && stream!=NULL) stream->println("Successfully left AT Mode");
+		if((debug_ & DEBUG_PROTOCOL) && stream!=NULL) stream->printf("Successfully left AT Mode\n");
 		atmode_ = false;
 		delay(1100);
 		return RES_OK;
 	}
 
-	if((debug_ & DEBUG_PROTOCOL) && stream!=NULL) stream->println("no response to ATCN");
+	if((debug_ & DEBUG_PROTOCOL) && stream!=NULL) stream->printf("no response to ATCN\n");
 	return RES_COMM_TIMEOUT;
 }
 
@@ -427,18 +432,18 @@ bb::Result bb::XBee::changeBPSTo(uint32_t bps, ConsoleStream *stream, bool stayI
 	String retval = sendStringAndWaitForResponse("ATBD");
 
 	if((unsigned)retval.toInt() == paramVal) {
-		if(stream) stream->println(String("XBee says it's already running at ") + bps + "bps");
+		if(stream) stream->printf("XBee says it's already running at %d bps\n", bps);
 		return RES_OK;
 	}
 
-	if(stream) stream->println(String("Sending ATBD=")+String(paramVal, HEX));
+	if(stream) stream->printf("Sending ATBD=%x\n", paramVal);
 	if(sendStringAndWaitForOK(String("ATBD=")+String(paramVal, HEX)) == false) return RES_SUBSYS_COMM_ERROR;
 
-	if(stream) stream->println(String("Closing and reopening serial at ") + bps + "bps");
+	if(stream) stream->printf("Closing and reopening serial at %dbps\n", bps);
 	uart_->end();	
 	uart_->begin(bps);
 
-	if(stream) stream->println(String("Waiting for ") + atmode_timeout_ + "ms to drop out of AT mode");
+	if(stream) stream->printf("Waiting for %dms to drop out of AT mode", atmode_timeout_);
 	delay(atmode_timeout_+10);
 
 	enterATModeIfNecessary();
@@ -459,25 +464,25 @@ bb::Result bb::XBee::setConnectionInfo(uint8_t chan, uint16_t pan, uint16_t stat
 	enterATModeIfNecessary();
 
 	if(sendStringAndWaitForOK(String("ATCH=")+String(chan, HEX)) == false) {
-		if(debug_ & DEBUG_PROTOCOL) Console::console.printlnBroadcast("ERROR: Setting Channel failed!");
+		if(debug_ & DEBUG_PROTOCOL) Console::console.printfBroadcast("ERROR: Setting Channel failed!\n");
 		if(!stayInAT) leaveATMode();
 		return RES_COMM_TIMEOUT;
 	} 
 	delay(10);
 	if(sendStringAndWaitForOK(String("ATID=")+String(pan, HEX)) == false) {
-		if(debug_ & DEBUG_PROTOCOL) Console::console.printlnBroadcast("ERROR: Setting PAN failed!");
+		if(debug_ & DEBUG_PROTOCOL) Console::console.printfBroadcast("ERROR: Setting PAN failed!\n");
 		if(!stayInAT) leaveATMode();
 		return RES_COMM_TIMEOUT;
 	}
 	delay(10);
 	if(sendStringAndWaitForOK(String("ATMY=")+String(station, HEX)) == false) {
-		if(debug_ & DEBUG_PROTOCOL) Console::console.printlnBroadcast("ERROR: Setting MY failed!");
+		if(debug_ & DEBUG_PROTOCOL) Console::console.printfBroadcast("ERROR: Setting MY failed!\n");
 		if(!stayInAT) leaveATMode();
 		return RES_COMM_TIMEOUT;
 	}
 	delay(10);
 	if(sendStringAndWaitForOK(String("ATDL=")+String(partner, HEX)) == false) {
-		if(debug_ & DEBUG_PROTOCOL) Console::console.printlnBroadcast("ERROR: Setting Destination Low failed!");
+		if(debug_ & DEBUG_PROTOCOL) Console::console.printfBroadcast("ERROR: Setting Destination Low failed!\n");
 		if(!stayInAT) leaveATMode();
 		return RES_COMM_TIMEOUT;
 	}
@@ -517,21 +522,56 @@ bb::Result bb::XBee::getConnectionInfo(uint8_t& chan, uint16_t& pan, uint16_t& s
 	return RES_OK;
 }
 
-bb::Result bb::XBee::discoverNetworks() {
+bb::Result bb::XBee::discoverNodes(std::vector<bb::XBee::Node>& nodes) {
 	if(operationStatus_ != RES_OK) return RES_SUBSYS_NOT_OPERATIONAL;
 
 	enterATModeIfNecessary();
 
-	Console::console.printlnBroadcast("Discover Networks");
+	nodes = std::vector<bb::XBee::Node>();
+
 	uart_->print("ATND\r");
 	uart_->flush();
-	int to=13;
+	int to=2000;
 	while(to>0) {
-		if(uart_->available()) {
-			Console::console.printlnBroadcast(uart_->readString());
+		if(!uart_->available()) {
+			delay(10);
+			to--;
+			continue;
 		}
-		delay(1000);
-		to--;
+
+		String my, sh, sl, rssi, ni;
+		if(readString(my) == false || my == "\r" || my == "") {
+			Console::console.printfBroadcast("Empty MY - end of discovery\n");
+			return RES_OK;
+		}
+		if(readString(sh) == false || sh == "\r" || sh == "") {
+			Console::console.printfBroadcast("Empty SH\n");
+			return RES_SUBSYS_COMM_ERROR;
+		}
+		if(readString(sl) == false || sl == "\r" || sl == "") {
+			Console::console.printfBroadcast("Empty SL\n");
+			return RES_SUBSYS_COMM_ERROR;
+		}
+		if(readString(rssi) == false || rssi == "\r" || rssi == "") {
+			Console::console.printfBroadcast("Empty RSSI\n");
+			return RES_SUBSYS_COMM_ERROR;
+		}
+		if(readString(ni) == false || ni == "\r" || ni == "") {
+			Console::console.printfBroadcast("Empty NI\n");
+			return RES_SUBSYS_COMM_ERROR;
+		}
+
+		my.trim(); sh.trim(); sl.trim(); rssi.trim(); ni.trim();
+
+		Node n;
+		n.stationId = (uint16_t)strtoul(my.c_str(), NULL, 16);
+		n.address = (uint64_t)strtoul(sh.c_str(), NULL, 16) << 32;
+		n.address |= (uint64_t)strtoul(sl.c_str(), NULL, 16);
+		n.rssi = (uint8_t)strtoul(rssi.c_str(), NULL, 16);
+		memset(n.name, 0, 20);
+		snprintf(n.name, 19, ni.c_str());
+
+		nodes.push_back(n);
 	}
 	if(to>0) return RES_OK;
 	return RES_COMM_TIMEOUT;
@@ -570,7 +610,7 @@ bb::Result bb::XBee::send(const bb::Packet& packet) {
 	uint8_t *buf = (uint8_t*)&frame.packet;
 	for(size_t i=0; i<sizeof(frame.packet)-1; i++) {
 		if(buf[i] & 0x80) {
-			Console::console.printlnBroadcast(String("ERROR: Byte ") + i + " of packet has highbit set! Not sending.");
+			Console::console.printfBroadcast("ERROR: Byte %d of packet has highbit set! Not sending.\n", i);
 			return RES_PACKET_INVALID_PACKET;
 		}
 	}
@@ -578,14 +618,6 @@ bb::Result bb::XBee::send(const bb::Packet& packet) {
 	frame.packet.seqnum = Runloop::runloop.getSequenceNumber() % MAX_SEQUENCE_NUMBER;
 	frame.crc = calculateCRC(frame.packet);
 	frame.highbit = 1;
-
-#if 0
-	buf = (uint8_t*)&frame;
-	for(size_t i=0; i<sizeof(frame); i++) {
-		Console::console.printBroadcast(String(buf[i], HEX) + " ");
-	}
-	Console::console.printlnBroadcast();
-#endif
 
 	uart_->write((uint8_t*)&frame, sizeof(frame));
 	uart_->flush();
@@ -612,13 +644,12 @@ String bb::XBee::receive() {
 
 bb::Result bb::XBee::receiveAndHandlePacket() {
 	if(!packetMode_) {
-		bb::Console::console.printlnBroadcast("Wrong mode.");
+		bb::Console::console.printfBroadcast("Wrong mode.\n");
 		return RES_SUBSYS_WRONG_MODE;
 	} 
 
 	while(available()) {
 		packetBuf_[packetBufPos_] = uart_->read();
-		//bb::Console::console.printBroadcast(String(packetBuf_[packetBufPos_], HEX) + " ");
 		if(packetBuf_[packetBufPos_] & 0x80) {
 			if(packetBufPos_ == sizeof(PacketFrame)-1) {
 				PacketFrame frame;
@@ -628,8 +659,7 @@ bb::Result bb::XBee::receiveAndHandlePacket() {
 				packetBufPos_ = 0;
 
 				if(frame.crc != calculateCRC(frame.packet)) {
-					bb::Console::console.printlnBroadcast(String("CRC incorrect - ") + String(frame.crc, HEX) + 
-						                                    String(" instead of ") + String(calculateCRC(frame.packet), HEX));
+					bb::Console::console.printfBroadcast("CRC incorrect - 0x%x instead of 0x%x\n", frame.crc, calculateCRC(frame.packet));
 					return RES_PACKET_INVALID_PACKET;
 				} 
 
@@ -639,11 +669,11 @@ bb::Result bb::XBee::receiveAndHandlePacket() {
 
 				return RES_OK;
 			} else {
-				Console::console.printlnBroadcast(String("Wrong packet size: ") + String(packetBufPos_+1) + String(" bytes instead of ") + sizeof(PacketFrame));
+				Console::console.printfBroadcast("Wrong packet size: %d bytes instead of %d\n", packetBufPos_+1, sizeof(PacketFrame));
 				for(size_t i=0; i<=packetBufPos_; i++) {
-					Console::console.printBroadcast(String(packetBuf_[i], HEX) + " ");
+					Console::console.printfBroadcast("0x%x ", packetBuf_[i]);
 				}
-				Console::console.printlnBroadcast("");
+				Console::console.printfBroadcast("\n");
 				memset(packetBuf_, 0, sizeof(packetBuf_));
 				packetBufPos_ = 0;
 				return RES_PACKET_TOO_SHORT;
@@ -651,7 +681,7 @@ bb::Result bb::XBee::receiveAndHandlePacket() {
 		} else {
 			packetBufPos_++;
 			if(packetBufPos_ >= sizeof(packetBuf_)) {
-				bb::Console::console.printlnBroadcast(String("Packet too long: ") + String(packetBufPos_+1) + String(" bytes instead of ") + sizeof(PacketFrame));
+				bb::Console::console.printfBroadcast("Packet too long: %d bytes instead of %d\n", packetBufPos_+1, sizeof(PacketFrame));
 
 				memset(packetBuf_, 0, sizeof(packetBuf_));
 				packetBufPos_ = 0;
@@ -666,9 +696,7 @@ bb::Result bb::XBee::receiveAndHandlePacket() {
 
 String bb::XBee::sendStringAndWaitForResponse(const String& str, int predelay, bool cr) {
   	if(debug_ & DEBUG_XBEE_COMM) {
-    	Console::console.printBroadcast("Sending \"");
-    	Console::console.printBroadcast(str);
-    	Console::console.printBroadcast("\"... ");
+    	Console::console.printfBroadcast("Sending \"%s\"...", str.c_str());
   	}
 
     uart_->print(str);
@@ -683,14 +711,14 @@ String bb::XBee::sendStringAndWaitForResponse(const String& str, int predelay, b
     String retval;
     if(readString(retval)) {
     	if(debug_ & DEBUG_XBEE_COMM) {
-    		Console::console.printBroadcast(retval);
-    		Console::console.printlnBroadcast(" ");
+    		Console::console.printfBroadcast(retval.c_str());
+    		Console::console.printfBroadcast(" ");
     	}
     	return retval;
     }
 
     if(debug_ & DEBUG_PROTOCOL) {
-    	Console::console.printlnBroadcast("Nothing.");
+    	Console::console.printfBroadcast("Nothing.\n");
     }
     return "";
 }
@@ -700,9 +728,7 @@ bool bb::XBee::sendStringAndWaitForOK(const String& str, int predelay, bool cr) 
   	if(result.equals("OK\r")) return true;
       
   	if(debug_ & DEBUG_PROTOCOL) {
-    	Console::console.printBroadcast("Expected \"OK\", got \"");
-    	Console::console.printBroadcast(result);
-    	Console::console.printlnBroadcast("\"... ");
+    	Console::console.printfBroadcast("Expected \"OK\", got \"%s\"... \n", result.c_str());
   	}
   return false;
 }
@@ -713,9 +739,9 @@ bool bb::XBee::readString(String& str, unsigned char terminator) {
 		while(!uart_->available()) {
 			delay(1);
 			to++;
-			if(debug_ & DEBUG_XBEE_COMM) Console::console.printBroadcast(".");
+			if(debug_ & DEBUG_XBEE_COMM) Console::console.printfBroadcast(".");
 			if(to >= timeout_) {
-				if(debug_ & DEBUG_PROTOCOL) Console::console.printlnBroadcast("Timeout!");
+				if(debug_ & DEBUG_PROTOCOL) Console::console.printfBroadcast("Timeout!\n");
 				return false;
 			}
 		}

@@ -83,10 +83,10 @@ struct StatePacket {
 };
 
 enum PacketType {
-	PACKET_TYPE_COMMAND = 0,
-	PACKET_TYPE_STATUS  = 1,
-	PACKET_TYPE_UNUSED1 = 2,
-	PACKET_TYPE_UNUSED2 = 3
+	PACKET_TYPE_COMMAND  = 0,
+	PACKET_TYPE_STATUS   = 1,
+	PACKET_TYPE_CONFIG   = 2,
+	PACKET_TYPE_PAIR     = 3
 };
 
 enum PacketSource {

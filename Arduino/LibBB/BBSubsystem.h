@@ -27,9 +27,9 @@ protected:
 
 class Subsystem {
 public:
-	virtual const String& name() { return name_; }
-	virtual const String& description() { return description_; }
-	virtual const String& help() { return help_; }
+	virtual const char* name() { return name_; }
+	virtual const char* description() { return description_; }
+	virtual const char* help() { return help_; }
 	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
 	virtual Result initialize() { operationStatus_ = RES_SUBSYS_NOT_STARTED; return registerWithManager(); };
@@ -167,10 +167,10 @@ protected:
 	};
 
 	std::vector<Parameter*> parameters_;
-	bool started_, begun_;
+	bool started_;
 	Result operationStatus_;
-	String name_, description_, help_;
-	Subsystem(): started_(false), begun_(false), operationStatus_(RES_SUBSYS_NOT_INITIALIZED), name_(""), description_(""), help_("") {}
+	const char *name_, *description_, *help_;
+	Subsystem(): started_(false), operationStatus_(RES_SUBSYS_NOT_INITIALIZED), name_(""), description_(""), help_("") {}
 	virtual ~Subsystem() { }
 };
 

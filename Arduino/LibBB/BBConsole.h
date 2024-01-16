@@ -36,15 +36,6 @@ public:
 	void printGreeting() {
 		printfFinal("Console ready. Type \"help\" for instructions.\n> ");
 	}
-
-	virtual void print(size_t val) = 0;
-	virtual void print(int val) = 0;
-	virtual void print(float val) = 0;
-	virtual void print(const String& val) = 0;
-	virtual void println(int val) = 0;
-	virtual void println(float val) = 0;
-	virtual void println(const String& val) = 0;
-	virtual void println() = 0;
 };
 
 class SerialConsoleStream: public ConsoleStream {
@@ -59,15 +50,6 @@ public:
 	virtual bool readStringUntil(unsigned char c, String& str);
 
 	virtual void printfFinal(const char* str);
-
-	virtual void print(size_t val);
-	virtual void print(int val);
-	virtual void print(float val);
-	virtual void print(const String& val);
-	virtual void println(int val);
-	virtual void println(float val);
-	virtual void println(const String& val);
-	virtual void println();
 protected:
 	HardwareSerial& ser_;
 	bool opened_;
@@ -89,8 +71,6 @@ public:
 	void handleStreamInput(ConsoleStream* stream);
 	Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream);
 	
-	void printBroadcast(const String& val = "");
-	void printlnBroadcast(const String& val = "");
 	void printfBroadcast(const char* format, ...);
 	void printHelpAllSubsystems(ConsoleStream* stream);
 	void printStatusAllSubsystems(ConsoleStream* stream);

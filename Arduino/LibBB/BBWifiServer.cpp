@@ -45,38 +45,6 @@ void bb::WifiConsoleStream::printfFinal(const char* str) {
 	client_.print(str);
 }
 
-void bb::WifiConsoleStream::print(size_t val) {
-	client_.print(val);
-}
-
-void bb::WifiConsoleStream::print(int val) {
-	client_.print(val);
-}
-
-void bb::WifiConsoleStream::print(float val) {
-	client_.print(val);
-}
-
-void bb::WifiConsoleStream::print(const String& val) {
-	client_.print(val);
-}
-
-void bb::WifiConsoleStream::println(int val) {
-	client_.println(val);
-}
-
-void bb::WifiConsoleStream::println(float val) { 
-	client_.println(val);
-}
-
-void bb::WifiConsoleStream::println(const String& val) {
-	client_.println(val);
-}
-
-void bb::WifiConsoleStream::println() {
-	client_.println();
-}
-
 bb::WifiServer::WifiServer(): tcp_(DEFAULT_TCP_PORT) {
 	name_ = "wifi";
 	help_ = "Creates an AP or joins a network. Starts a shell on TCP.\r\nSSID and WPA Key replacements: $MAC - Mac address";
@@ -93,12 +61,9 @@ bb::Result bb::WifiServer::initialize(const String& ssid, const String& wpakey, 
 	if(operationStatus_ != RES_SUBSYS_NOT_INITIALIZED) return RES_SUBSYS_ALREADY_INITIALIZED;
 
 	paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
-	Serial.print("Handle: "); Serial.println(paramsHandle_);
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
-		Serial.println("Block valid, reading config");
 		ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
 	} else {
-		Serial.println("Block invalid, initializing");
 		memset(&params_, 0, sizeof(params_));
 		strncpy(params_.ssid, ssid.c_str(), MAX_STRLEN);
 		strncpy(params_.wpaKey, wpakey.c_str(), MAX_STRLEN);
@@ -135,7 +100,7 @@ bb::Result bb::WifiServer::setOTANameAndPassword(const String& name, const Strin
 
 bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 	if(WiFi.status() == WL_NO_MODULE) {
-		if(stream) stream->println("WL_NO_MODULE!");
+		if(stream) stream->printf("WL_NO_MODULE!\n");
 		return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 	} 
 
@@ -148,31 +113,34 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 
 	if(params_.ap == true) { // Start Access Point
 		if(stream) {
-			stream->print(String("Start AP \"") + ssid_ + "\"... ");
+			stream->printf("Start AP \"%s\"... ", ssid_.c_str());
 		}
 
 		uint8_t retval = WiFi.beginAP(ssid_.c_str(), wpaKey_.c_str());
 		if(retval == WL_AP_LISTENING) {
-			if(stream) stream->print("success. ");
+			if(stream) stream->printf("success. ");
 		} else {
-			if(stream) stream->println("failure.");
+			if(stream) stream->printf("failure.\n");
 			return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 		}
 	} else { // Connect as client
 		if(stream) { 
-			stream->print(String("Connect to \"") + ssid_ + "\"... ");
+			stream->printf("Connect to \"%s\"... ", ssid_.c_str());
 		}
 
 		uint8_t retval = WiFi.begin(ssid_.c_str(), wpaKey_.c_str());
 		if(retval == WL_CONNECTED) {
-			if(stream) stream->print("success. ");
+			if(stream) stream->printf("success. ");
 		} else {
-			if(stream) stream->println("failure.");
+			if(stream) stream->printf("failure.\n");
 			return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 		}
 	}
 
+#if !defined(ARDUINO_PICO_VERSION_STR)
 	ArduinoOTA.begin(WiFi.localIP(), otaName_.c_str(), otaPassword_.c_str(), InternalStorage);
+#endif
+
 	tcp_ = WiFiServer(params_.tcpPort);
 	tcp_.begin();
 	udp_.begin(params_.udpPort);
@@ -191,7 +159,9 @@ bb::Result bb::WifiServer::stop(ConsoleStream* stream) {
 	bb::Console::console.removeConsoleStream(&consoleStream_);
 
 	udp_.stop();
+#if !defined(ARDUINO_PICO_VERSION_STR)
 	ArduinoOTA.end();
+#endif
 	WiFi.end();
 
 	started_ = false;
@@ -285,19 +255,19 @@ bool bb::WifiServer::sendUDPPacket(const IPAddress& addr, const uint8_t* packet,
 
 	if(WiFi.status() != WL_CONNECTED && WiFi.status() != WL_AP_CONNECTED) return false;
 	if(udp_.beginPacket(addr, params_.udpPort) == false) {
-		Console::console.printlnBroadcast("beginPacket() failed!");
+		Console::console.printfBroadcast("beginPacket() failed!\n");
 		return false;
 	}
 
 	if(udp_.write(packet, len) != len) {
-		Console::console.printlnBroadcast("write() failed");
+		Console::console.printfBroadcast("write() failed\n");
 		return false;
 	}
 
 	if(udp_.endPacket() == false) {
 		failures++;
 		if(failures > 10) {
-			Console::console.printlnBroadcast(String("endPacket() failed ") + failures + " in a row!");
+			Console::console.printfBroadcast("endPacket() failed %d times in a row!\n", failures);
 			failures = 0;
 		}
 
@@ -315,71 +285,66 @@ unsigned int bb::WifiServer::readDataIfAvailable(uint8_t *buf, unsigned int maxs
 	remoteIP = udp_.remoteIP();
 	if(len > maxsize) return len;
 	if((unsigned int)(udp_.read(buf, maxsize)) != len) { 
-		Serial.println("Huh? Differing sizes?!"); 
+		Serial.print("Huh? Differing sizes?!\n"); 
 		return 0;
 	} else {
 		return len;
 	}
 }
 
-void bb::WifiServer::updateDescription() {
+void bb::WifiServer::printStatus(ConsoleStream *stream) {
+	if(stream == NULL) return;
+
 	if(WiFi.status() == WL_NO_MODULE) {
-		description_ = "No Wifi module installed.";
+		stream->printf("No Wifi module installed.\n");
 		return;
 	}
 
-	description_ = String("Wifi module ") + macStr_ + ", status: ";
+	stream->printf("Wifi module %s, status: ", macStr_.c_str());
 	
 	IPAddress ip;
-
 	switch(WiFi.status()) {
     case WL_IDLE_STATUS:
-    	description_ += "idle";
+    	stream->printf("idle");
     	break;
     case WL_NO_SSID_AVAIL:
-    	description_ += "no SSID available";
+    	stream->printf("no SSID available");
     	break;
     case WL_SCAN_COMPLETED:
-    	description_ += "scan completed";
+    	stream->printf("scan completed");
     	break;
     case WL_CONNECTED:
-    	description_ += "connected as client, IP " + IPAddressToString(WiFi.localIP());
+    	ip = WiFi.localIP();
+    	stream->printf("connected as client, IP %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
     	break;
     case WL_CONNECT_FAILED:
-    	description_ += "conn failed";
+    	stream->printf("conn failed");
     	break;
     case WL_CONNECTION_LOST:
-    	description_ += "conn lost";
+    	stream->printf("conn lost");
     	break;
     case WL_DISCONNECTED:
-    	description_ += "disconnected";
+    	stream->printf("disconnected");
     	break;
     case WL_AP_LISTENING:
-    	description_ += "AP listening";
+    	stream->printf("AP listening");
     	break;
     case WL_AP_CONNECTED:
-    	description_ += "connected as AP, IP " + IPAddressToString(WiFi.localIP());
+    	ip = WiFi.localIP();    	
+    	stream->printf("connected as AP, IP %d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
     	break;
     case WL_AP_FAILED:
-    	description_ += "AP setup failed";
+    	stream->printf("AP setup failed");
     	break;
     default:
-    	description_ += "unknown";
+    	stream->printf("unknown");
     	break;
 	}
 
-#if 0
 	if(client_ == true) {
-		description_ += ", client ";
 		ip = client_.remoteIP();
-  	description_ += ip[0];
-  	description_ += ".";
-  	description_ += ip[1];
-  	description_ += ".";
-  	description_ += ip[2];
-  	description_ += ".";
-  	description_ += ip[3];
-		description_ += " connected";
+		stream->printf(", client %d.%d.%d.%d connected", ip[0], ip[1], ip[2], ip[3]);
 	}
-#endif
+
+	stream->printf(".\n");
 }
