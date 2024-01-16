@@ -1,9 +1,7 @@
 #include <Arduino.h>
 #include "Config.h"
 
-#if defined(LEFT_REMOTE)
-
-#include "RemoteDisplay.h"
+#include "RDisplay.h"
 #include "RemoteInput.h"
 #include "IMUFilter.h"
 
@@ -13,25 +11,24 @@ static const int BOTTOM_CIRCLE_Y = 120;
 static const int CIRCLE_RADIUS = 30;
 static const int CURSOR_SIZE = 5;
 
-#define BLACK  0x0000
-#define WHITE  0xffff
-#define RED    0xF800
-#define GREEN  0x0400
-#define BLUE   0x001F
-
 #define SQ(a) ((a)*(a))
 #define DEG2RAD(a) ((a)*M_PI/180.0)
 #define RAD2DEG(a) ((a)*180.0/M_PI)
 
-RemoteDisplay RemoteDisplay::display;
+RDisplay RDisplay::display;
 
-RemoteDisplay::RemoteDisplay(): ser_(P_DISPLAY_RX, P_DISPLAY_TX) {
+RDisplay::RDisplay()
+#if defined(LEFT_REMOTE)
+: ser_(P_DISPLAY_RX, P_DISPLAY_TX) 
+#endif // LEFT_REMOTE
+{
   name_ = "display";
 	description_ = "Display";
 	help_ = "";
 }
 
-Result RemoteDisplay::initialize() {
+Result RDisplay::initialize() {
+#if defined(LEFT_REMOTE)
   pinMode(P_NEOPIXEL, OUTPUT);
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
@@ -45,15 +42,13 @@ Result RemoteDisplay::initialize() {
     return RES_SUBSYS_COMM_ERROR;
   }
   Serial.println("Display OK");
-
-  RemoteInput::input.setDelegate(this);
+#endif
   
   return Subsystem::initialize();
 }
 
-Result RemoteDisplay::start(ConsoleStream *stream) {
-  curScreen_ = LOGO_SCREEN;
-
+Result RDisplay::start(ConsoleStream *stream) {
+#if defined(LEFT_REMOTE)
   last_millis_ = millis();
   left_led_state_ = false;
   right_led_state_ = false;
@@ -62,19 +57,26 @@ Result RemoteDisplay::start(ConsoleStream *stream) {
   started_ = true;
 
   return RES_OK;
+#else
+  return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+#endif
 }
 	
-Result RemoteDisplay::stop(ConsoleStream *stream) {
-  if(sendStringAndWaitForOK("logo") == false) return RES_SUBSYS_COMM_ERROR;
+Result RDisplay::stop(ConsoleStream *stream) {
+  Result res = RES_OK;
 
-  return RES_OK;
+  if(sendStringAndWaitForOK("logo") == false) res = RES_SUBSYS_COMM_ERROR;
+
+  started_ = false;
+  return res;
 }
 	
-Result RemoteDisplay::step() {
+Result RDisplay::step() {
   return update();
 }
 
-Result RemoteDisplay::showScreen(Screen screen) {
+#if 0
+Result RDisplay::showScreen(Screen screen) {
   if(screen == curScreen_) return RES_OK;
 
   if(screen == LOGO_SCREEN) {
@@ -128,8 +130,10 @@ Result RemoteDisplay::showScreen(Screen screen) {
 
   return RES_CMD_FAILURE;
 }
+#endif
 
-Result RemoteDisplay::update() {
+Result RDisplay::update() {
+#if 0
   // blink left LED as long as we are not connected, otherwise switch it on
   unsigned long current_millis = millis();
   if(current_millis - last_millis_ > 500) {
@@ -250,42 +254,22 @@ Result RemoteDisplay::update() {
       drawCursor(bottomX_, bottomY_, CURSOR_SIZE, WHITE);
     //}
   }
-
+#endif
   return RES_OK;
 }
 
-void RemoteDisplay::setConnected(bool conn) {
+void RDisplay::setConnected(bool conn) {
   connected_ = conn;
 }
 
-void RemoteDisplay::buttonTopLeftPressed() {
-  if(curScreen_ == LEFT_REMOTE_SCREEN) {
-    // do nothing 
-  } else if(curScreen_ == RIGHT_REMOTE_SCREEN) {
-    showScreen(LEFT_REMOTE_SCREEN);
-  } else {
-    showScreen(RIGHT_REMOTE_SCREEN);
-  }
-}
-
-void RemoteDisplay::buttonTopRightPressed() {
-  if(curScreen_ == LEFT_REMOTE_SCREEN) {
-    showScreen(RIGHT_REMOTE_SCREEN);
-  } else if(curScreen_ == RIGHT_REMOTE_SCREEN) {
-    showScreen(DROID_STATUS_SCREEN);
-  } else {
-    // do nothing
-  }
-}
-
-
-Result RemoteDisplay::drawCursor(int x, int y, int width, uint16_t color) {
+Result RDisplay::drawCursor(int x, int y, int width, uint16_t color) {
   if(sendStringAndWaitForOK(String("line ") + (x-width/2) + " " + y + " " + (x+width/2) + " " + y + " 0x" + String(color, HEX)) == false) return RES_SUBSYS_COMM_ERROR;
   if(sendStringAndWaitForOK(String("line ") + x + " " + (y-width/2) + " " + x + " " + (y+width/2) + " 0x" + String(color, HEX)) == false) return RES_SUBSYS_COMM_ERROR;
   return RES_OK;
 }
 
-String RemoteDisplay::sendStringAndWaitForResponse(const String& str, int predelay, bool nl) {
+String RDisplay::sendStringAndWaitForResponse(const String& str, int predelay, bool nl) {
+#if defined(LEFT_REMOTE)
   //Serial.println(String("Sending \"") + str + "\"");
   ser_.print(str);
   if(nl) {
@@ -300,18 +284,20 @@ String RemoteDisplay::sendStringAndWaitForResponse(const String& str, int predel
   if(readString(retval)) {
     return retval;
   }
+#endif
 
   return "";
 }
   
-bool RemoteDisplay::sendStringAndWaitForOK(const String& str, int predelay, bool nl) {
+bool RDisplay::sendStringAndWaitForOK(const String& str, int predelay, bool nl) {
   String result = sendStringAndWaitForResponse(str, predelay, nl);
   //Serial.println(String("Received \"") + result + "\"");
   if(result.equals("OK.\r\n")) return true;
   return false;
 }
 
-bool RemoteDisplay::readString(String& str, unsigned char terminator) {
+bool RDisplay::readString(String& str, unsigned char terminator) {
+#if defined(LEFT_REMOTE)
 	while(true) {
 		int to = 0;
 		while(!ser_.available()) {
@@ -325,6 +311,32 @@ bool RemoteDisplay::readString(String& str, unsigned char terminator) {
 		str += (char)c;
 		if(c == terminator) return true;
 	}
+#else
+  return false;
+#endif
 }
 
-#endif // LEFT_REMOTE
+Result RDisplay::cls() {
+  if(!sendStringAndWaitForOK("cls")) return RES_SUBSYS_COMM_ERROR;
+  return RES_OK;
+}
+
+Result RDisplay::text(uint8_t x, uint8_t y, uint16_t color, const String& text) {
+  String str = String("print ") + x + " " + y + " 0x" + String(color, HEX) + " \"" + text + "\"";
+  if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR; 
+  return RES_OK;
+}
+
+Result RDisplay::hline(uint8_t x, uint8_t y, uint8_t width, uint16_t color) {
+  String str = String("hline ") + x + " " + y + " " + width + " 0x" + String(color, HEX);
+  if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
+  return RES_OK;
+}
+
+Result RDisplay::rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color, bool filled) {
+  String str;
+  if(filled) str = String("rectfilled ") + x1 + " " + y1 + " " + x2 + " " + y2 + " " + " 0x" + String(color, HEX);
+  else str = String("rect ") + x1 + " " + y1 + " " + x2 + " " + y2 + " " + " 0x" + String(color, HEX);
+  if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
+  return RES_OK;
+}

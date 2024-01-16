@@ -1,6 +1,9 @@
+#if !defined(CONFIG_H)
+#define CONFIG_H
+
 #include <Arduino.h>
 
-//#define LEFT_REMOTE 
+#define LEFT_REMOTE 
 
 #if defined(LEFT_REMOTE)
 
@@ -49,3 +52,8 @@
 #define CalibBiasJoystickVertical   10
 #define CalibBiasJoystickHorizontal -14
 #define JoystickEpsilon             0.01f
+
+static const uint8_t BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 2 - Micke, 3 - Brad
+static const uint8_t REMOTE_ID = 0;
+
+#endif // CONFIG_H

@@ -1,5 +1,9 @@
+#include <LibBB.h>
+
 #include "RemoteInput.h"
 #include "Config.h"
+
+using namespace bb;
 
 RemoteInput RemoteInput::input;
 
@@ -89,7 +93,7 @@ void RemoteInput::update() {
       btnTopRChanged = false;
     }
     if(btnConfirmChanged) {
-      if(btnTopL) delegate_->buttonConfirmPressed();
+      if(btnConfirm) delegate_->buttonConfirmPressed();
       else delegate_->buttonConfirmReleased();
       btnConfirmChanged = false;
     }
