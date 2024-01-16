@@ -78,19 +78,19 @@ Result DOServos::start(ConsoleStream* stream) {
   dxl_.setPortProtocolVersion(2.0);
   unsigned int bps = 0;
 
-  if(stream) stream->print("Detecting Dynamixels... ");
+  if(stream) stream->printf("Detecting Dynamixels... ");
   for (unsigned int i = 0; i < numBps; i++) {
     dxl_.begin(bpsList[i]);
     if (dxl_.scan() == false) continue;
 
     bps = bpsList[i];
 
-    if(stream) stream->print(String("scan successful at ") + bps + "bps, enumerating up to " + MAX_SERVO_ID + "...");
+    if(stream) stream->printf("scan successful at %dbps, enumerating up to %d...", bps, MAX_SERVO_ID);
 
     for (uint8_t id = 1; id <= MAX_SERVO_ID; id++) {
       if (dxl_.ping(id)) {
         uint16_t model = dxl_.getModelNumber(id);
-        if(stream) stream->print(String("#") + id + ": model #" + model + "...");
+        if(stream) stream->printf("#%d: model # %d... ", id, model);
 
         Servo servo;
         servo.id = id;
@@ -113,35 +113,35 @@ Result DOServos::start(ConsoleStream* stream) {
           DYNAMIXEL::ControlTableItemInfo_t item;
           item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
           if (item.addr != ctrlPresentPos_.addr || item.addr_length != ctrlPresentPos_.addr_length) {
-            if (stream) stream->println("Servos use differing control tables, that is not supported currently!");
+            if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
             return RES_SUBSYS_HW_DEPENDENCY_MISSING;
           }
           item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
           if (item.addr != ctrlGoalPos_.addr || item.addr_length != ctrlGoalPos_.addr_length) {
-            if (stream) stream->println("Servos use differing control tables, that is not supported currently!");
+            if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
             return RES_SUBSYS_HW_DEPENDENCY_MISSING;
           }
           item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
           if (item.addr != ctrlProfileVel_.addr || item.addr_length != ctrlProfileVel_.addr_length) {
-            if (stream) stream->println("Servos use differing control tables, that is not supported currently!");
+            if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
             return RES_SUBSYS_HW_DEPENDENCY_MISSING;
           }
           item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
           if(item.addr == 0) item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT);
           if (item.addr != ctrlPresentLoad_.addr || item.addr_length != ctrlPresentLoad_.addr_length) {
-            if (stream) stream->println(String("Servos use differing control tables, that is not supported currently! (addr ") + item.addr + "!=" + ctrlPresentLoad_.addr + ", length " + item.addr_length + "!=" + ctrlPresentLoad_.addr_length + ")");
+            if (stream) stream->printf("Servos use differing control tables, that is not supported currently! (addr %d!=%d, length %d!=%d)\n", item.addr, ctrlPresentLoad_.addr, item.addr_length, ctrlPresentLoad_.addr_length);
             return RES_SUBSYS_HW_DEPENDENCY_MISSING;
           }
         }
       }
     } 
 
-    if (stream) stream->println();
+    if (stream) stream->printf("\n");
   }
 
   for(auto id: requiredIds_) {
     if(servoWithID(id) == NULL) {
-      if (stream) stream->println(String("Required servo ID  ") + id + " not found!");
+      if (stream) stream->printf("Required servo ID %d not found!\n", id);
       return RES_SUBSYS_HW_DEPENDENCY_MISSING;
     }
   }
@@ -150,7 +150,7 @@ Result DOServos::start(ConsoleStream* stream) {
     for(auto& s: servos_) {
       uint8_t err = errorStatus(s.id);
       if(err != 0x0) {
-        stream->print(String("Servo #") + s.id + " reports error " + String(err, HEX) + ". Consider rebooting it.");
+        stream->printf("Servo #%d reports error 0x%x. Consider rebooting it.\n", s.id, err);
       }
     }
   }
@@ -159,12 +159,12 @@ Result DOServos::start(ConsoleStream* stream) {
   if (bps != goalBps) {
     for (auto& s : servos_) {
       dxl_.torqueOff(s.id);
-      if(dxl_.setBaudrate(s.id, goalBps) == false) Console::console.printlnBroadcast(String("Faled to set baud rate on #") + s.id + " to " + goalBps);
+      if(dxl_.setBaudrate(s.id, goalBps) == false) Console::console.printfBroadcast("Failed to set baud rate on #%d to %d\n", s.id, goalBps);
     }
     delay(30);
     dxl_.begin(goalBps);
     if (dxl_.scan() == false) {
-      if(stream) stream->println(String("Could not rescan after switching to ") + goalBps + "bps!");
+      if(stream) stream->printf("Could not rescan after switching to %dbps!\n", goalBps);
       return RES_SUBSYS_HW_DEPENDENCY_MISSING;
     }
     bps = goalBps;
@@ -207,7 +207,7 @@ Result DOServos::step() {
   if (!started_ || operationStatus_ != RES_OK) return RES_SUBSYS_NOT_STARTED;
 
   if (failcount > 5) {
-    Console::console.printlnBroadcast("Servo communication failed more than 5 times in a row. Stopping subsystem.");
+    Console::console.printfBroadcast("Servo communication failed more than 5 times in a row. Stopping subsystem.\n");
     stop();
     failcount = 0;
     return RES_SUBSYS_COMM_ERROR;
@@ -285,7 +285,7 @@ Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleS
     if(words[1] == "all") {
       for (auto& s : servos_) {
         if (stream) {
-          stream->println(String("Rebooting ") + s.id + "... ");
+          stream->printf("Rebooting %d... ", s.id);
         }
         dxl_.reboot(s.id);
       }
@@ -316,19 +316,19 @@ Result DOServos::handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex 
   int id = words[1].toInt();
   if (words.size() == 2) {
     int val = (int)dxl_.readControlTableItem(idx, id);
-    if(stream) stream->println(words[0] + "=" + val);
+    if(stream) stream->printf("%s=%d\n", words[0].c_str(), val);
   } else {
     int val = words[2].toInt();
-    if(stream) stream->println(String("Setting ") + words[0] + " (" + (int)idx + ") to " + val);
+    if(stream) stream->printf("Setting %s (%d) to %d\n", words[0].c_str(), (int)idx, val);
     dxl_.writeControlTableItem(idx, id, val);
     val = (int)dxl_.readControlTableItem(idx, id);
-    if(stream) stream->println(words[0] + "=" + val);
+    if(stream) stream->printf("%s=%d\n", words[0].c_str(), val);
   }
   return RES_OK;
 }
 
 Result DOServos::home(float vel, ConsoleStream* stream) {
-  if(stream) stream->println("Homing servos...");
+  if(stream) stream->printf("Homing servos...\n");
 
   Result res;
   float maxoffs = 0;
@@ -364,18 +364,18 @@ Result DOServos::home(float vel, ConsoleStream* stream) {
     if(res != RES_OK) return res;
     for(auto& s: servos_) {
       if(stream) {
-        stream->print(String("Servo ") + s.id + ": Pos" + s.present + " Load" + s.load + " ");
+        stream->printf("Servo %d: Pos %d Load %d ", s.id, s.present, s.load);
       }
     }
-    if(stream) stream->println();
+    if(stream) stream->printf("\n");
     delay(1000);
     d-=1000;
   }
   if(stream) {
-    stream->print("Final: ");
+    stream->printf("Final: ");
     for(auto& s: servos_) {
       if(stream) {
-        stream->print(String("Servo ") + s.id + ": Pos" + s.present + " Load" + s.load + " ");
+        stream->printf("Servo %d: Pos %d Load %d ", s.id, s.present, s.load);
       }
     }
   }
@@ -412,47 +412,33 @@ bool DOServos::isTorqueOn(uint8_t id) {
 
 void DOServos::printStatus(ConsoleStream* stream, int id) {
   if (!started_) {
-    stream->println("Servo subsystem not started.");
+    stream->printf("Servo subsystem not started.\n");
     return;
   }
 
   Servo *s = servoWithID(id);
   if(s == NULL) {
-    stream->println(String("Servo #") + id + "does not exist.");
+    stream->printf("Servo #%d does not exist.\n", id);
     return;
   }
 
-  stream->print(String("Servo #") + id + ": ");
+  stream->printf("Servo #%d: ", id);
   if (dxl_.ping(id)) {
-    stream->print(String("model #") + dxl_.getModelNumber(id) + ", ");
-    stream->print(String("present: ") + present(id) + "deg (" + s->present + "), ");
-    stream->print(String("goal: ") + goal(id) + "deg (" + s->goal + "), ");
+    stream->printf("model #%d, present: %f° (%d), goal: %f° (%d), ", dxl_.getModelNumber(id), present(id), s->present, goal(id), s->goal);
     
-    stream->print(String("range: [") + s->min + ".." + s->max +"], ");
-    stream->print(String("offset: ") + s->offset + ", ");
-    stream->print(String("invert: ") + (dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1) + ", ");
+    stream->printf("range: [%d..%d], offset: %d, invert: %d, ", s->min, s->max, s->offset, dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1);
 
-    stream->print("hw err: $");
-    stream->print(String(dxl_.readControlTableItem(ControlTableItem::HARDWARE_ERROR_STATUS, id), HEX));
-    stream->print(", alarm shutdown: $");
-    stream->print(String(dxl_.readControlTableItem(ControlTableItem::SHUTDOWN, id), HEX));
-    stream->print(", torque limit: ");
-    stream->print((int)dxl_.readControlTableItem(ControlTableItem::TORQUE_LIMIT, id));
-    stream->print(", max torque: ");
-    stream->print((int)dxl_.readControlTableItem(ControlTableItem::MAX_TORQUE, id));
-    stream->print(", torque enabled: ");
-    stream->print((int)dxl_.readControlTableItem(ControlTableItem::TORQUE_ENABLE, id));
-    stream->print(", drive mode: ");
-    stream->print((int)dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id));
-    stream->print(", profile vel: ");
-    stream->print((int)dxl_.readControlTableItem(ControlTableItem::PROFILE_VELOCITY, id));
-    stream->print(", profile acc: ");
-    stream->print((int)dxl_.readControlTableItem(ControlTableItem::PROFILE_ACCELERATION, id));
-    stream->println();
+    stream->printf("hw err: $%x", dxl_.readControlTableItem(ControlTableItem::HARDWARE_ERROR_STATUS, id));
+    stream->printf(", alarm shutdown: $%x", dxl_.readControlTableItem(ControlTableItem::SHUTDOWN, id));
+    stream->printf(", torque limit: %d", (int)dxl_.readControlTableItem(ControlTableItem::TORQUE_LIMIT, id));
+    stream->printf(", max torque: %d", (int)dxl_.readControlTableItem(ControlTableItem::MAX_TORQUE, id));
+    stream->printf(", torque enabled: %d", (int)dxl_.readControlTableItem(ControlTableItem::TORQUE_ENABLE, id));
+    stream->printf(", drive mode: %d", (int)dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id));
+    stream->printf(", profile vel: %d", (int)dxl_.readControlTableItem(ControlTableItem::PROFILE_VELOCITY, id));
+    stream->printf(", profile acc: %d", (int)dxl_.readControlTableItem(ControlTableItem::PROFILE_ACCELERATION, id));
+    stream->printf("\n");
   } else {
-    stream->print("#");
-    stream->print(id);
-    stream->print(" not found! ");
+    stream->printf("#%d not found! ", id);
   }
 }
 
@@ -535,7 +521,7 @@ bool DOServos::setProfileVelocity(uint8_t id, float vel, ValueType t) {
     v = (uint32_t)((vel / 6.0f) / 0.229); // deg/s to rev/min, and then multiply with steps of 0.229
   }
 
-  Console::console.printlnBroadcast(String("Setting profile velocity to ") + v);
+  Console::console.printfBroadcast("Setting profile velocity to %d", v);
   s->profileVel = v;
   swVelInfos.is_info_changed = true;
 
@@ -554,7 +540,7 @@ uint32_t DOServos::computeRawValue(float val, ValueType t) {
   }
 
   if (retval < 0 && retval > 4096) {
-    Console::console.printlnBroadcast(String("Capping ") + retval + " (computed from " + val + ") to [0..4096]!");
+    Console::console.printfBroadcast("Capping %d (computed from %f) to [0..4096]!", retval, val);
     retval = constrain(retval, 0, 4096);
   }
 
@@ -706,15 +692,15 @@ Result DOServos::syncReadInfo(ConsoleStream *stream) {
   
   recv_cnt = dxl_.syncRead(&srPresentInfos);
   if(recv_cnt != servos_.size()) {
-    if(stream) stream->println("Receiving position failed!");
-    else Console::console.printlnBroadcast("Receiving position failed!");
+    if(stream) stream->printf("Receiving position failed!\n");
+    else Console::console.printfBroadcast("Receiving position failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
   recv_cnt = dxl_.syncRead(&srLoadInfos);
   if(recv_cnt != servos_.size()) {
-    if(stream) stream->println("Receiving initial load failed!");
-    else Console::console.printlnBroadcast("Receiving initial load failed!");
+    if(stream) stream->printf("Receiving initial load failed!\n");
+    else Console::console.printfBroadcast("Receiving initial load failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
@@ -723,14 +709,14 @@ Result DOServos::syncReadInfo(ConsoleStream *stream) {
 
 Result DOServos::syncWriteInfo(ConsoleStream* stream) {
   if(dxl_.syncWrite(&swGoalInfos) == false) {
-    if(stream) stream->println("Sending servo position goal failed!");
-    else Console::console.printlnBroadcast("Sending servo position goal failed!");
+    if(stream) stream->printf("Sending servo position goal failed!\n");
+    else Console::console.printfBroadcast("Sending servo position goal failed!\n");
     return RES_SUBSYS_COMM_ERROR;
   }
 
   if(dxl_.syncWrite(&swVelInfos) == false) {
-    if(stream) stream->println("Sending servo profile velocity failed!");
-    else Console::console.printlnBroadcast("Sending servo profile velocity failed!");
+    if(stream) stream->printf("Sending servo profile velocity failed!\n");
+    else Console::console.printfBroadcast("Sending servo profile velocity failed!\n");
     return RES_SUBSYS_COMM_ERROR;
   }
 

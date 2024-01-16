@@ -16,9 +16,10 @@ DOIMUControlInput::DOIMUControlInput(DOIMUControlInput::ProbeType pt): filter_(2
 }
 
 bb::Result DOIMUControlInput::update() {
-  if(DOIMU::imu.update() == true) return RES_OK;
+  //if(DOIMU::imu.update() == true) return RES_OK;
 
-  return RES_CMD_FAILURE;
+  //return RES_CMD_FAILURE;
+  return RES_OK;
 }
 
 float DOIMUControlInput::present() {
@@ -64,7 +65,7 @@ bool DOIMU::begin() {
   Wire.beginTransmission(IMU_ADDR);
   err = Wire.endTransmission();
   if(err != 0) {
-    bb::Console::console.printlnBroadcast(String("Wire.endTransmission() returns error ") + err + " while detecting IMU at " + String(IMU_ADDR, HEX));
+    bb::Console::console.printfBroadcast("Wire.endTransmission() returns error %d while detecting IMU at 0x%x\n", err, IMU_ADDR, HEX);
     available_ = false;
     return false;
   }
@@ -223,7 +224,7 @@ bool DOIMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
     avgP += p;
     avgH += h;
 
-    if(stream) stream->println(String("R=") + String(r, 6) + " P=" + String(p, 6) + " H=" + String(h, 6));
+    if(stream) stream->printf("R=%.6f, P=%.6f, H=%.6f\n", r, p, h);
 
     delay(step);
   }
@@ -234,8 +235,8 @@ bool DOIMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
   avgH /= count;
 
   if(stream) {
-    stream->print(String("Gyro calib finished (") + count + "cycles, avg temp " + avgTemp + "°C). ");
-    stream->println(String("R=") + String(avgR, 6) + " P=" + String(avgP, 6) + " H=" + String(avgH, 6));
+    stream->printf("Gyro calib finished (%d cycles, avg temp %f°C)\n", count, avgTemp);
+    stream->printf("R=%.6f P=%.6f H=%.6f\n", avgR, avgP, avgH);
   }
 
   calR_ = -avgR; calP_ = -avgP; calH_ = -avgH;

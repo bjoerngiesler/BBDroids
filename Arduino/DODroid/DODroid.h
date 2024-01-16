@@ -2,6 +2,8 @@
 #define DODROID_H
 
 #include <LibBB.h>
+#include "DOIMU.h"
+#include "DODriveController.h"
 
 using namespace bb;
 
@@ -10,6 +12,7 @@ public:
   static DODroid droid;
   
   struct Params {
+    float balKp, balKi, balKd;
     float speedKp, speedKi, speedKd;
     float posKp, posKi, posKd;
     float driveAccel;
@@ -30,9 +33,14 @@ public:
   virtual Result setParameterValue(const String& name, const String& stringVal);
 
 protected:
-  bb::DCMotor leftMotor, rightMotor;
-  bb::Encoder leftEncoder, rightEncoder;
-  bb::PIDController leftController, rightController;
+  bb::DCMotor leftMotor_, rightMotor_;
+  bb::Encoder leftEncoder_, rightEncoder_;
+  
+  bb::PIDController* balanceController_;
+  DOIMUControlInput* balanceInput_;
+  DODriveControlOutput* driveOutput_;
+  
+  bool motorsOK_;
 };
 
 #endif

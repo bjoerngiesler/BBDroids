@@ -18,7 +18,7 @@ bool DOBattStatus::begin() {
   Wire.beginTransmission(BATT_STATUS_ADDR);
   err = Wire.endTransmission();
   if(err != 0) {
-    bb::Console::console.printlnBroadcast(String("Wire.endTransmission() returns error ") + err + " while detecting battery monitor at " + String(BATT_STATUS_ADDR, HEX));
+    bb::Console::console.printfBroadcast("Wire.endTransmission() returns error %d while detecting battery monitor at 0x%x", err, BATT_STATUS_ADDR);
     available_ = false;
     return false;
   }
