@@ -17,6 +17,9 @@ int getAnalogReadResolution() { return 12; } // whatever
 void setup() {
   rp2040.enableDoubleResetBootloader();
 
+  Serial.begin(2000000);
+  //while(!Serial);
+
   pinMode(LEDR, OUTPUT);
   pinMode(LEDG, OUTPUT);
   pinMode(LEDB, OUTPUT);
@@ -34,9 +37,14 @@ void setup() {
 #else 
   uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
 #endif
-  XBee::xbee.initialize(DEFAULT_CHAN, 0x3333, station, DEFAULT_STATION_DROID, DEFAULT_BPS);
+  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, DEFAULT_STATION_DROID, 115200);
   XBee::xbee.setPacketMode(true);
-  WifiServer::server.initialize("Hogwarts", "1s(h1pu+Bj0rn", false, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
+  
+#if defined(LEFT_REMOTE)
+  WifiServer::server.initialize("LRemote-$MAC", "LRemoteKey", true, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
+#else
+  WifiServer::server.initialize("RRemote-$MAC", "RRemoteKey", true, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
+#endif
   RRemote::remote.initialize();
 
 #if defined(LEFT_REMOTE)

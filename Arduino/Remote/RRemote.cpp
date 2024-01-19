@@ -82,6 +82,8 @@ void RRemote::showRemotesMenu() {
     return;
   }
 
+  Console::console.printfBroadcast("Discovered %d nodes\n", discoveredNodes_.size());
+
   remotesMenu_->clear();
   for(auto& n: discoveredNodes_) {
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_REMOTE) continue;
@@ -94,7 +96,24 @@ void RRemote::showRemotesMenu() {
 
 void RRemote::selectDroid(uint16_t droid) {
   Console::console.printfBroadcast("Selecting droid 0x%x\n", droid);
+
+  waitMessage_->draw();
+
+  bb::Packet packet;
+  packet.type = bb::PACKET_TYPE_CONFIG;
+  packet.seqnum = 0;
+  packet.source = bb::PACKET_SOURCE_LEFT_REMOTE; 
+  bb::ConfigPacket& c = packet.payload.config;
+  c.type = bb::CONFIG_SET_DESTINATION_ID;
+  c.bits0to6 = droid & 0x7f;
+  droid >> 7;
+  c.bits7to13 = droid & 0x7f;
+  droid >> 7;
+  c.bits14to20 = droid & 0x7f;
+  c.bits21to27 = c.bits28to34 = c.bits35to41 = c.bits42to48 = 0;
   
+  XBee::xbee.send(packet);
+
   showMenu(mainMenu_);
 }
 
@@ -110,6 +129,8 @@ void RRemote::selectRightRemote(uint16_t remote) {
   bb::XBee::xbee.setConnectionInfo(chan, pan, station, remote, true);
   bb::XBee::xbee.getConnectionInfo(chan, pan, station, partner);
   Console::console.printfBroadcast("After: chan 0x%x pan 0x%x station 0x%x partner 0x%x\n", chan, pan, station, partner);
+
+  selectDroid(0xbabe);
 
   showMenu(mainMenu_);
 }
@@ -142,14 +163,16 @@ Result RRemote::stop(ConsoleStream *stream) {
 }
 
 Result RRemote::step() {
-  bb::Runloop::runloop.excuseOverrun();
-
+  //Runloop::runloop.excuseOverrun();
+  std::vector<unsigned long> timing;
+  timing.push_back(micros());
+  
   if(needsDraw_) {
     currentDrawable_->draw();
     needsDraw_ = false;
   }
 
-  unsigned long m = micros();
+  timing.push_back(micros()); // 1
 
   bool allOK = true;
   std::vector<Subsystem*> subsys = SubsystemManager::manager.subsystems();
@@ -159,9 +182,7 @@ Result RRemote::step() {
     }
   }
 
-  int i=0;
-  //Serial.print(String(i++) + (micros()-m) + " ");
-  //m = micros();
+  timing.push_back(micros()); // 2
 
   if(allOK) {
     digitalWrite(LEDR, LOW);
@@ -174,18 +195,14 @@ Result RRemote::step() {
   }
 
   if(!started_) return RES_SUBSYS_NOT_STARTED;
-  //if(!bb::XBee::xbee.isStarted()) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
-
-  //Serial.print(String(i++) + (micros()-m) + " ");
-  //m = micros();
   RemoteInput::input.update();
-  //Serial.print(String(i++) + (micros()-m) + " ");
-  //m = micros();
   
+  timing.push_back(micros()); // 3
+
   Packet packet;
 
   memset((uint8_t*)&packet, 0, sizeof(packet));
-  packet.type = PACKET_TYPE_COMMAND;
+  packet.type = PACKET_TYPE_CONTROL;
 
 #if defined(LEFT_REMOTE)
   packet.source = PACKET_SOURCE_LEFT_REMOTE;
@@ -193,17 +210,14 @@ Result RRemote::step() {
   packet.source = PACKET_SOURCE_RIGHT_REMOTE;
 #endif
 
-  packet.payload.cmd.button0 = RemoteInput::input.btnPinky;
-  packet.payload.cmd.button1 = RemoteInput::input.btnIndex;
-  packet.payload.cmd.button2 = RemoteInput::input.btnL;
-  packet.payload.cmd.button3 = RemoteInput::input.btnR;
-  packet.payload.cmd.button4 = RemoteInput::input.btnJoy;
+  packet.payload.control.button0 = RemoteInput::input.btnPinky;
+  packet.payload.control.button1 = RemoteInput::input.btnIndex;
+  packet.payload.control.button2 = RemoteInput::input.btnL;
+  packet.payload.control.button3 = RemoteInput::input.btnR;
+  packet.payload.control.button4 = RemoteInput::input.btnJoy;
 
-  packet.payload.cmd.setAxis(0, RemoteInput::input.joyH * AXIS_MAX);
-  packet.payload.cmd.setAxis(1, RemoteInput::input.joyV * AXIS_MAX);
-
-  //Serial.print(String(i++) + (micros()-m) + " ");
-  //m = micros();
+  packet.payload.control.setAxis(0, RemoteInput::input.joyH * AXIS_MAX);
+  packet.payload.control.setAxis(1, RemoteInput::input.joyV * AXIS_MAX);
 
   if (IMUFilter::imu.available()) {
     float roll, pitch, heading;
@@ -212,33 +226,40 @@ Result RRemote::step() {
 
     roll = -roll;
 
-    if(lastPacketSent_.payload.cmd.button2 == false && packet.payload.cmd.button2 == true) {
+    if(lastPacketSent_.payload.control.button2 == false && packet.payload.control.button2 == true) {
       deltaR_ = roll; deltaP_ = pitch; deltaH_ = heading;
     }
 
     float d = AXIS_MAX / 180.0;
-    packet.payload.cmd.setAxis(2, d * (roll-deltaR_)); 
-    packet.payload.cmd.setAxis(3, d * (pitch-deltaP_));
-    packet.payload.cmd.setAxis(4, d * (heading-deltaH_));
+    packet.payload.control.setAxis(2, d * (roll-deltaR_)); 
+    packet.payload.control.setAxis(3, d * (pitch-deltaP_));
+    packet.payload.control.setAxis(4, d * (heading-deltaH_));
   }
-  //Serial.print(String(i++) + (micros()-m) + " ");
-  //m = micros();
+
+  timing.push_back(micros()); // 4
 
   if(runningStatus_) {
     printStatus();
     Console::console.printfBroadcast("\r");
   }
 
-  //Serial.print(String(i++) + (micros()-m) + " ");
-  //m = micros();
+  static long counter = 0;
+  Result retval = RES_OK;
+  if(counter%4 == 0) {
+    lastPacketSent_ = packet;
+    retval = bb::XBee::xbee.send(packet);
+    if(retval != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(retval));
+  }
+  counter++;
+  timing.push_back(micros()); // 5
 
-  lastPacketSent_ = packet;
-  Result retval = bb::XBee::xbee.send(packet);
-  //Serial.print(String(i++) + (micros()-m) + " ");
-  //m = micros();
-  //Serial.println();
+#if 0
+  for(int i=1; i<timing.size(); i++) {
+    Console::console.printfBroadcast("%d: %d ", i, timing[i]-timing[i-1]);
+  }
+  Console::console.printfBroadcast("\n");
+#endif
 
-  //if(retval != RES_OK) Console::console.printfBroadcast("Error sending packet! %s\n", errorMessage(retval));
   return retval;
 }
 
@@ -264,30 +285,41 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
 } 
 
 Result RRemote::incomingPacket(const Packet& packet) {
-#if !defined(LEFT_REMOTE)
-  Console::console.printfBroadcast("Huh? Right remote received a packet but shouldn't\n");
+#if defined(LEFT_REMOTE)
+  Console::console.printfBroadcast("Huh? Left remote received a packet but shouldn't\n");
   return RES_SUBSYS_COMM_ERROR;
 #endif
 
   if(packet.source == PACKET_SOURCE_DROID) {
-    //Console::console.printfBroadcast("Packet from droid!\n");
+    Console::console.printfBroadcast("Packet from droid!\n");
 #if defined(LEFT_REMOTE)
     RDisplay::display.setLastPacketFromDroid(packet);
 #endif
     return RES_OK;
   }
 
-  else if(packet.source == PACKET_SOURCE_RIGHT_REMOTE) {
-    //Console::console.printfBroadcast("Packet from right remote!\n");
-#if defined(LEFT_REMOTE)
-    RDisplay::display.setLastPacketFromRightRemote(packet);
-#endif
-    return RES_OK;
-  }
-
   else if(packet.source == PACKET_SOURCE_LEFT_REMOTE) {
-    Console::console.printfBroadcast("Packet from left remote - huh? That's ourselves! Shouldn't happen.\n");
-    return RES_SUBSYS_COMM_ERROR;
+    if(packet.type == PACKET_TYPE_CONFIG) {
+      if(packet.payload.config.type == CONFIG_SET_DESTINATION_ID) {
+        uint16_t destId = packet.payload.config.bits0to6;
+        destId |= (packet.payload.config.bits7to13 < 7);
+        destId |= (packet.payload.config.bits14to20 < 14);
+        
+        Console::console.printfBroadcast("Setting destination ID to 0x%x, please wait...\n", destId);
+        uint8_t chan; uint16_t pan, station, partner;
+        XBee::xbee.getConnectionInfo(chan, pan, station, partner, true);  // get current values, and stay in AT mode
+        XBee::xbee.setConnectionInfo(chan, pan, station, destId, true);   // set new destionation id, and stay in AT mode
+        XBee::xbee.getConnectionInfo(chan, pan, station, partner, false); // check whether this worked, and leave AT mode
+        if(partner == destId) Console::console.printfBroadcast("Destination ID is now 0x%x.\n", destId);
+        else Console::console.printfBroadcast("Setting destination ID failed.\n", destId);
+      } else {
+        Console::console.printfBroadcast("Unknown config packet type 0x%x.\n", packet.payload.config.type);
+      }
+    } else if(packet.type == PACKET_TYPE_CONTROL) {
+      Console::console.printfBroadcast("Control packet received, forwarding.\n");
+      XBee::xbee.send(packet);
+    }
+    return RES_OK;
   }
 
   return RES_OK;

@@ -27,15 +27,15 @@ bb::XBee::XBee() {
 	help_ = "In order for communication to work, the PAN and channel numbers must be identical.\r\n" \
 	"Available commands:\r\n" \
 	"\tsend <string>:      Send <string> to partner\r\n"\
-	"\tsend_cmd_packet:    Send a zero command packet (with sequence number and CRC set) to partner\r\n"
+	"\tsend_control_packet:    Send a zero control packet (with sequence number and CRC set) to partner\r\n"
 	"\tcontinuous on|off:  Start or stop sending a continuous stream of numbers (or zero command packets when in packet mode)\r\n"\
 	"\tpacket_mode on|off: Switch to packet mode\r\n";
 
-	addParameter("channel", "Communication channel (between 11 and 26, usually 12)", chan_, 11, 26);
-	addParameter("pan", "Personal Area Network ID (16bit, 65535 is broadcast)", pan_, 0, 65535);
-	addParameter("station", "Station ID (MY) for this device (16bit)", station_, 0, 65535);
-	addParameter("partner", "Partner ID this device should talk to (16bit)", partner_, 0, 65535);
-	addParameter("bps", "Communication bps rate", bps_, 0, 200000);
+	addParameter("channel", "Communication channel (between 11 and 26, usually 12)", params_.chan, 11, 26);
+	addParameter("pan", "Personal Area Network ID (16bit, 65535 is broadcast)", params_.pan, 0, 65535);
+	addParameter("station", "Station ID (MY) for this device (16bit)", params_.station, 0, 65535);
+	addParameter("partner", "Partner ID this device should talk to (16bit)", params_.partner, 0, 65535);
+	addParameter("bps", "Communication bps rate", params_.bps, 0, 200000);
 
 	paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(XBeeParams));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
@@ -49,8 +49,10 @@ bb::Result bb::XBee::initialize(uint8_t chan, uint16_t pan, uint16_t station, ui
 
 	paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
+		Console::console.printfBroadcast("XBee: Storage block is valid\n");
 		ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
 	} else {
+		Console::console.printfBroadcast("XBee: Storage block is invalid, using passed parameters\n");
 		memset(&params_, 0, sizeof(params_));
 		params_.chan = chan;
 		params_.pan = pan;
@@ -68,6 +70,8 @@ bb::Result bb::XBee::initialize(uint8_t chan, uint16_t pan, uint16_t station, ui
 bb::Result bb::XBee::start(ConsoleStream *stream) {
 	if(isStarted()) return RES_SUBSYS_ALREADY_STARTED;
 	if(NULL == uart_) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+
+	if(stream == NULL) stream = Console::console.serialStream();
 
 	currentBPS_ = 0;
 	if(currentBPS_ == 0) {
@@ -143,10 +147,17 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 		return RES_SUBSYS_COMM_ERROR;
 	} 
 
+	bool changedBPS = false;
+
 	if(params_.bps != currentBPS_) {
 		if(changeBPSTo(params_.bps, stream, true) != RES_OK) {
-			if(stream) stream->printf("Setting BPS failed.\n");
+			if(stream) stream->printf("Setting BPS failed.\n"); 
+			else Console::console.printfBroadcast("Setting BPS failed.\n"); 
+			currentBPS_ = 0;
 			return RES_SUBSYS_COMM_ERROR;
+		} else {
+			Console::console.printfBroadcast("Setting BPS to %d successful.\n", params_.bps); 
+			changedBPS = true;
 		}
 	}
 
@@ -154,8 +165,20 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 		if(stream) stream->printf("Couldn't write config!\n");
 		return RES_SUBSYS_COMM_ERROR;
 	}
-
 	leaveATMode();
+
+	// we have changed the BPS successfully?
+	if(changedBPS) {
+		if(stream) stream->printf("Closing and reopening serial at %dbps\n", params_.bps);
+		uart_->end();
+		uart_->begin(params_.bps);
+
+		enterATModeIfNecessary();
+		if(sendStringAndWaitForOK("AT") == false) return RES_SUBSYS_COMM_ERROR;
+		currentBPS_ = params_.bps;
+	}
+	leaveATMode();
+
 	operationStatus_ = RES_OK;
 	started_ = true;
 
@@ -185,7 +208,7 @@ bb::Result bb::XBee::step() {
 
 			Packet packet;
 			memset(&packet, 0, sizeof(packet));
-			packet.type = PACKET_TYPE_COMMAND;
+			packet.type = PACKET_TYPE_CONTROL;
 			packet.source = PACKET_SOURCE_TEST_ONLY;
 
 			return send(packet);
@@ -219,22 +242,24 @@ bb::Result bb::XBee::setParameterValue(const String& name, const String& value) 
 
 	if(name == "channel") { 
 		params_.chan = value.toInt();
-		res = RES_OK;
+		res = setConnectionInfo(params_.chan, params_.pan, params_.station, params_.partner, false);
 	} else if(name == "pan") {
 		params_.pan = value.toInt();
-		res = RES_OK;
+		res = setConnectionInfo(params_.chan, params_.pan, params_.station, params_.partner, false);
 	} else if(name == "station") {
 		params_.station = value.toInt();
-		res = RES_OK;
+		res = setConnectionInfo(params_.chan, params_.pan, params_.station, params_.partner, false);
 	} else if(name == "partner") {
 		params_.partner = value.toInt();
-		res = RES_OK;
+		res = setConnectionInfo(params_.chan, params_.pan, params_.station, params_.partner, false);
 	} else if(name == "bps") {
 		params_.bps = value.toInt();
 		res = RES_OK;
-	} 
+	}
 
-	if(res == RES_OK) ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+	if(res == RES_OK) {
+		ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+	}
 
 	return res;
 }
@@ -247,12 +272,12 @@ bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, Cons
 		return send(words[1]);
 	} 
 
-	else if(words[0] == "send_cmd_packet") {
+	else if(words[0] == "send_control_packet") {
 		if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT;
 
 		Packet packet;
 		memset(&packet, 0, sizeof(packet));
-		packet.type = PACKET_TYPE_COMMAND;
+		packet.type = PACKET_TYPE_CONTROL;
 		packet.source = PACKET_SOURCE_TEST_ONLY;
 
 		return send(packet);
@@ -429,25 +454,17 @@ bb::Result bb::XBee::changeBPSTo(uint32_t bps, ConsoleStream *stream, bool stayI
 	default:     paramVal = bps; break;
 	}
 
+#if 0
 	String retval = sendStringAndWaitForResponse("ATBD");
 
 	if((unsigned)retval.toInt() == paramVal) {
 		if(stream) stream->printf("XBee says it's already running at %d bps\n", bps);
 		return RES_OK;
 	}
+#endif
 
 	if(stream) stream->printf("Sending ATBD=%x\n", paramVal);
 	if(sendStringAndWaitForOK(String("ATBD=")+String(paramVal, HEX)) == false) return RES_SUBSYS_COMM_ERROR;
-
-	if(stream) stream->printf("Closing and reopening serial at %dbps\n", bps);
-	uart_->end();	
-	uart_->begin(bps);
-
-	if(stream) stream->printf("Waiting for %dms to drop out of AT mode", atmode_timeout_);
-	delay(atmode_timeout_+10);
-
-	enterATModeIfNecessary();
-	if(sendStringAndWaitForOK("AT") == false) return RES_SUBSYS_COMM_ERROR;
 
 	if(stayInAT == false) leaveATMode();
 	currentBPS_ = bps;

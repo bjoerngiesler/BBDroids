@@ -7,7 +7,7 @@
 #include "BBConfigStorage.h"
 #include "BBPacket.h"
 
-#define DEFAULT_CHAN    0xC
+#define DEFAULT_CHAN    0x19   // no overlap with Wifi according to XBee documentation
 #define DEFAULT_PAN     0x3332
 
 #define DEFAULT_STATION_DROID 0x1
@@ -134,12 +134,10 @@ protected:
 	HardwareSerial* uart_;
 	unsigned int currentBPS_;
 
-	int chan_, pan_, station_, partner_, bps_;
-
 	typedef struct {
-		uint8_t chan;
-		uint16_t pan, station, partner;
-		uint32_t bps;
+		int chan;
+		int pan, station, partner;
+		int bps;
 		char name[20];
 	} XBeeParams;
 	XBeeParams params_;

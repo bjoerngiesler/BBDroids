@@ -61,12 +61,18 @@ class Console: public Subsystem {
 public:
 	static Console console;
 
-	virtual Result initialize(int bps=115200) { Serial.begin(bps); addConsoleStream(new SerialConsoleStream(Serial)); return Subsystem::initialize(); }
+	virtual Result initialize(int bps=115200) { 
+		Serial.begin(bps); 
+		serialStream_ = new SerialConsoleStream(Serial);
+		addConsoleStream(serialStream_); 
+		return Subsystem::initialize(); 
+	}
 	virtual Result start(ConsoleStream* stream = NULL);
 	virtual Result stop(ConsoleStream* stream = NULL);
 	virtual Result step();
 	virtual void addConsoleStream(ConsoleStream* stream);
 	virtual void removeConsoleStream(ConsoleStream* stream);
+	ConsoleStream* serialStream() { return serialStream_; }
 
 	void handleStreamInput(ConsoleStream* stream);
 	Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream);
@@ -80,6 +86,7 @@ public:
 protected:
 	Console();
 	std::vector<String> split(const String& str);
+	ConsoleStream *serialStream_;
 	std::vector<ConsoleStream*> streams_;
 	Subsystem* firstResponder_;
 };

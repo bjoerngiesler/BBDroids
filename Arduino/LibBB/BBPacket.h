@@ -7,12 +7,14 @@
 #define AXIS_MAX 255
 
 namespace bb {
+
 /*
  * REALTIME PROTOCOL
  *
  * This is designed to be sent via real-time remote control links.
  */
-struct __attribute__ ((packed)) CommandPacket {
+
+struct __attribute__ ((packed)) ControlPacket {
 	// byte 0
 	bool button0    : 1;
 	bool button1    : 1;
@@ -78,12 +80,39 @@ struct __attribute__ ((packed)) CommandPacket {
 	}
 };     // 8 bytes long, maximum should be <=10
 
-struct StatePacket {
+struct __attribute__ ((packed)) StatePacket {
+	uint8_t dummy;
+};
+
+enum ConfigType {
+	CONFIG_SET_DESTINATION_ID = 0
+};
+
+struct __attribute__ ((packed)) ConfigPacket {
+	ConfigType type         : 7;
+	uint8_t					: 0; // next byte
+	uint8_t bits0to6        : 7;
+	uint8_t 				: 0; // next byte	
+	uint8_t bits7to13       : 7;
+	uint8_t 				: 0; // next byte	
+	uint8_t bits14to20      : 7;
+	uint8_t 				: 0; // next byte	
+	uint8_t bits21to27      : 7;
+	uint8_t 				: 0; // next byte	
+	uint8_t bits28to34      : 7;
+	uint8_t 				: 0; // next byte	
+	uint8_t bits35to41      : 7;
+	uint8_t 				: 0; // next byte	
+	uint8_t bits42to48      : 7;
+	uint8_t 				: 0; // next byte	
+};
+
+struct __attribute__ ((packed)) PairPacket {
 	uint8_t dummy;
 };
 
 enum PacketType {
-	PACKET_TYPE_COMMAND  = 0,
+	PACKET_TYPE_CONTROL  = 0,
 	PACKET_TYPE_STATUS   = 1,
 	PACKET_TYPE_CONFIG   = 2,
 	PACKET_TYPE_PAIR     = 3
@@ -103,8 +132,10 @@ struct Packet {
 	uint8_t             : 0; // next byte
 
 	union {
-		CommandPacket cmd;
+		ControlPacket control;
 		StatePacket state;
+		ConfigPacket config;
+		PairPacket pair;
 	} payload;
 };
 
@@ -168,7 +199,7 @@ struct __attribute__ ((packed)) LargeStatusPacket {
 
 	DriveControlState drive[3];
 	IMUState imu[3];
-	CommandPacket lastCommand[2];
+	ControlPacket lastControl[2];
 	ServoState servo[10];
 	BatteryState battery[3];
 };
