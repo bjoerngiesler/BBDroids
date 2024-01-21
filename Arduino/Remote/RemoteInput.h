@@ -27,12 +27,12 @@ public:
 
   class Delegate {
   public:
-    virtual void buttonTopLeftPressed() = 0;
-    virtual void buttonTopRightPressed() = 0;
-    virtual void buttonConfirmPressed() = 0;
-    virtual void buttonTopLeftReleased() = 0;
-    virtual void buttonTopRightReleased() = 0;
-    virtual void buttonConfirmReleased() = 0;
+    virtual void buttonTopLeftPressed() {}
+    virtual void buttonTopRightPressed() {}
+    virtual void buttonConfirmPressed() {}
+    virtual void buttonTopLeftReleased() {}
+    virtual void buttonTopRightReleased() {}
+    virtual void buttonConfirmReleased() {}
   };
 
   void setDelegate(Delegate *d);

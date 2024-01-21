@@ -38,7 +38,6 @@ void setup() {
   uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
 #endif
   XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, DEFAULT_STATION_DROID, 115200);
-  XBee::xbee.setPacketMode(true);
   
 #if defined(LEFT_REMOTE)
   WifiServer::server.initialize("LRemote-$MAC", "LRemoteKey", true, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
@@ -55,11 +54,11 @@ void setup() {
 #endif
   WifiServer::server.start();
   XBee::xbee.start();
+  XBee::xbee.setAPIMode(true);
+  
   RRemote::remote.start();
 
-#if defined(LEFT_REMOTE)
   XBee::xbee.addPacketReceiver(&RRemote::remote);
-#endif
   Runloop::runloop.start(); // never returns
 }
 

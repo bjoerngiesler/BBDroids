@@ -22,10 +22,8 @@ public:
   void buttonTopLeftPressed();
   void buttonTopRightPressed();
   void buttonConfirmPressed();
-  void buttonTopLeftReleased();
-  void buttonTopRightReleased();
-  void buttonConfirmReleased();
 
+  void resetCursor() { cursor_ = 0; }
 protected:
   struct Entry {
     const char* title;

@@ -340,3 +340,9 @@ Result RDisplay::rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t c
   if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
   return RES_OK;
 }
+
+Result RDisplay::plot(uint8_t x, uint8_t y, uint16_t color) {
+  String str = String("circle ") + x + " " + y + " 0 0x" + String(color, HEX);
+  if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
+  return RES_OK;
+}

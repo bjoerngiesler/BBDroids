@@ -33,15 +33,6 @@ void RMenu::buttonConfirmPressed() {
   entries_[cursor_].callback();
 }
   
-void RMenu::buttonTopLeftReleased() {
-}
-
-void RMenu::buttonTopRightReleased() {
-}
-
-void RMenu::buttonConfirmReleased() {
-}
-
 Result RMenu::draw(ConsoleStream *stream) {
   Result res;
   

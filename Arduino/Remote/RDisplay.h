@@ -48,6 +48,7 @@ public:
   Result text(uint8_t x, uint8_t y, uint16_t color, const String& text);
   Result hline(uint8_t x, uint8_t y, uint8_t width, uint16_t color);
   Result rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color, bool filled=false);
+  Result plot(uint8_t x, uint8_t y, uint16_t color);
 
 protected:
   RDisplay();

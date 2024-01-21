@@ -2,6 +2,7 @@
 #include "RRemote.h"
 
 RRemote RRemote::remote;
+RRemote::RemoteParams RRemote::params_;
 
 RRemote::RRemote(): statusPixels_(2, P_NEOPIXEL, NEO_GRB+NEO_KHZ800) {
   name_ = "remote";
@@ -17,6 +18,15 @@ RRemote::RRemote(): statusPixels_(2, P_NEOPIXEL, NEO_GRB+NEO_KHZ800) {
   deltaR_ = 0; deltaP_ = 0; deltaH_ = 0;
   memset(&lastPacketSent_, 0, sizeof(Packet));
 
+#if defined(LEFT_REMOTE)
+  params_.leftID = XBee::makeStationID(XBee::REMOTE_BAVARIAN_L, BUILDER_ID, REMOTE_ID);
+  params_.rightID = 0;
+  params_.droidID = 0;
+#else
+  params_.leftID = 0;
+  params_.rightID = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
+  params_.droidID = 0;
+#endif
 }
 
 Result RRemote::initialize() { 
@@ -28,14 +38,16 @@ Result RRemote::initialize() {
   droidsMenu_ = new RMenu("Droids");
   remotesMenu_ = new RMenu("Remotes");
   waitMessage_ = new RMessage("Please wait");
+  graphs_ = new RGraphs();
 
-  mainMenu_->addEntry("Status", []() { RRemote::remote.showStatus(); });
   mainMenu_->addEntry("Settings...", []() { RRemote::remote.showSettingsMenu(); });
+  mainMenu_->addEntry("Back", []() { RRemote::remote.showGraphs(); });
   
   settingsMenu_->addEntry("Right Remote...", []() { RRemote::remote.showRemotesMenu(); });
   settingsMenu_->addEntry("Droid...", []() { RRemote::remote.showDroidsMenu(); });
   settingsMenu_->addEntry("Back", []() { RRemote::remote.showMainMenu(); });
-  showMenu(mainMenu_);
+
+  showGraphs();
 
   return Subsystem::initialize();
 }
@@ -44,6 +56,14 @@ void RRemote::showMenu(RMenu *menu) {
   currentDrawable_ = menu;
   RemoteInput::input.setDelegate(menu);
   menu->setNeedsCls(true);
+  menu->resetCursor();
+  needsDraw_ = true;
+}
+
+void RRemote::showGraphs() {
+  currentDrawable_ = graphs_;
+  graphs_->setNeedsCls(true);
+  RemoteInput::input.setDelegate(graphs_);
   needsDraw_ = true;
 }
 
@@ -76,9 +96,11 @@ void RRemote::showRemotesMenu() {
   waitMessage_->draw();
 
   remotesMenu_->clear();
+
   Result res = XBee::xbee.discoverNodes(discoveredNodes_);
   if(res != RES_OK) {
     Console::console.printfBroadcast("%s\n", errorMessage(res));
+    showMenu(settingsMenu_);
     return;
   }
 
@@ -95,6 +117,7 @@ void RRemote::showRemotesMenu() {
 }
 
 void RRemote::selectDroid(uint16_t droid) {
+#if defined(LEFT_REMOTE)
   Console::console.printfBroadcast("Selecting droid 0x%x\n", droid);
 
   waitMessage_->draw();
@@ -104,35 +127,32 @@ void RRemote::selectDroid(uint16_t droid) {
   packet.seqnum = 0;
   packet.source = bb::PACKET_SOURCE_LEFT_REMOTE; 
   bb::ConfigPacket& c = packet.payload.config;
-  c.type = bb::CONFIG_SET_DESTINATION_ID;
-  c.bits0to6 = droid & 0x7f;
-  droid >> 7;
-  c.bits7to13 = droid & 0x7f;
-  droid >> 7;
-  c.bits14to20 = droid & 0x7f;
-  c.bits21to27 = c.bits28to34 = c.bits35to41 = c.bits42to48 = 0;
-  
-  XBee::xbee.send(packet);
+  c.type = bb::CONFIG_SET_DROID_ID;
+  c.id = droid;
+  XBee::xbee.sendTo(params_.rightID, packet, true);
 
   showMenu(mainMenu_);
+#endif
 }
 
 void RRemote::selectRightRemote(uint16_t remote) {
+#if defined(LEFT_REMOTE)
   Console::console.printfBroadcast("Selecting right remote 0x%x\n", remote);
   
-  waitMessage_->draw();
-  
-  uint8_t chan; uint16_t pan, station, partner;
+  params_.rightID = remote;
 
-  bb::XBee::xbee.getConnectionInfo(chan, pan, station, partner, true);
-  Console::console.printfBroadcast("Before: chan 0x%x pan 0x%x station 0x%x partner 0x%x\n", chan, pan, station, partner);
-  bb::XBee::xbee.setConnectionInfo(chan, pan, station, remote, true);
-  bb::XBee::xbee.getConnectionInfo(chan, pan, station, partner);
-  Console::console.printfBroadcast("After: chan 0x%x pan 0x%x station 0x%x partner 0x%x\n", chan, pan, station, partner);
-
-  selectDroid(0xbabe);
+  bb::Packet packet;
+  packet.type = bb::PACKET_TYPE_CONFIG;
+  packet.seqnum = 0;
+  packet.source = bb::PACKET_SOURCE_LEFT_REMOTE; 
+  bb::ConfigPacket& c = packet.payload.config;
+  c.type = bb::CONFIG_SET_LEFT_REMOTE_ID;
+  c.id = params_.leftID;
+  bb::Result res = XBee::xbee.sendTo(params_.rightID, packet, true);  
+  Console::console.printfBroadcast("%s", bb::errorMessage(res));
 
   showMenu(mainMenu_);
+#endif
 }
 
 Result RRemote::start(ConsoleStream *stream) {
@@ -164,15 +184,10 @@ Result RRemote::stop(ConsoleStream *stream) {
 
 Result RRemote::step() {
   //Runloop::runloop.excuseOverrun();
-  std::vector<unsigned long> timing;
-  timing.push_back(micros());
-  
   if(needsDraw_) {
     currentDrawable_->draw();
     needsDraw_ = false;
   }
-
-  timing.push_back(micros()); // 1
 
   bool allOK = true;
   std::vector<Subsystem*> subsys = SubsystemManager::manager.subsystems();
@@ -181,8 +196,6 @@ Result RRemote::step() {
       allOK = false;
     }
   }
-
-  timing.push_back(micros()); // 2
 
   if(allOK) {
     digitalWrite(LEDR, LOW);
@@ -196,9 +209,15 @@ Result RRemote::step() {
 
   if(!started_) return RES_SUBSYS_NOT_STARTED;
   RemoteInput::input.update();
-  
-  timing.push_back(micros()); // 3
 
+  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
+    fillAndSend();
+  }
+
+  return RES_OK;
+}
+
+bb::Result RRemote::fillAndSend() {
   Packet packet;
 
   memset((uint8_t*)&packet, 0, sizeof(packet));
@@ -236,31 +255,29 @@ Result RRemote::step() {
     packet.payload.control.setAxis(4, d * (heading-deltaH_));
   }
 
-  timing.push_back(micros()); // 4
-
-  if(runningStatus_) {
-    printStatus();
-    Console::console.printfBroadcast("\r");
+#if defined(LEFT_REMOTE)
+  if(currentDrawable_ == graphs_) {
+    graphs_->plotControlPacket(RGraphs::TOP, packet.payload.control);
+    graphs_->advanceCursor(RGraphs::TOP);
   }
-
-  static long counter = 0;
-  Result retval = RES_OK;
-  if(counter%4 == 0) {
-    lastPacketSent_ = packet;
-    retval = bb::XBee::xbee.send(packet);
-    if(retval != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(retval));
-  }
-  counter++;
-  timing.push_back(micros()); // 5
-
-#if 0
-  for(int i=1; i<timing.size(); i++) {
-    Console::console.printfBroadcast("%d: %d ", i, timing[i]-timing[i-1]);
-  }
-  Console::console.printfBroadcast("\n");
 #endif
 
-  return retval;
+  Result res = RES_OK;
+#if !defined(LEFT_REMOTE) // right remote sends to left remote
+  if(params_.leftID != 0) {
+    Console::console.printfBroadcast("Sending packet to 0x%x\n", params_.leftID);
+    res = bb::XBee::xbee.sendTo(params_.leftID, packet, false);
+    if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
+  }
+#endif
+
+  // both remotes send to droid
+  if(params_.droidID != 0) {
+    res = bb::XBee::xbee.sendTo(params_.droidID, packet, false);
+    if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
+  }
+
+  return res;
 }
 
 Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
@@ -284,45 +301,58 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
   return RES_CMD_UNKNOWN_COMMAND;
 } 
 
-Result RRemote::incomingPacket(const Packet& packet) {
+Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& packet) {
 #if defined(LEFT_REMOTE)
-  Console::console.printfBroadcast("Huh? Left remote received a packet but shouldn't\n");
-  return RES_SUBSYS_COMM_ERROR;
-#endif
-
-  if(packet.source == PACKET_SOURCE_DROID) {
+  if(source == params_.droidID && params_.droidID != 0) {
     Console::console.printfBroadcast("Packet from droid!\n");
-#if defined(LEFT_REMOTE)
     RDisplay::display.setLastPacketFromDroid(packet);
-#endif
     return RES_OK;
+  } else if(source == params_.rightID && params_.rightID != 0) {
+    if(packet.type == PACKET_TYPE_CONTROL) {
+      Console::console.printfBroadcast("Control packet from right remote!\n");
+      RDisplay::display.setLastPacketFromRightRemote(packet);
+      if(currentDrawable_ == graphs_) {
+        graphs_->plotControlPacket(RGraphs::MIDDLE, packet.payload.control);
+        graphs_->advanceCursor(RGraphs::MIDDLE);
+      }
+      return RES_OK;
+    } else {
+      Console::console.printfBroadcast("Unknown packet type %d from right remote!\n", packet.type);
+      return RES_SUBSYS_COMM_ERROR;
+    }
+  } else {
+    Console::console.printfBroadcast("Unknown packet source %d!\n", source);
+    return RES_SUBSYS_COMM_ERROR;
   }
 
-  else if(packet.source == PACKET_SOURCE_LEFT_REMOTE) {
+#else // Right remote
+
+  if(source == params_.leftID || params_.leftID == 0) { // if we're not bound, we accept config packets from anyone
     if(packet.type == PACKET_TYPE_CONFIG) {
-      if(packet.payload.config.type == CONFIG_SET_DESTINATION_ID) {
-        uint16_t destId = packet.payload.config.bits0to6;
-        destId |= (packet.payload.config.bits7to13 < 7);
-        destId |= (packet.payload.config.bits14to20 < 14);
-        
-        Console::console.printfBroadcast("Setting destination ID to 0x%x, please wait...\n", destId);
-        uint8_t chan; uint16_t pan, station, partner;
-        XBee::xbee.getConnectionInfo(chan, pan, station, partner, true);  // get current values, and stay in AT mode
-        XBee::xbee.setConnectionInfo(chan, pan, station, destId, true);   // set new destionation id, and stay in AT mode
-        XBee::xbee.getConnectionInfo(chan, pan, station, partner, false); // check whether this worked, and leave AT mode
-        if(partner == destId) Console::console.printfBroadcast("Destination ID is now 0x%x.\n", destId);
-        else Console::console.printfBroadcast("Setting destination ID failed.\n", destId);
+      if(packet.payload.config.type == CONFIG_SET_LEFT_REMOTE_ID) {
+        Console::console.printfBroadcast("Setting Left Remote ID to 0x%x.\n", packet.payload.config.id);
+        params_.leftID = packet.payload.config.id;
+      } else if(packet.payload.config.type == CONFIG_SET_DROID_ID) {
+        Console::console.printfBroadcast("Setting Droid ID to 0x%x.\n", packet.payload.config.id);
+        params_.droidID = packet.payload.config.id;
+        return RES_OK;
       } else {
         Console::console.printfBroadcast("Unknown config packet type 0x%x.\n", packet.payload.config.type);
+        return RES_SUBSYS_COMM_ERROR;
       }
-    } else if(packet.type == PACKET_TYPE_CONTROL) {
-      Console::console.printfBroadcast("Control packet received, forwarding.\n");
-      XBee::xbee.send(packet);
+    } else {
+      Console::console.printfBroadcast("Unknown packet type %d from right remote!\n", packet.type);
+      return RES_SUBSYS_COMM_ERROR;
     }
-    return RES_OK;
+  } else {
+    Console::console.printfBroadcast("Unknown packet source %d!\n", source);
+    return RES_SUBSYS_COMM_ERROR;
   }
 
-  return RES_OK;
+#endif
+
+  Console::console.printfBroadcast("Should never get here.\n");
+  return RES_SUBSYS_COMM_ERROR;
 }
 
 void RRemote::printStatus(ConsoleStream *stream) {
