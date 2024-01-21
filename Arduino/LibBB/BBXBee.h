@@ -14,7 +14,7 @@
 #define DEFAULT_STATION_LEFT_REMOTE 0x2
 #define DEFAULT_STATION_RIGHT_REMOTE 0x3
 #define DEFAULT_BPS     9600
-
+	
 namespace bb {
 
 class XBee: public Subsystem {
@@ -100,6 +100,9 @@ public:
 	Result setConnectionInfo(uint8_t chan, uint16_t pan, uint16_t station, uint16_t partner, bool stayInAT=false);
 	Result getConnectionInfo(uint8_t& chan, uint16_t& pan, uint16_t& station, uint16_t& partner, bool stayInAT=false);
 
+	Result setAPIMode(bool onoff);
+	Result sendAPIModeATCommand(uint8_t frameID, const char* cmd, uint8_t argument);
+
 	struct Node {
 		uint16_t stationId;
 		uint64_t address;
@@ -111,9 +114,11 @@ public:
 	Result send(const String& str);
 	Result send(const uint8_t *bytes, size_t size);
 	Result send(const Packet& packet);
+	Result sendTo(uint16_t dest, const Packet& packet, bool ack);
 	bool available();
 	String receive();
 	Result receiveAndHandlePacket();
+	Result receiveAndHandleAPIMode();
 
 	typedef enum {
 		DEBUG_SILENT = 0,
@@ -133,6 +138,7 @@ protected:
 	bool atmode_, stayInAT_;
 	HardwareSerial* uart_;
 	unsigned int currentBPS_;
+	bool apiMode_;
 
 	typedef struct {
 		int chan;
@@ -150,10 +156,77 @@ protected:
 	uint8_t packetBuf_[255];
 	size_t packetBufPos_;
 
+	class APIFrame {
+	public:
+		APIFrame();
+		APIFrame(const uint8_t *data, uint16_t dataLength);
+		APIFrame(APIFrame& frame);
+		~APIFrame();
+
+		APIFrame& operator=(const APIFrame& frame);
+		
+		virtual const uint8_t *data() const { return data_; }
+		virtual uint16_t length() const { return length_; }
+		virtual uint8_t checksum() const { return checksum_; }
+
+		static APIFrame atRequest(uint8_t frameID, uint16_t command);
+		bool isATRequest();
+
+		Result unpackATResponse(uint8_t &frameID, uint16_t &command, uint8_t &status, uint8_t** data, uint16_t &length);
+
+		class __attribute__ ((packed)) EndianInt16 {
+			uint16_t value;
+		public:
+			inline operator uint16_t() const {
+				return ((value & 0xff) << 8) | (value >> 8);
+			}
+		};
+		class __attribute__ ((packed)) EndianInt32 {
+			uint32_t value;
+		public:
+			inline operator uint32_t() const {
+				return ((value & 0x000000ff) << 24) | ((value & 0x0000ff00) << 8) | ((value & 0x00ff0000) >> 8) | ((value & 0xff000000) >> 24);
+			}
+		};
+		class __attribute__ ((packed)) EndianInt64 {
+			uint64_t value;
+		public:
+			inline operator uint64_t() const {
+				return ((value & 0x00000000000000ff) << 56) | ((value & 0x000000000000ff00) << 40) | ((value & 0x0000000000ff0000) << 24) | ((value & 0x00000000ff000000) <<  8) | 
+					   ((value & 0x000000ff00000000) >>  8) | ((value & 0x0000ff0000000000) >> 24) | ((value & 0x00ff000000000000) >> 40) | ((value & 0xff00000000000000) >> 56);
+			}
+		};
+
+		static const uint8_t ATResponseNDMinLength = 11;
+		struct __attribute__ ((packed)) ATResponseND {
+			EndianInt16 my;
+			EndianInt64 address;
+			uint8_t rssi;
+			char name[20];
+		};
+
+	protected:
+		enum Type {
+			ATREQUEST 		= 0x08,
+			TRANSMITREQUEST = 0x10,
+			RECEIVE16BIT	= 0x81,
+			ATRESPONSE		= 0x88
+		};
+		APIFrame(uint16_t length);
+
+		uint8_t *data_;
+		uint16_t length_;
+		uint8_t checksum_;
+
+		void calcChecksum();
+	};
 
 	String sendStringAndWaitForResponse(const String& str, int predelay=0, bool cr=true);
 	bool sendStringAndWaitForOK(const String& str, int predelay=0, bool cr=true);
 	bool readString(String& str, unsigned char terminator='\r');
+
+	Result send(const APIFrame& frame);
+	Result receive(APIFrame& frame);
 };
 
 };

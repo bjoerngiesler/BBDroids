@@ -21,6 +21,7 @@ bb::XBee::XBee() {
 	currentBPS_ = 0;
 	memset(packetBuf_, 0, sizeof(packetBuf_));
 	packetBufPos_ = 0;
+	apiMode_ = false;
 
 	name_ = "xbee";
 	description_ = "Communication via XBee 802.5.14";
@@ -29,7 +30,9 @@ bb::XBee::XBee() {
 	"\tsend <string>:      Send <string> to partner\r\n"\
 	"\tsend_control_packet:    Send a zero control packet (with sequence number and CRC set) to partner\r\n"
 	"\tcontinuous on|off:  Start or stop sending a continuous stream of numbers (or zero command packets when in packet mode)\r\n"\
-	"\tpacket_mode on|off: Switch to packet mode\r\n";
+	"\tpacket_mode on|off: Switch to packet mode\r\n" \
+	"\tapi_mode on|off: Enter / leave API mode\r\n" \
+	"\tsend_api_packet <dest>: Send zero control packet to destination\r\n";
 
 	addParameter("channel", "Communication channel (between 11 and 26, usually 12)", params_.chan, 11, 26);
 	addParameter("pan", "Personal Area Network ID (16bit, 65535 is broadcast)", params_.pan, 0, 65535);
@@ -195,7 +198,10 @@ bb::Result bb::XBee::stop(ConsoleStream *stream) {
 
 bb::Result bb::XBee::step() {
 	while(available()) {
-		if(packetMode_) {
+		if(apiMode_) {
+			Result retval = receiveAndHandleAPIMode();
+			if(retval != RES_OK) return retval;
+		} else if(packetMode_) {
 			Result retval = receiveAndHandlePacket();
 			if(retval != RES_OK) return retval;
 		} else {
@@ -283,6 +289,22 @@ bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, Cons
 		return send(packet);
 	} 
 
+	else if(words[0] == "send_api_packet") {
+		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT;
+		if(!apiMode_) {
+			Console::console.printfBroadcast("Must be in API mode to do this.\n");
+			return RES_SUBSYS_WRONG_MODE;
+		}
+
+		uint16_t dest = words[1].toInt();
+
+		Packet packet;
+		memset(&packet, 0, sizeof(packet));
+		packet.type = PACKET_TYPE_CONTROL;
+		packet.source = PACKET_SOURCE_TEST_ONLY;
+
+		return sendTo(dest, packet, true);
+	} 
 	else if(words[0] == "continuous") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		else {
@@ -313,7 +335,18 @@ bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, Cons
 			}
 			else return RES_CMD_INVALID_ARGUMENT;	
 		}
-	} 
+	} else if(words[0] == "api_mode") {
+		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+		else {
+			if(words[1] == "on" || words[1] == "true") {
+				return setAPIMode(true);
+			}
+			else if(words[1] == "off" || words[1] == "false") {
+				return setAPIMode(false);
+			}
+			else return RES_CMD_INVALID_ARGUMENT;	
+		}		
+	}
 
 	return bb::Subsystem::handleConsoleCommand(words, stream);
 }
@@ -321,6 +354,36 @@ bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, Cons
 void bb::XBee::setPacketMode(bool onoff) {
 	packetMode_ = onoff;
 }
+
+bb::Result bb::XBee::setAPIMode(bool onoff) {
+	Result res;
+	if(onoff == true) {
+		if(apiMode_ == true) {
+			Console::console.printfBroadcast("Already in API mode\n");
+			return RES_CMD_INVALID_ARGUMENT;
+		}
+
+		enterATModeIfNecessary();
+		if(sendStringAndWaitForOK("ATAP=2") == true) {
+			apiMode_ = true;
+			leaveATMode();
+			return RES_OK;
+		} else {
+			leaveATMode();
+			return RES_SUBSYS_COMM_ERROR;
+		}
+	} else {
+		if(apiMode_ == false) {
+			Console::console.printfBroadcast("Not in API mode\n");
+			return RES_CMD_INVALID_ARGUMENT;			
+		}
+
+		res = sendAPIModeATCommand(1, "AP", 0);
+		if(res == RES_OK) apiMode_ = false;
+		return res;
+	}
+}
+
 
 bb::Result bb::XBee::addPacketReceiver(PacketReceiver *receiver) {
 	for(size_t i=0; i<receivers_.size(); i++)
@@ -541,57 +604,70 @@ bb::Result bb::XBee::getConnectionInfo(uint8_t& chan, uint16_t& pan, uint16_t& s
 
 bb::Result bb::XBee::discoverNodes(std::vector<bb::XBee::Node>& nodes) {
 	if(operationStatus_ != RES_OK) return RES_SUBSYS_NOT_OPERATIONAL;
-
-	enterATModeIfNecessary();
+	if(apiMode_ == false) return RES_SUBSYS_WRONG_MODE;
 
 	nodes = std::vector<bb::XBee::Node>();
 
-	uart_->print("ATND\r");
-	uart_->flush();
-	int to=2000;
-	while(to>0) {
-		if(!uart_->available()) {
-			delay(10);
-			to--;
-			continue;
-		}
+	Result res;
+	APIFrame request = APIFrame::atRequest(0x5, ('N'<<8 | 'D'));
+	res = send(request);
+	if(res != RES_OK) return res;
 
-		String my, sh, sl, rssi, ni;
-		if(readString(my) == false || my == "\r" || my == "") {
-			Console::console.printfBroadcast("Empty MY - end of discovery\n");
-			return RES_OK;
-		}
-		if(readString(sh) == false || sh == "\r" || sh == "") {
-			Console::console.printfBroadcast("Empty SH\n");
-			return RES_SUBSYS_COMM_ERROR;
-		}
-		if(readString(sl) == false || sl == "\r" || sl == "") {
-			Console::console.printfBroadcast("Empty SL\n");
-			return RES_SUBSYS_COMM_ERROR;
-		}
-		if(readString(rssi) == false || rssi == "\r" || rssi == "") {
-			Console::console.printfBroadcast("Empty RSSI\n");
-			return RES_SUBSYS_COMM_ERROR;
-		}
-		if(readString(ni) == false || ni == "\r" || ni == "") {
-			Console::console.printfBroadcast("Empty NI\n");
-			return RES_SUBSYS_COMM_ERROR;
-		}
+	int timeout = 10000;
 
-		my.trim(); sh.trim(); sl.trim(); rssi.trim(); ni.trim();
+	while(timeout > 0) {
+		delay(1);
+		timeout--;
 
-		Node n;
-		n.stationId = (uint16_t)strtoul(my.c_str(), NULL, 16);
-		n.address = (uint64_t)strtoul(sh.c_str(), NULL, 16) << 32;
-		n.address |= (uint64_t)strtoul(sl.c_str(), NULL, 16);
-		n.rssi = (uint8_t)strtoul(rssi.c_str(), NULL, 16);
-		memset(n.name, 0, 20);
-		snprintf(n.name, 19, ni.c_str());
+		if(available()) {
+			Result res;
+			APIFrame response;
+			res = receive(response);
+			if(res != RES_OK) {
+				Console::console.printfBroadcast("Error receiving response: %s\n", errorMessage(res));
+				continue;
+			}
 
-		nodes.push_back(n);
+			uint8_t frameID, status;
+			uint16_t command, length;
+			uint8_t *data;
+
+			res = response.unpackATResponse(frameID, command, status, &data, length);
+			if(res != RES_OK) {
+				Console::console.printfBroadcast("Error unpacking response: %s\n", errorMessage(res));
+				continue;
+			}
+
+			if(status != 0) {
+				Console::console.printfBroadcast("Response with status %d\"", status);
+				continue;
+			}
+
+			if(length < APIFrame::ATResponseNDMinLength) {
+				Console::console.printfBroadcast("Expected >=%d bytes, found %d\n", APIFrame::ATResponseNDMinLength, length);
+				continue;
+			}
+
+			for(int i=0; i<length; i++) Console::console.printfBroadcast("%d:%x ", i, data[i]);
+			Console::console.printfBroadcast("\n");
+
+			APIFrame::ATResponseND *r = (APIFrame::ATResponseND*)data;
+			Node n;
+			n.stationId = r->my;
+			n.address = r->address;
+			n.rssi = r->rssi;
+			Console::console.printfBroadcast("%x\n", r->name[0]);
+			memset(n.name, 0, sizeof(n.name));
+			if(length > APIFrame::ATResponseNDMinLength) {
+				strncpy(n.name, r->name, strlen(r->name));
+			}
+
+			Console::console.printfBroadcast("Discovered station 0x%x at address 0x%llx, RSSI %d, name \"%s\"\n", n.stationId, n.address, n.rssi, n.name);
+			nodes.push_back(n);	
+		}
 	}
-	if(to>0) return RES_OK;
-	return RES_COMM_TIMEOUT;
+
+	return RES_OK;
 }
 
 void bb::XBee::setDebugFlags(DebugFlags debug) {
@@ -641,6 +717,27 @@ bb::Result bb::XBee::send(const bb::Packet& packet) {
 
 	return RES_OK;
 }
+
+bb::Result bb::XBee::sendTo(uint16_t dest, const bb::Packet& packet, bool ack) {
+	uint8_t buf[14+sizeof(packet)];
+
+	buf[0] = 0x10; // transmit request
+	buf[1] = 0x0;  // no response frame
+	for(int i=2; i<10; i++) buf[i] = 0xff; 	// We use 16bit addressing, 64bit dest gets set to 0xffffffffffffffff
+	buf[10] = (dest >> 8) & 0xff;          	// 16bit dest address
+	buf[11] = dest & 0xff;
+	buf[12] = 0; 							// broadcast radius - unused
+	if(ack == false) {
+		buf[13] = 1;						// disable ACK
+	} else {
+		buf[13] = 0;						// Use default value of TO
+	}
+
+	memcpy(&(buf[14]), &packet, sizeof(packet));
+	
+	APIFrame frame(buf, 14+sizeof(packet));
+	return send(frame);
+}
 	
 bool bb::XBee::available() {
 	if(operationStatus_ != RES_OK) return false;
@@ -681,7 +778,7 @@ bb::Result bb::XBee::receiveAndHandlePacket() {
 				} 
 
 				for(size_t i=0; i<receivers_.size(); i++) {
-					receivers_[i]->incomingPacket(frame.packet);
+					receivers_[i]->incomingPacket(0, 0, frame.packet);
 				}
 
 				return RES_OK;
@@ -709,6 +806,49 @@ bb::Result bb::XBee::receiveAndHandlePacket() {
 	}
 
 	return RES_PACKET_TOO_SHORT;
+}
+
+bb::Result bb::XBee::receiveAndHandleAPIMode() {
+	if(!apiMode_) {
+		bb::Console::console.printfBroadcast("Wrong mode.\n");
+		return RES_SUBSYS_WRONG_MODE;
+	} 
+
+	APIFrame frame;
+
+	Result retval = receive(frame);
+	if(retval != RES_OK) return retval;
+
+#if 0
+	Console::console.printfBroadcast("Received packet of length %d: ", frame.length());
+	for(uint16_t i=0; i<frame.length(); i++) {
+		Console::console.printfBroadcast("%x ", frame.data()[i]);
+	}
+	Console::console.printfBroadcast("\n");
+#endif
+
+	if(frame.data()[0] == 0x81) { // 16bit address frame
+		if(frame.length() != sizeof(bb::Packet) + 5) {
+			Console::console.printfBroadcast("Invalid API Mode packet size %d (expected %d)\n", frame.length(), sizeof(bb::Packet) + 5);
+			return RES_SUBSYS_COMM_ERROR;
+		}
+		uint16_t source = (frame.data()[1] << 8) | frame.data()[2];
+		uint8_t rssi = frame.data()[3];
+		uint8_t options = frame.data()[4];
+
+		bb::Packet packet;
+		memcpy(&packet, &(frame.data()[5]), sizeof(packet));
+
+//		Console::console.printfBroadcast("Sending packet from 0x%x (RSSI %d, options 0x%x) to receivers.\n", source, rssi, options);
+
+		for(auto& r: receivers_) {
+			r->incomingPacket(source, rssi, packet);
+		}
+	} else {
+		Console::console.printfBroadcast("Unknown frame type 0x%x\n", frame.data()[0]);
+	}
+
+	return RES_OK;
 }
 
 String bb::XBee::sendStringAndWaitForResponse(const String& str, int predelay, bool cr) {
@@ -766,4 +906,256 @@ bool bb::XBee::readString(String& str, unsigned char terminator) {
 		str += (char)c;
 		if(c == terminator) return true;
 	}
+}
+
+bb::Result bb::XBee::sendAPIModeATCommand(uint8_t frameID, const char* cmd, uint8_t argument) {
+	if(apiMode_ == false) return RES_CMD_INVALID_ARGUMENT;
+	if(strlen(cmd) != 2) return RES_CMD_INVALID_ARGUMENT;
+
+	uint8_t buf[5];
+	buf[0] = 0x08; // AT command
+	buf[1] = frameID;
+	buf[2] = cmd[0];
+	buf[3] = cmd[1];
+	buf[4] = argument;
+
+	APIFrame frame(buf, 5);
+	if(send(frame) != RES_OK) return RES_SUBSYS_COMM_ERROR;
+
+	bool received = false;
+	for(int i=0; i<10 && received == false; i++) {
+		if(uart_->available()) {
+			if(receive(frame) != RES_OK) return RES_SUBSYS_COMM_ERROR;
+			else received = true;
+		} else delay(1);
+	}
+	if(!received) {
+		Console::console.printfBroadcast("Timed out waiting for frame reply\n");
+		return RES_SUBSYS_COMM_ERROR;
+	}
+
+	uint16_t length = frame.length();
+	const uint8_t *data = frame.data();
+
+	if(length < 5) return RES_SUBSYS_COMM_ERROR;
+	if(data[0] != 0x88 || data[1] != frameID || data[2] != cmd[0] || data[3] != cmd[1]) return RES_SUBSYS_COMM_ERROR;
+	switch(data[4]) {
+	case 0:
+		Console::console.printfBroadcast("OK.");
+		return RES_OK;
+		break;
+	case 1:
+		Console::console.printfBroadcast("XBee says ERROR.");
+		return RES_SUBSYS_COMM_ERROR;
+		break;
+	case 2:
+		Console::console.printfBroadcast("XBee says Invalid Command.");
+		return RES_SUBSYS_COMM_ERROR;
+		break;
+	case 3:
+		Console::console.printfBroadcast("XBee says Invalid Parameter.");
+		return RES_SUBSYS_COMM_ERROR;
+		break;
+	default:
+		break;
+	}
+
+	Console::console.printfBroadcast("XBee gives unknown error code.");
+	return RES_SUBSYS_COMM_ERROR;
+}
+
+bb::XBee::APIFrame::APIFrame() {
+	data_ = NULL;
+	length_ = 0;
+	calcChecksum();
+}
+
+bb::XBee::APIFrame::APIFrame(const uint8_t *data, uint16_t length) {
+	data_ = new uint8_t[length];
+	length_ = length;
+	memcpy(data_, data, length);
+	calcChecksum();
+}
+
+bb::XBee::APIFrame::APIFrame(bb::XBee::APIFrame& other) {
+	if(other.data_ != NULL) {
+		length_ = other.length_;
+		data_ = new uint8_t[length_];
+		memcpy(data_, other.data_, length_);
+	} else {
+		data_ = NULL;
+		length_ = 0;
+	}
+	checksum_ = other.checksum_;
+}
+
+bb::XBee::APIFrame::APIFrame(uint16_t length) {
+	data_ = new uint8_t[length];
+	length_ = length;
+}
+
+bb::XBee::APIFrame& bb::XBee::APIFrame::operator=(const APIFrame& other) {
+	if(other.data_ == NULL) {           	// they don't have data
+		if(data_ != NULL) delete data_; 	// ...but we do - delete
+		data_ = NULL;						// now we don't have data either
+		length_ = 0;
+	} else {  								// they do have data
+		if(data_ != NULL) {					// and so do we
+			if(length_ != other.length_) {	// but it's of a different size
+				delete data_;				// reallocate
+				length_ = other.length_;
+				data_ = new uint8_t[length_];
+			}
+			memcpy(data_, other.data_, length_); // and copy
+		} else {							// and we don't
+			length_ = other.length_;		
+			data_ = new uint8_t[length_];
+			memcpy(data_, other.data_, length_);
+		}
+	}
+	checksum_ = other.checksum_;
+
+	return *this;
+}
+
+bb::XBee::APIFrame::~APIFrame() {
+	if(data_ != NULL)
+		delete data_;
+}
+
+void bb::XBee::APIFrame::calcChecksum() {
+	checksum_ = 0;
+	if(data_ != NULL) {
+		for(uint16_t i=0; i<length_; i++) {
+			checksum_ += data_[i];
+		}
+	}
+
+	checksum_ = 0xff - (checksum_ & 0xff);
+}
+
+bb::XBee::APIFrame bb::XBee::APIFrame::atRequest(uint8_t frameID, uint16_t command) {
+	APIFrame frame(4);
+
+	frame.data_[0] = ATREQUEST; // local AT request
+	frame.data_[1] = frameID;
+	frame.data_[2] = (command>>8) & 0xff;
+	frame.data_[3] = command & 0xff;
+	frame.calcChecksum();
+
+	return frame;
+}
+
+bool bb::XBee::APIFrame::isATRequest() {
+	return data_[0] == ATREQUEST && length_ > 4;
+}
+
+bb::Result bb::XBee::APIFrame::unpackATResponse(uint8_t &frameID, uint16_t &command, uint8_t &status, uint8_t** data, uint16_t &length) {
+	if(data_[0] != ATRESPONSE || length_ < 5) return RES_SUBSYS_COMM_ERROR;
+
+	frameID = data_[1];
+	command = (data_[2]<<8)|data_[3];
+	status = data_[4];
+
+	if(length_ > 5) {
+		*data = &(data_[5]);
+		length = length_-5;
+	} else {
+		*data = NULL;
+		length = 0;
+	}
+
+	return RES_OK;
+}
+
+
+static inline int writeEscapedByte(HardwareSerial* uart, uint8_t byte) {
+	int sent = 0;
+	if(byte == 0x7d || byte == 0x7e || byte == 0x11 || byte == 0x13) {
+		sent += uart->write(0x7d);
+		sent += uart->write(byte ^ 0x20);
+	} else {
+		sent += uart->write(byte);
+	}
+	return sent;
+}
+
+static inline uint8_t readEscapedByte(HardwareSerial* uart) {
+	uint8_t byte = uart->read();
+	if(byte != 0x7d) return byte;
+	return (uart->read()^0x20);
+}
+
+bb::Result bb::XBee::send(const APIFrame& frame) {
+	if(apiMode_ == false) return RES_SUBSYS_WRONG_MODE;
+	
+	uint16_t length = frame.length();
+	const uint8_t *data = frame.data();
+
+	uint8_t lengthMSB = (length >> 8) & 0xff;
+	uint8_t lengthLSB = length & 0xff;
+	
+	uart_->write(0x7e); // start delimiter
+	writeEscapedByte(uart_, lengthMSB);
+	writeEscapedByte(uart_, lengthLSB);
+
+//	Console::console.printfBroadcast("Writing %d bytes: ", length);
+	for(uint16_t i=0; i<length; i++) {
+//		Console::console.printfBroadcast("%x ", data[i]);
+		writeEscapedByte(uart_, data[i]);
+	}
+//	Console::console.printfBroadcast("\n");
+//	Console::console.printfBroadcast("Writing checksum %x\n", frame.checksum());
+	writeEscapedByte(uart_, frame.checksum());
+
+	return RES_OK;
+}
+
+bb::Result bb::XBee::receive(APIFrame& frame) {
+	uint8_t byte = 0xff;
+	while(uart_->available()) {
+		byte = uart_->read();
+		if(byte == 0x7e) {
+			break;
+		} else {
+			Console::console.printfBroadcast("Read garbage '%c' 0x%x\n", byte, byte);
+		}
+	}
+	if(byte != 0x7e) {
+		Console::console.printfBroadcast("Timed out waiting for start delimiter\n");
+		return RES_SUBSYS_COMM_ERROR;
+	}
+
+	if(!uart_->available()) delay(1);
+	uint8_t lengthMSB = readEscapedByte(uart_);
+	if(!uart_->available()) delay(1);
+	uint8_t lengthLSB = readEscapedByte(uart_);
+
+	uint16_t length = (lengthMSB << 8) | lengthLSB;
+
+	uint8_t *buf = new uint8_t[length];
+	for(uint16_t i=0; i<length; i++) {
+		if(!uart_->available()) delay(1);
+		buf[i] = readEscapedByte(uart_);
+	}
+
+#if 0
+	Console::console.printfBroadcast("Read %d bytes: ", length);
+	for(uint16_t i=0; i<length; i++) {
+		Console::console.printfBroadcast("%x ", buf[i]);
+	}
+	Console::console.printfBroadcast("\n");
+#endif
+
+	if(!uart_->available()) delay(1);
+	uint8_t checksum = readEscapedByte(uart_);
+
+	frame = APIFrame(buf, length);
+	delete buf;
+	if(frame.checksum() != checksum) {
+		Console::console.printfBroadcast("Checksum invalid - expected 0x%x, got 0x%x\n", frame.checksum(), checksum);
+		return RES_SUBSYS_COMM_ERROR;
+	}
+
+	return RES_OK;
 }

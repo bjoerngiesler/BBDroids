@@ -85,26 +85,13 @@ struct __attribute__ ((packed)) StatePacket {
 };
 
 enum ConfigType {
-	CONFIG_SET_DESTINATION_ID = 0
+	CONFIG_SET_LEFT_REMOTE_ID = 0,
+	CONFIG_SET_DROID_ID       = 1
 };
 
 struct __attribute__ ((packed)) ConfigPacket {
-	ConfigType type         : 7;
-	uint8_t					: 0; // next byte
-	uint8_t bits0to6        : 7;
-	uint8_t 				: 0; // next byte	
-	uint8_t bits7to13       : 7;
-	uint8_t 				: 0; // next byte	
-	uint8_t bits14to20      : 7;
-	uint8_t 				: 0; // next byte	
-	uint8_t bits21to27      : 7;
-	uint8_t 				: 0; // next byte	
-	uint8_t bits28to34      : 7;
-	uint8_t 				: 0; // next byte	
-	uint8_t bits35to41      : 7;
-	uint8_t 				: 0; // next byte	
-	uint8_t bits42to48      : 7;
-	uint8_t 				: 0; // next byte	
+	ConfigType type;
+	uint16_t id;
 };
 
 struct __attribute__ ((packed)) PairPacket {
@@ -151,7 +138,7 @@ uint8_t calculateCRC(const Packet& packet);
 
 class PacketReceiver { 
 public:
-	virtual Result incomingPacket(const Packet& packet) { (void)packet; return RES_OK; } // remote --> droid
+	virtual Result incomingPacket(uint16_t source, uint8_t rssi, const Packet& packet) { (void)source; (void)rssi; (void)packet; return RES_OK; } // remote --> droid
 };
 
 /*
