@@ -50,12 +50,12 @@ static const float SPEED_KD = 0;
 static const float POS_KP = 0.05;
 static const float POS_KI = 0;
 static const float POS_KD = 0;
-static const float BAL_KP = 1;
+static const float BAL_KP = 25;
 static const float BAL_KI = 0;
-static const float BAL_KD = 0;
+static const float BAL_KD = 2;
 static const float PITCH_BIAS = 1.35;
 static const float PITCH_DEADBAND = .5;
-
+static const float PITCH_REMOTE_FACTOR = 20.0;
 
 static const uint8_t SERVO_NECK         = 1;
 static const uint8_t SERVO_HEAD_PITCH   = 2;
@@ -72,5 +72,8 @@ static const float GYRO_PITCH_DEADBAND = 1.0;
 static const float POWER_BATT_NONE = 5.0;  // Everything under this means we're connected to USB.
 static const float POWER_BATT_MIN  = 14.2; // Minimum voltage - below this, everything switches off to save the LiPos.
 static const float POWER_BATT_MAX  = 16.0; // Maximum voltage - above this, we're overvolting and will probably breal stuff.
+
+static const uint8_t BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 2 - Micke, 3 - Brad
+static const uint8_t DROID_ID = 0;
 
 #endif // DOCONFIG_H

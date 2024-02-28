@@ -26,11 +26,14 @@ public:
 	virtual Result step();
 
   virtual void printStatus(ConsoleStream *stream);
-  virtual Result fillAndSendStatusPacket();
+  virtual Result fillAndSendStatePacket();
 
-  virtual Result incomingPacket(const Packet& packet);
+  virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
+  virtual Result incomingConfigPacket(uint16_t station, PacketSource source, uint8_t rssi, const ConfigPacket& packet);
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   virtual Result setParameterValue(const String& name, const String& stringVal);
+
+  Result selfTest();
 
 protected:
   bb::DCMotor leftMotor_, rightMotor_;

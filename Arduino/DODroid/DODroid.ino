@@ -33,18 +33,26 @@ void SERCOM3_Handler() {
 }
 
 void initializeSubsystems() {
+  ConfigStorage::storage.initialize();
   Runloop::runloop.initialize();
   Console::console.initialize();
   WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
   WifiServer::server.setOTANameAndPassword("D-O", "OTA");
+  uint16_t station = XBee::makeStationID(XBee::DROID_DIFF_UNSTABLE, BUILDER_ID, DROID_ID);
+  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200, serialTXSerial);
+  XBee::xbee.setDebugFlags((XBee::DebugFlags)(XBee::DEBUG_PROTOCOL|XBee::DEBUG_XBEE_COMM));
+  XBee::xbee.setName(DROID_NAME);
   DOServos::servos.initialize();
   DOServos::servos.setRequiredIds(std::vector<uint8_t>{SERVO_NECK}); // Rest of the head servos may be disconnected
   DODroid::droid.initialize();
 }
 
 void startSubsystems() {
-  WifiServer::server.start();
   Console::console.start();
+  WifiServer::server.start();
+  XBee::xbee.addPacketReceiver(&DODroid::droid);
+  XBee::xbee.start();
+  XBee::xbee.setAPIMode(true);
   DOServos::servos.start();
   DODroid::droid.start();
   // sometimes this doesn't work on the first try for whatever reason
@@ -53,11 +61,7 @@ void startSubsystems() {
 
 void setup() {
   Serial.begin(2000000);
-  Serial.println();
-  Serial.println("D-O");
-  Serial.println("Firmware version 0.0");
-  Serial.println("(c) 2023 Björn Giesler");
-  Serial.println("======================");
+  Serial.println("Starting up...");
 
   Wire.begin();
 
@@ -65,6 +69,12 @@ void setup() {
 
   initializeSubsystems();
   startSubsystems();
+
+  Console::console.printfBroadcast("D-O\n");
+  Console::console.printfBroadcast("Firmware version 0.0\n");
+  Console::console.printfBroadcast("(c) 2023 Björn Giesler\n");
+  Console::console.printfBroadcast("======================\n");
+
   Runloop::runloop.start();
 }
 
