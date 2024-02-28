@@ -69,6 +69,7 @@ protected:
   };
 
   static RemoteParams params_;
+  static bb::ConfigStorage::HANDLE paramsHandle_;
 };
 
 #endif // RREMOTE_H

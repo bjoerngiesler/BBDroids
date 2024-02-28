@@ -3,6 +3,7 @@
 
 RRemote RRemote::remote;
 RRemote::RemoteParams RRemote::params_;
+bb::ConfigStorage::HANDLE RRemote::paramsHandle_;
 
 RRemote::RRemote(): statusPixels_(2, P_NEOPIXEL, NEO_GRB+NEO_KHZ800) {
   name_ = "remote";
@@ -32,6 +33,14 @@ RRemote::RRemote(): statusPixels_(2, P_NEOPIXEL, NEO_GRB+NEO_KHZ800) {
 Result RRemote::initialize() { 
   if(!RemoteInput::input.begin()) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
   if(!IMUFilter::imu.begin()) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+
+  paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
+	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
+    Console::console.printfBroadcast("Remote: Storage block 0x%x is valid.\n", paramsHandle_);
+    ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
+  } else {
+    Console::console.printfBroadcast("Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
+  }
 
   mainMenu_ = new RMenu("Main Menu");
   settingsMenu_ = new RMenu("Settings");
@@ -82,6 +91,7 @@ void RRemote::showDroidsMenu() {
 
   droidsMenu_->clear();
   for(auto& n: discoveredNodes_) {
+    Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_DROID) continue;
     droidsMenu_->addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.stationId); });
   }
@@ -120,16 +130,18 @@ void RRemote::selectDroid(uint16_t droid) {
 #if defined(LEFT_REMOTE)
   Console::console.printfBroadcast("Selecting droid 0x%x\n", droid);
 
-  waitMessage_->draw();
+  params_.droidID = droid;
 
-  bb::Packet packet;
-  packet.type = bb::PACKET_TYPE_CONFIG;
-  packet.seqnum = 0;
-  packet.source = bb::PACKET_SOURCE_LEFT_REMOTE; 
-  bb::ConfigPacket& c = packet.payload.config;
-  c.type = bb::CONFIG_SET_DROID_ID;
-  c.id = droid;
-  XBee::xbee.sendTo(params_.rightID, packet, true);
+  if(params_.rightID != 0) {
+    bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
+    packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
+
+    packet.payload.config.parameter.id = params_.droidID;
+    XBee::xbee.sendTo(params_.rightID, packet, true);
+  }
+
+  bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+  bb::ConfigStorage::storage.store();
 
   showMenu(mainMenu_);
 #endif
@@ -141,15 +153,19 @@ void RRemote::selectRightRemote(uint16_t remote) {
   
   params_.rightID = remote;
 
-  bb::Packet packet;
-  packet.type = bb::PACKET_TYPE_CONFIG;
-  packet.seqnum = 0;
-  packet.source = bb::PACKET_SOURCE_LEFT_REMOTE; 
-  bb::ConfigPacket& c = packet.payload.config;
-  c.type = bb::CONFIG_SET_LEFT_REMOTE_ID;
-  c.id = params_.leftID;
-  bb::Result res = XBee::xbee.sendTo(params_.rightID, packet, true);  
-  Console::console.printfBroadcast("%s", bb::errorMessage(res));
+  bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
+  packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID;
+  packet.payload.config.parameter.id = params_.leftID;
+  XBee::xbee.sendTo(params_.rightID, packet, true);  
+
+  if(params_.droidID != 0) {
+    packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
+    packet.payload.config.parameter.id = params_.droidID;
+    XBee::xbee.sendTo(params_.rightID, packet, true);   
+  }
+
+  bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+  bb::ConfigStorage::storage.store();
 
   showMenu(mainMenu_);
 #endif
@@ -235,8 +251,9 @@ bb::Result RRemote::fillAndSend() {
   packet.payload.control.button3 = RemoteInput::input.btnR;
   packet.payload.control.button4 = RemoteInput::input.btnJoy;
 
-  packet.payload.control.setAxis(0, RemoteInput::input.joyH * AXIS_MAX);
-  packet.payload.control.setAxis(1, RemoteInput::input.joyV * AXIS_MAX);
+  packet.payload.control.setAxis(0, RemoteInput::input.joyH);
+  Console::console.printfBroadcast("JoyH: %f Axis 0: %f\n", RemoteInput::input.joyH, packet.payload.control.getAxis(0));
+  packet.payload.control.setAxis(1, RemoteInput::input.joyV);
 
   if (IMUFilter::imu.available()) {
     float roll, pitch, heading;
@@ -249,10 +266,9 @@ bb::Result RRemote::fillAndSend() {
       deltaR_ = roll; deltaP_ = pitch; deltaH_ = heading;
     }
 
-    float d = AXIS_MAX / 180.0;
-    packet.payload.control.setAxis(2, d * (roll-deltaR_)); 
-    packet.payload.control.setAxis(3, d * (pitch-deltaP_));
-    packet.payload.control.setAxis(4, d * (heading-deltaH_));
+    packet.payload.control.setAxis(2, (roll-deltaR_)/180.0); 
+    packet.payload.control.setAxis(3, (pitch-deltaP_)/180.0);
+    packet.payload.control.setAxis(4, (heading-deltaH_)/180.0);
   }
 
 #if defined(LEFT_REMOTE)
@@ -265,7 +281,6 @@ bb::Result RRemote::fillAndSend() {
   Result res = RES_OK;
 #if !defined(LEFT_REMOTE) // right remote sends to left remote
   if(params_.leftID != 0) {
-    Console::console.printfBroadcast("Sending packet to 0x%x\n", params_.leftID);
     res = bb::XBee::xbee.sendTo(params_.leftID, packet, false);
     if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
   }
@@ -305,12 +320,9 @@ Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& pack
 #if defined(LEFT_REMOTE)
   if(source == params_.droidID && params_.droidID != 0) {
     Console::console.printfBroadcast("Packet from droid!\n");
-    RDisplay::display.setLastPacketFromDroid(packet);
     return RES_OK;
   } else if(source == params_.rightID && params_.rightID != 0) {
     if(packet.type == PACKET_TYPE_CONTROL) {
-      Console::console.printfBroadcast("Control packet from right remote!\n");
-      RDisplay::display.setLastPacketFromRightRemote(packet);
       if(currentDrawable_ == graphs_) {
         graphs_->plotControlPacket(RGraphs::MIDDLE, packet.payload.control);
         graphs_->advanceCursor(RGraphs::MIDDLE);
@@ -329,12 +341,19 @@ Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& pack
 
   if(source == params_.leftID || params_.leftID == 0) { // if we're not bound, we accept config packets from anyone
     if(packet.type == PACKET_TYPE_CONFIG) {
-      if(packet.payload.config.type == CONFIG_SET_LEFT_REMOTE_ID) {
-        Console::console.printfBroadcast("Setting Left Remote ID to 0x%x.\n", packet.payload.config.id);
-        params_.leftID = packet.payload.config.id;
-      } else if(packet.payload.config.type == CONFIG_SET_DROID_ID) {
-        Console::console.printfBroadcast("Setting Droid ID to 0x%x.\n", packet.payload.config.id);
-        params_.droidID = packet.payload.config.id;
+      if(packet.payload.config.type == bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID) {
+        Console::console.printfBroadcast("Setting Left Remote ID to 0x%x.\n", packet.payload.config.parameter.id);
+        params_.leftID = packet.payload.config.parameter.id;
+        bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+        bb::ConfigStorage::storage.store();
+        Console::console.printfBroadcast("Stored config parameters.\n");
+        return RES_OK;
+      } else if(packet.payload.config.type == bb::ConfigPacket::CONFIG_SET_DROID_ID) {
+        Console::console.printfBroadcast("Setting Droid ID to 0x%x.\n", packet.payload.config.parameter.id);
+        params_.droidID = packet.payload.config.parameter.id;
+        bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+        bb::ConfigStorage::storage.store();
+        Console::console.printfBroadcast("Stored config parameters.\n");
         return RES_OK;
       } else {
         Console::console.printfBroadcast("Unknown config packet type 0x%x.\n", packet.payload.config.type);
