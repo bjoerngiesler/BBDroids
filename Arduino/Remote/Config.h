@@ -49,8 +49,6 @@
 
 #endif
 
-#define CalibBiasJoystickVertical   10
-#define CalibBiasJoystickHorizontal -14
 #define JoystickEpsilon             0.01f
 
 static const uint8_t BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 2 - Micke, 3 - Brad
