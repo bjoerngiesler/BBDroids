@@ -58,7 +58,7 @@ DOIMU::DOIMU() {
 
 bool DOIMU::begin() {
   if(available_) return true;
-  Serial.print("Setting up Body IMU... ");
+  Console::console.printfBroadcast("Setting up Body IMU...\n");
 
   // Check whether we exist
   int err;
@@ -191,7 +191,7 @@ bool DOIMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
   return true;
 }
 
-bool DOIMU::getAccelMeasurement(float &x, float &y, float &z, int32_t &t) {
+bool DOIMU::getAccelMeasurement(float &x, float &y, float &z, uint32_t &t) {
   if(!available_) return false;
 
   sensors_event_t a;
