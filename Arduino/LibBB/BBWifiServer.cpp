@@ -171,6 +171,12 @@ bb::Result bb::WifiServer::stop(ConsoleStream* stream) {
 
 bb::Result bb::WifiServer::step() {
 	int status = WiFi.status();
+	if(status == WL_NO_MODULE) {
+		Console::console.printfBroadcast("WiFiNINA reports WL_NO_MODULE! Stopping.\n");
+		stop();
+		return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+	}
+
 	static int seqnum = 0;
 	static int dummy = 0;
 
