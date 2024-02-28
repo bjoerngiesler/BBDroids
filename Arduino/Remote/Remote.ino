@@ -27,6 +27,8 @@ void setup() {
   digitalWrite(LEDG, LOW);
   digitalWrite(LEDB, HIGH);
 
+  ConfigStorage::storage.initialize();
+
   Console::console.initialize();
   Console::console.start();
   
@@ -37,7 +39,8 @@ void setup() {
 #else 
   uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
 #endif
-  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, DEFAULT_STATION_DROID, 115200);
+  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200);
+  
   
 #if defined(LEFT_REMOTE)
   WifiServer::server.initialize("LRemote-$MAC", "LRemoteKey", true, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
