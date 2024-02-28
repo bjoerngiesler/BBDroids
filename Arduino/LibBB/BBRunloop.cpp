@@ -45,7 +45,9 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		for(auto& s: subsys) {
 			unsigned long us = micros();
 			if(s->isStarted() && s->operationStatus() == RES_OK) {
+				//Console::console.printfBroadcast("Calling step() in %s...", s->name());
 				s->step();
+				//Console::console.printfBroadcast("done.\n");
 			}
 			String str = String(s->name())  + ": " + (micros()-us) + "us ";
 			timingInfo.push_back(str);
