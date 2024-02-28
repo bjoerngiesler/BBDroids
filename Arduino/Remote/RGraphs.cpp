@@ -57,12 +57,7 @@ void RGraphs::plotAxisData(Graph g, float a0, float a1, float a2, float a3, floa
 }
 
 void RGraphs::plotControlPacket(Graph g, const bb::ControlPacket& packet) {
-  float a0 = ((float)packet.getAxis(0))/ AXIS_MAX;
-  float a1 = ((float)packet.getAxis(1))/ AXIS_MAX;
-  float a2 = ((float)packet.getAxis(2))/ AXIS_MAX;
-  float a3 = ((float)packet.getAxis(3))/ AXIS_MAX;
-  float a4 = ((float)packet.getAxis(4))/ AXIS_MAX;
-  plotAxisData(g, a0, a1, a2, a3, a4);
+  plotAxisData(g, packet.getAxis(0), packet.getAxis(1), packet.getAxis(2), packet.getAxis(3), packet.getAxis(4));
 }
 
 void RGraphs::advanceCursor(Graph g) { 
