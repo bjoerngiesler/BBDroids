@@ -43,6 +43,55 @@ static uint8_t calcCRC7(const uint8_t *buffer, size_t len) {
 	return crc;
 }
 
-uint8_t bb::calculateCRC(const Packet& packet) {
-	return calcCRC7((const uint8_t*)&packet, sizeof(packet)) & 0x7f;
+uint8_t bb::Packet::calculateCRC() {
+	return calcCRC7((const uint8_t*)this, sizeof(Packet));
+}
+
+bb::Result bb::PacketReceiver::incomingPacket(uint16_t station, uint8_t rssi, const Packet& packet) {
+	switch(packet.type) {
+	case bb::PACKET_TYPE_CONTROL:
+		return incomingControlPacket(station, packet.source, rssi, packet.payload.control);
+		break;
+	case bb::PACKET_TYPE_STATE:
+		return incomingStatePacket(station, packet.source, rssi, packet.payload.state);
+		break;
+	case bb::PACKET_TYPE_CONFIG:
+		return incomingConfigPacket(station, packet.source, rssi, packet.payload.config);
+		break;
+	case bb::PACKET_TYPE_PAIRING:
+	default:
+		return incomingPairingPacket(station, packet.source, rssi, packet.payload.pairing);
+	}
+}
+
+bb::Result bb::PacketReceiver::incomingControlPacket(uint16_t station, bb::PacketSource source, uint8_t rssi, const bb::ControlPacket& packet) {
+	(void)station;
+	(void)source;
+	(void)rssi;
+	(void)packet;
+	return RES_OK;
+}
+
+bb::Result bb::PacketReceiver::incomingStatePacket(uint16_t station, bb::PacketSource source, uint8_t rssi, const bb::StatePacket& packet) {
+	(void)station;
+	(void)source;
+	(void)rssi;
+	(void)packet;
+	return RES_OK;
+}
+
+bb::Result bb::PacketReceiver::incomingConfigPacket(uint16_t station, bb::PacketSource source, uint8_t rssi, const bb::ConfigPacket& packet) {
+	(void)station;
+	(void)source;
+	(void)rssi;
+	(void)packet;
+	return RES_OK;
+}
+
+bb::Result bb::PacketReceiver::incomingPairingPacket(uint16_t station, bb::PacketSource source, uint8_t rssi, const bb::PairingPacket& packet) {
+	(void)station;
+	(void)source;
+	(void)rssi;
+	(void)packet;
+	return RES_OK;
 }
