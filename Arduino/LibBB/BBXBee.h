@@ -10,9 +10,6 @@
 #define DEFAULT_CHAN    0x19   // no overlap with Wifi according to XBee documentation
 #define DEFAULT_PAN     0x3332
 
-#define DEFAULT_STATION_DROID 0x1
-#define DEFAULT_STATION_LEFT_REMOTE 0x2
-#define DEFAULT_STATION_RIGHT_REMOTE 0x3
 #define DEFAULT_BPS     9600
 	
 namespace bb {
@@ -78,17 +75,15 @@ public:
 	virtual Result step();
 	virtual Result parameterValue(const String& name, String& value);
 	virtual Result setParameterValue(const String& name, const String& value);
-	virtual Result initialize(uint8_t chan, uint16_t pan, uint16_t station, uint16_t partner, uint32_t bps, HardwareSerial *uart=&Serial1);
+	virtual Result initialize(uint8_t chan, uint16_t pan, uint16_t station, uint32_t bps, HardwareSerial *uart=&Serial1);
 	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
-	void setPacketMode(bool onoff);
 	Result addPacketReceiver(PacketReceiver *receiver);
 	Result removePacketReceiver(PacketReceiver *receiver);
 
 	void setChannel(uint8_t chan) { params_.chan = chan; }
 	void setPAN(uint16_t pan) { params_.pan = pan; }
 	void setStation(uint16_t station) { params_.station = station; }
-	void setPartner(uint16_t partner) { params_.partner = partner; }
 	void setBPS(uint32_t bps) { params_.bps = bps; }
 	void setName(const char* name) { memset(params_.name, 0, 20); snprintf(params_.name, 19, name); }
 
@@ -97,8 +92,8 @@ public:
 	bool isInATMode();
 	Result changeBPSTo(uint32_t bps, ConsoleStream *stream=NULL, bool stayInAT=false);
 	int getCurrentBPS() { return currentBPS_; }
-	Result setConnectionInfo(uint8_t chan, uint16_t pan, uint16_t station, uint16_t partner, bool stayInAT=false);
-	Result getConnectionInfo(uint8_t& chan, uint16_t& pan, uint16_t& station, uint16_t& partner, bool stayInAT=false);
+	Result setConnectionInfo(uint8_t chan, uint16_t pan, uint16_t station, bool stayInAT=false);
+	Result getConnectionInfo(uint8_t& chan, uint16_t& pan, uint16_t& station, bool stayInAT=false);
 
 	Result setAPIMode(bool onoff);
 	Result sendAPIModeATCommand(uint8_t frameID, const char* cmd, uint8_t argument);
@@ -142,7 +137,7 @@ protected:
 
 	typedef struct {
 		int chan;
-		int pan, station, partner;
+		int pan, station;
 		int bps;
 		char name[20];
 	} XBeeParams;
@@ -152,7 +147,6 @@ protected:
 
 	bool sendContinuous_;
 	int continuous_;
-	bool packetMode_; // if false, string mode
 	uint8_t packetBuf_[255];
 	size_t packetBufPos_;
 
@@ -160,14 +154,18 @@ protected:
 	public:
 		APIFrame();
 		APIFrame(const uint8_t *data, uint16_t dataLength);
-		APIFrame(APIFrame& frame);
+		APIFrame(uint16_t length);
+		APIFrame(const APIFrame& frame);
 		~APIFrame();
 
 		APIFrame& operator=(const APIFrame& frame);
 		
-		virtual const uint8_t *data() const { return data_; }
+		virtual uint8_t *data() const { return data_; }
 		virtual uint16_t length() const { return length_; }
 		virtual uint8_t checksum() const { return checksum_; }
+
+		void calcChecksum();
+
 
 		static APIFrame atRequest(uint8_t frameID, uint16_t command);
 		bool isATRequest();
@@ -212,13 +210,10 @@ protected:
 			RECEIVE16BIT	= 0x81,
 			ATRESPONSE		= 0x88
 		};
-		APIFrame(uint16_t length);
 
 		uint8_t *data_;
 		uint16_t length_;
 		uint8_t checksum_;
-
-		void calcChecksum();
 	};
 
 	String sendStringAndWaitForResponse(const String& str, int predelay=0, bool cr=true);
