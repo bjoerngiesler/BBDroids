@@ -13,6 +13,7 @@ public:
 
 	static ConfigStorage storage;
 
+	bool initialize();
 	HANDLE reserveBlock(size_t size);
 	Result writeBlock(HANDLE, uint8_t* block);
 	Result readBlock(HANDLE, uint8_t* block);
@@ -21,7 +22,6 @@ public:
 
 protected:
 	ConfigStorage();
-	bool initialize();
 
 	struct Block {
 		HANDLE handle;

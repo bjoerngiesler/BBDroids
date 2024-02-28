@@ -14,13 +14,20 @@ static const size_t MAXSIZE=EEPROM_EMULATION_SIZE;
 bb::ConfigStorage bb::ConfigStorage::storage;
 
 bb::ConfigStorage::HANDLE bb::ConfigStorage::reserveBlock(size_t size) {
-	if(!initialized_) initialize();
+	if(!initialized_) {
+		Serial.println("Not initialized, returning 0.");
+		return 0;
+	}
 
-	if(nextHandle_ + 1 + size > maxSize_) return 0;
+	if(nextHandle_ + 1 + size > maxSize_) {
+		Serial.println("Size too large");
+		return 0;
+	}
 
 	Block block = {nextHandle_+1, size};
 	blocks_.push_back(block);
 	nextHandle_ = nextHandle_ + size + 1;
+
 	return block.handle;
 }
 
@@ -36,7 +43,7 @@ bb::Result bb::ConfigStorage::writeBlock(HANDLE handle, uint8_t* data) {
   				EEPROM.write(handle+i, data[i]);	
   			} 
   			Serial.println("Marking as valid");
-  			EEPROM.write(handle-1, 1);
+  			EEPROM.write(handle-1, 0xba);
   			Serial.println("Done.");
   			return RES_OK;
   		}
@@ -61,8 +68,8 @@ bb::Result bb::ConfigStorage::readBlock(HANDLE handle, uint8_t* data) {
 bool bb::ConfigStorage::blockIsValid(HANDLE handle) {
 	if(handle == 0 || !initialized_) return false;
 	for(auto& block: blocks_) {
-  		if(block.handle  == handle) {
-  			if(EEPROM.read(handle-1) == 1) return true;
+  		if(block.handle == handle) {
+  			if(EEPROM.read(handle-1) == 0xba) return true;
   			else return false;
 		} 
 	}
@@ -71,11 +78,11 @@ bool bb::ConfigStorage::blockIsValid(HANDLE handle) {
 
 bool bb::ConfigStorage::initialize() {
 	if(initialized_) return true;
-#if defined(NANO_RP2040_CONNECT)
+
+#if defined(ARDUINO_NANO_RP2040_CONNECT)
 	EEPROM.begin(MAXSIZE);
-#else
-	maxSize_ = MAXSIZE;
 #endif
+	maxSize_ = MAXSIZE;
 
 	nextHandle_ = 0;
 	initialized_ = true;
