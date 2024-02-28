@@ -60,8 +60,7 @@ bool bb::SerialConsoleStream::readStringUntil(unsigned char c, String& str) {
 }
 
 void bb::SerialConsoleStream::printfFinal(const char* buf) {
-	if(opened_)
-		ser_.print(buf);
+	ser_.print(buf);
 }
 
 bb::Console::Console() {
@@ -205,17 +204,20 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 	}
 }
 
+#define PRINTF_MAXLEN 254
 void bb::Console::printfBroadcast(const char* format, ...) {
+	char str[PRINTF_MAXLEN+1];
+
 	va_list args;
 	va_start(args, format);
 	int len = vsnprintf(NULL, 0, format, args)+1;
-	char *str = new char[len];
+	if(len > PRINTF_MAXLEN) len = PRINTF_MAXLEN;
+	memset(str, 0, len);
 	vsnprintf(str, len, format, args);
 	va_end(args);
 	for(auto& s: streams_) {
 		s->printf(str);
 	}
-	delete str;
 }
 
 void bb::Console::printHelpAllSubsystems(ConsoleStream* stream) {
