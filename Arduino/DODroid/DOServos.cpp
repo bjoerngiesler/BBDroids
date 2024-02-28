@@ -442,6 +442,11 @@ void DOServos::printStatus(ConsoleStream* stream, int id) {
   }
 }
 
+bool DOServos::hasServoWithID(uint8_t id) {
+  return servoWithID(id) != NULL;
+}
+
+
 bool DOServos::setRange(uint8_t id, float min, float max, ValueType t) {
   Servo *s = servoWithID(id);
   if(s == NULL) return false;

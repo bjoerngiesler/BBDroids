@@ -42,6 +42,7 @@ public:
 
   void printStatus(ConsoleStream* stream, int id);
 
+  bool hasServoWithID(uint8_t id);
   bool setRange(uint8_t id, float min, float max, ValueType t=VALUE_DEGREE);
   bool setOffset(uint8_t id, float offset, ValueType t=VALUE_DEGREE);
   bool setInverted(uint8_t id, bool inverted);
