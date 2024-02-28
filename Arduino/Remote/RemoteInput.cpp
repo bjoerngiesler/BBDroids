@@ -31,6 +31,7 @@ void bTopRISR(void) {
 }
 
 RemoteInput::RemoteInput(): delegate_(NULL) {
+  zeroVertical_ = zeroHorizontal_ = 512;
 }
 
 void RemoteInput::setDelegate(RemoteInput::Delegate *d) {
@@ -61,15 +62,18 @@ bool RemoteInput::begin() {
   pinMode(P_A_JOY_VER, INPUT_PULLUP);
 #endif
 
+  zeroVertical_ = analogRead(P_A_JOY_VER);
+  zeroHorizontal_ = analogRead(P_A_JOY_HOR);
+
   return true;
 }
 
 void RemoteInput::update() {
-  joyH = (float)(analogRead(P_A_JOY_HOR) - 512 + CalibBiasJoystickHorizontal) / 512.0f;
+  joyH = (float)(zeroHorizontal_ - analogRead(P_A_JOY_HOR)) / 512.0f;
   if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;
   joyH = constrain(joyH, -1.0f, 1.0f);
   
-  joyV = (float)(analogRead(P_A_JOY_VER) - 512 + CalibBiasJoystickVertical) / 512.0f;
+  joyV = (float)(zeroVertical_ - analogRead(P_A_JOY_VER)) / 512.0f;
   if(abs(joyV) < JoystickEpsilon) joyV = 0.0f;
   joyV = constrain(joyV, -1.0f, 1.0f);
 

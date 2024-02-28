@@ -40,6 +40,7 @@ public:
 protected:
   RemoteInput();
   Delegate *delegate_;
+  uint16_t zeroVertical_, zeroHorizontal_;
 };
 
 #endif // REMOTEINPUT_H
