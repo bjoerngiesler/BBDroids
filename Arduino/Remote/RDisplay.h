@@ -38,12 +38,6 @@ public:
 	virtual Result stop(ConsoleStream *stream = NULL);
 	virtual Result step();
 
-  Result update();
-  void setConnected(bool conn);
-
-  void setLastPacketFromDroid(const Packet& packet) { lastPacketFromDroid_ = packet; }
-  void setLastPacketFromRightRemote(const Packet& packet) { lastPacketFromRightRemote_ = packet; }
-
   Result cls();
   Result text(uint8_t x, uint8_t y, uint16_t color, const String& text);
   Result hline(uint8_t x, uint8_t y, uint8_t width, uint16_t color);
@@ -54,7 +48,6 @@ protected:
   RDisplay();
   virtual ~RDisplay() {}
   bool readString(String& str, unsigned char terminator='\n');
-  Result drawCursor(int x, int y, int width, uint16_t color);
 
   String sendStringAndWaitForResponse(const String& str, int predelay=0, bool nl=true);
   bool sendStringAndWaitForOK(const String& str, int predelay=0, bool nl=true);
@@ -62,12 +55,8 @@ protected:
 #if defined(LEFT_REMOTE)
   SerialPIO ser_;
 #endif
-  bool connected_;
   bool left_led_state_, right_led_state_;
   unsigned long last_millis_;
-  int topX_, topY_, bottomX_, bottomY_;
-  float headingX_, headingY_;
-  Packet lastPacketFromDroid_, lastPacketFromRightRemote_;
 };
 
 #endif // RDISPLAY_H
