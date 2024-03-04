@@ -43,9 +43,6 @@ public:
 
   bool calibrateGyro(ConsoleStream *stream=NULL, int milliseconds = 2000, int step = 10);
 
-  bool integrateGyroMeasurement(bool reset = false);
-  int getIntegratedGyroMeasurement(float& r, float& p, float& h);
-
   bool getGyroMeasurement(float& dr, float& dp, float& dh, bool calibrated=true);
   bool getAccelMeasurement(float& ax, float& ay, float& az, uint32_t& timestamp);
 

@@ -16,9 +16,7 @@ DOIMUControlInput::DOIMUControlInput(DOIMUControlInput::ProbeType pt): filter_(2
 }
 
 bb::Result DOIMUControlInput::update() {
-  //if(DOIMU::imu.update() == true) return RES_OK;
-
-  //return RES_CMD_FAILURE;
+  // IMU update() is manually called in main droid step() function, so we don't do it here
   return RES_OK;
 }
 
@@ -136,46 +134,6 @@ bool DOIMU::getFilteredRPH(float &r, float &p, float &h) {
   p = madgwick_.getPitch();
   h = madgwick_.getYaw();
   return true;
-}
-
-bool DOIMU::integrateGyroMeasurement(bool reset) {
-  if(!available_) return false;
-
-  sensors_event_t g;
-  gyro_->getEvent(&g);
-  if(intRunning_ == false || reset == true) {
-    intR_ = g.gyro.roll; 
-    intP_ = g.gyro.pitch;
-    intH_ = g.gyro.heading;
-    intLastTS_ = g.timestamp;
-    intRunning_ = true;
-    intNum_ = 1;
-    return true;
-  }
-
-  float dt = 0;
-  if(g.timestamp < intLastTS_) { // wrap
-    dt = (float)(((INT_MAX - intLastTS_) + g.timestamp)) / 1000.0f;
-    Serial.print("wrap dt:"); Serial.println(dt, 10);
-  } else {
-    dt = (float)(g.timestamp - intLastTS_) / 1000.0f;
-  }
-
-  intR_ += dt*(g.gyro.roll + calR_);
-  intP_ += dt*(g.gyro.pitch + calP_);
-  intH_ += dt*(g.gyro.heading + calH_); 
-
-  intLastTS_ = g.timestamp;
-  intNum_++;
-
-  return true;
-}
-
-int DOIMU::getIntegratedGyroMeasurement(float& r, float& p, float& h) {
-  if(!available_) return false;
-
-  r = intR_*180.0/M_PI; p = intP_*180.0/M_PI; h = intH_*180.0/M_PI;
-  return intNum_;
 }
 
 bool DOIMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
