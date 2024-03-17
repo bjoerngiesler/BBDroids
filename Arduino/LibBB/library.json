@@ -1,17 +1,18 @@
 {
-  "name": "LibBB8",
+  "name": "LibBB",
+  "version": "0.0.1",
   "keywords": "BB8, droid, utility",
   "description": "Common code for the Bavaria Builders BB8 framework",
   "repository":
   {
     "type": "git",
-    "url": ""
+    "url": "https://github.com/bjoerngiesler/Droids"
   },
   "frameworks": "arduino",
   "platforms":
   [
     "avr",
     "mbed_nano",
-    "samd"
+    "atmelsam"
   ]
 }
