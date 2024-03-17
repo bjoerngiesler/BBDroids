@@ -3,4 +3,6 @@
 .clang_complete
 .gcc-flags.json
 .pio
+.DS_Store
+.vscode
 
