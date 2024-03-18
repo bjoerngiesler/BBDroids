@@ -24,7 +24,7 @@ float DOIMUControlInput::present() {
   float r, p, h;
   if(DOIMU::imu.getFilteredRPH(r, p, h) == false) return 0.0f;
   
-  float retval;
+  float retval=0;
 
   switch(pt_) {
   case IMU_ROLL:

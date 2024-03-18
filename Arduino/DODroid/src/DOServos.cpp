@@ -2,7 +2,7 @@
 #include "DOServos.h"
 #include "DOConfig.h"
 
-static uint32_t SLOW_VEL = 20;
+static uint32_t SLOW_VEL = 5;
 static const uint8_t MAX_SERVO_ID = 4;
 
 DOServos DOServos::servos;
@@ -253,7 +253,7 @@ Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleS
   else if (words[0] == "home") {
     if (words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
 
-    return home(5.0, stream);
+    return home(SLOW_VEL, stream);
   }
 
   else if (words[0] == "torque") {

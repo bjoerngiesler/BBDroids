@@ -87,7 +87,6 @@ bb::Result bb::Console::step() {
 	if(!started_) return RES_SUBSYS_NOT_STARTED;
 
 	for(size_t i=0; i<streams_.size(); i++) {
-		unsigned long m = micros();
 		handleStreamInput(streams_[i]);
 	}
 

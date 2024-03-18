@@ -16,15 +16,15 @@ bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_
   if(pin_en_ != PIN_OFF)
     pinMode(pin_en_, OUTPUT);
 
-    digitalWrite(pin_a_, LOW);
-    digitalWrite(pin_b_, LOW);
-    analogWrite(pin_pwm_, 0);
-    if(pin_en_ != PIN_OFF) {
-      digitalWrite(pin_en_, LOW);
-      en_ = false;
-    } else {
-      en_ = true;
-    }
+  digitalWrite(pin_a_, LOW);
+  digitalWrite(pin_b_, LOW);
+  analogWrite(pin_pwm_, 0);
+  if(pin_en_ != PIN_OFF) {
+    digitalWrite(pin_en_, LOW);
+    en_ = false;
+  } else {
+    en_ = true;
+  }
 
   speed_ = 0;
   reverse_ = false;

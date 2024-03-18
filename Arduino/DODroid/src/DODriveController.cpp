@@ -13,7 +13,6 @@ DODriveControlOutput::DODriveControlOutput(bb::ControlOutput& left, bb::ControlO
 
 bb::Result DODriveControlOutput::set(float value) {
   bb::Result resLeft, resRight;
-  static int zeroControlTimes = 0;
 
   float l = goalVel_ + goalRot_ - value;
   float r = goalVel_ - goalRot_ - value;

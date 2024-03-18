@@ -89,8 +89,8 @@ protected:
 		}
 	protected:
 		int& val_;
-		int min_, max_;
 		String help_;
+		int min_, max_;
 	};
 
 	class FloatParameter: public Parameter {
@@ -115,8 +115,8 @@ protected:
 		}
 	protected:
 		float& val_;
-		float min_, max_;
 		String help_;
+		float min_, max_;
 	};
 
 	class StringParameter: public Parameter {
@@ -138,8 +138,8 @@ protected:
 		}
 	protected:
 		String& val_;
-		int maxlen_;
 		String help_;
+		unsigned int maxlen_;
 	};	
 
 	class BoolParameter: public Parameter {

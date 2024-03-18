@@ -23,6 +23,8 @@ bool setupBoardComm() {
   dfplayerSerial = new Uart(&sercom1, P_DFPLAYER_RX, P_DFPLAYER_TX, SERCOM_RX_PAD_1, UART_TX_PAD_0);
   pinPeripheral(P_DFPLAYER_RX, PIO_SERCOM);
   pinPeripheral(P_DFPLAYER_TX, PIO_SERCOM);
+
+  return true;
 }
 
 void SERCOM1_Handler() {

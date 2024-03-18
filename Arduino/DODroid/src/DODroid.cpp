@@ -21,8 +21,8 @@ DODroid::Params DODroid::params_ = {
 
 DODroid::DODroid():
   leftMotor_(P_LEFT_PWMA, P_LEFT_PWMB), 
-  leftEncoder_(P_LEFT_ENCA, P_LEFT_ENCB, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
   rightMotor_(P_RIGHT_PWMA, P_RIGHT_PWMB), 
+  leftEncoder_(P_LEFT_ENCA, P_LEFT_ENCB, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
   rightEncoder_(P_RIGHT_ENCA, P_RIGHT_ENCB, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
   motorsOK_(false),
   servosOK_(false)
@@ -180,6 +180,8 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
 
   balanceController_->setControlParameters(params_.balKp, params_.balKi, params_.balKd);
   balanceController_->reset();
+
+  return RES_OK;
 }
 
 Result DODroid::fillAndSendStatePacket() {
