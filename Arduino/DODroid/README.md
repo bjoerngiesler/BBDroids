@@ -9,4 +9,8 @@ This software was written in 2023 and later by Björn Giesler <bjoern@giesler.de
 - implement speed control mode
 - implement position control mode
 - implement auto mode (position control if no remote input, speed control otherwise)
-- add servo initialization
+- check for max current draw
+- move IMU code into LibBB
+- move Servo code into LibBB
+- move sound code into LibBB
+- refactor Drive Controller and move into LibBB
