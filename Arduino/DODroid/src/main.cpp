@@ -4,8 +4,10 @@
 
 #include "DODroid.h"
 #include "DOServos.h"
+#include "DOSound.h"
 #include "DOConfig.h"
 #include "DOWifiSecrets.h"
+#include "../resources/systemsounds.h"
 
 #include <wiring_private.h>
 
@@ -69,6 +71,10 @@ void setup() {
   Wire.begin();
 
   setupBoardComm();
+
+  DOSound::sound.begin(dfplayerSerial);
+  DOSound::sound.setVolume(30);
+  DOSound::sound.playSystemSound(1);
 
   initializeSubsystems();
   startSubsystems();

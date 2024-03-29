@@ -6,8 +6,10 @@ static uint32_t SLOW_VEL = 5;
 static const uint8_t MAX_SERVO_ID = 4;
 
 DOServos DOServos::servos;
-static const unsigned int bpsList[] = { 57600, 115200, 1000000 };
-static const unsigned int numBps = 3;
+//static const unsigned int bpsList[] = { 57600, 115200, 1000000 };
+//static const unsigned int numBps = 3;
+static const unsigned int bpsList[] = { 1000000 };
+static const unsigned int numBps = 1;
 static const unsigned int goalBps = 1000000;
 
 struct StrToCtrlTable {
@@ -99,6 +101,7 @@ Result DOServos::start(ConsoleStream* stream) {
         servo.load = dxl_.readControlTableItem(ControlTableItem::PRESENT_LOAD, id);
         servo.min = dxl_.readControlTableItem(ControlTableItem::MIN_POSITION_LIMIT, id);
         servo.max = dxl_.readControlTableItem(ControlTableItem::MAX_POSITION_LIMIT, id);
+        servo.offset = 0;
         servos_.push_back(servo);
 
         if (ctrlPresentPos_.addr == 0) {
@@ -251,9 +254,10 @@ Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleS
   }
 
   else if (words[0] == "home") {
-    if (words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    if (words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 
-    return home(SLOW_VEL, stream);
+    if(words[1] == "all") return home(ID_ALL, SLOW_VEL, 50, stream);
+    else return home(words[1].toInt(), SLOW_VEL, 50, stream);
   }
 
   else if (words[0] == "torque") {
@@ -326,67 +330,97 @@ Result DOServos::handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex 
   return RES_OK;
 }
 
-Result DOServos::home(float vel, ConsoleStream* stream) {
-  if(stream) stream->printf("Homing servos...\n");
+#define ABS(x) (((x)<0?-(x):(x)))
+
+Result DOServos::home(uint8_t id, float vel, unsigned int maxLoadPercent, ConsoleStream* stream) {
+  Servo *s = NULL;
+  if(id != ID_ALL) {
+    s = servoWithID(id);
+    if(s == NULL) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
 
   Result res;
-  float maxoffs = 0;
-  
+  int maxoffs = 0;
+  uint32_t rawVel = vel / 0.229; // vel is given in units of 0.229rev/min
+  unsigned int maxLoad = maxLoadPercent * 10;
+
   res = syncReadInfo();
   if(res != RES_OK) return res;
 
-  uint32_t rawVel = computeRawValue(vel);
-
-  for(auto& s: servos_) {
-    s.lastVel = s.profileVel;
-    setProfileVelocity(s.id, rawVel, VALUE_RAW);
+  // store last profile velocity, switch torque on, and set new profile velocity
+  if(id == ID_ALL) {
+    for(auto& s: servos_) {
+      s.lastVel = s.profileVel;
+      switchTorque(s.id, true);
+      setProfileVelocity(s.id, rawVel, VALUE_RAW);
+      setGoal(s.id, (s.max - s.min)/2, VALUE_RAW); // FIXME Maybe home pos is not in the middle?
+      int offs = (int)s.present - (int)s.goal;
+      if(offs < 0) offs = -offs;
+      if(offs > maxoffs) maxoffs = offs;
+    }
+  } else {
+    s->lastVel = s->profileVel;
+    switchTorque(id, true);
+    setProfileVelocity(id, rawVel, VALUE_RAW);
+    setGoal(id, (s->max - s->min)/2, VALUE_RAW);
+    maxoffs = abs((int)s->present - (int)s->goal);
   }
   res = syncWriteInfo();
   if(res != RES_OK) return res;
 
-  // home servos
-  for(auto& s: servos_) {
-    setGoal(s.id, (s.max - s.min)/2, VALUE_RAW); // FIXME Maybe home pos is not in the middle?
-    int offs = s.present - s.goal;
-    if(offs < 0) offs = -offs;
-    if(offs > maxoffs) maxoffs = offs;
-  }
-  maxoffs = (maxoffs / 4096.0)*360.0;
-  
-  res = syncWriteInfo();
-  if(res != RES_OK) return res;
+  // how many ms should it take to reach the goal?
+  float timeToReachGoalMS = maxoffs / ((vel * 4096.0) / 60000);
 
-  int d = (int)((maxoffs / vel)*1100);
+  Console::console.printfBroadcast("Time to reach the goal: %f\n", timeToReachGoalMS);
+
+  int timeRemaining = (int)(2*timeToReachGoalMS);
   bool allReachedGoal = false;
-  while(d > 0) {
+  while(timeRemaining > 0) {
     syncReadInfo();
     allReachedGoal = true;
-    for(auto& s: servos_) {
-      if(stream) {
-        stream->printf("Servo %d: Pos %d Goal %d Diff %f Load %d ", s.id, s.present, s.goal, fabs(s.present-s.goal), s.load);
+    if(id == ID_ALL) {
+      for(auto& s: servos_) {
+        int diff = abs((int)s.present - (int)s.goal);
+        if(stream) {
+          stream->printf("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s.id, s.present, s.goal, diff, s.load, rawVel);
+        }
+        if(diff > 10) allReachedGoal = false;
+        if(abs(s.load) > maxLoad) {
+          if(stream) {
+            stream->printf("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.",
+                           maxLoad, s.id, s.load);
+          }
+          switchTorque(s.id, false);
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
       }
-      if(fabs(s.present - s.goal) > 10) allReachedGoal = false;
+    } else {
+      int diff = abs((int)s->present - (int)s->goal);
+      if(stream) {
+        stream->printf("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s->id, s->present, s->goal, diff, s->load, rawVel);
+      }
+      if(diff > 10) allReachedGoal = false;
+      if(ABS(s->load) > maxLoad) {
+        if(stream) {
+          stream->printf("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.", maxLoad, s->id, s->load);
+        }
+        switchTorque(s->id, false);
+        return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+      }
     }
-    if(stream) stream->printf("\n");
-    if(allReachedGoal == true) {
-      if(stream) stream->printf("All reached goal!\n");
-      break;
-    }
+
+    if(allReachedGoal == true) break;
     delay(10);
-    d-=10;
-  }
-  if(stream) {
-    stream->printf("Final: ");
-    for(auto& s: servos_) {
-      if(stream) {
-        stream->printf("Servo %d: Pos %d Goal %d Load %d ", s.id, s.present, s.goal, s.load);
-      }
-    }
+    timeRemaining -= 10;
   }
 
   // restore old profile velocities
-  for(auto& s: servos_) {
-    setProfileVelocity(s.id, s.lastVel, VALUE_RAW);
+  if(id == ID_ALL) {
+    for(auto& s: servos_) {
+      setProfileVelocity(s.id, s.lastVel, VALUE_RAW);
+    }
+  } else {
+    setProfileVelocity(id, s->lastVel, VALUE_RAW);
   }
   res = syncWriteInfo();
   if(res != RES_OK) return res;
@@ -505,7 +539,8 @@ bool DOServos::setGoal(uint8_t id, float goal, ValueType t) {
 
   Servo *s = servoWithID(id);
   if (s == NULL) return false;
-  uint32_t g = computeRawValue(goal, t) + s->offset;
+  //Console::console.printfBroadcast("Servo %d: Offset %d\n", s->id, s->offset);
+  uint32_t g = computeRawValue(goal, t); //+ s->offset;
   //Console::console.printfBroadcast("Goal of %f becomes %d\n", goal, g);
   s->goal = constrain(g, s->min, s->max);
   //Console::console.printfBroadcast("Goal of %d becomes %d\n", g, s->goal);

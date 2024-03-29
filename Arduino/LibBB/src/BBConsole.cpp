@@ -124,8 +124,9 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 		return;
 	}
 
-	stream->printf(errorMessage(firstResponder_->handleConsoleCommand(words, stream)));
-	stream->printf("\n> ");
+	Result res = firstResponder_->handleConsoleCommand(words, stream);
+	stream->printf(errorMessage(res));
+	stream->printf(".\n> ");
 }
 
 bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {
@@ -196,11 +197,11 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 		} else {
 			std::vector<String> wordsminusone = words;
 			wordsminusone.erase(wordsminusone.begin());
-			stream->printf(errorMessage(subsys->handleConsoleCommand(wordsminusone, stream)));
-			stream->printf("\n");
+			return subsys->handleConsoleCommand(wordsminusone, stream);
 		}
-		return RES_OK;
 	}
+
+	return RES_CMD_UNKNOWN_COMMAND;
 }
 
 #define PRINTF_MAXLEN 254

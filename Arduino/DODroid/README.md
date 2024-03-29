@@ -14,3 +14,4 @@ This software was written in 2023 and later by Björn Giesler <bjoern@giesler.de
 - move Servo code into LibBB
 - move sound code into LibBB
 - refactor Drive Controller and move into LibBB
+- exchange 12V Mini BEC for a bigger one, recable servos, move 5V BEC into head

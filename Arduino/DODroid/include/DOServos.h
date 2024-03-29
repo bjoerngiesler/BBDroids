@@ -38,7 +38,7 @@ public:
 
   void setRequiredIds(const std::vector<uint8_t>& ids) { requiredIds_ = ids; }
 
-  Result home(float vel, ConsoleStream* stream = NULL);
+  Result home(uint8_t id, float vel, unsigned int maxLoadPercent, ConsoleStream* stream = NULL);
 
   void printStatus(ConsoleStream* stream, int id);
 

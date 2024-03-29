@@ -3,6 +3,8 @@
 #include "DOIMU.h"
 #include "DOBattStatus.h"
 #include "DOServos.h"
+#include "DOSound.h"
+#include "../resources/systemsounds.h"
 
 DODroid DODroid::droid;
 DODroid::Params DODroid::params_ = {
@@ -24,11 +26,15 @@ DODroid::DODroid():
   rightMotor_(P_RIGHT_PWMA, P_RIGHT_PWMB), 
   leftEncoder_(P_LEFT_ENCA, P_LEFT_ENCB, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
   rightEncoder_(P_RIGHT_ENCA, P_RIGHT_ENCB, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
-  motorsOK_(false),
-  servosOK_(false)
+  leftMotorStatus_(MOTOR_UNTESTED),
+  rightMotorStatus_(MOTOR_UNTESTED),
+  servosOK_(false),
+  driveMode_(DRIVE_PITCH)
 {
-  pinMode(PULL_DOWN_A0, OUTPUT);
-  digitalWrite(PULL_DOWN_A0, LOW);
+  pinMode(PULL_DOWN_15, OUTPUT);
+  digitalWrite(PULL_DOWN_15, LOW);
+  pinMode(PULL_DOWN_20, OUTPUT);
+  digitalWrite(PULL_DOWN_20, LOW);
 
   name_ = "d-o";
 
@@ -50,8 +56,8 @@ Result DODroid::initialize() {
   addParameter("pos_kp", "Proportional constant for position PID controller", params_.posKp, 0, INT_MAX);
   addParameter("pos_ki", "Integrative constant for position PID controller", params_.posKi, 0, INT_MAX);
   addParameter("pos_kd", "Derivative constant for position PID controller", params_.posKd, 0, INT_MAX);
-  addParameter("speed_remote_factor", "Amplification factor for remote speed axis", params_.speedRemoteFactor, 0, 100);
-  addParameter("rot_remote_factor", "Amplification factor for remote rotation axis", params_.rotRemoteFactor, 0, 100);
+  addParameter("speed_remote_factor", "Amplification factor for remote speed axis", params_.speedRemoteFactor, 0, 255);
+  addParameter("rot_remote_factor", "Amplification factor for remote rotation axis", params_.rotRemoteFactor, 0, 255);
 
   balanceInput_ = new DOIMUControlInput(DOIMUControlInput::IMU_PITCH);
   driveOutput_ = new DODriveControlOutput(leftMotor_, rightMotor_);
@@ -64,11 +70,8 @@ Result DODroid::start(ConsoleStream* stream) {
   DOIMU::imu.begin();
   DOBattStatus::batt.begin();
 
-  operationStatus_ = RES_OK;
-#if 0
   operationStatus_ = selfTest();
   if(operationStatus_ != RES_OK) return operationStatus_;
-#endif
 
   leftMotor_.set(0);
   leftEncoder_.setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
@@ -80,6 +83,8 @@ Result DODroid::start(ConsoleStream* stream) {
   rightEncoder_.setUnit(bb::Encoder::UNIT_MILLIMETERS);
 
   balanceController_->setControlParameters(params_.balKp, params_.balKi, params_.balKd);
+
+  DOServos::servos.switchTorque(SERVO_NECK, true);
 
   started_ = true;
   operationStatus_ = RES_OK;
@@ -106,7 +111,7 @@ Result DODroid::step() {
   
   DOIMU::imu.update();
 
-  if(motorsOK_) {
+  if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK && driveMode_ != DRIVE_OFF) {
     balanceController_->update();
     float err, errI, errD, control;
     balanceController_->getControlState(err, errI, errD, control);
@@ -117,6 +122,7 @@ Result DODroid::step() {
   
   return RES_OK;
 }
+
 
 void DODroid::printStatus(ConsoleStream *stream) {
   if(!stream) return;
@@ -135,10 +141,16 @@ void DODroid::printStatus(ConsoleStream *stream) {
   stream->printf(", servos: %s", DOServos::servos.isStarted() ? "OK" : "not started");
 
   stream->printf(", motors: ");
+
   leftEncoder_.update();
+  if(leftMotorStatus_ == MOTOR_OK) stream->printf("L OK");
+  else stream->printf("L Err %d", leftMotorStatus_);
+  stream->printf(", enc %.1f", leftEncoder_.presentPosition());
+
   rightEncoder_.update();
-  if(motorsOK_) stream->printf(" OK, encoders: R%.1f L%.1f", rightEncoder_.presentPosition(), leftEncoder_.presentPosition());
-  else stream->printf("failure");
+  if(rightMotorStatus_ == MOTOR_OK) stream->printf(", R OK");
+  else stream->printf("R Err %d", rightMotorStatus_);
+  stream->printf(", enc %.1f", rightEncoder_.presentPosition());
 
   stream->printf("\n");
 }
@@ -165,10 +177,7 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
 
   if(words.size() == 1 && words[0] == "selftest") {
     Runloop::runloop.excuseOverrun();
-    if(stream) stream->printf("Running selftest.\n");
-    Result res = selfTest(stream);
-    if(stream) stream->printf("Selftest returns %s.\n", errorMessage(res));
-    return res;
+    return selfTest(stream);
   }
 
   return bb::Subsystem::handleConsoleCommand(words, stream);
@@ -228,20 +237,36 @@ Result DODroid::fillAndSendStatePacket() {
 Result DODroid::selfTest(ConsoleStream *stream) {
   Runloop::runloop.excuseOverrun();
 
+  DOSound::sound.playSystemSound(SystemSounds::SELFTEST_STARTING_PLEASE_STAND_CLEAR);
+  delay(2000);
+
   Console::console.printfBroadcast("D-O Self Test\n=============\n");
   
   // Check battery
+  DOSound::sound.playSystemSound(SystemSounds::POWER);
   if(!DOBattStatus::batt.available()) {
     Console::console.printfBroadcast("Critical error: Battery monitor not available!\n");
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
   DOBattStatus::batt.updateVoltage();
   DOBattStatus::batt.updateCurrent();
   Console::console.printfBroadcast("Battery OK. Voltage: %.2fV, current draw: %.2fmA\n", DOBattStatus::batt.voltage(), DOBattStatus::batt.current());
+  if(DOBattStatus::batt.voltage() < 12.0) {
+    DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
+    return RES_DROID_VOLTAGE_TOO_LOW;
+  } else if(DOBattStatus::batt.voltage() > 17.0) {
+    DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_HIGH);
+    return RES_DROID_VOLTAGE_TOO_HIGH;
+  }
+  DOSound::sound.playSystemSound(SystemSounds::OK);
+
 
   // Check IMU
+  DOSound::sound.playSystemSound(SystemSounds::IMU);
   if(DOIMU::imu.available() == false) {
     Console::console.printfBroadcast("Critical error: IMU not available!\n");
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
   DOIMU::imu.update();
@@ -250,13 +275,96 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   DOIMU::imu.getAccelMeasurement(ax, ay, az, timestamp);
   if(fabs(ax) > 1.0 || fabs(ay) > 1.0 || fabs(az) < 9.0) {
     Console::console.printfBroadcast("Critical error: Droid not upright!\n");
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
   Console::console.printfBroadcast("IMU OK. Down vector: %.2f %.2f %.2f\n", ax, ay, az);
 
+  DOSound::sound.playSystemSound(SystemSounds::CALIBRATING);
   DOIMU::imu.calibrateGyro(stream);
   Console::console.printfBroadcast("IMU calibrated.\n");
+  DOSound::sound.playSystemSound(SystemSounds::OK);
 
+  DOSound::sound.playSystemSound(SystemSounds::SERVOS);
+  if(servoTest(stream) != RES_OK) {
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+  } else {
+    DOSound::sound.playSystemSound(SystemSounds::OK);
+  }
+
+  DOSound::sound.playSystemSound(SystemSounds::LEFT_MOTOR);
+  leftMotorStatus_ = singleMotorTest(leftMotor_, leftEncoder_, false, stream);
+  switch(leftMotorStatus_) {
+  case MOTOR_UNTESTED:
+    DOSound::sound.playSystemSound(SystemSounds::UNTESTED);
+    break;
+  case MOTOR_OK:
+    DOSound::sound.playSystemSound(SystemSounds::OK);
+    break;
+  case MOTOR_DISCONNECTED:
+    DOSound::sound.playSystemSound(SystemSounds::DISCONNECTED);
+    break;
+  case MOTOR_ENC_DISCONNECTED:
+    DOSound::sound.playSystemSound(SystemSounds::ENCODER_DISCONNECTED);
+    break;
+  case MOTOR_REVERSED:
+    DOSound::sound.playSystemSound(SystemSounds::REVERSED);
+    break;
+  case MOTOR_ENC_REVERSED:
+    DOSound::sound.playSystemSound(SystemSounds::ENCODER_REVERSED);
+    break;
+  case MOTOR_BOTH_REVERSED:
+    DOSound::sound.playSystemSound(SystemSounds::REVERSED);
+    DOSound::sound.playSystemSound(SystemSounds::ENCODER_REVERSED);
+    break;
+  case MOTOR_BLOCKED:
+    DOSound::sound.playSystemSound(SystemSounds::BLOCKED);
+    break;
+  case MOTOR_OTHER:
+  default:
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    break;
+  }
+
+  DOSound::sound.playSystemSound(SystemSounds::RIGHT_MOTOR);
+  rightMotorStatus_ = singleMotorTest(rightMotor_, rightEncoder_, true, stream);
+  switch(rightMotorStatus_) {
+  case MOTOR_UNTESTED:
+    DOSound::sound.playSystemSound(SystemSounds::UNTESTED);
+    break;
+  case MOTOR_OK:
+    DOSound::sound.playSystemSound(SystemSounds::OK);
+    break;
+  case MOTOR_DISCONNECTED:
+    DOSound::sound.playSystemSound(SystemSounds::DISCONNECTED);
+    break;
+  case MOTOR_ENC_DISCONNECTED:
+    DOSound::sound.playSystemSound(SystemSounds::ENCODER_DISCONNECTED);
+    delay(1000);
+    break;
+  case MOTOR_REVERSED:
+    DOSound::sound.playSystemSound(SystemSounds::REVERSED);
+    break;
+  case MOTOR_ENC_REVERSED:
+    DOSound::sound.playSystemSound(SystemSounds::ENCODER_REVERSED);
+    break;
+  case MOTOR_BOTH_REVERSED:
+    DOSound::sound.playSystemSound(SystemSounds::REVERSED);
+    DOSound::sound.playSystemSound(SystemSounds::ENCODER_REVERSED);
+    break;
+  case MOTOR_BLOCKED:
+    DOSound::sound.playSystemSound(SystemSounds::BLOCKED);
+    break;
+  case MOTOR_OTHER:
+  default:
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    break;
+  }
+
+  return RES_OK;
+}
+
+Result DODroid::servoTest(ConsoleStream *stream) {
   // Check servos
   servosOK_ = false;
   if(DOServos::servos.isStarted() == false) {
@@ -276,88 +384,209 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   if(DOServos::servos.hasServoWithID(SERVO_HEAD_ROLL) == false) {
     Console::console.printfBroadcast("Degraded: Head roll servo missing.\n");
   }
-  if(DOServos::servos.home(5.0) != RES_OK) {
+  if(DOServos::servos.home(SERVO_NECK, 5.0, 50, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
   servosOK_ = true;
   Console::console.printfBroadcast("Servos OK.\n");
-
-  // Check motors
-  motorsOK_ = false;
-  unsigned long delayTime = 1e6/DOIMU::imu.dataRate();
-  static const float testKp = .3, testKi = .5, testKd = 0;
-  static const float turnDistance = (M_PI*WHEEL_DISTANCE)/4;
-  static const float distanceCriterion = turnDistance/10;
-  static const long timeoutCriterion = 2000000;
-
-  leftEncoder_.update();
-  leftEncoder_.setMode(bb::Encoder::INPUT_POSITION);
-  leftEncoder_.setUnit(bb::Encoder::UNIT_MILLIMETERS);
-  bb::PIDController leftTestController(leftEncoder_, leftMotor_);
-  leftTestController.setControlParameters(testKp, testKi, testKd);
-  float leftStart = leftEncoder_.presentPosition();
-
-  rightEncoder_.update();
-  rightEncoder_.setMode(bb::Encoder::INPUT_POSITION);
-  rightEncoder_.setUnit(bb::Encoder::UNIT_MILLIMETERS);
-  bb::PIDController rightTestController(rightEncoder_, rightMotor_);
-  rightTestController.setControlParameters(testKp, testKi, testKd);
-  float rightStart = rightEncoder_.presentPosition();
-
-  leftMotor_.setEnabled(true);
-  rightMotor_.setEnabled(true);
-
-  float r0, p0, h0;
-  DOIMU::imu.getFilteredRPH(r0, p0, h0);
-
-  long timeout = timeoutCriterion;
-  bool goalReached = false;
-
-  leftTestController.setGoal(leftStart - turnDistance);
-  rightTestController.setGoal(rightStart + turnDistance);
-  while(timeout > 0) {
-    leftTestController.update();
-    rightTestController.update();
-    DOIMU::imu.update();
-
-    if(goalReached == false && 
-       fabs(leftTestController.error()) < distanceCriterion && fabs(rightTestController.error()) < distanceCriterion) {
-      goalReached = true;
-    }
-
-    delayMicroseconds(delayTime);
-    timeout -= delayTime;
-  }
-  if(goalReached == false) return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
-
-  leftTestController.reset();
-  rightTestController.reset();
-
-  leftTestController.setGoal(leftStart);
-  rightTestController.setGoal(rightStart);
-  timeout = timeoutCriterion;
-  goalReached = false;
-  while(timeout > 0) {
-    leftTestController.update();
-    rightTestController.update();
-    DOIMU::imu.update();
-    float r, p, h;
-    DOIMU::imu.getFilteredRPH(r, p, h);
-    
-    if(goalReached == false && 
-       fabs(leftTestController.error()) < distanceCriterion && fabs(rightTestController.error()) < distanceCriterion) {
-      goalReached = true;
-    }
-
-    delayMicroseconds(delayTime);
-    timeout -= delayTime;
-  }
-  if(goalReached == false) return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  motorsOK_ = true;
-  Console::console.printfBroadcast("Motors OK.\n");
-
   return RES_OK;
 }
 
+DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc, bool reverse, ConsoleStream *stream) {
+  mot.set(0);
+  mot.setEnabled(true);
 
+  enc.update();
+  enc.setUnit(bb::Encoder::UNIT_MILLIMETERS);
+  float startPosition = enc.presentPosition();
+
+  int pwmStep = 1, pwm;
+
+  float r, p, h, h0, ax, ay, az, axmax=0, aymax=0, hdiffmax=0;
+  uint32_t timestamp;
+  unsigned int blockedcount = 0;
+  float distance = 0;
+
+  DOIMU::imu.update();
+  DOIMU::imu.getFilteredRPH(r, p, h0);
+
+  unsigned long microsPerLoop = (unsigned long)(1e6 / DOIMU::imu.dataRate());
+
+  for(pwm = ST_MIN_PWM; pwm < ST_MAX_PWM; pwm += pwmStep) {
+    unsigned long us0 = micros();
+    if(reverse) mot.set(-pwm);
+    else mot.set(pwm);
+
+    DOBattStatus::batt.updateCurrent();
+    float mA = DOBattStatus::batt.current();
+    
+    DOIMU::imu.update();
+    DOIMU::imu.getFilteredRPH(r, p, h);
+    float hdiff = h-h0;
+    if(hdiff < -180) hdiff += 360;
+    else if(hdiff > 180) hdiff -= 360;
+    if(fabs(hdiff) > fabs(hdiffmax)) {
+      hdiffmax = hdiff;
+    }
+
+    DOIMU::imu.getAccelMeasurement(ax, ay, az, timestamp);
+    if(fabs(ax) > fabs(axmax)) {
+      axmax = ax;
+      aymax = ay;
+    }
+
+    enc.update();
+    distance = enc.presentPosition()-startPosition;
+
+    Console::console.printfBroadcast("PWM: %d h0: %f h: %f ax: %f ay: %f az: %f Current: %f Enc: %f\n", pwm, h0, h, ax, ay, az, mA, distance);
+    if(fabs(mA) > ST_ABORT_MILLIAMPS) { 
+      blockedcount++;
+    } else {
+      blockedcount = 0;
+    }
+
+    if(fabs(distance) > ST_ABORT_DISTANCE) {
+      Console::console.printfBroadcast("Distance criterion triggered (fabs(%f) > %f)\n", distance, ST_ABORT_DISTANCE);
+      break;
+    } 
+    
+    if(fabs(hdiffmax) > ST_ABORT_HEADING_CHANGE) {
+      Console::console.printfBroadcast("Heading criterion triggered (fabs(%f) > %f)\n", hdiffmax, ST_ABORT_HEADING_CHANGE);
+      break;
+    }
+
+    if(fabs(axmax) > ST_ABORT_ACCEL) {
+      Console::console.printfBroadcast("X max accel criterion triggered (fabs(%f) > %f)\n", fabs(axmax), ST_ABORT_ACCEL);
+      break;
+    }
+    if(fabs(aymax) > ST_ABORT_ACCEL) {
+      Console::console.printfBroadcast("Y max accel criterion triggered (fabs(%f) > %f)\n", fabs(aymax), ST_ABORT_ACCEL);
+      break;
+    }
+    if(blockedcount > 10) {
+      Console::console.printfBroadcast("Motor load criterion triggered %d times (%f > %f)\n", blockedcount, mA, ST_ABORT_MILLIAMPS);
+      break;
+    }
+
+    unsigned long us1 = micros();
+    unsigned long tdiff = us1-us0;
+    if(microsPerLoop > tdiff) delayMicroseconds(microsPerLoop - tdiff);
+  }
+
+  Console::console.printfBroadcast("PWM at end: %d\n", pwm);
+
+  for(; pwm>=ST_MIN_PWM; pwm -= pwmStep) {
+    unsigned long us0 = micros();
+    if(reverse) mot.set(-pwm);
+    else mot.set(pwm);
+    delayMicroseconds(microsPerLoop - (micros()-us0));
+  }
+  mot.set(0.0);
+
+  // Current too high? Motor blocked.
+  if(blockedcount > 5) {
+    Console::console.printfBroadcast("Motor pulling too much power. Likely blocked!\n");
+    return MOTOR_BLOCKED;
+  }
+
+  // Not blocked
+
+  // High acceleration in y? Probably IMU is turned by 90°
+  if(fabs(aymax) > ST_MIN_ACCEL && (aymax < -fabs(axmax) || aymax > fabs(axmax))) {
+    Console::console.printfBroadcast("Accel in Y direction %f higher than in x %f. IMU likely rotated 90°!\n", aymax, axmax);
+    return MOTOR_OTHER;
+  }
+
+  // Not blocked, and acceleration is along the correct axis
+
+  // Not enough distance returned from the encoder...
+  if(fabs(distance) < ST_MIN_DISTANCE) {
+    // ...but measured enough acceleration? Motor is connected, encoder likely isn't.
+    if(fabs(axmax) > ST_MIN_ACCEL) {
+      Console::console.printfBroadcast("Distance of %f (<%f) too low, but accel of %f measured. Encoder likely disconnected!\n",
+                                       distance, ST_MIN_DISTANCE, axmax);
+      return MOTOR_ENC_DISCONNECTED;
+    } else { // ...and not measured enough acceleration? Motor is likely not connected.
+      Console::console.printfBroadcast("Distance of %f (<%f) and accel of %f (<%f) both too low. Motor likely disconnected!\n",
+                                       distance, ST_MIN_DISTANCE, axmax, ST_MIN_ACCEL);
+      return MOTOR_DISCONNECTED;
+    }
+  }
+
+  // Not blocked, accel axis is OK, enough distance driven
+
+#if 0
+  // Not enough acceleration measured? We're likely sitting in the station.
+  if(fabs(axmax) < ST_MIN_ACCEL) {
+    Console::console.printfBroadcast("Accel %f too small, we're likely in the station, encoder/motor reverse detection cannot be distinguished!\n",
+                                     axmax);
+  }
+#endif
+  
+  // Not enough heading change observed? We're likely sitting in the station.
+  if(fabs(hdiffmax) < ST_MIN_HEADING_CHANGE) {
+    Console::console.printfBroadcast("Heading change %f too small, we're likely in the station, encoder/motor reverse detection cannot be distinguished!\n",
+                                     hdiffmax);
+  }
+
+  // Not blocked, accel axis is OK, enough distance driven, enough accel measured
+#if 0
+  if(reverse) {
+    if(distance < 0 && axmax > 0 && fabs(axmax) > ST_MIN_ACCEL) {
+      Console::console.printfBroadcast("Reverse %d, distance %f in right direction, accel %f in wrong direction. Motor likely reversed!\n",
+                                       reverse, distance, axmax);
+      return MOTOR_REVERSED;
+    } else if(distance > 0 && axmax < 0 && fabs(axmax) > ST_MIN_ACCEL) {
+      Console::console.printfBroadcast("Reverse %d, distance %f in wrong direction, accel %f in right direction. Encoder likely reversed!\n",
+                                       reverse, distance, axmax);
+      return MOTOR_ENC_REVERSED;
+    } else if(distance > 0 && axmax > 0 && fabs(axmax) > ST_MIN_ACCEL) {
+      Console::console.printfBroadcast("Reverse %d, distance %f and accel %f both in wrong direction. Motor and encoder likely reversed!\n",
+                                       reverse, distance, axmax);
+      return MOTOR_ENC_REVERSED;
+    }
+  } else {
+    if(distance < 0 && axmax > 0 && fabs(axmax) > ST_MIN_ACCEL) {
+      Console::console.printfBroadcast("Reverse %d, distance %f in wrong direction, accel %f in right direction. Encoder likely reversed!\n",
+                                       reverse, distance, axmax);
+      return MOTOR_ENC_REVERSED;
+    } else if(distance > 0 && axmax < 0 && fabs(axmax) > ST_MIN_ACCEL) {
+      Console::console.printfBroadcast("Reverse %d, distance %f in right direction, accel %f in wrong direction. Motor likely reversed!\n",
+                                       reverse, distance, axmax);
+      return MOTOR_REVERSED;
+    } else if(distance < 0 && axmax < 0 && fabs(axmax) > ST_MIN_ACCEL) {
+      Console::console.printfBroadcast("Reverse %d, distance %f and accel %f both in wrong direction. Motor and encoder likely reversed!\n",
+                                       reverse, distance, axmax);
+      return MOTOR_ENC_REVERSED;
+    }
+  }
+#endif
+  
+  Console::console.printfBroadcast("Max hdiff: %f\n", hdiffmax);
+
+  if(hdiffmax > 0) { // turned in the wrong direction
+    if((reverse && distance >= 0) ||
+       (!reverse && distance <= 0)) {
+      Console::console.printfBroadcast("%s, turning in wrong direction, distance %f in wrong direction. Motor likely reversed.",
+                                       reverse ? "Reverse" : "Forward", distance);
+      return MOTOR_REVERSED;
+    } else {
+      Console::console.printfBroadcast("%s, turning in wrong direction, distance %f in right direction. Motor and encoder likely reversed.",
+                                       reverse ? "Reverse" : "Forward", distance);
+      return MOTOR_BOTH_REVERSED;
+    }
+  } else { // turned in the right direction
+    if((reverse && distance >= 0) ||
+       (!reverse && distance <= 0)) {
+      Console::console.printfBroadcast("%s, turning in right direction, distance %f in wrong direction. Encoder likely reversed.",
+                                       reverse ? "Reverse" : "Forward", distance);
+      return MOTOR_ENC_REVERSED;
+    }
+  }
+
+  // Not blocked, accel axis is OK, enough distance driven, enough accel generated, accel and distance both in right direction?
+  // Looks good. 
+
+  return MOTOR_OK;
+}

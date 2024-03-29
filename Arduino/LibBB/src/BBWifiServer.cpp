@@ -178,11 +178,9 @@ bb::Result bb::WifiServer::step() {
 	}
 
 	static int seqnum = 0;
-	static int dummy = 0;
 
 	if(seqnum == (1e6/Runloop::runloop.cycleTimeMicros())/4) {
 #if !defined(ARDUINO_PICO_VERSION_STR)
-		unsigned long m = micros();
 		ArduinoOTA.poll();
 #endif
 		seqnum = 0;

@@ -18,10 +18,10 @@ class DCMotor: public ControlOutput {
 public:
   static const uint8_t PIN_OFF = 255;
 
-  typedef enum {
+  enum Scheme {
     SCHEME_A_B_PWM,
     SCHEME_PWM_A_PWM_B
-  } Scheme;
+  };
 
   // Use to initialize a motor that has A/B/PWM control scheme
   DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_en = PIN_OFF);

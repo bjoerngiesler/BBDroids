@@ -1,0 +1,29 @@
+001 I am Dodo
+002 Yes
+003 No
+004 Failure
+005 OK
+006 Degraded
+007 Unavailable
+008 Calibrating
+009
+010 Selftest starting, please stand clear
+011 Power
+012 I.M.U.
+013 Servos
+014 Left Motor
+015 Right Motor
+016 Center Motor
+017 Main Motor
+018 Lean Motor
+019 Turn Motor
+020 Untested
+021 Working
+022 Disconnected
+023 Encoder Disconnected
+024 Reversed
+025 Encoder Reversed
+026 Blocked
+027 Voltage too high
+028 Voltage too low
+029 Current too high

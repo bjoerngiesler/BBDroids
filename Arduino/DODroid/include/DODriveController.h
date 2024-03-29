@@ -5,13 +5,15 @@
 
 using namespace bb;
 
+
+
 class DODriveControlOutput: public bb::ControlOutput {
 public:
   DODriveControlOutput(bb::ControlOutput& left, bb::ControlOutput& right);
 
-  void setGoalVelocity(float goalVel);
-  void setAcceleration(float accel);
-  void setGoalRotation(float goalRot);
+  virtual void setGoalVelocity(float goalVel);
+  virtual void setAcceleration(float accel);
+  virtual void setGoalRotation(float goalRot);
   void setDeadband(float deadband);
 
   // These are used by the controller framework, do not call directly.

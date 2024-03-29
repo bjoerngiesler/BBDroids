@@ -89,15 +89,13 @@ bool DOIMU::begin() {
     return false;
   }
 
-  lsm6ds_data_rate_t dataRate = imu_.getGyroDataRate();
-  if(dataRate == LSM6DS_RATE_104_HZ) {
-    dataRate_ = 104.0;
-    Runloop::runloop.setCycleTimeMicros(1000000/104);
-    Serial.print("data rate of 104Hz... ");
-  } else {
-    dataRate_ = 1e6/Runloop::runloop.cycleTimeMicros();
-    Serial.print(String("unknown data rate ") + dataRate);
-  }
+  //  imu_.setAccelRange(LSM6DS_ACCEL_RANGE_2_G);
+  //  imu_.setGyroRange(LSM6DS_GYRO_RANGE_250_DPS);
+  imu_.setAccelDataRate(LSM6DS_RATE_104_HZ);
+  imu_.setGyroDataRate(LSM6DS_RATE_104_HZ);
+
+  dataRate_ = 104.0;
+  Runloop::runloop.setCycleTimeMicros(1000000/104);
   
   madgwick_.begin(dataRate_);
 

@@ -9,6 +9,9 @@
 
 bb::SubsystemManager bb::SubsystemManager::manager;
 	
+bb::SubsystemManager::SubsystemManager() {
+}
+
 bb::Result bb::SubsystemManager::registerSubsystem(Subsystem* subsys) {
 	if(subsystemWithName(subsys->name()) != NULL) return RES_SUBSYS_ALREADY_REGISTERED; // already have this
 	subsys_.push_back(subsys);
@@ -26,9 +29,6 @@ const std::vector<bb::Subsystem*>& bb::SubsystemManager::subsystems() {
 	return subsys_;
 }
 
-
-bb::SubsystemManager::SubsystemManager() {
-}
 
 bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
 	if(words[0] == "help") {
@@ -118,14 +118,12 @@ void bb::Subsystem::printParameters(ConsoleStream* stream) {
 	}	
 }
 
-
 bb::Subsystem::Parameter* bb::Subsystem::findParameter(const String& name) {
 	for(auto p: parameters_) {
 		if(p->name() == name) return p;
 	}
 	return NULL;
 }
-
 
 bb::Result bb::Subsystem::addParameter(const String& name, const String& help, int& val, int min, int max) {
 	if(findParameter(name) != NULL) return RES_COMMON_DUPLICATE_IN_LIST;
