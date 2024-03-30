@@ -97,7 +97,6 @@ static const float PITCH_DEADBAND = .5;
 static const float SPEED_REMOTE_FACTOR = 30.0;
 static const float ROT_REMOTE_FACTOR = 250.0;
 
-
 static const uint8_t SERVO_NECK         = 1;
 static const uint8_t SERVO_HEAD_PITCH   = 2;
 static const uint8_t SERVO_HEAD_HEADING = 3;

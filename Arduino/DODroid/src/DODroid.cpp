@@ -111,6 +111,15 @@ Result DODroid::step() {
   
   DOIMU::imu.update();
 
+#if 0
+  float r, p, h;
+  if(servosOK_) {
+    DOIMU::imu.getFilteredRPH(r, p, h);
+    Console::console.printfBroadcast("Pitch: %f\n", p);
+    DOServos::servos.setGoal(SERVO_NECK, 180+p);
+  }
+#endif
+
   if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK && driveMode_ != DRIVE_OFF) {
     balanceController_->update();
     float err, errI, errD, control;
@@ -285,6 +294,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   Console::console.printfBroadcast("IMU calibrated.\n");
   DOSound::sound.playSystemSound(SystemSounds::OK);
 
+  // Check Servos
   DOSound::sound.playSystemSound(SystemSounds::SERVOS);
   if(servoTest(stream) != RES_OK) {
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
@@ -292,6 +302,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
     DOSound::sound.playSystemSound(SystemSounds::OK);
   }
 
+  // Check Motors
   DOSound::sound.playSystemSound(SystemSounds::LEFT_MOTOR);
   leftMotorStatus_ = singleMotorTest(leftMotor_, leftEncoder_, false, stream);
   switch(leftMotorStatus_) {
@@ -524,62 +535,27 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
   }
 #endif
   
+  Console::console.printfBroadcast("Max hdiff: %f\n", hdiffmax);
+
   // Not enough heading change observed? We're likely sitting in the station.
   if(fabs(hdiffmax) < ST_MIN_HEADING_CHANGE) {
     Console::console.printfBroadcast("Heading change %f too small, we're likely in the station, encoder/motor reverse detection cannot be distinguished!\n",
                                      hdiffmax);
-  }
-
-  // Not blocked, accel axis is OK, enough distance driven, enough accel measured
-#if 0
-  if(reverse) {
-    if(distance < 0 && axmax > 0 && fabs(axmax) > ST_MIN_ACCEL) {
-      Console::console.printfBroadcast("Reverse %d, distance %f in right direction, accel %f in wrong direction. Motor likely reversed!\n",
-                                       reverse, distance, axmax);
-      return MOTOR_REVERSED;
-    } else if(distance > 0 && axmax < 0 && fabs(axmax) > ST_MIN_ACCEL) {
-      Console::console.printfBroadcast("Reverse %d, distance %f in wrong direction, accel %f in right direction. Encoder likely reversed!\n",
-                                       reverse, distance, axmax);
-      return MOTOR_ENC_REVERSED;
-    } else if(distance > 0 && axmax > 0 && fabs(axmax) > ST_MIN_ACCEL) {
-      Console::console.printfBroadcast("Reverse %d, distance %f and accel %f both in wrong direction. Motor and encoder likely reversed!\n",
-                                       reverse, distance, axmax);
-      return MOTOR_ENC_REVERSED;
-    }
-  } else {
-    if(distance < 0 && axmax > 0 && fabs(axmax) > ST_MIN_ACCEL) {
-      Console::console.printfBroadcast("Reverse %d, distance %f in wrong direction, accel %f in right direction. Encoder likely reversed!\n",
-                                       reverse, distance, axmax);
-      return MOTOR_ENC_REVERSED;
-    } else if(distance > 0 && axmax < 0 && fabs(axmax) > ST_MIN_ACCEL) {
-      Console::console.printfBroadcast("Reverse %d, distance %f in right direction, accel %f in wrong direction. Motor likely reversed!\n",
-                                       reverse, distance, axmax);
-      return MOTOR_REVERSED;
-    } else if(distance < 0 && axmax < 0 && fabs(axmax) > ST_MIN_ACCEL) {
-      Console::console.printfBroadcast("Reverse %d, distance %f and accel %f both in wrong direction. Motor and encoder likely reversed!\n",
-                                       reverse, distance, axmax);
-      return MOTOR_ENC_REVERSED;
-    }
-  }
-#endif
-  
-  Console::console.printfBroadcast("Max hdiff: %f\n", hdiffmax);
-
-  if(hdiffmax > 0) { // turned in the wrong direction
+  } else if(hdiffmax > 0) { // turned in the wrong direction
     if((reverse && distance >= 0) ||
        (!reverse && distance <= 0)) {
-      Console::console.printfBroadcast("%s, turning in wrong direction, distance %f in wrong direction. Motor likely reversed.",
+      Console::console.printfBroadcast("%s, turning in wrong direction, distance %f in wrong direction. Motor likely reversed.\n",
                                        reverse ? "Reverse" : "Forward", distance);
       return MOTOR_REVERSED;
     } else {
-      Console::console.printfBroadcast("%s, turning in wrong direction, distance %f in right direction. Motor and encoder likely reversed.",
+      Console::console.printfBroadcast("%s, turning in wrong direction, distance %f in right direction. Motor and encoder likely reversed.\n",
                                        reverse ? "Reverse" : "Forward", distance);
       return MOTOR_BOTH_REVERSED;
     }
   } else { // turned in the right direction
     if((reverse && distance >= 0) ||
        (!reverse && distance <= 0)) {
-      Console::console.printfBroadcast("%s, turning in right direction, distance %f in wrong direction. Encoder likely reversed.",
+      Console::console.printfBroadcast("%s, turning in right direction, distance %f in wrong direction. Encoder likely reversed.\n",
                                        reverse ? "Reverse" : "Forward", distance);
       return MOTOR_ENC_REVERSED;
     }

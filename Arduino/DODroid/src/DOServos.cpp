@@ -353,18 +353,27 @@ Result DOServos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Consol
       s.lastVel = s.profileVel;
       switchTorque(s.id, true);
       setProfileVelocity(s.id, rawVel, VALUE_RAW);
+    }
+  } else {
+    s->lastVel = s->profileVel;
+    switchTorque(id, true);
+    setProfileVelocity(id, rawVel, VALUE_RAW);
+  }
+  res = syncWriteInfo();
+  if(res != RES_OK) return res;
+
+  // set goal. Can't do this in one with profile velocity setting.
+  if(id == ID_ALL) {
+    for(auto& s: servos_) {
       setGoal(s.id, (s.max - s.min)/2, VALUE_RAW); // FIXME Maybe home pos is not in the middle?
       int offs = (int)s.present - (int)s.goal;
       if(offs < 0) offs = -offs;
       if(offs > maxoffs) maxoffs = offs;
     }
   } else {
-    s->lastVel = s->profileVel;
-    switchTorque(id, true);
-    setProfileVelocity(id, rawVel, VALUE_RAW);
     setGoal(id, (s->max - s->min)/2, VALUE_RAW);
     maxoffs = abs((int)s->present - (int)s->goal);
-  }
+  }      
   res = syncWriteInfo();
   if(res != RES_OK) return res;
 
@@ -381,29 +390,21 @@ Result DOServos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Consol
     if(id == ID_ALL) {
       for(auto& s: servos_) {
         int diff = abs((int)s.present - (int)s.goal);
-        if(stream) {
-          stream->printf("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s.id, s.present, s.goal, diff, s.load, rawVel);
-        }
+        Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s.id, s.present, s.goal, diff, s.load, rawVel);
         if(diff > 10) allReachedGoal = false;
         if(abs(s.load) > maxLoad) {
-          if(stream) {
-            stream->printf("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.",
-                           maxLoad, s.id, s.load);
-          }
+          Console::console.printfBroadcast("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.\n",
+                                           maxLoad, s.id, s.load);
           switchTorque(s.id, false);
           return RES_SUBSYS_HW_DEPENDENCY_MISSING;
         }
       }
     } else {
       int diff = abs((int)s->present - (int)s->goal);
-      if(stream) {
-        stream->printf("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s->id, s->present, s->goal, diff, s->load, rawVel);
-      }
+      Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s->id, s->present, s->goal, diff, s->load, rawVel);
       if(diff > 10) allReachedGoal = false;
       if(ABS(s->load) > maxLoad) {
-        if(stream) {
-          stream->printf("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.", maxLoad, s->id, s->load);
-        }
+        Console::console.printfBroadcast("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.", maxLoad, s->id, s->load);
         switchTorque(s->id, false);
         return RES_SUBSYS_HW_DEPENDENCY_MISSING;
       }
@@ -753,15 +754,15 @@ Result DOServos::syncReadInfo(ConsoleStream *stream) {
 }
 
 Result DOServos::syncWriteInfo(ConsoleStream* stream) {
-  if(dxl_.syncWrite(&swGoalInfos) == false) {
-    if(stream) stream->printf("Sending servo position goal failed!\n");
-    else Console::console.printfBroadcast("Sending servo position goal failed!\n");
-    return RES_SUBSYS_COMM_ERROR;
-  }
-
   if(dxl_.syncWrite(&swVelInfos) == false) {
     if(stream) stream->printf("Sending servo profile velocity failed!\n");
     else Console::console.printfBroadcast("Sending servo profile velocity failed!\n");
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
+  if(dxl_.syncWrite(&swGoalInfos) == false) {
+    if(stream) stream->printf("Sending servo position goal failed!\n");
+    else Console::console.printfBroadcast("Sending servo position goal failed!\n");
     return RES_SUBSYS_COMM_ERROR;
   }
 
