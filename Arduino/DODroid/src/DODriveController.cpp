@@ -24,7 +24,7 @@ bb::Result DODriveControlOutput::set(float value) {
   if(resRight != RES_OK) return resRight;
   return RES_OK;
 }
-  
+
 float DODriveControlOutput::present() {
   return (left_.present() + right_.present()) / 2.0f;
 }
@@ -43,4 +43,15 @@ void DODriveControlOutput::setGoalRotation(float goalRot) {
 
 void DODriveControlOutput::setDeadband(float deadband) {
   deadband_ = deadband;  
+}
+
+DODriveControlInput::DODriveControlInput(bb::ControlInput& left, bb::ControlInput& right):
+  left_(left), right_(right) {  
+}
+
+Result DODriveControlInput::update() {
+}
+
+float DODriveControlInput::present() {
+  return (left_.present() + right_.present())/2.0f;
 }

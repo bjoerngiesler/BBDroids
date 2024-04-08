@@ -11,13 +11,26 @@ class DODroid: public Subsystem, public PacketReceiver {
 public:
   static DODroid droid;
   
+  enum DriveMode {
+    DRIVE_OFF                 = 0,
+    DRIVE_NAIVE               = 1,
+    DRIVE_PITCH               = 2,
+    DRIVE_PITCH_SPEED         = 3,
+    DRIVE_PITCH_HEADING_SPEED = 4
+  };
+  
+
   struct Params {
+    float wheelSpeedKp, wheelSpeedKi, wheelSpeedKd;
     float balKp, balKi, balKd;
     float speedKp, speedKi, speedKd;
     float posKp, posKi, posKd;
     float speedRemoteFactor, rotRemoteFactor;
+    float balSpeedRemoteFactor, balRotRemoteFactor;
+    int driveMode;
   };
   static Params params_;
+
 
   enum MotorStatus { // FIXME this probably needs to go somewhere else, closer to DCMotor or EncoderMotor?
     MOTOR_UNTESTED         = 0,
@@ -29,14 +42,6 @@ public:
     MOTOR_BOTH_REVERSED    = 6,
     MOTOR_BLOCKED          = 7,
     MOTOR_OTHER            = 8 // for example IMU broken
-  };
-
-  enum DriveMode {
-    DRIVE_OFF                 = 0,
-    DRIVE_NAIVE               = 1,
-    DRIVE_PITCH               = 2,
-    DRIVE_PITCH_SPEED         = 3,
-    DRIVE_PITCH_HEADING_SPEED = 4
   };
 
   DODroid();
@@ -63,19 +68,25 @@ public:
   Result motorTest(ConsoleStream *stream = NULL);
   MotorStatus singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc, bool reverse, ConsoleStream *stream = NULL);
 
+  bool antennasOK() { return antennasOK_; }
+  bool setAntennas(uint8_t a1, uint8_t a2, uint8_t a3);
+  bool getAntennas(uint8_t& a1, uint8_t& a2, uint8_t& a3);
+
 protected:
   bb::DCMotor leftMotor_, rightMotor_;
   bb::Encoder leftEncoder_, rightEncoder_;
   
+  bb::PIDController* lSpeedController_;
+  bb::PIDController* rSpeedController_;
   bb::PIDController* balanceController_;
+  bb::PIDController* speedController_;
   DOIMUControlInput* balanceInput_;
   DODriveControlOutput* driveOutput_;
+  DODriveControlInput* driveInput_;
   
   MotorStatus leftMotorStatus_, rightMotorStatus_;
-
-  DriveMode driveMode_;
   
-  bool servosOK_;
+  bool servosOK_, antennasOK_;
 };
 
 #endif

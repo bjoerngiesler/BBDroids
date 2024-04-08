@@ -83,19 +83,26 @@ static const float ST_MIN_HEADING_CHANGE   = ST_ABORT_HEADING_CHANGE / 4.0;
 static const uint8_t BATT_STATUS_ADDR   = 0x40;
 static const uint8_t IMU_ADDR           = 0x6a;
 
-static const float SPEED_KP = 0.013;
-static const float SPEED_KI = 1.0; //0.8; 
-static const float SPEED_KD = 0;
+static const float WHEEL_SPEED_KP = 0.1;
+static const float WHEEL_SPEED_KI = 0.8;
+static const float WHEEL_SPEED_KD = 0;
 static const float POS_KP = 0.05;
 static const float POS_KI = 0;
 static const float POS_KD = 0;
-static const float BAL_KP = 40;
+static const float BAL_KP = 45;
 static const float BAL_KI = 0;
-static const float BAL_KD = 4;
+static const float BAL_KD = 3;
+static const float SPEED_KP = 0.1;
+static const float SPEED_KI = 0.0;
+static const float SPEED_KD = 0;
 static const float PITCH_BIAS = 1.35;
 static const float PITCH_DEADBAND = .5;
-static const float SPEED_REMOTE_FACTOR = 30.0;
-static const float ROT_REMOTE_FACTOR = 250.0;
+static const float SPEED_REMOTE_FACTOR = 1.0;
+static const float ROT_REMOTE_FACTOR = 1.0;
+static const float BAL_SPEED_REMOTE_FACTOR = 30.0;
+static const float BAL_ROT_REMOTE_FACTOR = 250.0;
+
+static const float MAX_SPEED = 400;
 
 static const uint8_t SERVO_NECK         = 1;
 static const uint8_t SERVO_HEAD_PITCH   = 2;

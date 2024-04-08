@@ -17,8 +17,8 @@ public:
   void setDeadband(float deadband);
 
   // These are used by the controller framework, do not call directly.
-  virtual Result set(float value); 
   virtual float present();
+  virtual Result set(float value); 
 
 protected:
   float goalVel_, goalRot_;
@@ -26,6 +26,17 @@ protected:
   float deadband_;
   float presentGoalVelL_, presentGoalVelR_;
   bb::ControlOutput &left_, &right_;
+  unsigned long lastCycleUS_;
+};
+
+class DODriveControlInput: public bb::ControlInput {
+public:
+  DODriveControlInput(bb::ControlInput& left, bb::ControlInput& right);
+
+  virtual Result update();
+  virtual float present();
+protected:
+  bb::ControlInput &left_, &right_;
   unsigned long lastCycleUS_;
 };
 

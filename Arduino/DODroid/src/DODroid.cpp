@@ -8,6 +8,9 @@
 
 DODroid DODroid::droid;
 DODroid::Params DODroid::params_ = {
+  .wheelSpeedKp = WHEEL_SPEED_KP,
+  .wheelSpeedKi = WHEEL_SPEED_KI,
+  .wheelSpeedKd = WHEEL_SPEED_KD,
   .balKp = BAL_KP,
   .balKi = BAL_KI,
   .balKd = BAL_KD,
@@ -17,8 +20,11 @@ DODroid::Params DODroid::params_ = {
   .posKp = POS_KP,
   .posKi = POS_KI,
   .posKd = POS_KD,
-  .speedRemoteFactor = SPEED_REMOTE_FACTOR,
-  .rotRemoteFactor = ROT_REMOTE_FACTOR
+  .speedRemoteFactor = MAX_SPEED,
+  .rotRemoteFactor = MAX_SPEED,
+  .balSpeedRemoteFactor = BAL_SPEED_REMOTE_FACTOR,
+  .balRotRemoteFactor = BAL_ROT_REMOTE_FACTOR,
+  .driveMode = DRIVE_OFF
 };
 
 DODroid::DODroid():
@@ -29,7 +35,7 @@ DODroid::DODroid():
   leftMotorStatus_(MOTOR_UNTESTED),
   rightMotorStatus_(MOTOR_UNTESTED),
   servosOK_(false),
-  driveMode_(DRIVE_PITCH)
+  antennasOK_(false)
 {
   pinMode(PULL_DOWN_15, OUTPUT);
   digitalWrite(PULL_DOWN_15, LOW);
@@ -47,6 +53,10 @@ DODroid::DODroid():
 }
 
 Result DODroid::initialize() {
+  addParameter("drive_mode", "0: off, 1: naive, 2: pitch control, 3: speed -> pitch", params_.driveMode, 0, 3);
+  addParameter("wheel_speed_kp", "Proportional constant for wheel speed PID controller", params_.wheelSpeedKp, 0, INT_MAX);
+  addParameter("wheel_speed_ki", "Integrative constant for wheel speed PID controller", params_.wheelSpeedKi, 0, INT_MAX);
+  addParameter("wheel_speed_kd", "Derivative constant for wheel speed PID controller", params_.wheelSpeedKd, 0, INT_MAX);
   addParameter("bal_kp", "Proportional constant for balance PID controller", params_.balKp, 0, INT_MAX);
   addParameter("bal_ki", "Integrative constant for balance PID controller", params_.balKi, 0, INT_MAX);
   addParameter("bal_kd", "Derivative constant for balance PID controller", params_.balKd, 0, INT_MAX);
@@ -56,12 +66,18 @@ Result DODroid::initialize() {
   addParameter("pos_kp", "Proportional constant for position PID controller", params_.posKp, 0, INT_MAX);
   addParameter("pos_ki", "Integrative constant for position PID controller", params_.posKi, 0, INT_MAX);
   addParameter("pos_kd", "Derivative constant for position PID controller", params_.posKd, 0, INT_MAX);
-  addParameter("speed_remote_factor", "Amplification factor for remote speed axis", params_.speedRemoteFactor, 0, 255);
-  addParameter("rot_remote_factor", "Amplification factor for remote rotation axis", params_.rotRemoteFactor, 0, 255);
+  addParameter("speed_remote_factor", "Amplification factor for remote speed axis", params_.speedRemoteFactor, 0, INT_MAX);
+  addParameter("rot_remote_factor", "Amplification factor for remote rotation axis", params_.rotRemoteFactor, 0, INT_MAX);
+  addParameter("bal_speed_remote_factor", "Amplification factor for balance remote speed axis", params_.speedRemoteFactor, 0, 255);
+  addParameter("bal_rot_remote_factor", "Amplification factor for balance remote rotation axis", params_.rotRemoteFactor, 0, 255);
 
+  lSpeedController_ = new bb::PIDController(leftEncoder_, leftMotor_);
+  rSpeedController_ = new bb::PIDController(rightEncoder_, rightMotor_);
   balanceInput_ = new DOIMUControlInput(DOIMUControlInput::IMU_PITCH);
-  driveOutput_ = new DODriveControlOutput(leftMotor_, rightMotor_);
+  driveOutput_ = new DODriveControlOutput(*lSpeedController_, *rSpeedController_);
+  driveInput_ = new DODriveControlInput(leftEncoder_, rightEncoder_);
   balanceController_ = new PIDController(*balanceInput_, *driveOutput_);
+  speedController_ = new PIDController(*driveInput_, *balanceController_);
 
   return Subsystem::initialize();
 }
@@ -82,7 +98,12 @@ Result DODroid::start(ConsoleStream* stream) {
   rightEncoder_.setMode(bb::Encoder::INPUT_SPEED);
   rightEncoder_.setUnit(bb::Encoder::UNIT_MILLIMETERS);
 
+  lSpeedController_->setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
+  rSpeedController_->setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
+
   balanceController_->setControlParameters(params_.balKp, params_.balKi, params_.balKd);
+
+  speedController_->setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
 
   DOServos::servos.switchTorque(SERVO_NECK, true);
 
@@ -111,20 +132,38 @@ Result DODroid::step() {
   
   DOIMU::imu.update();
 
-#if 0
   float r, p, h;
   if(servosOK_) {
     DOIMU::imu.getFilteredRPH(r, p, h);
-    Console::console.printfBroadcast("Pitch: %f\n", p);
     DOServos::servos.setGoal(SERVO_NECK, 180+p);
   }
-#endif
 
-  if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK && driveMode_ != DRIVE_OFF) {
-    balanceController_->update();
+  if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
     float err, errI, errD, control;
-    balanceController_->getControlState(err, errI, errD, control);
-    //Console::console.printfBroadcast("Balance controller: %f %f %f %f\n", err, errI, errD, control);
+    switch(params_.driveMode) {
+    case DRIVE_OFF:
+    default:
+      leftMotor_.set(0);
+      rightMotor_.set(0);
+      break;
+    case DRIVE_PITCH_SPEED:
+      lSpeedController_->update();
+      rSpeedController_->update();
+      speedController_->update();
+      speedController_->getControlState(err, errI, errD, control);
+      Console::console.printfBroadcast("Speed controller error: %f ErrI: %f ErrD: %f control: %f\n", err, errI, errD, control);
+      balanceController_->update();
+      break;
+    case DRIVE_PITCH:
+      balanceController_->update();
+      lSpeedController_->update();
+      rSpeedController_->update();
+      break;
+    case DRIVE_NAIVE:
+      lSpeedController_->update();
+      rSpeedController_->update();
+      break;
+    }
   }
 
   fillAndSendStatePacket();
@@ -170,8 +209,29 @@ Result DODroid::incomingControlPacket(uint16_t station, PacketSource source, uin
     return RES_OK;
   } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
     //Console::console.printfBroadcast("Control packet from right remote: %.2f %.2f\n", packet.getAxis(0), packet.getAxis(1));
-    balanceController_->setGoal(params_.speedRemoteFactor*packet.getAxis(1));
-    driveOutput_->setGoalRotation(params_.rotRemoteFactor*packet.getAxis(0));
+    float lSpeed, rSpeed;
+
+    switch(params_.driveMode) {
+    case DRIVE_OFF:
+    default:
+      break;
+    case DRIVE_NAIVE:
+      lSpeed = params_.speedRemoteFactor*packet.getAxis(1) + params_.rotRemoteFactor*packet.getAxis(0);
+      rSpeed = params_.speedRemoteFactor*packet.getAxis(1) - params_.rotRemoteFactor*packet.getAxis(0);
+      lSpeed = constrain(lSpeed, -MAX_SPEED, MAX_SPEED);
+      rSpeed = constrain(rSpeed, -MAX_SPEED, MAX_SPEED);
+      lSpeedController_->setGoal(lSpeed);
+      rSpeedController_->setGoal(rSpeed);
+      break;
+    case DRIVE_PITCH:
+      balanceController_->setGoal(params_.balSpeedRemoteFactor*packet.getAxis(1));
+      driveOutput_->setGoalRotation(params_.balRotRemoteFactor*packet.getAxis(0));
+      break;
+    case DRIVE_PITCH_SPEED:
+      speedController_->setGoal(params_.speedRemoteFactor*packet.getAxis(1));
+      driveOutput_->setGoalRotation(params_.rotRemoteFactor*packet.getAxis(0));
+      break;
+    }
     return RES_OK;
   }
   return RES_OK;
@@ -196,8 +256,16 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
   Result retval = Subsystem::setParameterValue(name, stringVal);
   if(retval != RES_OK) return retval;
 
+  lSpeedController_->setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
+  rSpeedController_->setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
+  lSpeedController_->reset();
+  rSpeedController_->reset();
+  
   balanceController_->setControlParameters(params_.balKp, params_.balKi, params_.balKd);
   balanceController_->reset();
+
+  speedController_->setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
+  speedController_->reset();
 
   return RES_OK;
 }
@@ -293,6 +361,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   DOIMU::imu.calibrateGyro(stream);
   Console::console.printfBroadcast("IMU calibrated.\n");
   DOSound::sound.playSystemSound(SystemSounds::OK);
+  DOIMU::imu.update();
 
   // Check Servos
   DOSound::sound.playSystemSound(SystemSounds::SERVOS);
@@ -300,6 +369,29 @@ Result DODroid::selfTest(ConsoleStream *stream) {
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
   } else {
     DOSound::sound.playSystemSound(SystemSounds::OK);
+  }
+
+  // Check Antennas
+  Wire.beginTransmission(0x17);
+  uint8_t antErr = Wire.endTransmission();
+  if(antErr != 0) {
+    Console::console.printfBroadcast("Antenna error: 0x%x\n", antErr);
+  } else {
+    uint8_t step=4, d=25;
+    antennasOK_ = true;
+    for(uint8_t val = 127; val < 255; val+=step) {
+      setAntennas(val, val, val);
+      delay(d);
+    }
+    for(uint8_t val = 255; val > 64; val-=step) {
+      setAntennas(val, val, val);
+      delay(d);
+    }
+    for(uint8_t val = 64; val < 127; val+=step) {
+      setAntennas(val, val, val);
+      delay(d);
+    }
+    setAntennas(127, 127, 127);
   }
 
   // Check Motors
@@ -385,20 +477,41 @@ Result DODroid::servoTest(ConsoleStream *stream) {
   if(DOServos::servos.hasServoWithID(SERVO_NECK) == false) {
     Console::console.printfBroadcast("Critical error: Neck servo missing!\n");
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  }
-  if(DOServos::servos.hasServoWithID(SERVO_HEAD_PITCH) == false) {
-    Console::console.printfBroadcast("Degraded: Head pitch servo missing.\n");
-  }
-  if(DOServos::servos.hasServoWithID(SERVO_HEAD_HEADING) == false) {
-    Console::console.printfBroadcast("Degraded: Head heading servo missing.\n");
-  }
-  if(DOServos::servos.hasServoWithID(SERVO_HEAD_ROLL) == false) {
-    Console::console.printfBroadcast("Degraded: Head roll servo missing.\n");
-  }
-  if(DOServos::servos.home(SERVO_NECK, 5.0, 50, stream) != RES_OK) {
+  } else if(DOServos::servos.home(SERVO_NECK, 5.0, 95, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  } else {
+    DOServos::servos.setRange(SERVO_NECK, 180-NECK_RANGE, 180+NECK_RANGE);
   }
+
+  if(DOServos::servos.hasServoWithID(SERVO_HEAD_PITCH) == false) {
+    Console::console.printfBroadcast("Degraded: Head pitch servo missing.\n");
+  } else if(DOServos::servos.home(SERVO_HEAD_PITCH, 5.0, 50, stream) != RES_OK) {
+    Console::console.printfBroadcast("Homing servos failed!\n");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  } else {
+    DOServos::servos.setRange(SERVO_HEAD_PITCH, 180-HEAD_PITCH_RANGE, 180+HEAD_PITCH_RANGE);
+  }
+
+  if(DOServos::servos.hasServoWithID(SERVO_HEAD_HEADING) == false) {
+    Console::console.printfBroadcast("Degraded: Head heading servo missing.\n");
+  } else if(DOServos::servos.home(SERVO_HEAD_HEADING, 5.0, 50, stream) != RES_OK) {
+    Console::console.printfBroadcast("Homing servos failed!\n");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  } else {
+    DOServos::servos.setRange(SERVO_HEAD_HEADING, 180-HEAD_HEADING_RANGE, 180+HEAD_HEADING_RANGE);
+  }
+
+
+  if(DOServos::servos.hasServoWithID(SERVO_HEAD_ROLL) == false) {
+    Console::console.printfBroadcast("Degraded: Head roll servo missing.\n");
+  } else if(DOServos::servos.home(SERVO_HEAD_ROLL, 5.0, 50, stream) != RES_OK) {
+    Console::console.printfBroadcast("Homing servos failed!\n");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  } else {
+    DOServos::servos.setRange(SERVO_HEAD_ROLL, 180-HEAD_ROLL_RANGE, 180+HEAD_ROLL_RANGE);
+  }
+
   servosOK_ = true;
   Console::console.printfBroadcast("Servos OK.\n");
   return RES_OK;
@@ -565,4 +678,33 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
   // Looks good. 
 
   return MOTOR_OK;
+}
+
+bool DODroid::setAntennas(uint8_t a1, uint8_t a2, uint8_t a3) {
+  if(antennasOK_ == false) return false;
+  uint8_t antennas[3] = {a1, a2, a3};
+  Wire.beginTransmission(0x17);
+  Wire.write(antennas, sizeof(antennas));
+  if(Wire.endTransmission() == 0) return true;
+  return false;
+}
+
+bool DODroid::getAntennas(uint8_t& a1, uint8_t& a2, uint8_t& a3) {
+  if(antennasOK_ == false) return false;
+  int timeout;
+  Wire.requestFrom(0x17, 3);
+
+  for(timeout=100; timeout>0 && !Wire.available(); timeout--);
+  if(timeout < 0) return false;
+  a1 = Wire.read();
+
+  for(timeout=100; timeout>0 && !Wire.available(); timeout--);
+  if(timeout < 0) return false;
+  a2 = Wire.read();
+
+  for(timeout=100; timeout>0 && !Wire.available(); timeout--);
+  if(timeout < 0) return false;
+  a3 = Wire.read();
+
+  return true;
 }
