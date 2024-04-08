@@ -1,3 +1,4 @@
+
 #include <LibBB.h>
 
 using namespace bb;
@@ -7,8 +8,8 @@ static const uint8_t PIN_DISABLE = 255;
 // STEP 1
 // Define your motor driver and pins here
 
-#define DIRECTIONPIN_MOTOR_DRIVER
-//#define DUALPWM_MOTOR_DRIVER
+//#define DIRECTIONPIN_MOTOR_DRIVER
+#define DUALPWM_MOTOR_DRIVER
 #if defined(USE_DIRECTIONPIN_MOTOR_DRIVER)
 static const uint8_t PIN_DIR_A_1   = 2;
 static const uint8_t PIN_DIR_B_1   = 3;
@@ -23,10 +24,10 @@ DCMotor motor[2] = {
   DCMotor(PIN_DIR_A_2, PIN_DIR_B_2, PIN_DIR_PWM_2, PIN_ENABLE_2)
   };
 #elif defined(DUALPWM_MOTOR_DRIVER)
-static const uint8_t PIN_PWM_A_1   = 2;
-static const uint8_t PIN_PWM_B_1   = 3;
-static const uint8_t PIN_PWM_A_2   = PIN_DISABLE;
-static const uint8_t PIN_PWM_B_2   = PIN_DISABLE;
+static const uint8_t PIN_PWM_A_1   = 18;
+static const uint8_t PIN_PWM_B_1   = 19;
+static const uint8_t PIN_PWM_A_2   = 3;
+static const uint8_t PIN_PWM_B_2   = 2;
 DCMotor motor[2] = {
   DCMotor(PIN_PWM_A_1, PIN_PWM_B_1), 
   DCMotor(PIN_PWM_A_2, PIN_PWM_B_2)
@@ -38,10 +39,10 @@ DCMotor motor[2] = {
 // STEP 2
 // Define your encoder pins here
 
-static const uint8_t PIN_ENC_A_1 = 6;
-static const uint8_t PIN_ENC_B_1 = 7;
-static const uint8_t PIN_ENC_A_2 = PIN_DISABLE;
-static const uint8_t PIN_ENC_B_2 = PIN_DISABLE;
+static const uint8_t PIN_ENC_A_1 = 17;
+static const uint8_t PIN_ENC_B_1 = 16;
+static const uint8_t PIN_ENC_A_2 = 7;
+static const uint8_t PIN_ENC_B_2 = 6;
 
 bb::Encoder input[2] = {bb::Encoder(PIN_ENC_A_1, PIN_ENC_B_1), bb::Encoder(PIN_ENC_A_2, PIN_ENC_B_2)};
 
@@ -73,7 +74,7 @@ const uint8_t UNIT_FAKE = 2;
 int unit = 1;
 
 #define DROID_DO
-#define DROID_BB8
+//#define DROID_BB8
 
 #if defined(DROID_DO)
 // Values for D-O. This gives about 0.14mm per tick.
@@ -162,9 +163,9 @@ public:
     }
 
     if(outputMode == OUTPUT_SERIALPLOTTER) {
-      Console::console.printBroadcast(String("Goal:") + goal);
+      Console::console.printfBroadcast("Goal:%f", goal);
     } else {
-      Console::console.printBroadcast(String(goal));
+      Console::console.printfBroadcast("%f", goal);
     }
 
     if(mode == MODE_PWM) {
@@ -175,16 +176,15 @@ public:
           input[i].update();
 
           if(outputMode == OUTPUT_SERIALPLOTTER)
-            Console::console.printBroadcast(String(",RawEnc") + i + ":" + input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit));
+            Console::console.printfBroadcast(",RawEnc%d:%f", i, input[i].present(bb::Encoder::INPUT_SPEED));
           else {
-            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit, true)));
-            Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit, false)));
-            Console::console.printBroadcast(" ");
+            Console::console.printfBroadcast("%f %f", 
+                                             input[i].present(bb::Encoder::INPUT_SPEED, true), 
+                                             input[i].present(bb::Encoder::INPUT_SPEED, false));
           }
         }
       }
-      Console::console.printlnBroadcast();
+      Console::console.printfBroadcast("\n");
     } 
     
     else if(mode == MODE_SPEED) {
@@ -206,21 +206,20 @@ public:
           control[i].update();
 
           if(outputMode == OUTPUT_SERIALPLOTTER) {
-            Console::console.printBroadcast(String(",Speed") + i + ":" + input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit));
+            Console::console.printfBroadcast(",Speed%d:%f", i, input[i].present(bb::Encoder::INPUT_SPEED));
           } else {
-            Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit, true)));
-            Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_SPEED, (bb::Encoder::Unit)unit)));
+            Console::console.printfBroadcast(" %f %f", 
+                                            input[i].present(bb::Encoder::INPUT_SPEED, true),
+                                            input[i].present(bb::Encoder::INPUT_SPEED));
           }
         }
       }
-      Console::console.printlnBroadcast();
+      Console::console.printfBroadcast("\n");
     } 
     
     else if(mode == MODE_POSITION) {
       if(outputMode == OUTPUT_SERIALPLOTTER)
-        Console::console.printBroadcast(String("Goal:") + goal);
+        Console::console.printfBroadcast("Goal:%f", goal);
       for(int i=0; i<2; i++) {
         input[i].setMode(bb::Encoder::INPUT_POSITION);
         input[i].setUnit((bb::Encoder::Unit)unit);
@@ -230,16 +229,15 @@ public:
 
           control[i].update();
           if(outputMode == OUTPUT_SERIALPLOTTER) {
-            Console::console.printBroadcast(String(",Pos:") + input[i].present(bb::Encoder::INPUT_POSITION, (bb::Encoder::Unit)unit, true));
+            Console::console.printfBroadcast(",Pos:%f", input[i].present(bb::Encoder::INPUT_POSITION, true));
           } else {
-            Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_POSITION, (bb::Encoder::Unit)unit, true)));
-            Console::console.printBroadcast(" ");
-            Console::console.printBroadcast(String(input[i].present(bb::Encoder::INPUT_POSITION, (bb::Encoder::Unit)unit)));
+            Console::console.printfBroadcast(" %f %f", 
+                                            input[i].present(bb::Encoder::INPUT_POSITION, true),
+                                            input[i].present(bb::Encoder::INPUT_POSITION));
           }
         } 
       }
-      Console::console.printlnBroadcast();
+      Console::console.printfBroadcast("\n");
     }
 
     return RES_OK;
@@ -249,7 +247,7 @@ public:
     if(words.size() == 0) return RES_CMD_UNKNOWN_COMMAND;
 
     if(words[0] == "help") {
-      stream->println(help_);
+      stream->printf(help_);
       printParameters(stream);
       return RES_OK;
     }
@@ -306,7 +304,7 @@ void setup() {
 
   Console::console.initialize(200000);
   Runloop::runloop.initialize();
-  Runloop::runloop.setCycleTime(10000);
+  Runloop::runloop.setCycleTimeMicros(10000);
   sut.initialize();
 
   Console::console.setFirstResponder(&sut);
