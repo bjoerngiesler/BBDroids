@@ -57,7 +57,7 @@ protected:
   float lastErr_, errI_, lastErrD_, lastControl_;
   float iMin_, iMax_; bool iBounded_;
   float controlMin_, controlMax_; bool controlBounded_;
-  float goal_;
+  float goal_, speed_;
   unsigned long lastCycleUS_;
 };
 
