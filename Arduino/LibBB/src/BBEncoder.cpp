@@ -58,8 +58,11 @@ float bb::Encoder::present(bb::Encoder::InputMode mode, bool raw) {
     break;
   }
 
-  if(unit_ == UNIT_TICKS) return retval;
-  else return retval * mmPT_;
+  if(unit_ == UNIT_TICKS) {
+    return retval;
+  } else {
+    return retval * mmPT_;
+  }
 }
 
   
