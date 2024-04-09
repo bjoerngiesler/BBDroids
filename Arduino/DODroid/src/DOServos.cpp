@@ -541,7 +541,7 @@ bool DOServos::setGoal(uint8_t id, float goal, ValueType t) {
   Servo *s = servoWithID(id);
   if (s == NULL) return false;
   //Console::console.printfBroadcast("Servo %d: Offset %d\n", s->id, s->offset);
-  uint32_t g = computeRawValue(goal, t); //+ s->offset;
+  uint32_t g = computeRawValue(goal, t) + s->offset;
   //Console::console.printfBroadcast("Goal of %f becomes %d\n", goal, g);
   s->goal = constrain(g, s->min, s->max);
   //Console::console.printfBroadcast("Goal of %d becomes %d\n", g, s->goal);
