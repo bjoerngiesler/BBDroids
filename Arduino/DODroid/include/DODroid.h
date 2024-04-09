@@ -27,6 +27,7 @@ public:
     float posKp, posKi, posKd;
     float speedRemoteFactor, rotRemoteFactor;
     float balSpeedRemoteFactor, balRotRemoteFactor;
+    float faNeckAccel, faNeckSpeed;
     int driveMode;
   };
   static Params params_;
@@ -50,13 +51,10 @@ public:
   virtual Result stop(ConsoleStream *stream = NULL);
 	virtual Result step();
 
-  Result stepDriveNaive();
-  Result stepDrivePitch();
-  Result stepDrivePitchSpeed();
-  Result stepDrivePitchHeadingSpeed();
-
   virtual void printStatus(ConsoleStream *stream);
   virtual Result fillAndSendStatePacket();
+
+  void setDriveMode(DriveMode mode);
 
   virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
   virtual Result incomingConfigPacket(uint16_t station, PacketSource source, uint8_t rssi, const ConfigPacket& packet);
@@ -87,6 +85,7 @@ protected:
   MotorStatus leftMotorStatus_, rightMotorStatus_;
   
   bool servosOK_, antennasOK_;
+  bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
 };
 
 #endif
