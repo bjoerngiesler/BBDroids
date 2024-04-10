@@ -1,16 +1,23 @@
 #include <math.h>
 
 #include <Arduino.h> // for constrain(), min(), max()
-#include <BBControllers.h>
-#include <BBConsole.h>
+#include <LibBB.h>
 
 using namespace bb;
 
-bb::PIDController::PIDController(ControlInput& input, ControlOutput& output): input_(input), output_(output) {
+bb::PIDController::PIDController(ControlInput& input, ControlOutput& output): 
+  input_(input), 
+  output_(output), 
+  autoupdate_(true),
+  debug_(false),
+  inputScale_(1.0),
+  reverse_(false),
+  ramp_(0.0) {
   setControlParameters(0.0f, 0.0f, 0.0f);
   setIUnbounded();
   setControlUnbounded();
   setGoal(input_.present());
+  deadbandMin_ = deadbandMax_ = 0;
 
   reset();
 }
@@ -30,13 +37,32 @@ void bb::PIDController::update(void) {
   }
   lastCycleUS_ = us;
 
-  input_.update();
+  if(autoupdate_) input_.update();
 
   float dt = timediffUS / 1e6; 
 
+  if(!EPSILON(ramp_) && !EPSILON(curSetpoint_ - goal_)) {
+    if(curSetpoint_ < goal_) {
+      curSetpoint_ += fabs(ramp_*dt);
+      if(curSetpoint_ > goal_) {
+        curSetpoint_ = goal_;
+      }
+    } else if(curSetpoint_ > goal_) {
+      curSetpoint_ -= fabs(ramp_*dt);
+      if(curSetpoint_ < goal_) {
+        curSetpoint_ = goal_;
+      }
+    }
+  }
+
   //bb::Runloop::runloop.excuseOverrun();
 
-  float err = goal_ - input_.present();
+  float err;
+  if(reverse_) {
+    err = curSetpoint_ + input_.present()*inputScale_;
+  } else {
+    err = curSetpoint_ - input_.present()*inputScale_;
+  } 
 
   errI_ += err * dt;
   if(iBounded_) {
@@ -53,13 +79,20 @@ void bb::PIDController::update(void) {
     lastControl_ = constrain(lastControl_, controlMin_, controlMax_);
   }
 
-
-  setControlOutput(lastControl_);
-//  Console::console.printfBroadcast("Control: Goal: %f Cur In: %f Cur Out: %f Err: %f errI: %f errD: %f Control: %f\n", goal_, input_.present(), output_.present(), err, errI_, lastErrD_, lastControl_);
+  if(lastControl_ > deadbandMin_ && lastControl_ < deadbandMax_) {
+    setControlOutput(0);
+  } else if(reverse_) {
+    setControlOutput(-lastControl_);
+  } else {
+    setControlOutput(lastControl_);
+  }
+  if(debug_)
+    Console::console.printfBroadcast("Control: SP: %f Cur In: %f Cur Out: %f Err: %f errI: %f errD: %f Control: %f\n", curSetpoint_, input_.present(), output_.present(), err, errI_, lastErrD_, lastControl_);
 }
   
 void bb::PIDController::setGoal(const float& sp) {
   goal_ = sp;
+  if(EPSILON(ramp_)) curSetpoint_ = goal_;
 }
 
 float bb::PIDController::present() {
@@ -113,3 +146,6 @@ bool bb::PIDController::isControlBounded() {
   return controlBounded_;
 }
 
+void bb::PIDController::setControlDeadband (float deadbandMin, float deadbandMax) {
+  deadbandMin_ = deadbandMin; deadbandMax_ = deadbandMax;
+}
