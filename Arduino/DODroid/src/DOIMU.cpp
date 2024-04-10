@@ -56,41 +56,39 @@ DOIMU::DOIMU() {
 
 bool DOIMU::begin() {
   if(available_) return true;
-  Console::console.printfBroadcast("Setting up Body IMU...\n");
+  Console::console.printfBroadcast("Setting up Body IMU...");
 
   // Check whether we exist
   int err;
   Wire.beginTransmission(IMU_ADDR);
   err = Wire.endTransmission();
   if(err != 0) {
-    bb::Console::console.printfBroadcast("Wire.endTransmission() returns error %d while detecting IMU at 0x%x\n", err, IMU_ADDR, HEX);
+    Console::console.printfBroadcast("Wire.endTransmission() returns error %d while detecting IMU at 0x%x\n", err, IMU_ADDR, HEX);
     available_ = false;
     return false;
   }
 
   if(!imu_.begin_I2C()) {
-    Serial.println("failed!");
+    Console::console.printfBroadcast("failed!\n");
     return false;
   }
 
   temp_ = imu_.getTemperatureSensor();
   if(NULL == temp_) {
-    Serial.println("could not get temp sensor!");
+    Console::console.printfBroadcast("could not get temp sensor!\n");
     return false;
   }
   accel_ = imu_.getAccelerometerSensor();
   if(NULL == accel_) {
-    Serial.println("could not get accel sensor!");
+    Console::console.printfBroadcast("could not get accel sensor!\n");
     return false;
   }
   gyro_ = imu_.getGyroSensor();
   if(NULL == accel_) {
-    Serial.println("could not get gyro sensor!");
+    Console::console.printfBroadcast("could not get gyro sensor!\n");
     return false;
   }
 
-  //  imu_.setAccelRange(LSM6DS_ACCEL_RANGE_2_G);
-  //  imu_.setGyroRange(LSM6DS_GYRO_RANGE_250_DPS);
   imu_.setAccelDataRate(LSM6DS_RATE_104_HZ);
   imu_.setGyroDataRate(LSM6DS_RATE_104_HZ);
 
@@ -99,7 +97,7 @@ bool DOIMU::begin() {
   
   madgwick_.begin(dataRate_);
 
-  Serial.println("ok");
+  Console::console.printfBroadcast("ok\n");
   available_ = true;
   return true;
 }
@@ -114,10 +112,18 @@ void DOIMU::printStats(const String& prefix) {
   gyro_->printSensorDetails();
 }
 
-bool DOIMU::update() {
+bool DOIMU::update(bool block) {
   if(!available_) return false;
 
-  if(!imu_.gyroscopeAvailable() || !imu_.accelerationAvailable()) return false;
+  int timeout = 3;
+  while(!imu_.gyroscopeAvailable() && !imu_.accelerationAvailable()) {
+    timeout--;
+    delayMicroseconds(1);
+    if(timeout < 0 && block==false) {
+      Console::console.printfBroadcast("No gyro or accel data available\n");
+      return false;
+    }
+  }
   
   imu_.readGyroscope(lastR_, lastP_, lastH_);
   imu_.readAcceleration(lastX_, lastY_, lastZ_);
@@ -149,15 +155,12 @@ bool DOIMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
   return true;
 }
 
-bool DOIMU::getAccelMeasurement(float &x, float &y, float &z, uint32_t &t) {
+bool DOIMU::getAccelMeasurement(float &x, float &y, float &z) {
   if(!available_) return false;
 
-  sensors_event_t a;
-  accel_->getEvent(&a);
-  x = a.acceleration.x;
-  y = a.acceleration.y;
-  z = a.acceleration.z;
-  t = a.timestamp;
+  x = lastX_;
+  y = lastY_;
+  z = lastZ_;
   
   return true;
 }

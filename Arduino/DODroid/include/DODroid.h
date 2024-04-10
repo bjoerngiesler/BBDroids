@@ -15,8 +15,6 @@ public:
     DRIVE_OFF                 = 0,
     DRIVE_NAIVE               = 1,
     DRIVE_PITCH               = 2,
-    DRIVE_PITCH_SPEED         = 3,
-    DRIVE_PITCH_HEADING_SPEED = 4
   };
   
 
@@ -28,6 +26,7 @@ public:
     float speedRemoteFactor, rotRemoteFactor;
     float balSpeedRemoteFactor, balRotRemoteFactor;
     float faNeckAccel, faNeckSpeed;
+    float faHeadRollTurn, faHeadHeadingTurn;
     int driveMode;
   };
   static Params params_;

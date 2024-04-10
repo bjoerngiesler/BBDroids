@@ -16,17 +16,20 @@ public:
   virtual void setGoalRotation(float goalRot);
   void setDeadband(float deadband);
 
+  bool useControlInput() { return useControlInput_; }
+  void setUseControlInput(bool yesno) { useControlInput_ = yesno; }
+
   // These are used by the controller framework, do not call directly.
   virtual float present();
   virtual Result set(float value); 
 
 protected:
-  float goalVel_, goalRot_;
+  float goalVel_, goalRot_, curVel_, curRot_;
   float accel_;
   float deadband_;
-  float presentGoalVelL_, presentGoalVelR_;
   bb::ControlOutput &left_, &right_;
   unsigned long lastCycleUS_;
+  bool useControlInput_;
 };
 
 class DODriveControlInput: public bb::ControlInput {

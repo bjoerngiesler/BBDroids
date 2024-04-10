@@ -26,6 +26,8 @@ DODroid::Params DODroid::params_ = {
   .balRotRemoteFactor = BAL_ROT_REMOTE_FACTOR,
   .faNeckAccel = FA_NECK_ACCEL,
   .faNeckSpeed = FA_NECK_SPEED,
+  .faHeadRollTurn = FA_HEAD_ROLL_TURN,
+  .faHeadHeadingTurn = FA_HEAD_HEADING_TURN,
   .driveMode = DRIVE_OFF
 };
 
@@ -70,43 +72,50 @@ Result DODroid::initialize() {
   addParameter("pos_kd", "Derivative constant for position PID controller", params_.posKd, -INT_MAX, INT_MAX);
   addParameter("speed_remote_factor", "Amplification factor for remote speed axis", params_.speedRemoteFactor, 0, INT_MAX);
   addParameter("rot_remote_factor", "Amplification factor for remote rotation axis", params_.rotRemoteFactor, 0, INT_MAX);
-  addParameter("bal_speed_remote_factor", "Amplification factor for balance remote speed axis", params_.speedRemoteFactor, 0, INT_MAX);
-  addParameter("bal_rot_remote_factor", "Amplification factor for balance remote rotation axis", params_.rotRemoteFactor, 0, INT_MAX);
+  addParameter("bal_speed_remote_factor", "Amplification factor for balance remote speed axis", params_.balSpeedRemoteFactor, 0, INT_MAX);
+  addParameter("bal_rot_remote_factor", "Amplification factor for balance remote rotation axis", params_.balRotRemoteFactor, 0, INT_MAX);
   addParameter("fa_neck_accel", "Free Animation factor - neck on IMU accel", params_.faNeckAccel, -INT_MAX, INT_MAX);
   addParameter("fa_neck_speed", "Free Animation factor - neck on wheel speed", params_.faNeckSpeed, -INT_MAX, INT_MAX);
+  addParameter("fa_head_roll_turn", "Free Animation factor - head roll on turn speed", params_.faHeadRollTurn, -INT_MAX, INT_MAX);
+  addParameter("fa_head_heading_turn", "Free Animation factor - head heading on turn speed", params_.faHeadHeadingTurn, -INT_MAX, INT_MAX);
 
   // Underlying wheel speed controllers relying on encoder input.
   lSpeedController_ = new bb::PIDController(leftEncoder_, leftMotor_);
   lSpeedController_->setAutoUpdate(false);
-  //lSpeedController_->setDebug(true);
   rSpeedController_ = new bb::PIDController(rightEncoder_, rightMotor_);
   rSpeedController_->setAutoUpdate(false);
 
   // Balance controller. Sets speed controller setpoints via intermediate class that handles turns via differential speed.
   balanceInput_ = new DOIMUControlInput(DOIMUControlInput::IMU_PITCH);
   driveOutput_ = new DODriveControlOutput(*lSpeedController_, *rSpeedController_);
+  driveOutput_->setAcceleration(1500);
+  
   balanceController_ = new PIDController(*balanceInput_, *driveOutput_);
   balanceController_->setAutoUpdate(false);
   balanceController_->setReverse(true);
-
-  // Speed controller. Sets balance controller setpoint based on encoder feedback.
-  driveInput_ = new DODriveControlInput(leftEncoder_, rightEncoder_);  
-  speedController_ = new PIDController(*driveInput_, *balanceController_);
-  speedController_->setAutoUpdate(false);
-  speedController_->setInputScaleFactor(0.01); // Max speed is in the hundreds of centimeters/s, max pitch angle is in the tens of degrees
-  //speedController_->setDebug(true);
+  balanceController_->setControlDeadband(-10.0, 10.0);
 
   return Subsystem::initialize();
 }
 
 Result DODroid::start(ConsoleStream* stream) {
+  lastBtn0_ = lastBtn1_ = lastBtn2_ = lastBtn3_ = lastBtn4_ = false;
   DOIMU::imu.begin();
   DOBattStatus::batt.begin();
 
   operationStatus_ = selfTest();
-  operationStatus_ = RES_OK;
-  if(operationStatus_ != RES_OK) return operationStatus_;
 
+  if(operationStatus_ == RES_DROID_VOLTAGE_TOO_LOW) {
+    Console::console.printfBroadcast("No power (%.fV), USB only!\n", DOBattStatus::batt.voltage());
+    if(DOBattStatus::batt.voltage() < 1.0) {
+      started_ = true;
+      operationStatus_ = RES_OK;
+      return RES_OK;
+    }
+  } else if(operationStatus_ != RES_OK) {
+    return operationStatus_;
+  }
+  
   leftMotor_.set(0);
   leftEncoder_.setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
   leftEncoder_.setMode(bb::Encoder::INPUT_SPEED);
@@ -117,15 +126,15 @@ Result DODroid::start(ConsoleStream* stream) {
   rightEncoder_.setUnit(bb::Encoder::UNIT_MILLIMETERS);
 
   lSpeedController_->setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
+  lSpeedController_->setRamp(WHEEL_SPEED_RAMP);
   rSpeedController_->setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
+  rSpeedController_->setRamp(WHEEL_SPEED_RAMP);
 
   balanceController_->setControlParameters(params_.balKp, params_.balKi, params_.balKd);
-
-  speedController_->setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
+  balanceController_->setRamp(0);
+  //balanceController_->setDebug(true);
 
   DOServos::servos.switchTorque(SERVO_NECK, true);
-
-  lastBtn0_ = lastBtn1_ = lastBtn2_ = lastBtn3_ = lastBtn4_ = false;
 
   started_ = true;
   operationStatus_ = RES_OK;
@@ -141,29 +150,58 @@ Result DODroid::stop(ConsoleStream* stream) {
 }
 
 Result DODroid::step() {
+  unsigned long usec0 = micros();
+
   if(!DOIMU::imu.available() || !DOBattStatus::batt.available()) {
     fillAndSendStatePacket();
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
-  if((Runloop::runloop.getSequenceNumber() % 100) == 0) {
+  if((Runloop::runloop.getSequenceNumber() % 1000) == 0) {
     DOBattStatus::batt.updateVoltage();
+    Console::console.printfBroadcast("Power: %.1fV\n", DOBattStatus::batt.voltage());
+
+    // CRITICAL: Switch everything off and go into endless loop if power 
+    if(DOBattStatus::batt.voltage() > 2.0 &&
+       DOBattStatus::batt.voltage() < POWER_BATT_MIN) {
+      leftMotor_.set(0);
+      rightMotor_.set(0);
+      DOServos::servos.switchTorque(SERVO_HEAD_PITCH, false);
+      DOServos::servos.switchTorque(SERVO_HEAD_HEADING, false);
+      DOServos::servos.switchTorque(SERVO_HEAD_ROLL, false);
+      while(true) {
+        DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
+        delay(5000);
+      }
+    }
   }
+
+  unsigned long usec1 = micros() - usec0;
 
   leftEncoder_.update();  // needed for wheel speed controller and body speed controller.
   rightEncoder_.update();  
   DOIMU::imu.update();    // needed for balance controller.
 
-  float r, p, h, ax, ay, az;
+  unsigned long usec2 = micros() - usec0;
+
+  float r, p, h, dr, dp, dh, ax, ay, az;
   if(servosOK_) {
-    uint32_t timestamp;
     DOIMU::imu.getFilteredRPH(r, p, h);
-    DOIMU::imu.getAccelMeasurement(ax, ay, az, timestamp);
+    DOIMU::imu.getAccelMeasurement(ax, ay, az);
+    DOIMU::imu.getGyroMeasurement(dr, dp, dh);
     float speed = (leftEncoder_.presentSpeed() + rightEncoder_.presentSpeed())/2;
 
-    float neck = 180 + p + params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
-    DOServos::servos.setGoal(SERVO_NECK, neck);
+    // float nod = p + params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
+    float nod = params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
+    DOServos::servos.setGoal(SERVO_NECK, 180 + nod);
+    DOServos::servos.setGoal(SERVO_HEAD_PITCH, 180 - nod);
+    
+    DOServos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh);
+    DOServos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 + 
+    params_.faHeadRollTurn * dh);
   }
+
+  unsigned long usec3 = micros() - usec0;
 
   if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
     float err, errI, errD, control;
@@ -172,21 +210,6 @@ Result DODroid::step() {
     default:
       leftMotor_.set(0);
       rightMotor_.set(0);
-      break;
-    case DRIVE_PITCH_SPEED:
-      lSpeedController_->update();
-      rSpeedController_->update();
-      speedController_->update();
-      speedController_->getControlState(err, errI, errD, control);
-      Console::console.printfBroadcast("Speed controller error: %f ErrI: %f ErrD: %f control: %f\n", err, errI, errD, control);
-      balanceController_->update();
-#if 0
-      times++;
-      if(times > 100) {
-        times = 0;
-        params_.driveMode = 0;
-      }
-#endif
       break;
     case DRIVE_PITCH:
       balanceController_->update();
@@ -200,8 +223,14 @@ Result DODroid::step() {
     }
   }
 
+  unsigned long usec4 = micros() - usec0;
+
   fillAndSendStatePacket();
-  
+
+  unsigned long usec5 = micros() - usec0;
+
+  //Console::console.printfBroadcast("Usecs: %d %d %d %d %d\n", usec1, usec2-usec1, usec3-usec2, usec4-usec3, usec5-usec4);
+
   return RES_OK;
 }
 
@@ -211,9 +240,20 @@ void DODroid::setDriveMode(DriveMode mode) {
   rSpeedController_->reset();
   rSpeedController_->setGoal(0);
   balanceController_->reset();
-  balanceController_->setGoal(0);
-  speedController_->reset();
-  speedController_->setGoal(0);
+
+  switch(mode) {
+  case DRIVE_NAIVE:
+    lSpeedController_->setRamp(WHEEL_SPEED_RAMP);
+    rSpeedController_->setRamp(WHEEL_SPEED_RAMP);
+    break;
+  case DRIVE_PITCH:
+    lSpeedController_->setRamp(0);
+    rSpeedController_->setRamp(0);
+    balanceController_->setRamp(0);
+    break;
+  default:
+    break;
+  }
 
   params_.driveMode = mode;
 }
@@ -221,8 +261,11 @@ void DODroid::setDriveMode(DriveMode mode) {
 void DODroid::printStatus(ConsoleStream *stream) {
   if(!stream) return;
   stream->printf("%s: %s", name_, started_ ? "started" : "not started");
-  if(!started_) return;
-  
+  if(!started_) {
+    stream->printf("\n");
+    return;
+  }
+
   stream->printf(", status: %s", errorMessage(operationStatus_));
   
   stream->printf(", batt: ");
@@ -299,15 +342,8 @@ Result DODroid::incomingControlPacket(uint16_t station, PacketSource source, uin
       if(numZero > 5) {
         balanceController_->reset();
       }
-      balanceController_->setGoal(params_.balSpeedRemoteFactor*packet.getAxis(1));
+      driveOutput_->setGoalVelocity(params_.balSpeedRemoteFactor*packet.getAxis(1));
       driveOutput_->setGoalRotation(params_.balRotRemoteFactor*packet.getAxis(0));
-      break;
-    case DRIVE_PITCH_SPEED:
-      if(numZero > 5) {
-        speedController_->reset();
-      }
-      speedController_->setGoal(params_.speedRemoteFactor*packet.getAxis(1));
-      driveOutput_->setGoalRotation(params_.rotRemoteFactor*packet.getAxis(0));
       break;
     }
     return RES_OK;
@@ -341,9 +377,6 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
   
   balanceController_->setControlParameters(params_.balKp, params_.balKi, params_.balKd);
   balanceController_->reset();
-
-  speedController_->setControlParameters(params_.speedKp, params_.speedKi, params_.speedKd);
-  speedController_->reset();
 
   return RES_OK;
 }
@@ -397,6 +430,34 @@ Result DODroid::selfTest(ConsoleStream *stream) {
 
   Console::console.printfBroadcast("D-O Self Test\n=============\n");
   
+  // Check IMU
+  DOSound::sound.playSystemSound(SystemSounds::IMU);
+  if(DOIMU::imu.available() == false) {
+    Console::console.printfBroadcast("Critical error: IMU not available!\n");
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
+  DOIMU::imu.update(true);
+  float ax, ay, az;
+  DOIMU::imu.getAccelMeasurement(ax, ay, az);
+  if(fabs(ax) > 0.1 || fabs(ay) > 0.1 || fabs(az) < 0.9) {
+    Console::console.printfBroadcast("Critical error: Droid not upright (ax %f, ay %f, az %f)!\n", ax, ay, az);
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
+  Console::console.printfBroadcast("IMU OK. Down vector: %.2f %.2f %.2f\n", ax, ay, az);
+
+  DOSound::sound.playSystemSound(SystemSounds::CALIBRATING);
+  DOIMU::imu.calibrateGyro(stream);
+  for(int i=0; i<100; i++) {
+    DOIMU::imu.update(true);
+  }
+  float r, p, h;
+  DOIMU::imu.getFilteredRPH(r, p, h);
+  balanceController_->setGoal(-p);
+  Console::console.printfBroadcast("IMU calibrated. Pitch angle at rest: %f\n", p);
+  DOSound::sound.playSystemSound(SystemSounds::OK);
+
   // Check battery
   DOSound::sound.playSystemSound(SystemSounds::POWER);
   if(!DOBattStatus::batt.available()) {
@@ -415,31 +476,6 @@ Result DODroid::selfTest(ConsoleStream *stream) {
     return RES_DROID_VOLTAGE_TOO_HIGH;
   }
   DOSound::sound.playSystemSound(SystemSounds::OK);
-
-
-  // Check IMU
-  DOSound::sound.playSystemSound(SystemSounds::IMU);
-  if(DOIMU::imu.available() == false) {
-    Console::console.printfBroadcast("Critical error: IMU not available!\n");
-    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
-    return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  }
-  DOIMU::imu.update();
-  float ax, ay, az;
-  uint32_t timestamp;
-  DOIMU::imu.getAccelMeasurement(ax, ay, az, timestamp);
-  if(fabs(ax) > 1.0 || fabs(ay) > 1.0 || fabs(az) < 9.0) {
-    Console::console.printfBroadcast("Critical error: Droid not upright!\n");
-    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
-    return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  }
-  Console::console.printfBroadcast("IMU OK. Down vector: %.2f %.2f %.2f\n", ax, ay, az);
-
-  DOSound::sound.playSystemSound(SystemSounds::CALIBRATING);
-  DOIMU::imu.calibrateGyro(stream);
-  Console::console.printfBroadcast("IMU calibrated.\n");
-  DOSound::sound.playSystemSound(SystemSounds::OK);
-  DOIMU::imu.update();
 
   // Check Servos
   DOSound::sound.playSystemSound(SystemSounds::SERVOS);
@@ -572,6 +608,7 @@ Result DODroid::servoTest(ConsoleStream *stream) {
   } else {
     DOServos::servos.setRange(SERVO_HEAD_PITCH, 180-HEAD_PITCH_RANGE, 180+HEAD_PITCH_RANGE);
     DOServos::servos.setOffset(SERVO_HEAD_PITCH, HEAD_PITCH_OFFSET);
+    DOServos::servos.setProfileVelocity(SERVO_HEAD_PITCH, 50);
   }
 
   if(DOServos::servos.hasServoWithID(SERVO_HEAD_HEADING) == false) {
@@ -611,7 +648,6 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
   int pwmStep = 1, pwm;
 
   float r, p, h, h0, ax, ay, az, axmax=0, aymax=0, hdiffmax=0;
-  uint32_t timestamp;
   unsigned int blockedcount = 0;
   float distance = 0;
 
@@ -637,7 +673,7 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
       hdiffmax = hdiff;
     }
 
-    DOIMU::imu.getAccelMeasurement(ax, ay, az, timestamp);
+    DOIMU::imu.getAccelMeasurement(ax, ay, az);
     if(fabs(ax) > fabs(axmax)) {
       axmax = ax;
       aymax = ay;
@@ -646,7 +682,6 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     enc.update();
     distance = enc.presentPosition()-startPosition;
 
-    Console::console.printfBroadcast("PWM: %d h0: %f h: %f ax: %f ay: %f az: %f Current: %f Enc: %f\n", pwm, h0, h, ax, ay, az, mA, distance);
     if(fabs(mA) > ST_ABORT_MILLIAMPS) { 
       blockedcount++;
     } else {

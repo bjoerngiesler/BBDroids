@@ -44,10 +44,10 @@ public:
   bool calibrateGyro(ConsoleStream *stream=NULL, int milliseconds = 2000, int step = 10);
 
   bool getGyroMeasurement(float& dr, float& dp, float& dh, bool calibrated=true);
-  bool getAccelMeasurement(float& ax, float& ay, float& az, uint32_t& timestamp);
+  bool getAccelMeasurement(float& ax, float& ay, float& az);
   float dataRate() { return dataRate_; }
 
-  virtual bool update();
+  virtual bool update(bool block=false);
   bool getFilteredRPH(float& r, float& p, float& h);
 
   IMUState getIMUState();
