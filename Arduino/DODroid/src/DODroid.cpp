@@ -1,6 +1,5 @@
 #include "DODroid.h"
 #include "DOConfig.h"
-#include "DOIMU.h"
 #include "DOBattStatus.h"
 #include "DOServos.h"
 #include "DOSound.h"
@@ -39,7 +38,8 @@ DODroid::DODroid():
   leftMotorStatus_(MOTOR_UNTESTED),
   rightMotorStatus_(MOTOR_UNTESTED),
   servosOK_(false),
-  antennasOK_(false)
+  antennasOK_(false),
+  imu_(IMU_ADDR)
 {
   pinMode(PULL_DOWN_15, OUTPUT);
   digitalWrite(PULL_DOWN_15, LOW);
@@ -86,7 +86,7 @@ Result DODroid::initialize() {
   rSpeedController_->setAutoUpdate(false);
 
   // Balance controller. Sets speed controller setpoints via intermediate class that handles turns via differential speed.
-  balanceInput_ = new DOIMUControlInput(DOIMUControlInput::IMU_PITCH);
+  balanceInput_ = new bb::IMUControlInput(imu_, bb::IMUControlInput::IMU_PITCH);
   driveOutput_ = new DODriveControlOutput(*lSpeedController_, *rSpeedController_);
   driveOutput_->setAcceleration(1500);
   
@@ -100,7 +100,7 @@ Result DODroid::initialize() {
 
 Result DODroid::start(ConsoleStream* stream) {
   lastBtn0_ = lastBtn1_ = lastBtn2_ = lastBtn3_ = lastBtn4_ = false;
-  DOIMU::imu.begin();
+  imu_.begin();
   DOBattStatus::batt.begin();
 
   operationStatus_ = selfTest();
@@ -152,7 +152,7 @@ Result DODroid::stop(ConsoleStream* stream) {
 Result DODroid::step() {
   unsigned long usec0 = micros();
 
-  if(!DOIMU::imu.available() || !DOBattStatus::batt.available()) {
+  if(!imu_.available() || !DOBattStatus::batt.available()) {
     fillAndSendStatePacket();
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
@@ -180,15 +180,15 @@ Result DODroid::step() {
 
   leftEncoder_.update();  // needed for wheel speed controller and body speed controller.
   rightEncoder_.update();  
-  DOIMU::imu.update();    // needed for balance controller.
+  imu_.update();    // needed for balance controller.
 
   unsigned long usec2 = micros() - usec0;
 
   float r, p, h, dr, dp, dh, ax, ay, az;
   if(servosOK_) {
-    DOIMU::imu.getFilteredRPH(r, p, h);
-    DOIMU::imu.getAccelMeasurement(ax, ay, az);
-    DOIMU::imu.getGyroMeasurement(dr, dp, dh);
+    imu_.getFilteredRPH(r, p, h);
+    imu_.getAccelMeasurement(ax, ay, az);
+    imu_.getGyroMeasurement(dr, dp, dh);
     float speed = (leftEncoder_.presentSpeed() + rightEncoder_.presentSpeed())/2;
 
     // float nod = p + params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
@@ -409,7 +409,7 @@ Result DODroid::fillAndSendStatePacket() {
   p.drive[1].errorState = ERROR_NOT_PRESENT;
   p.drive[2].errorState = ERROR_NOT_PRESENT;
 
-  p.imu[0] = DOIMU::imu.getIMUState();
+  p.imu[0] = imu_.getIMUState();
   p.imu[1].errorState = ERROR_NOT_PRESENT;
   p.imu[2].errorState = ERROR_NOT_PRESENT;
 
@@ -432,14 +432,14 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   
   // Check IMU
   DOSound::sound.playSystemSound(SystemSounds::IMU);
-  if(DOIMU::imu.available() == false) {
+  if(imu_.available() == false) {
     Console::console.printfBroadcast("Critical error: IMU not available!\n");
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
-  DOIMU::imu.update(true);
+  imu_.update(true);
   float ax, ay, az;
-  DOIMU::imu.getAccelMeasurement(ax, ay, az);
+  imu_.getAccelMeasurement(ax, ay, az);
   if(fabs(ax) > 0.1 || fabs(ay) > 0.1 || fabs(az) < 0.9) {
     Console::console.printfBroadcast("Critical error: Droid not upright (ax %f, ay %f, az %f)!\n", ax, ay, az);
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
@@ -448,12 +448,12 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   Console::console.printfBroadcast("IMU OK. Down vector: %.2f %.2f %.2f\n", ax, ay, az);
 
   DOSound::sound.playSystemSound(SystemSounds::CALIBRATING);
-  DOIMU::imu.calibrateGyro(stream);
+  imu_.calibrateGyro(stream);
   for(int i=0; i<100; i++) {
-    DOIMU::imu.update(true);
+    imu_.update(true);
   }
   float r, p, h;
-  DOIMU::imu.getFilteredRPH(r, p, h);
+  imu_.getFilteredRPH(r, p, h);
   balanceController_->setGoal(-p);
   Console::console.printfBroadcast("IMU calibrated. Pitch angle at rest: %f\n", p);
   DOSound::sound.playSystemSound(SystemSounds::OK);
@@ -651,10 +651,10 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
   unsigned int blockedcount = 0;
   float distance = 0;
 
-  DOIMU::imu.update();
-  DOIMU::imu.getFilteredRPH(r, p, h0);
+  imu_.update();
+  imu_.getFilteredRPH(r, p, h0);
 
-  unsigned long microsPerLoop = (unsigned long)(1e6 / DOIMU::imu.dataRate());
+  unsigned long microsPerLoop = (unsigned long)(1e6 / imu_.dataRate());
 
   for(pwm = ST_MIN_PWM; pwm < ST_MAX_PWM; pwm += pwmStep) {
     unsigned long us0 = micros();
@@ -664,8 +664,8 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     DOBattStatus::batt.updateCurrent();
     float mA = DOBattStatus::batt.current();
     
-    DOIMU::imu.update();
-    DOIMU::imu.getFilteredRPH(r, p, h);
+    imu_.update();
+    imu_.getFilteredRPH(r, p, h);
     float hdiff = h-h0;
     if(hdiff < -180) hdiff += 360;
     else if(hdiff > 180) hdiff -= 360;
@@ -673,7 +673,7 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
       hdiffmax = hdiff;
     }
 
-    DOIMU::imu.getAccelMeasurement(ax, ay, az);
+    imu_.getAccelMeasurement(ax, ay, az);
     if(fabs(ax) > fabs(axmax)) {
       axmax = ax;
       aymax = ay;

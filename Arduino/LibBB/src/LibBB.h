@@ -16,6 +16,7 @@
 #include "BBControllers.h"
 #include "BBLowPassFilter.h"
 #include "BBDCMotor.h"
+#include "BBIMU.h"
 #if defined(ARDUINO_ARCH_SAMD)
 #include "BBEncoder.h"
 #endif

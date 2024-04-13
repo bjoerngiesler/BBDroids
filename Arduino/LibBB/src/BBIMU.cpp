@@ -1,28 +1,24 @@
-#include "DOIMU.h"
+#include "BBIMU.h"
 
 #include <LibBB.h>
 
 #include <vector>
 #include <limits.h>
 
-using namespace bb;
-
-DOIMU DOIMU::imu;
-
-DOIMUControlInput::DOIMUControlInput(DOIMUControlInput::ProbeType pt): filter_(2.0f) {
+bb::IMUControlInput::IMUControlInput(IMU& imu, IMUControlInput::ProbeType pt): filter_(2.0f), imu_(imu) {
   pt_ = pt;
   bias_ = 0;
   deadband_ = 0;
 }
 
-bb::Result DOIMUControlInput::update() {
+bb::Result bb::IMUControlInput::update() {
   // IMU update() is manually called in main droid step() function, so we don't do it here
   return RES_OK;
 }
 
-float DOIMUControlInput::present() {
+float bb::IMUControlInput::present() {
   float r, p, h;
-  if(DOIMU::imu.getFilteredRPH(r, p, h) == false) return 0.0f;
+  if(imu_.getFilteredRPH(r, p, h) == false) return 0.0f;
   
   float retval=0;
 
@@ -40,35 +36,34 @@ float DOIMUControlInput::present() {
 
   if(fabs(retval) < fabs(deadband_)) return 0.0f;
   return retval;
-
-  return 0.0f;
 }
 
-void DOIMUControlInput::setFilterFrequency(float frequency) {
-  filter_.setSampleFrequency(frequency);
+void bb::IMUControlInput::setFilterCutoff(float frequency) {
+  filter_.setCutoff(frequency);
 }
 
-DOIMU::DOIMU() {
+bb::IMU::IMU(uint8_t addr) {
   available_ = false;
   calR_ = calP_ = calH_ = 0.0f;
   intRunning_ = false;
+  addr_ = addr;
 }
 
-bool DOIMU::begin() {
+bool bb::IMU::begin() {
   if(available_) return true;
   Console::console.printfBroadcast("Setting up Body IMU...");
 
   // Check whether we exist
   int err;
-  Wire.beginTransmission(IMU_ADDR);
+  Wire.beginTransmission(addr_);
   err = Wire.endTransmission();
   if(err != 0) {
-    Console::console.printfBroadcast("Wire.endTransmission() returns error %d while detecting IMU at 0x%x\n", err, IMU_ADDR, HEX);
+    Console::console.printfBroadcast("Wire.endTransmission() returns error %d while detecting IMU at 0x%x\n", err, addr_);
     available_ = false;
     return false;
   }
 
-  if(!imu_.begin_I2C()) {
+  if(!imu_.begin_I2C(addr_)) {
     Console::console.printfBroadcast("failed!\n");
     return false;
   }
@@ -102,7 +97,7 @@ bool DOIMU::begin() {
   return true;
 }
 
-void DOIMU::printStats(const String& prefix) {
+void bb::IMU::printStats(const String& prefix) {
   if(!available_ || NULL == temp_ || NULL == accel_ || NULL == gyro_)
     return;
 
@@ -112,7 +107,7 @@ void DOIMU::printStats(const String& prefix) {
   gyro_->printSensorDetails();
 }
 
-bool DOIMU::update(bool block) {
+bool bb::IMU::update(bool block) {
   if(!available_) return false;
 
   int timeout = 3;
@@ -133,7 +128,7 @@ bool DOIMU::update(bool block) {
   return true;
 }
 
-bool DOIMU::getFilteredRPH(float &r, float &p, float &h) {
+bool bb::IMU::getFilteredRPH(float &r, float &p, float &h) {
   if(!available_) return false;
 
   r = madgwick_.getRoll();
@@ -142,7 +137,7 @@ bool DOIMU::getFilteredRPH(float &r, float &p, float &h) {
   return true;
 }
 
-bool DOIMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
+bool bb::IMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
   if(!available_) return false;
 
   r = lastR_; p = lastP_; h = lastH_;
@@ -155,7 +150,7 @@ bool DOIMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
   return true;
 }
 
-bool DOIMU::getAccelMeasurement(float &x, float &y, float &z) {
+bool bb::IMU::getAccelMeasurement(float &x, float &y, float &z) {
   if(!available_) return false;
 
   x = lastX_;
@@ -166,7 +161,7 @@ bool DOIMU::getAccelMeasurement(float &x, float &y, float &z) {
 }
 
 
-bool DOIMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
+bool bb::IMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
   if(!available_) return false;
 
   double avgTemp = 0.0, avgR = 0.0, avgP = 0.0, avgH = 0.0;
@@ -203,7 +198,7 @@ bool DOIMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
   return true;
 }
 
-bb::IMUState DOIMU::getIMUState() {
+bb::IMUState bb::IMU::getIMUState() {
   bb::IMUState imuState;
   if(!available_) {
     imuState.errorState = ERROR_NOT_PRESENT;

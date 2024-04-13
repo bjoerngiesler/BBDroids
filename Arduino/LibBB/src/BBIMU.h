@@ -1,17 +1,20 @@
-#if !defined(DOIMU_H)
-#define DOIMU_H
+#if !defined(BBIMU_H)
+#define BBIMU_H
 
-#include <LibBB.h>
+#include "BBConsole.h"
+#include "BBControllers.h"
+#include "BBLowPassFilter.h"
+#include "BBPacket.h"
 
 #include <math.h>
 #include <Adafruit_ISM330DHCX.h>
 #include <MadgwickAHRS.h>
 
-#include "DOConfig.h"
+namespace bb {
 
-using namespace bb;
+class IMU;
 
-class DOIMUControlInput: public bb::ControlInput {
+class IMUControlInput: public bb::ControlInput {
 public:
   typedef enum {
     IMU_ROLL,
@@ -19,23 +22,24 @@ public:
     IMU_HEADING
   } ProbeType;
 
-  DOIMUControlInput(ProbeType pt);
+  IMUControlInput(IMU& imu, ProbeType pt);
   float present();
   Result update();
 
-  void setFilterFrequency(float frequency);
+  void setFilterCutoff(float frequency);
   void setBias(float bias) { bias_ = bias; }
   void setDeadband(float deadband) { deadband_ = deadband; }
 protected:
   ProbeType pt_;
   bb::LowPassFilter filter_;
   float bias_, deadband_;
+  IMU& imu_;
 };
 
 
-class DOIMU {
+class IMU {
 public:
-  static DOIMU imu;
+  IMU(uint8_t addr);
 
   bool begin();
 
@@ -53,7 +57,6 @@ public:
   IMUState getIMUState();
   void printStats(const arduino::String& prefix = "");
 private:  
-  DOIMU();
 
   Madgwick madgwick_;
   bool available_;
@@ -67,6 +70,8 @@ private:
   float dataRate_;
   int32_t intLastTS_;
   bool intRunning_ = false;
+  uint8_t addr_;
 };
 
-#endif // DOIMU_H
+}; // namespace bb
+#endif // BBIMU_H

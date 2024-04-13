@@ -2,7 +2,6 @@
 #define DODROID_H
 
 #include <LibBB.h>
-#include "DOIMU.h"
 #include "DODriveController.h"
 
 using namespace bb;
@@ -77,7 +76,7 @@ protected:
   bb::PIDController* rSpeedController_;
   bb::PIDController* balanceController_;
   bb::PIDController* speedController_;
-  DOIMUControlInput* balanceInput_;
+  bb::IMUControlInput* balanceInput_;
   DODriveControlOutput* driveOutput_;
   DODriveControlInput* driveInput_;
   
@@ -85,6 +84,7 @@ protected:
   
   bool servosOK_, antennasOK_;
   bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
+  bb::IMU imu_;
 };
 
 #endif
