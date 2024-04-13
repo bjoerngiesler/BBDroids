@@ -10,6 +10,8 @@ Hardware concept, layout and realization by Felix Beyer, software concept and re
 
 *Work on BB-8 is on hold until D-O software is finished, at which point the improvements will be ported over. This is expected to happen still in April 2024.*
 
+*If you want to base your own build off of BBDroids, I would suggest to hold off until mid May 2024 or so, when work on D-O and BB-8 are (mostly) finished and some cleanup work has been done.*
+
 *Watch this space for official releases!*
 
 ## About
