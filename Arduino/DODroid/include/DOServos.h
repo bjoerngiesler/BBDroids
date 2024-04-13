@@ -74,7 +74,7 @@ protected:
     uint32_t present;
     int16_t load;
     uint32_t min, max;
-    int32_t offset;
+    int16_t offset;
     uint32_t lastVel;
   };
 

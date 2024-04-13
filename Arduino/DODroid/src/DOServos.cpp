@@ -61,7 +61,7 @@ Result DOServos::initialize() {
           "\tset_vel <servo>|all <val>           <val> in deg/s; 0 is infinite speed.\r\n"
           "\thome                                Home all servos, slowly.\r\n"
           "\tinfo <servo>                        Get info on <servo>.\r\n"
-          "\t<ctrltableitem> <servo> [<value>]   Get or set, options: vel_limit, current_limit, profile_acc.\r\n"
+          "\t<ctrltableitem> <servo> [<value>]   Get or set, options: vel_limit, current_limit, profile_acc, profile_vel, operating_mode, pos_p_gain, pos_i_gain, pos_d_gain.\r\n"
           "\reboot <servo>|all                   Reboot <servo>";
 
   ctrlPresentPos_.addr = 0;
@@ -490,15 +490,15 @@ bool DOServos::setRange(uint8_t id, float min, float max, ValueType t) {
   Servo *s = servoWithID(id);
   if(s == NULL) return false;
   
-  if(min > max) {
-    float t = min;
-    max = min;
-    min = t;
+  if(min < max) {
+    s->min = computeRawValue(min, t);
+    s->max = computeRawValue(max, t);
+  } else {
+    s->max = computeRawValue(min, t);
+    s->min = computeRawValue(max, t);
   }
 
-  s->min = computeRawValue(min, t);
-  s->max = computeRawValue(max, t);
-  s->goal = constrain(s->goal, s->min, s->max);
+  setGoal(id, constrain(s->goal, s->min, s->max), VALUE_RAW);
 
   return true;
 }
@@ -540,12 +540,8 @@ bool DOServos::setGoal(uint8_t id, float goal, ValueType t) {
 
   Servo *s = servoWithID(id);
   if (s == NULL) return false;
-  //Console::console.printfBroadcast("Servo %d: Offset %d\n", s->id, s->offset);
-  uint32_t g = computeRawValue(goal, t) + s->offset;
-  //Console::console.printfBroadcast("Goal of %f becomes %d\n", goal, g);
-  s->goal = constrain(g, s->min, s->max);
-  //Console::console.printfBroadcast("Goal of %d becomes %d\n", g, s->goal);
-
+  int32_t g = computeRawValue(goal, t) + s->offset; // s->offset can be negative...
+  s->goal = constrain(g, s->min, s->max);           // ...but s->min and s->max are uint32_t, so constrain() will fix it
   swGoalInfos.is_info_changed = true;
 
   return true;
