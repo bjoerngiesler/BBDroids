@@ -1,0 +1,137 @@
+<mxfile host="Electron" modified="2024-04-11T15:50:25.912Z" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.1.0 Chrome/120.0.6099.109 Electron/28.1.0 Safari/537.36" etag="XShWdwQ2atpwYRIuH6CE" version="24.1.0" type="device">
+  <diagram name="Seite-1" id="kHR3K2X6mLvnaRXTm4rC">
+    <mxGraphModel dx="1853" dy="654" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-1" value="Left Motor" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="640" y="250" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-7" value="PWM" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" target="4gz29d7Vr_LdfD3-UEPO-5">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="450" y="290" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-8" value="Measurement: Wheel Speed" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-3" target="4gz29d7Vr_LdfD3-UEPO-21">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="370" y="310" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="350" y="350" />
+              <mxPoint x="350" y="310" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-3" value="Left Encoder" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="640" y="320" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-6" value="Power" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-5" target="4gz29d7Vr_LdfD3-UEPO-1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-5" value="Left Motor Controller" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="504" y="260" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-10" value="Right Motor" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="640" y="410" width="80" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-11" value="PWM" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" target="4gz29d7Vr_LdfD3-UEPO-16" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="450" y="450" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-13" value="Measurement: Wheel Speed" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.75;entryDx=0;entryDy=0;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="4gz29d7Vr_LdfD3-UEPO-14" parent="1">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="370" y="470" as="targetPoint" />
+            <Array as="points">
+              <mxPoint x="350" y="510" />
+              <mxPoint x="350" y="470" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-14" value="Right Encoder" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="640" y="480" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-15" value="Power" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" edge="1" source="4gz29d7Vr_LdfD3-UEPO-16" target="4gz29d7Vr_LdfD3-UEPO-10" parent="1">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-16" value="Right Motor Controller" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="504" y="420" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-26" value="Measurement:&lt;br&gt;Pitch" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.75;entryDx=0;entryDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-18" target="4gz29d7Vr_LdfD3-UEPO-24">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-18" value="IMU" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="-30" y="160" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-21" value="Left Speed Controller PID" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="370" y="260" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-23" value="Right Speed Controller PID" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="370" y="420" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-30" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-24" target="4gz29d7Vr_LdfD3-UEPO-32">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="190" y="350" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-45" value="Setpoint:&lt;br&gt;Speed Adaption" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" vertex="1" connectable="0" parent="4gz29d7Vr_LdfD3-UEPO-30">
+          <mxGeometry x="0.5143" relative="1" as="geometry">
+            <mxPoint y="-51" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-24" value="Balance Controller PID" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="150" y="130" width="90" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-28" value="Setpoint:&lt;br&gt;Pitch at rest" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-27" target="4gz29d7Vr_LdfD3-UEPO-24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-27" value="Pitch at rest (from calibration)" style="rounded=0;whiteSpace=wrap;html=1;" vertex="1" parent="1">
+          <mxGeometry x="-30" y="90" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-33" value="Velocity" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-31" target="4gz29d7Vr_LdfD3-UEPO-32">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-44" value="Turn Rate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.75;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-31" target="4gz29d7Vr_LdfD3-UEPO-38">
+          <mxGeometry x="0.5152" relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="90" y="425" />
+              <mxPoint x="90" y="275" />
+            </Array>
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-31" value="Remote" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="-30" y="380" width="80" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-37" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-32" target="4gz29d7Vr_LdfD3-UEPO-34">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-43" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-32" target="4gz29d7Vr_LdfD3-UEPO-38">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-32" value="+" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="180" y="310" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-36" value="Setpoint: &lt;br&gt;Right Speed" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-34" target="4gz29d7Vr_LdfD3-UEPO-23">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-34" value="-" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="230" y="420" width="30" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-35" value="Turn Rate" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=1;exitY=0.75;exitDx=0;exitDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-31" target="4gz29d7Vr_LdfD3-UEPO-34">
+          <mxGeometry x="0.4737" relative="1" as="geometry">
+            <mxPoint x="200" y="450" as="targetPoint" />
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-42" value="Setpoint:&lt;br&gt;Left Speed" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-38" target="4gz29d7Vr_LdfD3-UEPO-21">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="4gz29d7Vr_LdfD3-UEPO-38" value="+" style="ellipse;whiteSpace=wrap;html=1;aspect=fixed;" vertex="1" parent="1">
+          <mxGeometry x="230" y="260" width="30" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
