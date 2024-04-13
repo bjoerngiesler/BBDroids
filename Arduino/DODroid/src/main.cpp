@@ -3,7 +3,6 @@
 #include <Wire.h>
 
 #include "DODroid.h"
-#include "DOServos.h"
 #include "DOSound.h"
 #include "DOConfig.h"
 #include "DOWifiSecrets.h"
@@ -47,8 +46,8 @@ void initializeSubsystems() {
   XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200, serialTXSerial);
   XBee::xbee.setDebugFlags((XBee::DebugFlags)(XBee::DEBUG_PROTOCOL|XBee::DEBUG_XBEE_COMM));
   XBee::xbee.setName(DROID_NAME);
-  DOServos::servos.initialize();
-  DOServos::servos.setRequiredIds(std::vector<uint8_t>{SERVO_NECK}); // Rest of the head servos may be disconnected
+  Servos::servos.initialize();
+  Servos::servos.setRequiredIds(std::vector<uint8_t>{SERVO_NECK}); // Rest of the head servos may be disconnected
   DODroid::droid.initialize();
 }
 
@@ -58,7 +57,7 @@ void startSubsystems() {
   XBee::xbee.addPacketReceiver(&DODroid::droid);
   XBee::xbee.start();
   XBee::xbee.setAPIMode(true);
-  DOServos::servos.start();
+  Servos::servos.start();
   DODroid::droid.start();
   // sometimes this doesn't work on the first try for whatever reason
   if(WifiServer::server.isStarted() == false) WifiServer::server.start(); 

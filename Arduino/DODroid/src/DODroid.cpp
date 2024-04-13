@@ -1,7 +1,6 @@
 #include "DODroid.h"
 #include "DOConfig.h"
 #include "DOBattStatus.h"
-#include "DOServos.h"
 #include "DOSound.h"
 #include "../resources/systemsounds.h"
 
@@ -134,7 +133,7 @@ Result DODroid::start(ConsoleStream* stream) {
   balanceController_->setRamp(0);
   //balanceController_->setDebug(true);
 
-  DOServos::servos.switchTorque(SERVO_NECK, true);
+  bb::Servos::servos.switchTorque(SERVO_NECK, true);
 
   started_ = true;
   operationStatus_ = RES_OK;
@@ -161,14 +160,14 @@ Result DODroid::step() {
     DOBattStatus::batt.updateVoltage();
     Console::console.printfBroadcast("Power: %.1fV\n", DOBattStatus::batt.voltage());
 
-    // CRITICAL: Switch everything off and go into endless loop if power 
+    // CRITICAL: Switch everything off (except the neck servo, so that we don't drop the head) and go into endless loop if power 
     if(DOBattStatus::batt.voltage() > 2.0 &&
        DOBattStatus::batt.voltage() < POWER_BATT_MIN) {
       leftMotor_.set(0);
       rightMotor_.set(0);
-      DOServos::servos.switchTorque(SERVO_HEAD_PITCH, false);
-      DOServos::servos.switchTorque(SERVO_HEAD_HEADING, false);
-      DOServos::servos.switchTorque(SERVO_HEAD_ROLL, false);
+      bb::Servos::servos.switchTorque(SERVO_HEAD_PITCH, false);
+      bb::Servos::servos.switchTorque(SERVO_HEAD_HEADING, false);
+      bb::Servos::servos.switchTorque(SERVO_HEAD_ROLL, false);
       while(true) {
         DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
         delay(5000);
@@ -193,11 +192,11 @@ Result DODroid::step() {
 
     // float nod = p + params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
     float nod = params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
-    DOServos::servos.setGoal(SERVO_NECK, 180 + nod);
-    DOServos::servos.setGoal(SERVO_HEAD_PITCH, 180 - nod);
+    bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
+    bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 - nod);
     
-    DOServos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh);
-    DOServos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 + 
+    bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh);
+    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 + 
     params_.faHeadRollTurn * dh);
   }
 
@@ -274,7 +273,7 @@ void DODroid::printStatus(ConsoleStream *stream) {
     stream->printf("not available");
   }
 
-  stream->printf(", servos: %s", DOServos::servos.isStarted() ? "OK" : "not started");
+  stream->printf(", servos: %s", bb::Servos::servos.isStarted() ? "OK" : "not started");
 
   stream->printf(", motors: ");
 
@@ -583,52 +582,52 @@ Result DODroid::selfTest(ConsoleStream *stream) {
 Result DODroid::servoTest(ConsoleStream *stream) {
   // Check servos
   servosOK_ = false;
-  if(DOServos::servos.isStarted() == false) {
+  if(bb::Servos::servos.isStarted() == false) {
     Console::console.printfBroadcast("Critical error: Servo subsystem not started!\n");
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
-  if(DOServos::servos.hasServoWithID(SERVO_NECK) == false) {
+  if(bb::Servos::servos.hasServoWithID(SERVO_NECK) == false) {
     Console::console.printfBroadcast("Critical error: Neck servo missing!\n");
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  } else if(DOServos::servos.home(SERVO_NECK, 5.0, 95, stream) != RES_OK) {
+  } else if(bb::Servos::servos.home(SERVO_NECK, 5.0, 95, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   } else {
-    DOServos::servos.setRange(SERVO_NECK, 180-NECK_RANGE, 180+NECK_RANGE);
-    DOServos::servos.setOffset(SERVO_NECK, NECK_OFFSET);
-    DOServos::servos.setProfileVelocity(SERVO_NECK, 50);
+    bb::Servos::servos.setRange(SERVO_NECK, 180-NECK_RANGE, 180+NECK_RANGE);
+    bb::Servos::servos.setOffset(SERVO_NECK, NECK_OFFSET);
+    bb::Servos::servos.setProfileVelocity(SERVO_NECK, 50);
   }
 
-  if(DOServos::servos.hasServoWithID(SERVO_HEAD_PITCH) == false) {
+  if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_PITCH) == false) {
     Console::console.printfBroadcast("Degraded: Head pitch servo missing.\n");
-  } else if(DOServos::servos.home(SERVO_HEAD_PITCH, 5.0, 50, stream) != RES_OK) {
+  } else if(bb::Servos::servos.home(SERVO_HEAD_PITCH, 5.0, 50, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   } else {
-    DOServos::servos.setRange(SERVO_HEAD_PITCH, 180-HEAD_PITCH_RANGE, 180+HEAD_PITCH_RANGE);
-    DOServos::servos.setOffset(SERVO_HEAD_PITCH, HEAD_PITCH_OFFSET);
-    DOServos::servos.setProfileVelocity(SERVO_HEAD_PITCH, 50);
+    bb::Servos::servos.setRange(SERVO_HEAD_PITCH, 180-HEAD_PITCH_RANGE, 180+HEAD_PITCH_RANGE);
+    bb::Servos::servos.setOffset(SERVO_HEAD_PITCH, HEAD_PITCH_OFFSET);
+    bb::Servos::servos.setProfileVelocity(SERVO_HEAD_PITCH, 50);
   }
 
-  if(DOServos::servos.hasServoWithID(SERVO_HEAD_HEADING) == false) {
+  if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_HEADING) == false) {
     Console::console.printfBroadcast("Degraded: Head heading servo missing.\n");
-  } else if(DOServos::servos.home(SERVO_HEAD_HEADING, 5.0, 50, stream) != RES_OK) {
+  } else if(bb::Servos::servos.home(SERVO_HEAD_HEADING, 5.0, 50, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   } else {
-    DOServos::servos.setRange(SERVO_HEAD_HEADING, 180-HEAD_HEADING_RANGE, 180+HEAD_HEADING_RANGE);
-    DOServos::servos.setOffset(SERVO_HEAD_HEADING, HEAD_HEADING_OFFSET);
+    bb::Servos::servos.setRange(SERVO_HEAD_HEADING, 180-HEAD_HEADING_RANGE, 180+HEAD_HEADING_RANGE);
+    bb::Servos::servos.setOffset(SERVO_HEAD_HEADING, HEAD_HEADING_OFFSET);
   }
 
 
-  if(DOServos::servos.hasServoWithID(SERVO_HEAD_ROLL) == false) {
+  if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_ROLL) == false) {
     Console::console.printfBroadcast("Degraded: Head roll servo missing.\n");
-  } else if(DOServos::servos.home(SERVO_HEAD_ROLL, 5.0, 50, stream) != RES_OK) {
+  } else if(bb::Servos::servos.home(SERVO_HEAD_ROLL, 5.0, 50, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   } else {
-    DOServos::servos.setRange(SERVO_HEAD_ROLL, 180-HEAD_ROLL_RANGE, 180+HEAD_ROLL_RANGE);
-    DOServos::servos.setOffset(SERVO_HEAD_ROLL, HEAD_ROLL_OFFSET);
+    bb::Servos::servos.setRange(SERVO_HEAD_ROLL, 180-HEAD_ROLL_RANGE, 180+HEAD_ROLL_RANGE);
+    bb::Servos::servos.setOffset(SERVO_HEAD_ROLL, HEAD_ROLL_OFFSET);
   }
 
   servosOK_ = true;

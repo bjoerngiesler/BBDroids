@@ -1,15 +1,14 @@
 #include <Wire.h>
-#include "DOServos.h"
-#include "DOConfig.h"
+#include <LibBB.h>
 
 static uint32_t SLOW_VEL = 5;
 static const uint8_t MAX_SERVO_ID = 4;
 
-DOServos DOServos::servos;
-//static const unsigned int bpsList[] = { 57600, 115200, 1000000 };
-//static const unsigned int numBps = 3;
-static const unsigned int bpsList[] = { 1000000 };
-static const unsigned int numBps = 1;
+using namespace bb;
+
+bb::Servos bb::Servos::servos;
+static const unsigned int bpsList[] = { 57600, 115200, 1000000 };
+static const unsigned int numBps = 3;
 static const unsigned int goalBps = 1000000;
 
 struct StrToCtrlTable {
@@ -30,28 +29,28 @@ static const StrToCtrlTable strToCtrlTable_[] = {
 
 static const int strToCtrlTableLen_ = 8;
 
-DOServoControlOutput::DOServoControlOutput(uint8_t sn, float offset) {
+bb::ServoControlOutput::ServoControlOutput(uint8_t sn, float offset) {
   sn_ = sn;
   offset_ = offset;
 }
 
-bb::Result DOServoControlOutput::set(float value) {
-  if(DOServos::servos.setGoal(sn_, value) == true) return RES_OK;
+bb::Result bb::ServoControlOutput::set(float value) {
+  if(Servos::servos.setGoal(sn_, value) == true) return RES_OK;
   return RES_CMD_FAILURE;
 }
 
-float DOServoControlOutput::present() {
-  return DOServos::servos.present(sn_);
+float bb::ServoControlOutput::present() {
+  return Servos::servos.present(sn_);
 }
 
-DOServos::DOServos() {
+bb::Servos::Servos() {
   infoXelsSrPresent = NULL;
   infoXelsSrLoad = NULL;
   infoXelsSwGoal = NULL;
   infoXelsSwVel = NULL;
 }
 
-Result DOServos::initialize() {
+Result bb::Servos::initialize() {
   name_ = "servos";
   description_ = "Dynamixel subsystem";
   help_ = "Dynamixel Subsystem\r\n"
@@ -71,7 +70,7 @@ Result DOServos::initialize() {
   return Subsystem::initialize();
 }
 
-Result DOServos::start(ConsoleStream* stream) {
+Result bb::Servos::start(ConsoleStream* stream) {
   if (isStarted()) return RES_SUBSYS_ALREADY_STARTED;
 
   Runloop::runloop.excuseOverrun();
@@ -188,7 +187,7 @@ Result DOServos::start(ConsoleStream* stream) {
   return RES_OK;
 }
 
-Result DOServos::stop(ConsoleStream* stream) {
+Result bb::Servos::stop(ConsoleStream* stream) {
   (void)stream;
 
   teardownSyncBuffers();
@@ -203,7 +202,7 @@ Result DOServos::stop(ConsoleStream* stream) {
   return RES_OK;
 }
 
-Result DOServos::step() {
+Result bb::Servos::step() {
   static unsigned int failcount = 0;
 
   if (!started_ || operationStatus_ != RES_OK) return RES_SUBSYS_NOT_STARTED;
@@ -231,7 +230,7 @@ Result DOServos::step() {
   return RES_OK;
 }
 
-Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {
+Result bb::Servos::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {
   (void)stream;
   if (words.size() == 0) return RES_CMD_UNKNOWN_COMMAND;
 
@@ -314,7 +313,7 @@ Result DOServos::handleConsoleCommand(const std::vector<String>& words, ConsoleS
   return bb::Subsystem::handleConsoleCommand(words, stream);
 }
 
-Result DOServos::handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex idx, const std::vector<String>& words, ConsoleStream* stream) {
+Result bb::Servos::handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex idx, const std::vector<String>& words, ConsoleStream* stream) {
   if (words.size() < 2 || words.size() > 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
   int id = words[1].toInt();
   if (words.size() == 2) {
@@ -332,7 +331,7 @@ Result DOServos::handleCtrlTableCommand(ControlTableItem::ControlTableItemIndex 
 
 #define ABS(x) (((x)<0?-(x):(x)))
 
-Result DOServos::home(uint8_t id, float vel, unsigned int maxLoadPercent, ConsoleStream* stream) {
+Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, ConsoleStream* stream) {
   Servo *s = NULL;
   if(id != ID_ALL) {
     s = servoWithID(id);
@@ -430,7 +429,7 @@ Result DOServos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Consol
 }
 
 
-Result DOServos::switchTorque(uint8_t id, bool onoff) {
+Result bb::Servos::switchTorque(uint8_t id, bool onoff) {
   if (operationStatus_ != RES_OK) return operationStatus_;
   if(id == ID_ALL) {
     for(auto& s: servos_) {
@@ -445,11 +444,11 @@ Result DOServos::switchTorque(uint8_t id, bool onoff) {
   return RES_OK;
 }
 
-bool DOServos::isTorqueOn(uint8_t id) {
+bool bb::Servos::isTorqueOn(uint8_t id) {
   return dxl_.readControlTableItem(ControlTableItem::TORQUE_ENABLE, id);
 }
 
-void DOServos::printStatus(ConsoleStream* stream, int id) {
+void bb::Servos::printStatus(ConsoleStream* stream, int id) {
   if (!started_) {
     stream->printf("Servo subsystem not started.\n");
     return;
@@ -481,12 +480,11 @@ void DOServos::printStatus(ConsoleStream* stream, int id) {
   }
 }
 
-bool DOServos::hasServoWithID(uint8_t id) {
+bool bb::Servos::hasServoWithID(uint8_t id) {
   return servoWithID(id) != NULL;
 }
 
-
-bool DOServos::setRange(uint8_t id, float min, float max, ValueType t) {
+bool bb::Servos::setRange(uint8_t id, float min, float max, ValueType t) {
   Servo *s = servoWithID(id);
   if(s == NULL) return false;
   
@@ -503,7 +501,7 @@ bool DOServos::setRange(uint8_t id, float min, float max, ValueType t) {
   return true;
 }
 
-bool DOServos::setOffset(uint8_t id, float offset, ValueType t) {
+bool bb::Servos::setOffset(uint8_t id, float offset, ValueType t) {
   Servo *s = servoWithID(id);
   if(s == NULL) return false;
 
@@ -515,7 +513,7 @@ bool DOServos::setOffset(uint8_t id, float offset, ValueType t) {
   return true;
 }
 
-bool DOServos::setInverted(uint8_t id, bool invert) {
+bool bb::Servos::setInverted(uint8_t id, bool invert) {
   uint8_t dm = dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id);
   if(invert) dm |= 0x1;
   else dm &= ~0x1;
@@ -524,11 +522,11 @@ bool DOServos::setInverted(uint8_t id, bool invert) {
   return true;
 }
 
-bool DOServos::inverted(uint8_t id) {
+bool bb::Servos::inverted(uint8_t id) {
   return dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1;
 }
 
-bool DOServos::setGoal(uint8_t id, float goal, ValueType t) {
+bool bb::Servos::setGoal(uint8_t id, float goal, ValueType t) {
   if (isnan(goal)) return false;
 
   if (id == ID_ALL) {
@@ -540,14 +538,14 @@ bool DOServos::setGoal(uint8_t id, float goal, ValueType t) {
 
   Servo *s = servoWithID(id);
   if (s == NULL) return false;
-  int32_t g = computeRawValue(goal, t) + s->offset; // s->offset can be negative...
-  s->goal = constrain(g, s->min, s->max);           // ...but s->min and s->max are uint32_t, so constrain() will fix it
+  uint32_t g = computeRawValue(goal, t) + s->offset; // FIXME - s->offset can be negative, is this safe?
+  s->goal = constrain(g, s->min, s->max);          
   swGoalInfos.is_info_changed = true;
 
   return true;
 }
 
-bool DOServos::setProfileVelocity(uint8_t id, float vel, ValueType t) {
+bool bb::Servos::setProfileVelocity(uint8_t id, float vel, ValueType t) {
   if(isnan(vel) || vel<0) return false;
 
   if (id == ID_ALL) {
@@ -570,7 +568,7 @@ bool DOServos::setProfileVelocity(uint8_t id, float vel, ValueType t) {
   return true;
 }
 
-uint32_t DOServos::computeRawValue(float val, ValueType t) {
+uint32_t bb::Servos::computeRawValue(float val, ValueType t) {
   int32_t retval;
   switch (t) {
     case VALUE_DEGREE:
@@ -589,12 +587,12 @@ uint32_t DOServos::computeRawValue(float val, ValueType t) {
   return (uint32_t)retval;
 }
 
-bool DOServos::setProfileAcceleration(uint8_t id, uint32_t val) {
+bool bb::Servos::setProfileAcceleration(uint8_t id, uint32_t val) {
   dxl_.writeControlTableItem(ControlTableItem::PROFILE_ACCELERATION, id, val);
   return true;
 }
 
-float DOServos::goal(uint8_t id, ValueType t) {
+float bb::Servos::goal(uint8_t id, ValueType t) {
   Servo *s = servoWithID(id);
   if (s == NULL) return 0.0f;
 
@@ -604,14 +602,14 @@ float DOServos::goal(uint8_t id, ValueType t) {
     return s->goal;
 }
 
-float DOServos::present(uint8_t id, ValueType t) {
+float bb::Servos::present(uint8_t id, ValueType t) {
   Servo *s = servoWithID(id);
   if (s == NULL) return 0.0f;
   if (t == VALUE_DEGREE) return (s->present / 4096.0) * 360.0;
   else return s->present;
 }
 
-float DOServos::load(uint8_t id) {
+float bb::Servos::load(uint8_t id) {
   if (operationStatus_ != RES_OK) return 0.0f;
 
   Servo *s = servoWithID(id);
@@ -619,29 +617,29 @@ float DOServos::load(uint8_t id) {
   return s->load;
 }
 
-uint8_t DOServos::errorStatus(uint8_t id) {
+uint8_t bb::Servos::errorStatus(uint8_t id) {
   return dxl_.readControlTableItem(ControlTableItem::HARDWARE_ERROR_STATUS, id);
 }
 
-bool DOServos::loadShutdownEnabled(uint8_t id) {
+bool bb::Servos::loadShutdownEnabled(uint8_t id) {
   return dxl_.readControlTableItem(ControlTableItem::SHUTDOWN, id) & (1<<5);
 }
 
-void DOServos::setLoadShutdownEnabled(uint8_t id, bool yesno) {
+void bb::Servos::setLoadShutdownEnabled(uint8_t id, bool yesno) {
   uint8_t shutdown = dxl_.readControlTableItem(ControlTableItem::SHUTDOWN, id);
   if(yesno) shutdown |= (1<<5);
   else shutdown &= ~(1<<5);
   dxl_.writeControlTableItem(ControlTableItem::SHUTDOWN, id, shutdown);
 }
 
-DOServos::Servo* DOServos::servoWithID(uint8_t id) {
+bb::Servos::Servo* bb::Servos::servoWithID(uint8_t id) {
   for(auto& s: servos_) {
     if(s.id == id) return &s;
   }
   return NULL;
 }
 
-void DOServos::setupSyncBuffers() {
+void bb::Servos::setupSyncBuffers() {
   unsigned int i;
 
   if (!servos_.size()) return;
@@ -710,7 +708,7 @@ void DOServos::setupSyncBuffers() {
   swVelInfos.is_info_changed = true;
 }
 
-void DOServos::teardownSyncBuffers() {
+void bb::Servos::teardownSyncBuffers() {
   delete infoXelsSrPresent;
   infoXelsSrPresent = NULL;
   delete infoXelsSrLoad;
@@ -729,7 +727,7 @@ void DOServos::teardownSyncBuffers() {
   swVelInfos.xel_count = 0;
 }
 
-Result DOServos::syncReadInfo(ConsoleStream *stream) {
+Result bb::Servos::syncReadInfo(ConsoleStream *stream) {
   uint8_t recv_cnt;
   
   recv_cnt = dxl_.syncRead(&srPresentInfos);
@@ -749,7 +747,7 @@ Result DOServos::syncReadInfo(ConsoleStream *stream) {
   return RES_OK;
 }
 
-Result DOServos::syncWriteInfo(ConsoleStream* stream) {
+Result bb::Servos::syncWriteInfo(ConsoleStream* stream) {
   if(dxl_.syncWrite(&swVelInfos) == false) {
     if(stream) stream->printf("Sending servo profile velocity failed!\n");
     else Console::console.printfBroadcast("Sending servo profile velocity failed!\n");

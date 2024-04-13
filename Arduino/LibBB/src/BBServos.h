@@ -1,15 +1,16 @@
-#if !defined(DOSERVOS_H)
-#define DOSERVOS_H
+#if !defined(BBSERVOS_H)
+#define BBSERVOS_H
 
-#include <LibBB.h>
+#include "BBControllers.h"
+#include "BBConsole.h"
 #include <DynamixelShield.h>
 #include <vector>
 
-using namespace bb;
+namespace bb {
 
-class DOServoControlOutput: public bb::ControlOutput {
+class ServoControlOutput: public bb::ControlOutput {
 public:
-  DOServoControlOutput(uint8_t servoNum, float offset=0.0f);
+  ServoControlOutput(uint8_t servoNum, float offset=0.0f);
   float present();
   bb::Result set(float value);
 
@@ -18,14 +19,14 @@ protected:
   float offset_;
 };
 
-class DOServos: public Subsystem {
+class Servos: public Subsystem {
 public:
   typedef enum {
     VALUE_DEGREE,
     VALUE_RAW
   } ValueType;
 
-  static DOServos servos;
+  static Servos servos;
 
   static const uint8_t ID_ALL = 255;
 
@@ -64,7 +65,7 @@ public:
   uint32_t computeRawValue(float val, ValueType t=VALUE_DEGREE);
 
 protected:
-  DOServos();
+  Servos();
   DynamixelShield dxl_;
 
   struct Servo {
@@ -78,7 +79,6 @@ protected:
     uint32_t lastVel;
   };
 
-  //std::map<uint8_t,Servo> servos_;
   std::vector<Servo> servos_;
   Servo *servoWithID(uint8_t id);
 
@@ -116,6 +116,8 @@ protected:
   void teardownSyncBuffers();
   Result syncReadInfo(ConsoleStream *stream = NULL);
   Result syncWriteInfo(ConsoleStream *stream = NULL);
+};
+
 };
 
 #endif // DOSERVOS_H
