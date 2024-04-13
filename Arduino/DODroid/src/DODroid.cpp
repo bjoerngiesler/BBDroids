@@ -204,7 +204,6 @@ Result DODroid::step() {
   unsigned long usec3 = micros() - usec0;
 
   if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
-    float err, errI, errD, control;
     switch(params_.driveMode) {
     case DRIVE_OFF:
     default:
