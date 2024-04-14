@@ -60,7 +60,7 @@ void initializeSubsystems() {
   BB8StatusPixels::statusPixels.linkSubsystem(&BB8::bb8, STATUSPIXEL_OVERALL);
 
   // Initialize the servos subsystem.
-  BB8Servos::servos.initialize();
+  bb::Servos::servos.initialize();
   BB8StatusPixels::statusPixels.linkSubsystem(&BB8Servos::servos, STATUSPIXEL_MOTORS);
 }
 
@@ -80,9 +80,9 @@ void startSubsystems() {
   if (XBee::xbee.isStarted()) BB8Sound::sound.playSystem(SOUND_XBEE_OK);
   else BB8Sound::sound.playSystem(SOUND_XBEE_FAILURE);
 
-  BB8Servos::servos.start();
+  bb::Servos::servos.start();
   BB8StatusPixels::statusPixels.update();
-  if (BB8Servos::servos.isStarted()) BB8Sound::sound.playSystem(SOUND_SERVOS_OK);
+  if (bb::Servos::servos.isStarted()) BB8Sound::sound.playSystem(SOUND_SERVOS_OK);
   else BB8Sound::sound.playSystem(SOUND_SERVOS_FAILURE);
 
   BB8::bb8.start();
