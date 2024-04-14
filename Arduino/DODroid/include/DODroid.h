@@ -9,24 +9,15 @@ using namespace bb;
 class DODroid: public Subsystem, public PacketReceiver {
 public:
   static DODroid droid;
-  
-  enum DriveMode {
-    DRIVE_OFF                 = 0,
-    DRIVE_NAIVE               = 1,
-    DRIVE_PITCH               = 2,
-  };
-  
 
   struct Params {
     float wheelSpeedKp, wheelSpeedKi, wheelSpeedKd;
     float balKp, balKi, balKd;
-    float speedKp, speedKi, speedKd;
-    float posKp, posKi, posKd;
-    float speedRemoteFactor, rotRemoteFactor;
-    float balSpeedRemoteFactor, balRotRemoteFactor;
+    float pwmBalKp, pwmBalKi, pwmBalKd;
+    float accel, pwmAccel;
+    float maxSpeed;
     float faNeckAccel, faNeckSpeed;
     float faHeadRollTurn, faHeadHeadingTurn;
-    int driveMode;
   };
   static Params params_;
 
@@ -48,14 +39,17 @@ public:
   virtual Result start(ConsoleStream *stream = NULL);
   virtual Result stop(ConsoleStream *stream = NULL);
 	virtual Result step();
+  Result stepPowerProtect();
+  Result stepDrive();
+  Result stepHead();
 
   virtual void printStatus(ConsoleStream *stream);
   virtual Result fillAndSendStatePacket();
 
-  void setDriveMode(DriveMode mode);
+  void setControlParameters();
+  void switchDrive(bool onoff);
 
   virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
-  virtual Result incomingConfigPacket(uint16_t station, PacketSource source, uint8_t rssi, const ConfigPacket& packet);
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   virtual Result setParameterValue(const String& name, const String& stringVal);
 
@@ -69,22 +63,21 @@ public:
   bool getAntennas(uint8_t& a1, uint8_t& a2, uint8_t& a3);
 
 protected:
+  bb::IMU imu_;
   bb::DCMotor leftMotor_, rightMotor_;
   bb::Encoder leftEncoder_, rightEncoder_;
-  
-  bb::PIDController* lSpeedController_;
-  bb::PIDController* rSpeedController_;
-  bb::PIDController* balanceController_;
-  bb::PIDController* speedController_;
-  bb::IMUControlInput* balanceInput_;
-  DODriveControlOutput* driveOutput_;
-  DODriveControlInput* driveInput_;
+  bb::PIDController lSpeedController_, rSpeedController_;
+
+  bb::IMUControlInput balanceInput_;
+  DODriveControlOutput driveOutput_, pwmDriveOutput_;
+  bb::PIDController balanceController_, pwmBalanceController_;
   
   MotorStatus leftMotorStatus_, rightMotorStatus_;
   
+  bool pwm_;
+  bool driveOn_;
   bool servosOK_, antennasOK_;
   bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
-  bb::IMU imu_;
 };
 
 #endif

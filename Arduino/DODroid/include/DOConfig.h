@@ -14,8 +14,6 @@ static const float         WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979 ti
 static const float         WHEEL_DISTANCE = 95.0;
 
 // Motion Limits
-static const float MAX_SPEED           = 800;
-
 static const float NECK_RANGE          = 30.0;
 static const float NECK_OFFSET         = -5.0;
 static const float HEAD_PITCH_RANGE    = 45.0;
@@ -35,20 +33,19 @@ static const float POWER_BATT_MAX  = 16.0; // Maximum voltage - above this, we'r
 static const float WHEEL_SPEED_KP   = 0.1;
 static const float WHEEL_SPEED_KI   = 0.8;
 static const float WHEEL_SPEED_KD   = 0;
-static const float WHEEL_SPEED_RAMP = 500;
-
-static const float POS_KP = 0.05;
-static const float POS_KI = 0;
-static const float POS_KD = 0;
 
 static const float BAL_KP = 22;
 static const float BAL_KI = 0;
 static const float BAL_KD = 0;
-static const float BAL_RAMP = 100;
 
-static const float SPEED_KP = 0.01;
-static const float SPEED_KI = 0.0;
-static const float SPEED_KD = 0;
+static const float PWM_BAL_KP = 0;
+static const float PWM_BAL_KI = 0;
+static const float PWM_BAL_KD = 0;
+
+static const float MAX_SPEED  = 820;
+static const float ACCEL      = MAX_SPEED*2;
+static const float PWM_ACCEL  = 512;
+
 static const float PITCH_BIAS = 1.35;
 static const float PITCH_DEADBAND = .5;
 static const float SPEED_REMOTE_FACTOR = 1.0;
