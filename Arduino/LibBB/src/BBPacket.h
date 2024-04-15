@@ -51,7 +51,7 @@ struct __attribute__ ((packed)) ControlPacket {
 		}
 		return 0.0;
 	}
-};     // 8 bytes long, maximum should be <=10
+};     // 7 bytes long, maximum should be <=10
 
 struct __attribute__ ((packed)) ControlMode {
 	enum ControlType {
