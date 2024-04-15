@@ -257,7 +257,9 @@ bool bb::WifiServer::broadcastUDPPacket(const uint8_t* packet, size_t len) {
 bool bb::WifiServer::sendUDPPacket(const IPAddress& addr, const uint8_t* packet, size_t len) {
 	static unsigned int failures = 0;
 
-	if(WiFi.status() != WL_CONNECTED && WiFi.status() != WL_AP_CONNECTED) return false;
+	if(WiFi.status() != WL_CONNECTED && WiFi.status() != WL_AP_CONNECTED) {
+		return false;
+	}
 	if(udp_.beginPacket(addr, params_.udpPort) == false) {
 		Console::console.printfBroadcast("beginPacket() failed!\n");
 		return false;
