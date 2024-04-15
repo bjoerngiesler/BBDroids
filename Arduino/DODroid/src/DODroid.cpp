@@ -21,26 +21,28 @@ DODroid::Params DODroid::params_ = {
   .faNeckAccel = FA_NECK_ACCEL,
   .faNeckSpeed = FA_NECK_SPEED,
   .faHeadRollTurn = FA_HEAD_ROLL_TURN,
-  .faHeadHeadingTurn = FA_HEAD_HEADING_TURN
+  .faHeadHeadingTurn = FA_HEAD_HEADING_TURN,
+  .faAntennaSpeed = FA_ANTENNA_SPEED
 };
 
 DODroid::DODroid():
   imu_(IMU_ADDR),
+
   leftMotor_(P_LEFT_PWMA, P_LEFT_PWMB), 
   rightMotor_(P_RIGHT_PWMA, P_RIGHT_PWMB), 
   leftEncoder_(P_LEFT_ENCA, P_LEFT_ENCB, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
   rightEncoder_(P_RIGHT_ENCA, P_RIGHT_ENCB, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
+
   lSpeedController_(leftEncoder_, leftMotor_),
   rSpeedController_(rightEncoder_, rightMotor_),
+
   balanceInput_(imu_, bb::IMUControlInput::IMU_PITCH),
+
   driveOutput_(lSpeedController_, rSpeedController_),
   pwmDriveOutput_(leftMotor_, rightMotor_),
+
   balanceController_(balanceInput_, driveOutput_),
-  pwmBalanceController_(balanceInput_, pwmDriveOutput_),
-  leftMotorStatus_(MOTOR_UNTESTED),
-  rightMotorStatus_(MOTOR_UNTESTED),
-  servosOK_(false),
-  antennasOK_(false)
+  pwmBalanceController_(balanceInput_, pwmDriveOutput_)
 {
   pinMode(PULL_DOWN_15, OUTPUT);
   digitalWrite(PULL_DOWN_15, LOW);
@@ -69,19 +71,19 @@ Result DODroid::initialize() {
   addParameter("pwm_bal_ki", "Integrative constant for balance PID controller (PWM mode)", params_.pwmBalKi, -INT_MAX, INT_MAX);
   addParameter("pwm_bal_kd", "Derivative constant for balance PID controller (PWM mode)", params_.pwmBalKd, -INT_MAX, INT_MAX);
   addParameter("accel", "Acceleration in mm/s^2", params_.accel, -INT_MAX, INT_MAX);
-  addParameter("pwmAccel", "Acceleration in pwm/s", params_.accel, -INT_MAX, INT_MAX);
+  addParameter("pwm_accel", "Acceleration in pwm/s", params_.accel, -INT_MAX, INT_MAX);
   addParameter("max_speed", "Maximum speed (only honored in speed control mode)", params_.maxSpeed, 0, INT_MAX);
   addParameter("fa_neck_accel", "Free Animation factor - neck on IMU accel", params_.faNeckAccel, -INT_MAX, INT_MAX);
   addParameter("fa_neck_speed", "Free Animation factor - neck on wheel speed", params_.faNeckSpeed, -INT_MAX, INT_MAX);
   addParameter("fa_head_roll_turn", "Free Animation factor - head roll on turn speed", params_.faHeadRollTurn, -INT_MAX, INT_MAX);
   addParameter("fa_head_heading_turn", "Free Animation factor - head heading on turn speed", params_.faHeadHeadingTurn, -INT_MAX, INT_MAX);
+  addParameter("fa_antenna_speed", "Free Animation factor - antenna position on wheel speed", params_.faHeadHeadingTurn, -INT_MAX, INT_MAX);
 
   lSpeedController_.setAutoUpdate(false);
   rSpeedController_.setAutoUpdate(false);
 
   balanceController_.setAutoUpdate(false);
   balanceController_.setReverse(true);
-  balanceController_.setControlDeadband(-10.0, 10.0);
 
   pwmBalanceController_.setAutoUpdate(false);
   pwmBalanceController_.setReverse(true);
@@ -91,14 +93,21 @@ Result DODroid::initialize() {
 
 Result DODroid::start(ConsoleStream* stream) {
   lastBtn0_ = lastBtn1_ = lastBtn2_ = lastBtn3_ = lastBtn4_ = false;
+  leftMotorStatus_ = MOTOR_UNTESTED;
+  rightMotorStatus_ = MOTOR_UNTESTED;
+  servosOK_ = false;
+  antennasOK_ = false;
+  driveOn_ = false;
+  pwm_ = false;
+
   imu_.begin();
   DOBattStatus::batt.begin();
 
   operationStatus_ = selfTest();
 
   if(operationStatus_ == RES_DROID_VOLTAGE_TOO_LOW) {
-    Console::console.printfBroadcast("No power (%.fV), USB only!\n", DOBattStatus::batt.voltage());
     if(DOBattStatus::batt.voltage() < 1.0) {
+      Console::console.printfBroadcast("No power (%.fV), USB only!\n", DOBattStatus::batt.voltage());
       started_ = true;
       operationStatus_ = RES_OK;
       return RES_OK;
@@ -107,13 +116,7 @@ Result DODroid::start(ConsoleStream* stream) {
     return operationStatus_;
   }
 
-  driveOn_ = false;
-  pwm_ = false;
-  
-  leftMotor_.set(0);
-  rightMotor_.set(0);
-
-  bb::Servos::servos.switchTorque(SERVO_NECK, true);
+  setControlParameters();
 
   started_ = true;
   operationStatus_ = RES_OK;
@@ -149,7 +152,7 @@ void DODroid::setControlParameters() {
   pwmBalanceController_.setControlParameters(params_.pwmBalKp, params_.pwmBalKi, params_.pwmBalKd);
   pwmBalanceController_.setRamp(0);
   pwmBalanceController_.reset();
-  pwmDriveOutput_.setAcceleration(PWM_ACCEL);
+  pwmDriveOutput_.setAcceleration(params_.pwmAccel);
 }
 
 Result DODroid::step() {
@@ -176,7 +179,6 @@ Result DODroid::step() {
 
 bb::Result DODroid::stepPowerProtect() {
   DOBattStatus::batt.updateVoltage();
-  Console::console.printfBroadcast("Power: %.1fV\n", DOBattStatus::batt.voltage());
 
   // CRITICAL: Switch everything off (except the neck servo, so that we don't drop the head) and go into endless loop if power 
   if(DOBattStatus::batt.voltage() > 2.0 &&
@@ -209,8 +211,10 @@ bb::Result DODroid::stepHead() {
     bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 - nod);
     
     bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh);
-    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 + 
-    params_.faHeadRollTurn * dh);
+    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 + params_.faHeadRollTurn * dh);
+
+    float ant = 127 + speed*FA_ANTENNA_SPEED;
+    setAntennas(ant, ant, ant);
   }
   
   return RES_OK;
@@ -279,10 +283,8 @@ void DODroid::printStatus(ConsoleStream *stream) {
 
 Result DODroid::incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
-    //Console::console.printfBroadcast("Control packet from left remote\n");
     return RES_OK;
   } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
-    //Console::console.printfBroadcast("Control packet from right remote: %.2f %.2f\n", packet.getAxis(0), packet.getAxis(1));
     static int numZero = 0;
     if(EPSILON(packet.getAxis(0)) && EPSILON(packet.getAxis(1))) {
       numZero++;
@@ -370,31 +372,67 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
 
 Result DODroid::fillAndSendStatePacket() {
   LargeStatePacket p;
+  memset(&p, 0, sizeof(LargeStatePacket));
 
-  //if((Runloop::runloop.getSequenceNumber() % 4) != 0) return RES_OK;
+  if((Runloop::runloop.getSequenceNumber() % 4) != 0) return RES_OK;
 
   p.timestamp = Runloop::runloop.millisSinceStart() / 1000.0;
   p.droidType = DroidType::DROID_DO;
-  return RES_OK;
 
   strncpy(p.droidName, DROID_NAME, sizeof(p.droidName));
 
   float err, errI, errD, control;
 
-  p.drive[0].errorState = ERROR_OK;
-  p.drive[0].controlMode = 0;
-  p.drive[0].presentPWM = 0; balanceController_.present();
-  p.drive[0].presentPos = leftEncoder_.presentPosition();
-  p.drive[0].presentSpeed = leftEncoder_.presentSpeed();
-  
-  balanceController_.getControlState(err, errI, errD, control);
-  p.drive[0].err = err;
-  p.drive[0].errI = errI;
-  p.drive[0].errD = errD;
-  p.drive[0].control = control;
+  if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
+    p.drive[0].errorState = ERROR_OK;
+    p.drive[0].controlMode = driveOn_ ? bb::ControlMode::CONTROL_RC : bb::ControlMode::CONTROL_OFF;
+    if(pwm_) {
+      p.drive[0].presentPWM = pwmBalanceController_.present();
+      p.drive[0].presentPos = pwmDriveOutput_.present();
+      p.drive[0].presentSpeed = pwmDriveOutput_.present();
+      pwmBalanceController_.getControlState(err, errI, errD, control);
+    } else {
+      p.drive[0].presentPWM = balanceController_.present();
+      p.drive[0].presentPos = leftEncoder_.presentPosition();
+      p.drive[0].presentSpeed = leftEncoder_.presentSpeed();
+      balanceController_.getControlState(err, errI, errD, control);
+    }
 
-  p.drive[1].errorState = ERROR_NOT_PRESENT;
-  p.drive[2].errorState = ERROR_NOT_PRESENT;
+    p.drive[0].err = err;
+    p.drive[0].errI = errI;
+    p.drive[0].errD = errD;
+    p.drive[0].control = control;
+  }
+
+  if(leftMotorStatus_ == MOTOR_OK) {
+    p.drive[1].errorState = ERROR_OK;
+    p.drive[1].controlMode = driveOn_ ? bb::ControlMode::CONTROL_RC : bb::ControlMode::CONTROL_OFF;
+    p.drive[1].presentPWM = leftMotor_.present();
+    p.drive[1].presentPos = leftEncoder_.presentPosition();
+    p.drive[1].presentSpeed = leftEncoder_.presentSpeed();
+    lSpeedController_.getControlState(err, errI, errD, control);
+    p.drive[1].err = err;
+    p.drive[1].errI = errI;
+    p.drive[1].errD = errD;
+    p.drive[1].control = control;
+  } else {
+    p.drive[1].errorState = ERROR_NOT_PRESENT;
+  }
+
+  if(rightMotorStatus_ == MOTOR_OK) {
+    p.drive[2].errorState = ERROR_OK;
+    p.drive[2].controlMode = driveOn_ ? bb::ControlMode::CONTROL_RC : bb::ControlMode::CONTROL_OFF;
+    p.drive[2].presentPWM = rightMotor_.present();
+    p.drive[2].presentPos = rightEncoder_.presentPosition();
+    p.drive[2].presentSpeed = rightEncoder_.presentSpeed();
+    rSpeedController_.getControlState(err, errI, errD, control);
+    p.drive[2].err = err;
+    p.drive[2].errI = errI;
+    p.drive[2].errD = errD;
+    p.drive[2].control = control;
+  } else {
+     p.drive[2].errorState = ERROR_NOT_PRESENT;
+  }
 
   p.imu[0] = imu_.getIMUState();
   p.imu[1].errorState = ERROR_NOT_PRESENT;

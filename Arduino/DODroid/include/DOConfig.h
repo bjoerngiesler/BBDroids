@@ -44,7 +44,7 @@ static const float PWM_BAL_KD = 0;
 
 static const float MAX_SPEED  = 820;
 static const float ACCEL      = MAX_SPEED*2;
-static const float PWM_ACCEL  = 512;
+static const float PWM_ACCEL  = 0; //512;
 
 static const float PITCH_BIAS = 1.35;
 static const float PITCH_DEADBAND = .5;
@@ -55,9 +55,10 @@ static const float BAL_ROT_REMOTE_FACTOR = MAX_SPEED/2.0;
 
 // Free Anim Weights
 static const float FA_NECK_ACCEL        = 0;    // Turn this up to move the neck with the droid's absolute acceleration
-static const float FA_NECK_SPEED        = -.05; // Turn this up to move the neck with the droid's speed over ground
-static const float FA_HEAD_ROLL_TURN    = .2;    // Turn this up to roll the head with the droid's turn speed ("lean into" the turn)
-static const float FA_HEAD_HEADING_TURN = .4;    // Turn this up to change head heading with the droid's turn speed ("look into" the turn)
+static const float FA_NECK_SPEED        = -.04; // Turn this up to move the neck with the droid's speed over ground
+static const float FA_HEAD_ROLL_TURN    = .15;    // Turn this up to roll the head with the droid's turn speed ("lean into" the turn)
+static const float FA_HEAD_HEADING_TURN = .3;    // Turn this up to change head heading with the droid's turn speed ("look into" the turn)
+static const float FA_ANTENNA_SPEED     = .1;
 
 // Selftest Constants
 static const float ST_MIN_PWM              = 40.0;

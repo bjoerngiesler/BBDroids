@@ -18,6 +18,7 @@ public:
     float maxSpeed;
     float faNeckAccel, faNeckSpeed;
     float faHeadRollTurn, faHeadHeadingTurn;
+    float faAntennaSpeed;
   };
   static Params params_;
 
