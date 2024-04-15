@@ -2,8 +2,6 @@
 #define BB8_H
 
 #include <LibBB.h>
-#include "BB8IMU.h"
-#include "BB8Servos.h"
 
 using namespace bb;
 
@@ -33,7 +31,8 @@ public:
 
   virtual void printStatus(ConsoleStream *stream);
 
-  virtual Result incomingPacket(const Packet& packet);
+  virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
+
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   virtual Result fillAndSendStatusPacket();
 
@@ -44,9 +43,7 @@ public:
 protected:
   typedef struct {
     float driveSpeedKp, driveSpeedKi, driveSpeedKd;
-    float bodyRollKp, bodyRollKi, bodyRollKd;
-    float domePitchKp, domePitchKi, domePitchKd;
-    float domeRollKp, domeRollKi, domeRollKd;
+    float balKp, balKi, balKd;
   } BB8Params;
 
   static BB8Params params_;
@@ -55,7 +52,7 @@ protected:
   bool pwmControl_;
 
   ConfigStorage::HANDLE paramsHandle_;
-  Packet lastPacket_;
+  bb::ControlPacket lastPacket_;
   int packetTimeout_;
   size_t packetsReceived_, packetsMissed_;
   bool runningStatus_;
@@ -67,16 +64,15 @@ protected:
     DOME_SERVO_BOTH
   } DomeServoType;
 
+  bb::IMU imu_;
+  
   DomeServoType servoDomeToIMU_;
   unsigned int kioskDelay_;
 
   Mode mode_;
 
-  BB8IMUControlInput rollControlInput_;
-  BB8ServoControlOutput rollControlOutput_;
-  bb::PIDController rollController_;
-
-  bb::Encoder driveControlInput_;
+  bb::DCMotor driveMotor_, yawMotor_;
+  bb::Encoder driveEncoder_;
   bb::PIDController driveController_;
 };
 

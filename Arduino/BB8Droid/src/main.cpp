@@ -4,7 +4,6 @@
 #include "BB8WifiSecrets.h"
 #include "BB8StatusPixels.h"
 #include "BB8Sound.h"
-#include "BB8Servos.h"
 #include <math.h>
 #include <limits.h>
 #include <wiring_private.h>
@@ -45,9 +44,10 @@ void initializeSubsystems() {
   Console::console.initialize();
 
   // Initialize XBee communication.
-  XBee::xbee.initialize(DEFAULT_CHAN, 0x3333, DEFAULT_STATION_DROID, DEFAULT_STATION_LEFT_REMOTE, DEFAULT_BPS, serialTXSerial);
-  XBee::xbee.setPacketMode(true);
-  XBee::xbee.addPacketReceiver(&BB8::bb8);
+  uint16_t station = XBee::makeStationID(XBee::DROID_DIFF_UNSTABLE, BUILDER_ID, DROID_ID);
+  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200, serialTXSerial);
+  XBee::xbee.setDebugFlags((XBee::DebugFlags)(XBee::DEBUG_PROTOCOL|XBee::DEBUG_XBEE_COMM));
+  XBee::xbee.setName(DROID_NAME);
   BB8StatusPixels::statusPixels.linkSubsystem(&XBee::xbee, STATUSPIXEL_REMOTE);
 
   // Initialize Wifi communication.
@@ -61,7 +61,7 @@ void initializeSubsystems() {
 
   // Initialize the servos subsystem.
   bb::Servos::servos.initialize();
-  BB8StatusPixels::statusPixels.linkSubsystem(&BB8Servos::servos, STATUSPIXEL_MOTORS);
+  BB8StatusPixels::statusPixels.linkSubsystem(&bb::Servos::servos, STATUSPIXEL_MOTORS);
 }
 
 void startSubsystems() {
@@ -75,7 +75,10 @@ void startSubsystems() {
   Console::console.start();
   BB8StatusPixels::statusPixels.update();
 
+  XBee::xbee.addPacketReceiver(&BB8::bb8);
   XBee::xbee.start();
+  XBee::xbee.setAPIMode(true);
+
   BB8StatusPixels::statusPixels.update();
   if (XBee::xbee.isStarted()) BB8Sound::sound.playSystem(SOUND_XBEE_OK);
   else BB8Sound::sound.playSystem(SOUND_XBEE_FAILURE);

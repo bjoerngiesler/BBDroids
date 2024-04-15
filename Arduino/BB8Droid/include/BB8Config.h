@@ -3,6 +3,12 @@
 
 #include <Arduino.h>
 #include <math.h>
+#include <LibBB.h>
+
+static const bb::DroidType DROID_TYPE = bb::DroidType::DROID_BB8;
+static const char*         DROID_NAME = "Generic BB-8";
+static const uint8_t       BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 2 - Micke, 3 - Brad
+static const uint8_t       DROID_ID = 0;
 
 // Network config
 static const uint16_t COMMAND_UDP_PORT = 2000; // BB8 listens on this port for commands (see BB8Packet.h for command structure)
@@ -52,6 +58,9 @@ const long unsigned int DYNAMIXEL_BPS = 57600;
 static const float DRIVE_SPEED_KP       = 0.075f;
 static const float DRIVE_SPEED_KI       = 0.2f;
 static const float DRIVE_SPEED_KD       = 0.0f;
+static const float BAL_KP               = 0;
+static const float BAL_KI               = 0;
+static const float BAL_KD               = 0;
 static const float DRIVE_SPEED_IMAX     = 10.0f;     // not used yet
 static const float DRIVE_SPEED_DEADBAND = 0.01f; // not used yet
 static const float DRIVE_SPEED_IABORT   = 1000.0f; // not used yet
@@ -102,5 +111,8 @@ typedef enum {
 } PlotMode;
 
 extern PlotMode plotMode;
+
+static const uint8_t IMU_ADDR           = 0x6a;
+
 
 #endif // BB8CONFIG_H

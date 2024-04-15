@@ -1,8 +1,6 @@
 #include "BB8Droid.h"
 #include "BB8Config.h"
-#include "BB8Servos.h"
 #include "BB8StatusPixels.h"
-#include "BB8IMU.h"
 #include "BB8BattStatus.h"
 #include "BB8Sound.h"
 
@@ -15,17 +13,21 @@ ServoLimits servolimits[] = {
   { 160.0f, 200.0f, 0.0f, 80.0 }
 };
 
-bb::DCMotor driveMotor(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM, P_DRIVE_EN);
-bb::DCMotor yawMotor(P_YAW_A, P_YAW_B, P_YAW_PWM, P_YAW_EN);
-
-BB8::BB8Params BB8::params_;
+BB8::BB8Params BB8::params_ = {
+  .driveSpeedKp = DRIVE_SPEED_KP, 
+  .driveSpeedKi = DRIVE_SPEED_KI,
+  .driveSpeedKd = DRIVE_SPEED_KD,
+  .balKp = BAL_KP,
+  .balKi = BAL_KI, 
+  .balKd = BAL_KD
+};
 
 BB8::BB8()
-  : rollControlInput_(BB8IMUControlInput::IMU_ROLL),
-    rollControlOutput_(BODY_ROLL_SERVO, 180.0),
-    rollController_(rollControlInput_, rollControlOutput_),
-    driveControlInput_(P_DRIVEENC_A, P_DRIVEENC_B, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
-    driveController_(driveControlInput_, driveMotor) {
+  : imu_(IMU_ADDR),
+    driveMotor_(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM, P_DRIVE_EN),
+    yawMotor_(P_YAW_A, P_YAW_B, P_YAW_PWM, P_YAW_EN),
+    driveEncoder_(P_DRIVEENC_A, P_DRIVEENC_B, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
+    driveController_(driveEncoder_, driveMotor_) {
   name_ = "bb8";
   description_ = "BB8 Main System";
   help_ = "BB8 Main System\r\n"
@@ -45,39 +47,9 @@ BB8::BB8()
   addParameter("drive_speed_ki", "Integral constant for drive speed controller", params_.driveSpeedKi);
   addParameter("drive_speed_kd", "Derivative constant for drive speed controller", params_.driveSpeedKd);
   addParameter("drive_speed_goal", "Drive speed goal", driveSpeedGoal_);
-
-  addParameter("body_roll_kp", "Proportional constant for body roll controller", params_.bodyRollKp);
-  addParameter("body_roll_ki", "Integral constant for body roll controller", params_.bodyRollKi);
-  addParameter("body_roll_kd", "Derivative constant for body roll controller", params_.bodyRollKd);
-  addParameter("body_roll_goal", "Body roll goal", bodyRollGoal_);
-
-  addParameter("dome_roll_kp", "Proportional constant for dome pitch controller", params_.domePitchKp);
-  addParameter("dome_roll_ki", "Integral constant for dome pitch controller", params_.domePitchKi);
-  addParameter("dome_roll_kd", "Derivative constant for dome pitch controller", params_.domePitchKd);
-  addParameter("dome_roll_goal", "Dome pitch goal", domePitchGoal_);
-
-  addParameter("dome_roll_kp", "Proportional constant for dome roll controller", params_.domeRollKp);
-  addParameter("dome_roll_ki", "Integral constant for dome roll controller", params_.domeRollKi);
-  addParameter("dome_roll_kd", "Derivative constant for dome roll controller", params_.domeRollKd);
-  addParameter("dome_roll_goal", "Dome roll goal", domeRollGoal_);
 }
 
 Result BB8::initialize() {
-  paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
-  if (ConfigStorage::storage.blockIsValid(paramsHandle_)) {
-    ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t *)&params_);
-  } else {
-    params_.driveSpeedKp = DRIVE_SPEED_KP;
-    params_.driveSpeedKi = DRIVE_SPEED_KI;
-    params_.driveSpeedKd = DRIVE_SPEED_KD;
-    params_.domeRollKp = 1.0;
-    params_.domeRollKi = 0.0;
-    params_.domeRollKd = 0.0;
-    params_.domePitchKp = 1.0;
-    params_.domePitchKi = 0.0;
-    params_.domePitchKd = 0.0;
-  }
-
   return Subsystem::initialize();
 }
 
@@ -91,27 +63,22 @@ Result BB8::start(ConsoleStream *stream) {
   memset((uint8_t *)&lastPacket_, 0, sizeof(lastPacket_));
   packetTimeout_ = 0;
 
-  BB8IMU::imu.begin();
+  imu_.begin();
   BB8BattStatus::batt.begin();
 
   pwmControl_ = false;
-  driveMotor.set(0.0f);
-  driveControlInput_.setMillimetersPerTick(BODY_CIRCUMFERENCE / DRIVE_MOTOR_TICKS_PER_TURN);
-  // driveControlInput_.setMaxSpeed(DRIVE_MOTOR_MAX_SPEED_M_PER_S);
-  driveMotor.setReverse(true);
-  driveMotor.setEnabled(true);
+  driveMotor_.set(0.0f);
+  driveEncoder_.setMillimetersPerTick(BODY_CIRCUMFERENCE / DRIVE_MOTOR_TICKS_PER_TURN);
+  driveMotor_.setReverse(true);
+  driveMotor_.setEnabled(true);
 
-  if (!BB8Servos::servos.isStarted()) {
-    if (BB8Servos::servos.start(stream) != RES_OK) {
+  if (!bb::Servos::servos.isStarted()) {
+    if (bb::Servos::servos.start(stream) != RES_OK) {
       return RES_SUBSYS_HW_DEPENDENCY_MISSING;
     }
   }
 
-  BB8Servos::servos.switchTorque(BB8Servos::ID_ALL, true);
-
-  rollController_.setControlParameters(params_.bodyRollKp, params_.bodyRollKi, params_.bodyRollKd);
-  //rollController_.setIBounds(-180.0, 180.0);
-  rollController_.setGoal(0.0);
+  bb::Servos::servos.switchTorque(bb::Servos::ID_ALL, true);
 
   driveController_.setControlParameters(params_.driveSpeedKp, params_.driveSpeedKi, params_.driveSpeedKd);
   //driveController_.setIBounds(-100.0, 100.0);
@@ -131,7 +98,7 @@ Result BB8::stop(ConsoleStream *stream) {
 Result BB8::step() {
   static int stepcount = 0;
 
-  BB8IMU::imu.update();
+  imu_.update();
   BB8StatusPixels::statusPixels.update();
 
   stepcount++;
@@ -144,24 +111,24 @@ Result BB8::step() {
   Result res;
   res = stepDriveMotor();
   if (res != RES_OK) {
-    Console::console.printlnBroadcast("stepDriveMotor() failed!");
+    Console::console.printfBroadcast("stepDriveMotor() failed!\n");
     return res;
   }
 
   res = stepRollMotor();
   if (res != RES_OK) {
-    Console::console.printlnBroadcast("stepDriveMotor() failed!");
+    Console::console.printfBroadcast("stepDriveMotor() failed!\n");
     return res;
   }
 //  res = stepDome();
   if (res != RES_OK) {
-    Console::console.printlnBroadcast("stepDriveMotor() failed!");
+    Console::console.printfBroadcast("stepDriveMotor() failed!\n");
     return res;
   }
 
   if (runningStatus_) {
     printCurrentSystemStatus();
-    Console::console.printBroadcast("\r");
+    Console::console.printfBroadcast("\r");
   }
 
   if (packetTimeout_ > 0) packetTimeout_--;
@@ -178,7 +145,7 @@ Result BB8::stepDriveMotor() {
     if(pwmControl_ == true) return RES_OK;
 
     driveController_.update();
-    if(fabs(driveMotor.present()) < 1.0f) numZeroFrames++;
+    if(fabs(driveMotor_.present()) < 1.0f) numZeroFrames++;
     if(numZeroFrames > 1000) driveController_.reset();
     return RES_OK;
   }
@@ -191,51 +158,6 @@ Result BB8::stepRollMotor() {
 }
 
 Result BB8::stepDome() {
-  if (mode_ == MODE_OFF) {
-    return RES_OK;
-  }
-
-  else if (mode_ == MODE_KIOSK) {
-    if (kioskDelay_ < Runloop::runloop.cycleTime()) {
-      if (random(0, 2) != 0) {
-        BB8Servos::servos.setGoal(DOME_HEADING_SERVO, (float)random(servolimits[DOME_HEADING_SERVO].min, servolimits[DOME_HEADING_SERVO].max));
-      }
-      if (random(0, 2) != 0) {
-        BB8Servos::servos.setGoal(DOME_ROLL_SERVO, (float)random(servolimits[DOME_ROLL_SERVO].min, servolimits[DOME_ROLL_SERVO].max));
-      }
-      if (random(0, 2) != 0) {
-        BB8Servos::servos.setGoal(DOME_PITCH_SERVO, (float)random(servolimits[DOME_PITCH_SERVO].min, servolimits[DOME_PITCH_SERVO].max));
-      }
-      kioskDelay_ = random(2000000, 5000000);
-    } else kioskDelay_ -= Runloop::runloop.cycleTime();
-  }
-
-  else {
-    float r, p, h, gr, gp, gh, goal;
-    BB8IMU::imu.getFilteredRPH(r, p, h);
-    BB8IMU::imu.getGyroMeasurement(gr, gp, gh);
-
-#if 0
-    goal = params_.domeRollKp * 2 * r + params_.domeRollKd * gr + 180.0;
-    if (goal < 0 || goal > 360.0) {
-      Console::console.printlnBroadcast(String("Roll out of range (") + goal + ")");
-    } else {
-      if (BB8Servos::servos.setGoal(DOME_ROLL_SERVO, goal) == false) {
-        Console::console.printlnBroadcast(String("Huh? ") + r + " " + params_.domeRollKp + " " + params_.domeRollKd + " " + r + " " + gr);
-      }
-    }
-#endif
-
-    goal = params_.domePitchKp * 2 * p + params_.domePitchKd * gr + 180.0;
-    if (goal < 0 || goal > 360.0) {
-      Console::console.printlnBroadcast(String("Pitch out of range (") + goal + ")");
-    } else {
-      if (BB8Servos::servos.setGoal(DOME_PITCH_SERVO, goal) == false) {
-        Console::console.printlnBroadcast(String("Huh? ") + goal + " " + params_.domePitchKp + " " + params_.domePitchKd + " " + p + " " + gp);
-      }
-    }
-  }
-
   return RES_OK;
 }
 
@@ -244,13 +166,12 @@ Result BB8::setMode(BB8::Mode mode) {
   mode_ = mode;
 
   if (mode_ == MODE_OFF) {
-    BB8Servos::servos.switchTorque(DOME_HEADING_SERVO, false);
-    BB8Servos::servos.switchTorque(DOME_ROLL_SERVO, false);
-    BB8Servos::servos.switchTorque(DOME_PITCH_SERVO, false);
-    BB8Servos::servos.switchTorque(BODY_ROLL_SERVO, false);
+    bb::Servos::servos.switchTorque(DOME_HEADING_SERVO, false);
+    bb::Servos::servos.switchTorque(DOME_ROLL_SERVO, false);
+    bb::Servos::servos.switchTorque(DOME_PITCH_SERVO, false);
+    bb::Servos::servos.switchTorque(BODY_ROLL_SERVO, false);
   }
 
-  rollController_.reset();
   driveController_.reset();
 
   return RES_OK;
@@ -259,94 +180,70 @@ Result BB8::setMode(BB8::Mode mode) {
 void BB8::printStatus(ConsoleStream *stream) {
   if (stream == NULL) return;
 
-  stream->print(name() + " (" + description() + "): ");
+  stream->printf("%s (%s): ", name(), description());
 
   if (isStarted()) {
-    stream->print("started, ");
+    stream->printf("started, ");
     switch (operationStatus()) {
       case RES_OK:
-        stream->print("operational");
+        stream->printf("operational");
         break;
       default:
-        stream->print("not operational: ");
-        stream->print(errorMessage(operationStatus()));
+        stream->printf("not operational: ");
+        stream->printf(errorMessage(operationStatus()));
         break;
     }
-  } else stream->print("stopped");
+  } else stream->printf("stopped");
 
   if (BB8BattStatus::batt.available(BB8BattStatus::BATT_1)) {
-    stream->print(String(", batt1: ") + BB8BattStatus::batt.voltage(BB8BattStatus::BATT_1) + "V " + BB8BattStatus::batt.current(BB8BattStatus::BATT_1) + "mA");
+    stream->printf(", batt1: %fV %fmA", BB8BattStatus::batt.voltage(BB8BattStatus::BATT_1), BB8BattStatus::batt.current(BB8BattStatus::BATT_1));
   } else {
-    stream->print(", batt1 n/a");
+    stream->printf(", batt1 n/a");
   }
 
   if (BB8BattStatus::batt.available(BB8BattStatus::BATT_2)) {
-    stream->print(String(", batt2: ") + BB8BattStatus::batt.voltage(BB8BattStatus::BATT_2) + "V " + BB8BattStatus::batt.current(BB8BattStatus::BATT_2) + "mA");
+    stream->printf(", batt2: %fV %fmA", BB8BattStatus::batt.voltage(BB8BattStatus::BATT_2), BB8BattStatus::batt.current(BB8BattStatus::BATT_2));
   } else {
-    stream->print(", batt2 n/a");
+    stream->printf(", batt2 n/a");
   }
 
-  stream->println();
+  stream->printf("\n");
 }
 
-Result BB8::incomingPacket(const Packet &packet) {
-  if (packet.source == PACKET_SOURCE_TEST_ONLY) {
-    Console::console.printlnBroadcast("Test packet received!");
+Result BB8::incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
+  if (source == PACKET_SOURCE_TEST_ONLY) {
+    Console::console.printfBroadcast("Test packet received!\n");
     return RES_OK;
   }
 
-  if (packet.type != PACKET_TYPE_COMMAND) {
-    BB8StatusPixels::statusPixels.overridePixelUntil(STATUSPIXEL_REMOTE, BB8StatusPixels::STATUS_FAIL, millis()+100);
-    return RES_SUBSYS_PROTOCOL_ERROR;
-  }
-
-  if(packet.seqnum % 2)
-    BB8StatusPixels::statusPixels.overridePixelUntil(STATUSPIXEL_REMOTE, BB8StatusPixels::STATUS_ACTIVITY, millis()+100);
-  else
-    BB8StatusPixels::statusPixels.overridePixelUntil(STATUSPIXEL_REMOTE, BB8StatusPixels::STATUS_OK, millis()+100);
-
-  packetsReceived_++;
-  if (packet.seqnum != (lastPacket_.seqnum + 1) % MAX_SEQUENCE_NUMBER) packetsMissed_++;  // FIXME not correct - should count based on seqnum
-
-  float bodyRollInput = packet.payload.cmd.getAxis(0);
-  float velInput = packet.payload.cmd.getAxis(1);
-  float domeRollInput = packet.payload.cmd.getAxis(2);
-  float domePitchInput = packet.payload.cmd.getAxis(3);
-  float domeHeadingInput = packet.payload.cmd.getAxis(4);
+  float bodyRollInput = packet.getAxis(0);
+  float velInput = packet.getAxis(1);
+  float domeRollInput = packet.getAxis(2);
+  float domePitchInput = packet.getAxis(3);
+  float domeHeadingInput = packet.getAxis(4);
   
-  if(packet.payload.cmd.button1) {    
+  if(packet.button1) {    
     float vel = (DRIVE_SPEED_MAX * velInput / AXIS_MAX);  // magic
-    driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
-    Serial.println(String("Setting controller to ") + vel);
+    driveEncoder_.setMode(bb::Encoder::INPUT_SPEED);
     driveController_.setGoal(vel);
 
     float roll;
     if(BODY_ROLL_SERVO_REVERSE) roll = 180.0 - (bodyRollInput * 20.0) / AXIS_MAX;
     else roll = 180.0 + (bodyRollInput * 20.0) / AXIS_MAX;
-    BB8Servos::servos.setGoal(BODY_ROLL_SERVO, roll);
+    bb::Servos::servos.setGoal(BODY_ROLL_SERVO, roll);
   } 
-#if 0 // Untested - right now it will go to zero goal at centered joystick position. Needs to pick up actual position as a start point.
-  else if(packet.payload.cmd.button0) {
-    float pos = (800.0 * axis1 / AXIS_MAX);  // magic -- yeah same as above, I know
-    driveControlInput_.setMode(bb::Encoder::INPUT_POSITION);
-    driveController_.setGoal(pos);
-
-    float roll = 180.0 - (axis0 * 20.0) / AXIS_MAX;
-    BB8Servos::servos.setGoal(BODY_ROLL_SERVO, roll);
-  } 
-#endif
   else {
-    driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
+    driveEncoder_.setMode(bb::Encoder::INPUT_SPEED);
     driveController_.setGoal(0.0f);
-    BB8Servos::servos.setGoal(BODY_ROLL_SERVO, 180.0);
+    bb::Servos::servos.setGoal(BODY_ROLL_SERVO, 180.0);
   }
 
   float r, p, h;
-  BB8IMU::imu.getFilteredRPH(r, p, h);
+  imu_.getFilteredRPH(r, p, h);
   static float domeRollZero = 0, domePitchZero = 0, domeHeadingZero = 0;
 
-  if(packet.payload.cmd.button2) {
-    if(!lastPacket_.payload.cmd.button2) { // fresh press - use current values as zero
+  if(packet.button2) {
+    if(!lastPacket_.button2) { // fresh press - use current values as zero
       domeRollZero = domeRollInput;
       domePitchZero = domePitchInput;
       domeHeadingZero = domeHeadingInput;
@@ -355,27 +252,26 @@ Result BB8::incomingPacket(const Packet &packet) {
     domePitchInput -= domePitchZero;
     domeHeadingInput -= domeHeadingZero;
 
-    //Console::console.printlnBroadcast(String("roll: ") + domeRollInput + " pitch:" + domePitchInput + " heading:" + domeHeadingInput);
     
-    if(DOME_ROLL_SERVO_REVERSE) domeRollInput = 180.0 - ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0));
-    else domeRollInput = 180.0 + ((domeRollInput*30.0)*4/AXIS_MAX - 2*(BB8Servos::servos.present(BODY_ROLL_SERVO)-180.0));
+    if(DOME_ROLL_SERVO_REVERSE) domeRollInput = 180.0 - ((domeRollInput*30.0)*4/AXIS_MAX - 2*(bb::Servos::servos.present(BODY_ROLL_SERVO)-180.0));
+    else domeRollInput = 180.0 + ((domeRollInput*30.0)*4/AXIS_MAX - 2*(bb::Servos::servos.present(BODY_ROLL_SERVO)-180.0));
     if(DOME_PITCH_SERVO_REVERSE) domePitchInput = 180.0 - ((domePitchInput*30.0)*4/AXIS_MAX);
     else domePitchInput = 180.0 + ((domePitchInput*30.0)*4/AXIS_MAX);
     if(DOME_HEADING_SERVO_REVERSE) domeHeadingInput = 180.0 - ((domeHeadingInput*30.0)*4/AXIS_MAX);
     else domeHeadingInput = 180.0 + ((domeHeadingInput*30.0)*4/AXIS_MAX);
       
-    BB8Servos::servos.setGoal(DOME_ROLL_SERVO, domeRollInput);
-    BB8Servos::servos.setGoal(DOME_PITCH_SERVO, domePitchInput);
-    BB8Servos::servos.setGoal(DOME_HEADING_SERVO, domeHeadingInput);
+    bb::Servos::servos.setGoal(DOME_ROLL_SERVO, domeRollInput);
+    bb::Servos::servos.setGoal(DOME_PITCH_SERVO, domePitchInput);
+    bb::Servos::servos.setGoal(DOME_HEADING_SERVO, domeHeadingInput);
   } else {
-    BB8Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0);
-    BB8Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0);
-    BB8Servos::servos.setGoal(DOME_HEADING_SERVO, 180.0);
+    bb::Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0);
+    bb::Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0);
+    bb::Servos::servos.setGoal(DOME_HEADING_SERVO, 180.0);
   }
 
-  BB8Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, DOME_MAX_VELOCITY);
-  BB8Servos::servos.setProfileVelocity(DOME_PITCH_SERVO, DOME_MAX_VELOCITY);
-  BB8Servos::servos.setProfileVelocity(DOME_HEADING_SERVO, DOME_MAX_VELOCITY);
+  bb::Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, DOME_MAX_VELOCITY);
+  bb::Servos::servos.setProfileVelocity(DOME_PITCH_SERVO, DOME_MAX_VELOCITY);
+  bb::Servos::servos.setProfileVelocity(DOME_HEADING_SERVO, DOME_MAX_VELOCITY);
 
   packetTimeout_ = 3;
   lastPacket_ = packet;
@@ -389,7 +285,7 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
   if (words[0] == "status") {
     if (words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
     printStatus(stream);
-    stream->println();
+    stream->printf("\n");
     return RES_OK;
   }
 
@@ -414,7 +310,7 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
   }
 
   else if (words[0] == "calibrate") {
-    BB8IMU::imu.calibrateGyro(stream);
+    imu_.calibrateGyro(stream);
   }
 
   else if (words[0] == "drive") {
@@ -422,18 +318,18 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
 
     if (words[1] == "pwm") {
       pwmControl_ = true;
-      driveMotor.set(words[2].toFloat());
-      driveMotor.setEnabled(true);
+      driveMotor_.set(words[2].toFloat());
+      driveMotor_.setEnabled(true);
       return RES_OK;
     } else if (words[1] == "position") {
       pwmControl_ = false;
-      driveControlInput_.setMode(bb::Encoder::INPUT_POSITION);
+      driveEncoder_.setMode(bb::Encoder::INPUT_POSITION);
       driveController_.setGoal(words[2].toFloat());
-      driveMotor.setEnabled(true);
+      driveMotor_.setEnabled(true);
       return RES_OK;
     } else if (words[1] == "speed") {
       pwmControl_ = false;
-      driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
+      driveEncoder_.setMode(bb::Encoder::INPUT_SPEED);
       driveController_.setGoal(words[2].toFloat());
       return RES_OK;
     } else return RES_CMD_INVALID_ARGUMENT;
@@ -443,28 +339,28 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
     if (words.size() == 1) {
       switch (mode_) {
         case MODE_OFF:
-          if (stream) stream->println("off");
+          if (stream) stream->printf("off\n");
           break;
         case MODE_ROLL_CONTROL_ONLY:
-          if (stream) stream->println("roll");
+          if (stream) stream->printf("roll\n");
           break;
         case MODE_SPEED_CONTROL_ONLY:
-          if (stream) stream->println("speed");
+          if (stream) stream->printf("speed\n");
           break;
         case MODE_SPEED_ROLL_CONTROL:
-          if (stream) stream->println("speed_roll");
+          if (stream) stream->printf("speed_roll\n");
           break;
         case MODE_POS_CONTROL:
-          if (stream) stream->println("pos");
+          if (stream) stream->printf("pos\n");
           break;
         case MODE_KIOSK:
-          if (stream) stream->println("kiosk");
+          if (stream) stream->printf("kiosk\n");
           break;
         case MODE_CALIB:
-          if (stream) stream->println("calib");
+          if (stream) stream->printf("calib\n");
           break;
         default:
-          if (stream) stream->println("unknown");
+          if (stream) stream->printf("unknown\n");
           break;
       }
     } else if (words.size() == 2) {
@@ -511,7 +407,7 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
     for(uint addr=0x8; addr<=0x77; addr++) {
       Wire.beginTransmission(addr);
       uint8_t result = Wire.endTransmission();
-      if(result == 0) stream->println(String("Found device at ") + String(addr, HEX));
+      if(result == 0) stream->printf("Found device at 0x%x\n", addr);
     }
     return RES_OK;
   }
@@ -520,7 +416,7 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
 }
 
 Result BB8::fillAndSendStatusPacket() {
-  LargeStatusPacket p;
+  bb::LargeStatePacket p;
 
   p.timestamp = Runloop::runloop.millisSinceStart() / 1000.0;
   p.droidType = DroidType::DROID_BB8;
@@ -528,10 +424,10 @@ Result BB8::fillAndSendStatusPacket() {
   float err, errI, errD, control;
 
   p.drive[0].errorState = ERROR_OK;
-  p.drive[0].controlMode = driveControlInput_.mode();
-  p.drive[0].presentPWM = driveMotor.present();
-  p.drive[0].presentPos = driveControlInput_.presentPosition();
-  p.drive[0].presentSpeed = driveControlInput_.presentSpeed();
+  p.drive[0].controlMode = driveEncoder_.mode();
+  p.drive[0].presentPWM = driveMotor_.present();
+  p.drive[0].presentPos = driveEncoder_.presentPosition();
+  p.drive[0].presentSpeed = driveEncoder_.presentSpeed();
   driveController_.getControlState(err, errI, errD, control);
   p.drive[0].err = err;
   p.drive[0].errI = errI;
@@ -541,7 +437,7 @@ Result BB8::fillAndSendStatusPacket() {
   p.drive[1].errorState = ERROR_NOT_PRESENT;  // Not quite true, but we have no encoder info for this motor.
   p.drive[2].errorState = ERROR_NOT_PRESENT;
 
-  p.imu[0] = BB8IMU::imu.getIMUState();
+  p.imu[0] = imu_.getIMUState();
   p.imu[1].errorState = ERROR_NOT_PRESENT;
   p.imu[2].errorState = ERROR_NOT_PRESENT;
 
@@ -560,11 +456,7 @@ void BB8::parameterChangedCallback(const String &name) {
     driveController_.setControlParameters(params_.driveSpeedKp, params_.driveSpeedKi, params_.driveSpeedKd);
   } else if (name == "drive_speed_goal") {
     driveController_.setGoal(driveSpeedGoal_);
-    driveControlInput_.setMode(bb::Encoder::INPUT_SPEED);
-  } else if (name == "body_roll_kp" || name == "body_roll_ki" || name == "body_roll_kd") {
-    rollController_.setControlParameters(params_.driveSpeedKp, params_.driveSpeedKi, params_.driveSpeedKd);
-  } else if (name == "body_roll_goal") {
-    rollController_.setGoal(bodyRollGoal_);
+    driveEncoder_.setMode(bb::Encoder::INPUT_SPEED);
   }
 
   if (res == RES_OK) ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t *)&params_);
@@ -573,22 +465,21 @@ void BB8::parameterChangedCallback(const String &name) {
 
 void BB8::printCurrentSystemStatus(ConsoleStream *stream) {
   float r, p, h;
-  BB8IMU::imu.getFilteredRPH(r, p, h);
-  String str = String("Received: ") + packetsReceived_ + " Missed: " + packetsMissed_ + " Seq: " + lastPacket_.seqnum;
-  str += " Buttons: ";
-  lastPacket_.payload.cmd.button0 ? str += 'X' : str += '_';
-  lastPacket_.payload.cmd.button1 ? str += 'X' : str += '_';
-  lastPacket_.payload.cmd.button2 ? str += 'X' : str += '_';
-  lastPacket_.payload.cmd.button3 ? str += 'X' : str += '_';
-  lastPacket_.payload.cmd.button4 ? str += 'X' : str += '_';
+  imu_.getFilteredRPH(r, p, h);
+  String str = "Buttons: ";
+  lastPacket_.button0 ? str += 'X' : str += '_';
+  lastPacket_.button1 ? str += 'X' : str += '_';
+  lastPacket_.button2 ? str += 'X' : str += '_';
+  lastPacket_.button3 ? str += 'X' : str += '_';
+  lastPacket_.button4 ? str += 'X' : str += '_';
   str += " Axes: ";
   for (int i = 0; i < 5; i++) {
-    str += lastPacket_.payload.cmd.getAxis(i);
+    str += lastPacket_.getAxis(i);
     str += " ";
   }
 
   str += String("Gyro: R") + r + " P" + p + " H" + h;
 
-  if (stream != NULL) stream->println(str);
-  else Console::console.printlnBroadcast(str);
+  if (stream != NULL) stream->printf("%s\n", str.c_str());
+  else Console::console.printfBroadcast("%s\n", str.c_str());
 }
