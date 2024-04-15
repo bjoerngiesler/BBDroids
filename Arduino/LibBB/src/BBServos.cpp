@@ -539,7 +539,7 @@ bool bb::Servos::setGoal(uint8_t id, float goal, ValueType t) {
   Servo *s = servoWithID(id);
   if (s == NULL) return false;
   uint32_t g = computeRawValue(goal, t) + s->offset; // FIXME - s->offset can be negative, is this safe?
-  s->goal = constrain(g, s->min, s->max);          
+  s->goal = constrain(g, s->min, s->max);
   swGoalInfos.is_info_changed = true;
 
   return true;
