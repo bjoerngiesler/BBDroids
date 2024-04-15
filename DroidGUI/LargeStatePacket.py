@@ -16,12 +16,12 @@ class IMUState:
 	def numValues(cls):
 		return 10
 class CommandPacket:
-	PACK_FORMAT = "8B"
+	PACK_FORMAT = "7B"
 	def __init__(self, t):
 		self.t = t # FIXME later
 	@classmethod
 	def numValues(cls):
-		return 8
+		return 7
 class ServoState:
 	PACK_FORMAT = "B3f"
 	def __init__(self, t):
