@@ -12,12 +12,15 @@ bb::PIDController::PIDController(ControlInput& input, ControlOutput& output):
   debug_(false),
   inputScale_(1.0),
   reverse_(false),
-  ramp_(0.0) {
+  ramp_(0.0),
+  differentialFilter_(5.0, 100) {
   setControlParameters(0.0f, 0.0f, 0.0f);
   setIUnbounded();
   setControlUnbounded();
   setGoal(input_.present());
   deadbandMin_ = deadbandMax_ = 0;
+  errDeadbandMin_ = errDeadbandMax_ = 0;
+  controlOffset_ = 0;
 
   reset();
 }
@@ -63,6 +66,7 @@ void bb::PIDController::update(void) {
   } else {
     err = curSetpoint_ - input_.present()*inputScale_;
   } 
+  if(err > errDeadbandMin_ && err < errDeadbandMax_) err = 0;
 
   errI_ += err * dt;
   if(iBounded_) {
@@ -71,8 +75,9 @@ void bb::PIDController::update(void) {
 
   lastErrD_ = (err - lastErr_)/dt;
   lastErr_ = err;
+  lastErrDFiltered_ = differentialFilter_.filter(lastErrD_);
 
-  lastControl_ = kp_ * lastErr_ + ki_ * errI_ + kd_ * lastErrD_;
+  lastControl_ = kp_ * lastErr_ + ki_ * errI_ + kd_ * lastErrDFiltered_;
   lastControl_ *= input_.controlGain();
 
   if(controlBounded_) {
@@ -80,14 +85,14 @@ void bb::PIDController::update(void) {
   }
 
   if(lastControl_ > deadbandMin_ && lastControl_ < deadbandMax_) {
-    setControlOutput(0);
+    setControlOutput(controlOffset_);
   } else if(reverse_) {
-    setControlOutput(-lastControl_);
+    setControlOutput(-(lastControl_ + controlOffset_));
   } else {
-    setControlOutput(lastControl_);
+    setControlOutput(lastControl_ + controlOffset_);
   }
   if(debug_)
-    Console::console.printfBroadcast("Control: SP: %f Cur In: %f Cur Out: %f Err: %f errI: %f errD: %f Control: %f\n", curSetpoint_, input_.present(), output_.present(), err, errI_, lastErrD_, lastControl_);
+    Console::console.printfBroadcast("Control: SP: %f Cur In: %f Cur Out: %f Err: %f errI: %f errD: %f Control: %f\n", curSetpoint_, input_.present(), output_.present(), err, errI_, lastErrDFiltered_, lastControl_);
 }
   
 void bb::PIDController::setGoal(const float& sp) {
@@ -114,7 +119,7 @@ void bb::PIDController::getControlParameters(float& kp, float& ki, float& kd) {
 void bb::PIDController::getControlState(float& err, float& errI, float& errD, float& control) {
   err = lastErr_;
   errI = errI_;
-  errD = lastErrD_;
+  errD = lastErrDFiltered_;
   control = lastControl_;
 }
 
@@ -149,3 +154,9 @@ bool bb::PIDController::isControlBounded() {
 void bb::PIDController::setControlDeadband (float deadbandMin, float deadbandMax) {
   deadbandMin_ = deadbandMin; deadbandMax_ = deadbandMax;
 }
+
+void bb::PIDController::setErrorDeadband(float errDeadbandMin, float errDeadbandMax) {
+  errDeadbandMin_ = errDeadbandMin; 
+  errDeadbandMax_ = errDeadbandMax;
+}
+

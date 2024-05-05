@@ -19,6 +19,7 @@ public:
     float faNeckAccel, faNeckSpeed;
     float faHeadRollTurn, faHeadHeadingTurn;
     float faAntennaSpeed;
+    float annealHeadTime;
   };
   static Params params_;
 
@@ -79,6 +80,9 @@ protected:
   bool driveOn_;
   bool servosOK_, antennasOK_;
   bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
+  float remoteP_, remoteH_, remoteR_;
+  float remoteP0_, remoteH0_, remoteR0_;
+  float annealP_, annealH_, annealR_;
 };
 
 #endif

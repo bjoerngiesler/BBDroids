@@ -9,6 +9,7 @@ DODriveControlOutput::DODriveControlOutput(bb::ControlOutput& left, bb::ControlO
     curRot_ = 0;
     accel_ = 0;
     useControlInput_ = true;
+    maxSpeed_ = 0;
     lastCycleUS_ = micros();
 }
 
@@ -39,8 +40,16 @@ bb::Result DODriveControlOutput::set(float value) {
     if(curRot_ < goalRot_) curRot_ = goalRot_;
   }
 
-  resLeft = left_.set(curVel_ + curRot_ - value);
-  resRight = right_.set(curVel_ - curRot_ - value);
+  float leftGoal = curVel_ + curRot_ - value;
+  float rightGoal = curVel_ - curRot_ - value;
+  if(!EPSILON(maxSpeed_)) {
+    leftGoal = constrain(leftGoal, -maxSpeed_, maxSpeed_);
+    rightGoal = constrain(rightGoal, -maxSpeed_, maxSpeed_);
+  }
+
+  //Console::console.printfBroadcast("Set goal L%f R%f\n", leftGoal, rightGoal);
+  resLeft = left_.set(leftGoal);
+  resRight = right_.set(rightGoal);
 
   if(resLeft != RES_OK) return resLeft;
   if(resRight != RES_OK) return resRight;

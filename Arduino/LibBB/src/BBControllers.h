@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <BBError.h>
+#include <BBLowPassFilter.h>
 
 namespace bb {
 
@@ -45,6 +46,8 @@ public:
   void setControlParameters(const float& kp, const float& ki, const float& kd);
   void getControlParameters(float& kp, float& ki, float& kd);
   void getControlState(float& err, float& errI, float& errD, float& control);
+  void setControlOffset(float offset) { controlOffset_ = offset; }
+  float controlOffset() { return controlOffset_; }
 
   void setIBounds(float iMin, float iMax);
   void setIUnbounded();
@@ -54,7 +57,8 @@ public:
   void setControlUnbounded();
   bool isControlBounded();
 
-  void setControlDeadband (float deadbandMin, float deadbandMax);
+  void setControlDeadband(float deadbandMin, float deadbandMax);
+  void setErrorDeadband(float errDeadbandMin, float errDeadbandMax);
 
   void setInputScaleFactor(float inputScale) { inputScale_ = inputScale; }
   float inputScaleFactor() { return inputScale_; }
@@ -76,12 +80,15 @@ protected:
   bool reverse_;
 
   float kp_, ki_, kd_;
-  float lastErr_, errI_, lastErrD_, lastControl_;
+  float lastErr_, errI_, lastErrD_, lastErrDFiltered_, lastControl_;
   float iMin_, iMax_; bool iBounded_;
   float controlMin_, controlMax_; bool controlBounded_;
   float deadbandMin_, deadbandMax_;
+  float errDeadbandMin_, errDeadbandMax_;
   float goal_, ramp_, curSetpoint_;
   unsigned long lastCycleUS_;
+  float controlOffset_;
+  bb::LowPassFilter differentialFilter_;
 };
 
 

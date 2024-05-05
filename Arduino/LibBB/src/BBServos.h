@@ -43,6 +43,9 @@ public:
 
   void printStatus(ConsoleStream* stream, int id);
 
+  void setTorqueOffOnStop(bool yesno) { torqueOffOnStop_ = yesno; }
+  bool torqueOffOnStop() { return torqueOffOnStop_; }
+
   bool hasServoWithID(uint8_t id);
   bool setRange(uint8_t id, float min, float max, ValueType t=VALUE_DEGREE);
   bool setOffset(uint8_t id, float offset, ValueType t=VALUE_DEGREE);
@@ -58,6 +61,11 @@ public:
   uint8_t errorStatus(uint8_t id);
   bool loadShutdownEnabled(uint8_t id);
   void setLoadShutdownEnabled(uint8_t id, bool yesno);
+
+  // call this with 0 to switch compliant mode off
+  bool setCompliantMode(uint8_t id, uint8_t maxCurrentPercent);
+
+  bool setPIDValues(uint8_t id, uint16_t kp, uint16_t ki, uint16_t kd);
   
   Result switchTorque(uint8_t id, bool onoff);
   bool isTorqueOn(uint8_t id);
@@ -86,6 +94,7 @@ protected:
   DYNAMIXEL::ControlTableItemInfo_t ctrlPresentPos_, ctrlGoalPos_, ctrlProfileVel_, ctrlPresentLoad_;
   static const uint16_t userPktBufCap = 128;
   uint8_t userPktBufPresent[userPktBufCap], userPktBufLoad[userPktBufCap];
+  bool torqueOffOnStop_;
 
   typedef struct {
     int32_t presentPos;

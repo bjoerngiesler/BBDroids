@@ -22,7 +22,8 @@ DODroid::Params DODroid::params_ = {
   .faNeckSpeed = FA_NECK_SPEED,
   .faHeadRollTurn = FA_HEAD_ROLL_TURN,
   .faHeadHeadingTurn = FA_HEAD_HEADING_TURN,
-  .faAntennaSpeed = FA_ANTENNA_SPEED
+  .faAntennaSpeed = FA_ANTENNA_SPEED,
+  .annealHeadTime = ANNEAL_HEAD_TIME
 };
 
 DODroid::DODroid():
@@ -84,6 +85,7 @@ Result DODroid::initialize() {
 
   balanceController_.setAutoUpdate(false);
   balanceController_.setReverse(true);
+  //balanceController_.setDebug(true);
 
   pwmBalanceController_.setAutoUpdate(false);
   pwmBalanceController_.setReverse(true);
@@ -118,6 +120,8 @@ Result DODroid::start(ConsoleStream* stream) {
 
   setControlParameters();
 
+  annealH_ = annealP_ = annealR_ = 0;
+
   started_ = true;
   operationStatus_ = RES_OK;
   return operationStatus_;
@@ -141,13 +145,17 @@ void DODroid::setControlParameters() {
 
   lSpeedController_.setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
   rSpeedController_.setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
+  lSpeedController_.setIBounds(-WHEEL_SPEED_IMAX, WHEEL_SPEED_IMAX);
+  rSpeedController_.setIBounds(-WHEEL_SPEED_IMAX, WHEEL_SPEED_IMAX);
   lSpeedController_.reset();
   rSpeedController_.reset();
 
   balanceController_.setControlParameters(params_.balKp, params_.balKi, params_.balKd);
   balanceController_.setRamp(0);
+  balanceController_.setErrorDeadband(-1.0, 1.0);
   balanceController_.reset();
   driveOutput_.setAcceleration(params_.accel);
+  driveOutput_.setMaxSpeed(params_.maxSpeed);
 
   pwmBalanceController_.setControlParameters(params_.pwmBalKp, params_.pwmBalKi, params_.pwmBalKd);
   pwmBalanceController_.setRamp(0);
@@ -165,6 +173,8 @@ Result DODroid::step() {
     stepPowerProtect();
   }
 
+  Runloop::runloop.excuseOverrun();
+
   // needed for everything, so we do these here.
   leftEncoder_.update();  
   rightEncoder_.update();  
@@ -174,6 +184,7 @@ Result DODroid::step() {
   stepDrive();
 
   fillAndSendStatePacket();
+
   return RES_OK;
 }
 
@@ -208,13 +219,41 @@ bb::Result DODroid::stepHead() {
     // float nod = p + params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
     float nod = params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
     bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
-    bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 - nod);
+    bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 - nod - remoteP_);
     
-    bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh);
-    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 + params_.faHeadRollTurn * dh);
+    bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh - remoteH_);
+    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 + params_.faHeadRollTurn * dh + remoteR_);
 
-    float ant = 127 + speed*FA_ANTENNA_SPEED;
+    float ant = 127 + FA_ANTENNA_BIAS + speed*FA_ANTENNA_SPEED;
+    ant = constrain(ant, 0, 255);
     setAntennas(ant, ant, ant);
+  }
+
+
+  if(lastBtn0_ == false) {
+    if(remoteP_ > 0.5) {
+      remoteP_ -= annealP_;
+      if(remoteP_ < 0) remoteP_ = 0;
+    } else if(remoteP_ < -0.5) {
+      remoteP_ += annealP_;
+      if(remoteP_ > 0) remoteP_ = 0;
+    } else remoteP_ = 0;
+
+    if(remoteH_ > 0.5) {
+      remoteH_ -= annealH_;
+      if(remoteH_ < 0) remoteH_ = 0;
+    } else if(remoteH_ < -0.5) {
+      remoteH_ += annealH_;
+      if(remoteH_ > 0) remoteH_ = 0;
+    } else remoteH_ = 0;
+
+    if(remoteR_ > 0.5) {
+      remoteR_ -= annealR_;
+      if(remoteR_ < 0) remoteR_ = 0;
+    } else if(remoteR_ < -0.5) {
+      remoteR_ += annealR_;
+      if(remoteR_ > 0) remoteR_ = 0;
+    } else remoteR_ = 0;
   }
   
   return RES_OK;
@@ -302,6 +341,30 @@ Result DODroid::incomingControlPacket(uint16_t station, PacketSource source, uin
       }
     }
 
+    if(packet.button0 && !lastBtn0_) {
+      remoteR0_ = packet.getAxis(2)*180.0;
+      remoteP0_ = packet.getAxis(3)*180.0;
+      remoteH0_ = packet.getAxis(4)*180.0;
+      remoteR_ = 0;
+      remoteP_ = 0;
+      remoteH_ = 0;
+      //Console::console.printfBroadcast("Init - %f %f %f\n", remoteP_, remoteR_, remoteH_);
+    } else if(packet.button0) {
+      remoteR_ = packet.getAxis(2)*180.0 - remoteR0_;
+      remoteP_ = packet.getAxis(3)*180.0 - remoteP0_;
+      remoteH_ = packet.getAxis(4)*180.0 - remoteH0_;
+      if(remoteH_ > 180.0) remoteH_ -= 360.0;
+      else if(remoteH_ < -180.0) remoteH_ += 360.0;
+      annealR_ = fabs(remoteR_ / (params_.annealHeadTime / bb::Runloop::runloop.cycleTimeSeconds()));
+      annealP_ = fabs(remoteP_ / (params_.annealHeadTime / bb::Runloop::runloop.cycleTimeSeconds()));
+      annealH_ = fabs(remoteH_ / (params_.annealHeadTime / bb::Runloop::runloop.cycleTimeSeconds()));
+      //Console::console.printfBroadcast("%f %f %f\n", remoteH_, remoteH0_, packet.getAxis(4));
+    }
+
+    if(packet.button1 && !lastBtn1_) DOSound::sound.playFolderRandom(2, false);
+    else if(packet.button2 && !lastBtn2_) DOSound::sound.playFolderRandom(3, false);
+    else if(packet.button3 && !lastBtn3_) DOSound::sound.playFolderRandom(4, false);
+
     lastBtn0_ = packet.button0;
     lastBtn1_ = packet.button1;
     lastBtn2_ = packet.button2;
@@ -319,10 +382,12 @@ Result DODroid::incomingControlPacket(uint16_t station, PacketSource source, uin
         if(numZero > 5) {
           balanceController_.reset();
         }
+        //Console::console.printfBroadcast("Setting goal vel to %f\n", params_.maxSpeed*packet.getAxis(1));
         driveOutput_.setGoalVelocity(params_.maxSpeed*packet.getAxis(1));
-        driveOutput_.setGoalRotation(params_.maxSpeed*packet.getAxis(0));
+        driveOutput_.setGoalRotation(params_.maxSpeed*packet.getAxis(0)/2);
       }
     }
+
   } // right remote
   return RES_OK;
 }
@@ -374,7 +439,9 @@ Result DODroid::fillAndSendStatePacket() {
   LargeStatePacket p;
   memset(&p, 0, sizeof(LargeStatePacket));
 
-  if((Runloop::runloop.getSequenceNumber() % 4) != 0) return RES_OK;
+  if((Runloop::runloop.getSequenceNumber() % 5) != 0) return RES_OK;
+
+  Runloop::runloop.excuseOverrun(); // not nice but sending the UDP packet takes about 3ms
 
   p.timestamp = Runloop::runloop.millisSinceStart() / 1000.0;
   p.droidType = DroidType::DROID_DO;
@@ -391,11 +458,13 @@ Result DODroid::fillAndSendStatePacket() {
       p.drive[0].presentPos = pwmDriveOutput_.present();
       p.drive[0].presentSpeed = pwmDriveOutput_.present();
       pwmBalanceController_.getControlState(err, errI, errD, control);
+      p.drive[0].goal = pwmBalanceController_.goal();
     } else {
       p.drive[0].presentPWM = balanceController_.present();
       p.drive[0].presentPos = leftEncoder_.presentPosition();
       p.drive[0].presentSpeed = leftEncoder_.presentSpeed();
       balanceController_.getControlState(err, errI, errD, control);
+      p.drive[0].goal = balanceController_.goal();
     }
 
     p.drive[0].err = err;
@@ -411,6 +480,7 @@ Result DODroid::fillAndSendStatePacket() {
     p.drive[1].presentPos = leftEncoder_.presentPosition();
     p.drive[1].presentSpeed = leftEncoder_.presentSpeed();
     lSpeedController_.getControlState(err, errI, errD, control);
+    p.drive[1].goal = lSpeedController_.goal();
     p.drive[1].err = err;
     p.drive[1].errI = errI;
     p.drive[1].errD = errD;
@@ -426,6 +496,7 @@ Result DODroid::fillAndSendStatePacket() {
     p.drive[2].presentPos = rightEncoder_.presentPosition();
     p.drive[2].presentSpeed = rightEncoder_.presentSpeed();
     rSpeedController_.getControlState(err, errI, errD, control);
+    p.drive[2].goal = rSpeedController_.goal();
     p.drive[2].err = err;
     p.drive[2].errI = errI;
     p.drive[2].errD = errD;

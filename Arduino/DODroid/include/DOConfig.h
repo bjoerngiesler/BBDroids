@@ -15,7 +15,7 @@ static const float         WHEEL_DISTANCE = 95.0;
 
 // Motion Limits
 static const float NECK_RANGE          = 30.0;
-static const float NECK_OFFSET         = -5.0;
+static const float NECK_OFFSET         = 7.0;
 static const float HEAD_PITCH_RANGE    = 45.0;
 static const float HEAD_PITCH_OFFSET   = 0.0;
 static const float HEAD_HEADING_RANGE  = 90.0;
@@ -33,6 +33,7 @@ static const float POWER_BATT_MAX  = 16.0; // Maximum voltage - above this, we'r
 static const float WHEEL_SPEED_KP   = 0.1;
 static const float WHEEL_SPEED_KI   = 0.8;
 static const float WHEEL_SPEED_KD   = 0;
+static const float WHEEL_SPEED_IMAX = 300;
 
 static const float BAL_KP = 22;
 static const float BAL_KI = 0;
@@ -42,7 +43,7 @@ static const float PWM_BAL_KP = 0;
 static const float PWM_BAL_KI = 0;
 static const float PWM_BAL_KD = 0;
 
-static const float MAX_SPEED  = 820;
+static const float MAX_SPEED  = 600;
 static const float ACCEL      = MAX_SPEED*2;
 static const float PWM_ACCEL  = 0; //512;
 
@@ -54,11 +55,14 @@ static const float BAL_SPEED_REMOTE_FACTOR = MAX_SPEED;
 static const float BAL_ROT_REMOTE_FACTOR = MAX_SPEED/2.0;
 
 // Free Anim Weights
-static const float FA_NECK_ACCEL        = 0;    // Turn this up to move the neck with the droid's absolute acceleration
+static const float FA_NECK_ACCEL        = -25;  // Turn this up to move the neck with the droid's absolute acceleration
 static const float FA_NECK_SPEED        = -.04; // Turn this up to move the neck with the droid's speed over ground
 static const float FA_HEAD_ROLL_TURN    = .15;    // Turn this up to roll the head with the droid's turn speed ("lean into" the turn)
-static const float FA_HEAD_HEADING_TURN = .3;    // Turn this up to change head heading with the droid's turn speed ("look into" the turn)
-static const float FA_ANTENNA_SPEED     = .1;
+static const float FA_HEAD_HEADING_TURN = .2;    // Turn this up to change head heading with the droid's turn speed ("look into" the turn)
+static const float FA_ANTENNA_SPEED     = .2;
+static const float FA_ANTENNA_BIAS      = -70;
+
+static const float ANNEAL_HEAD_TIME     = 0.5;
 
 // Selftest Constants
 static const float ST_MIN_PWM              = 40.0;

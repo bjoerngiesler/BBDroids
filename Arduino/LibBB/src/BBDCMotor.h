@@ -32,6 +32,7 @@ public:
   // Negative numbers run the motor backward. 
   // Between (-1..1) the motor will idle.
   virtual Result set(float speed);
+  virtual Result brake(float force=10.0);
   virtual float present() { return speed_; }
   virtual void setEnabled(bool en);
   virtual bool isEnabled() { return en_; }

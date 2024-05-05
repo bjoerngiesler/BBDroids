@@ -25,6 +25,7 @@ public:
   bool begin(Uart *ser);
   bool available() { return available_; }
   bool playFolder(int folderNumber, int fileNumber, bool block = true);
+  bool playFolderRandom(int foldernumber, bool block = true);
   bool playSystemSound(int snd, bool block = true) { return playFolder(1, (int)snd, block); }
   bool setVolume(uint8_t vol);
 

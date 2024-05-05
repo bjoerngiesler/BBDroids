@@ -48,6 +48,7 @@ void initializeSubsystems() {
   XBee::xbee.setName(DROID_NAME);
   Servos::servos.initialize();
   Servos::servos.setRequiredIds(std::vector<uint8_t>{SERVO_NECK}); // Rest of the head servos may be disconnected
+  Servos::servos.setTorqueOffOnStop(false); // because this can crash the head
   DODroid::droid.initialize();
 }
 
@@ -70,9 +71,9 @@ void setup() {
   Wire.begin();
 
   setupBoardComm();
-
+  
   DOSound::sound.begin(dfplayerSerial);
-  DOSound::sound.setVolume(50);
+  DOSound::sound.setVolume(100);
   DOSound::sound.playSystemSound(1);
 
   initializeSubsystems();

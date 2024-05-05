@@ -35,12 +35,12 @@ bb::ServoControlOutput::ServoControlOutput(uint8_t sn, float offset) {
 }
 
 bb::Result bb::ServoControlOutput::set(float value) {
-  if(Servos::servos.setGoal(sn_, value) == true) return RES_OK;
+  if(Servos::servos.setGoal(sn_, value+offset_) == true) return RES_OK;
   return RES_CMD_FAILURE;
 }
 
 float bb::ServoControlOutput::present() {
-  return Servos::servos.present(sn_);
+  return Servos::servos.present(sn_)-offset_;
 }
 
 bb::Servos::Servos() {
@@ -58,6 +58,7 @@ Result bb::Servos::initialize() {
           "\ttorque <servo>|all on|off           Switch torque.\r\n"
           "\tmove <servo>|all <angle>            <angle>: deg [-180.0..180.0].\r\n"
           "\tset_vel <servo>|all <val>           <val> in deg/s; 0 is infinite speed.\r\n"
+          "\tset_goal_current <servo> <val>      <val> in percent; 0 is switch to position control mode.\r\n"
           "\thome                                Home all servos, slowly.\r\n"
           "\tinfo <servo>                        Get info on <servo>.\r\n"
           "\t<ctrltableitem> <servo> [<value>]   Get or set, options: vel_limit, current_limit, profile_acc, profile_vel, operating_mode, pos_p_gain, pos_i_gain, pos_d_gain.\r\n"
@@ -67,6 +68,7 @@ Result bb::Servos::initialize() {
   ctrlPresentLoad_.addr = 0;
   ctrlGoalPos_.addr = 0;
   ctrlProfileVel_.addr = 0;
+  torqueOffOnStop_ = true;
   return Subsystem::initialize();
 }
 
@@ -177,7 +179,7 @@ Result bb::Servos::start(ConsoleStream* stream) {
 
   for (auto& s : servos_) {
     dxl_.setOperatingMode(s.id, OP_POSITION);
-    dxl_.writeControlTableItem(ControlTableItem::RETURN_DELAY_TIME, s.id, 10);
+    dxl_.writeControlTableItem(ControlTableItem::RETURN_DELAY_TIME, s.id, 5);
     dxl_.writeControlTableItem(ControlTableItem::DRIVE_MODE, s.id, 0);
     dxl_.torqueOn(s.id);
   }
@@ -192,8 +194,10 @@ Result bb::Servos::stop(ConsoleStream* stream) {
 
   teardownSyncBuffers();
 
-  for (auto& s : servos_) {
-    dxl_.torqueOff(s.id);
+  if(torqueOffOnStop_) {
+    for (auto& s : servos_) {
+      dxl_.torqueOff(s.id);
+    }
   }
   while (servos_.size()) servos_.erase(servos_.begin());
 
@@ -207,8 +211,8 @@ Result bb::Servos::step() {
 
   if (!started_ || operationStatus_ != RES_OK) return RES_SUBSYS_NOT_STARTED;
 
-  if (failcount > 5) {
-    Console::console.printfBroadcast("Servo communication failed more than 5 times in a row. Stopping subsystem.\n");
+  if (failcount > 100) {
+    Console::console.printfBroadcast("Servo communication failed more than %d times in a row. Stopping subsystem.\n", failcount);
     stop();
     failcount = 0;
     return RES_SUBSYS_COMM_ERROR;
@@ -224,6 +228,13 @@ Result bb::Servos::step() {
   if(res!=RES_OK) {
     failcount++;
     return RES_SUBSYS_COMM_ERROR;
+  }
+
+  for(auto& s: servos_) {
+    int maxload = (int)(1193.0*0.8);
+    if(s.load > maxload || s.load < -maxload) {
+      Console::console.printfBroadcast("Warning - servo %d load %d exceeds 80%%!\n", s.id, s.load);
+    }
   }
 
   failcount = 0;
@@ -249,6 +260,15 @@ Result bb::Servos::handleConsoleCommand(const std::vector<String>& words, Consol
     float vel = words[2].toFloat();
     if(vel < 0) return RES_CMD_INVALID_ARGUMENT;
     if(setProfileVelocity(id, vel)) return RES_OK;
+    return RES_CMD_INVALID_ARGUMENT;
+  }
+
+  else if (words[0] == "set_goal_current") {
+    if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    unsigned int id = words[1] == "all" ? ID_ALL : words[1].toInt();
+    int current = words[2].toInt();
+    if(current < 0 || current > 100) return RES_CMD_INVALID_ARGUMENT;
+    if(setCompliantMode(id, current)) return RES_OK;
     return RES_CMD_INVALID_ARGUMENT;
   }
 
@@ -462,11 +482,16 @@ void bb::Servos::printStatus(ConsoleStream* stream, int id) {
 
   stream->printf("Servo #%d: ", id);
   if (dxl_.ping(id)) {
-    stream->printf("model #%d, present: %f° (%d), goal: %f° (%d), ", dxl_.getModelNumber(id), present(id), s->present, goal(id), s->goal);
+    stream->printf("model #%d, present: %.1f° (%d), goal: %.1f° (%d), load: %.1f (%d), ", dxl_.getModelNumber(id), present(id), s->present, goal(id), s->goal, load(id), s->load);
     
     stream->printf("range: [%d..%d], offset: %d, invert: %d, ", s->min, s->max, s->offset, dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1);
 
     stream->printf("hw err: $%x", dxl_.readControlTableItem(ControlTableItem::HARDWARE_ERROR_STATUS, id));
+    uint8_t operatingMode = dxl_.readControlTableItem(ControlTableItem::OPERATING_MODE, id);
+    stream->printf(", mode: %d", operatingMode);
+    if(operatingMode == OP_CURRENT_BASED_POSITION) {
+      stream->printf(", goal current: %d", dxl_.readControlTableItem(ControlTableItem::GOAL_CURRENT, id));
+    }
     stream->printf(", alarm shutdown: $%x", dxl_.readControlTableItem(ControlTableItem::SHUTDOWN, id));
     stream->printf(", torque limit: %d", (int)dxl_.readControlTableItem(ControlTableItem::TORQUE_LIMIT, id));
     stream->printf(", max torque: %d", (int)dxl_.readControlTableItem(ControlTableItem::MAX_TORQUE, id));
@@ -538,8 +563,9 @@ bool bb::Servos::setGoal(uint8_t id, float goal, ValueType t) {
 
   Servo *s = servoWithID(id);
   if (s == NULL) return false;
-  uint32_t g = computeRawValue(goal, t) + s->offset; // FIXME - s->offset can be negative, is this safe?
-  s->goal = constrain(g, s->min, s->max);
+  uint32_t g = computeRawValue(goal, t);
+  s->goal = constrain(g, s->min, s->max) + s->offset; // FIXME - s->offset can be negative, is this safe?
+  //if(s->id == 4) Console::console.printfBroadcast("Goal: %d Min: %d Max: %d Final: %d\n", g, s->min, s->max, s->goal);
   swGoalInfos.is_info_changed = true;
 
   return true;
@@ -631,6 +657,43 @@ void bb::Servos::setLoadShutdownEnabled(uint8_t id, bool yesno) {
   else shutdown &= ~(1<<5);
   dxl_.writeControlTableItem(ControlTableItem::SHUTDOWN, id, shutdown);
 }
+
+bool bb::Servos::setCompliantMode(uint8_t id, uint8_t maxCurrentPercent) {
+  bool res;
+  bool torque = dxl_.getTorqueEnableStat(id);
+  if(torque) {
+    dxl_.torqueOff(id);
+  }
+  
+  maxCurrentPercent = constrain(maxCurrentPercent, 0, 100);
+  
+  if(maxCurrentPercent == 0) {
+    res = dxl_.writeControlTableItem(ControlTableItem::OPERATING_MODE, id, OP_POSITION);
+    if(res == true) {
+      dxl_.setGoalCurrent(id, 100, UNIT_PERCENT);
+      dxl_.writeControlTableItem(ControlTableItem::CURRENT_LIMIT, id, 1193);
+    }
+  } else {
+    res = dxl_.writeControlTableItem(ControlTableItem::OPERATING_MODE, id, OP_CURRENT_BASED_POSITION);
+    if(res == true) {
+      Console::console.printfBroadcast("Setting %d\% as goal current\n", maxCurrentPercent);
+      dxl_.setGoalCurrent(id, maxCurrentPercent, UNIT_PERCENT);
+      dxl_.writeControlTableItem(ControlTableItem::CURRENT_LIMIT, id, (1193*maxCurrentPercent)/100);
+      Console::console.printfBroadcast("Goal current now: %d\n", dxl_.readControlTableItem(ControlTableItem::GOAL_CURRENT, id));
+    }
+  }
+  if(torque)
+    dxl_.torqueOn(id);
+
+  return res;
+}
+
+bool bb::Servos::setPIDValues(uint8_t id, uint16_t kp, uint16_t ki, uint16_t kd) {
+  dxl_.writeControlTableItem(ControlTableItem::P_GAIN, id, kp);
+  dxl_.writeControlTableItem(ControlTableItem::I_GAIN, id, ki);
+  dxl_.writeControlTableItem(ControlTableItem::D_GAIN, id, kd);
+}
+
 
 bb::Servos::Servo* bb::Servos::servoWithID(uint8_t id) {
   for(auto& s: servos_) {

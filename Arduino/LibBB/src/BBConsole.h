@@ -57,6 +57,15 @@ protected:
 	unsigned long checkInterval_, lastCheck_;
 };
 
+class BroadcastStream: public ConsoleStream {
+public:
+	static BroadcastStream bc;
+
+	virtual bool available() { return false; }
+	virtual bool readStringUntil(unsigned char c, String& str) { return false; }
+	virtual void printfFinal(const char* str);
+};
+
 class Console: public Subsystem {
 public:
 	static Console console;
@@ -73,6 +82,8 @@ public:
 	virtual void addConsoleStream(ConsoleStream* stream);
 	virtual void removeConsoleStream(ConsoleStream* stream);
 	ConsoleStream* serialStream() { return serialStream_; }
+	ConsoleStream* broadcastStream() { return &BroadcastStream::bc; }
+	const std::vector<ConsoleStream*>& streams() { return streams_; }
 
 	void handleStreamInput(ConsoleStream* stream);
 	Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream);

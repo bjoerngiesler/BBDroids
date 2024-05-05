@@ -5,10 +5,11 @@
 #include <vector>
 #include <limits.h>
 
-bb::IMUControlInput::IMUControlInput(IMU& imu, IMUControlInput::ProbeType pt): filter_(2.0f), imu_(imu) {
+bb::IMUControlInput::IMUControlInput(IMU& imu, IMUControlInput::ProbeType pt, bool inverse): filter_(100.0f, 100.0), imu_(imu) {
   pt_ = pt;
   bias_ = 0;
   deadband_ = 0;
+  inv_ = inverse;
 }
 
 bb::Result bb::IMUControlInput::update() {
@@ -35,6 +36,7 @@ float bb::IMUControlInput::present() {
   }
 
   if(fabs(retval) < fabs(deadband_)) return 0.0f;
+  if(inv_) return -retval;
   return retval;
 }
 

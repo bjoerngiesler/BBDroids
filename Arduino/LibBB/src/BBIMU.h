@@ -22,7 +22,7 @@ public:
     IMU_HEADING
   } ProbeType;
 
-  IMUControlInput(IMU& imu, ProbeType pt);
+  IMUControlInput(IMU& imu, ProbeType pt, bool inverse = false);
   float present();
   Result update();
 
@@ -34,6 +34,7 @@ protected:
   bb::LowPassFilter filter_;
   float bias_, deadband_;
   IMU& imu_;
+  bool inv_;
 };
 
 

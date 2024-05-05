@@ -1,5 +1,8 @@
 #include "DOSound.h"
 #include "DOConfig.h"
+#include <LibBB.h>
+
+using namespace bb;
 
 DOSound DOSound::sound;
 
@@ -70,6 +73,22 @@ bool DOSound::playFolder(int foldernumber, int filenumber, bool block) {
   }
   return true;
 }
+
+bool DOSound::playFolderRandom(int foldernumber, bool block) {
+  return false;
+  if(!available_) return false;
+  bool debug = false;
+
+  int num = dfp_.readFileCountsInFolder(foldernumber);
+  if(num == 0) {
+    Console::console.printfBroadcast("Folder %d empty!\n", num);
+    return false;
+  }
+  num = random(1, num);
+  Console::console.printfBroadcast("Playing folder %d file %d", foldernumber, num);
+  return playFolder(foldernumber, num, block);
+}
+
 
 bool DOSound::setVolume(uint8_t vol) {
   if(!available_) return false;

@@ -63,6 +63,14 @@ void bb::SerialConsoleStream::printfFinal(const char* buf) {
 	ser_.print(buf);
 }
 
+bb::BroadcastStream bb::BroadcastStream::bc;
+
+void bb::BroadcastStream::printfFinal(const char* str) {
+	const std::vector<ConsoleStream*>& streams = Console::console.streams();
+	for(auto* s: streams) s->printfFinal(str);
+}
+
+
 bb::Console::Console() {
 	name_ = "console";
 	description_ = "Console interaction facility";

@@ -29,21 +29,29 @@ public:
   virtual Result stepDome();
   virtual Result setMode(Mode mode);
 
+  Result selfTest(ConsoleStream *stream = NULL);
+  Result servoTest(ConsoleStream *stream = NULL);
+
   virtual void printStatus(ConsoleStream *stream);
 
   virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
 
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
-  virtual Result fillAndSendStatusPacket();
+  virtual Result fillAndSendStatePacket();
 
-  virtual void parameterChangedCallback(const String& name);
+  virtual Result setParameterValue(const String& name, const String& stringVal);
 
   void printCurrentSystemStatus(ConsoleStream *stream = NULL);
 
 protected:
+  void setControlParameters();
+
   typedef struct {
     float driveSpeedKp, driveSpeedKi, driveSpeedKd;
     float balKp, balKi, balKd;
+    float rollKp, rollKi, rollKd;
+    float rollServoKp, rollServoKi, rollServoKd;
+    float rollServoVel;
   } BB8Params;
 
   static BB8Params params_;
@@ -73,7 +81,11 @@ protected:
 
   bb::DCMotor driveMotor_, yawMotor_;
   bb::Encoder driveEncoder_;
-  bb::PIDController driveController_;
+  bb::ServoControlOutput rollOutput_;
+  bb::IMUControlInput balanceInput_, rollInput_;
+  bb::PIDController driveController_, balanceController_, rollController_;
+
+  bool servosOK_;
 };
 
 #endif // BB8_H

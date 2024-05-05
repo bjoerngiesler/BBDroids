@@ -22,6 +22,8 @@ public:
   // These are used by the controller framework, do not call directly.
   virtual float present();
   virtual Result set(float value); 
+  virtual float maxSpeed() { return maxSpeed_; }
+  virtual void setMaxSpeed(float m) { maxSpeed_ = m; }
 
 protected:
   float goalVel_, goalRot_, curVel_, curRot_;
@@ -30,6 +32,7 @@ protected:
   bb::ControlOutput &left_, &right_;
   unsigned long lastCycleUS_;
   bool useControlInput_;
+  float maxSpeed_;
 };
 
 class DODriveControlInput: public bb::ControlInput {
