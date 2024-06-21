@@ -2,7 +2,9 @@
 #define RDISPLAY_H
 
 #include <LibBB.h>
+#if defined(LEFT_REMOTE)
 #include <SoftwareSerial.h>
+#endif
 #include <vector>
 
 #include "RemoteInput.h"

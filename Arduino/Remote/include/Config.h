@@ -29,23 +29,15 @@
 
 #else // defined(LEFT_REMOTE)
 
-#define P_A_POT1        A0
-#define P_A_POT2        A1
-#define P_A_BATT_CHECK  A5
+#define P_D_NEOPIXEL    A0
+#define P_A_JOY_HOR     A1
 #define P_A_JOY_VER     A2
-#define P_A_JOY_HOR     A3
+#define P_A_BATT_CHECK  A3
 
-#define P_D_BTN_PINKY   D10
-#define P_D_BTN_INDEX   D9
-#define P_D_BTN_JOY     D8
-#define P_D_BTN_TOP_L   D7
-#define P_D_BTN_TOP_R   D6
-#define P_D_BTN_CONFIRM D5
-#define P_D_NEOPIXEL    D4
-#define P_D_BTN_L       D3
-#define P_D_BTN_R       D2
+#define P_A_POT2        A8
+#define P_A_POT1        A10
 
-#define P_NEOPIXEL      D4
+#define P_NEOPIXEL      D0
 
 #endif
 
@@ -53,5 +45,7 @@
 
 static const uint8_t BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 2 - Micke, 3 - Brad
 static const uint8_t REMOTE_ID = 0;
+
+static const uint8_t IMU_ADDR           = 0x6a;
 
 #endif // CONFIG_H

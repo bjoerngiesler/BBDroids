@@ -3,7 +3,6 @@
 
 #include "RDisplay.h"
 #include "RemoteInput.h"
-#include "IMUFilter.h"
 
 static const int CIRCLE_X = 40;
 static const int TOP_CIRCLE_Y = 50;

@@ -7,7 +7,6 @@
 #include "RMenu.h"
 #include "RMessage.h"
 #include "RGraphs.h"
-#include "IMUFilter.h"
 
 using namespace bb;
 
@@ -55,6 +54,7 @@ protected:
   RDrawable *currentDrawable_;
   bool needsDraw_;
   std::vector<XBee::Node> discoveredNodes_;
+  bb::IMU imu_;
 
 #if defined(LEFT_REMOTE)
   Packet lastPacketFromDroid_, lastPacketFromRightRemote_;

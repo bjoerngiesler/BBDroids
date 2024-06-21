@@ -7,6 +7,7 @@ using namespace bb;
 
 RemoteInput RemoteInput::input;
 
+#if 0
 static void prepareInterruptPin(int pin, void (*isr)(void)) {
   pinMode(pin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(pin), isr, CHANGE);
@@ -29,6 +30,7 @@ void bTopRISR(void) {
   RemoteInput::input.btnTopR = !digitalRead(P_D_BTN_TOP_R); 
   RemoteInput::input.btnTopRChanged = true;
 }
+#endif
 
 RemoteInput::RemoteInput(): delegate_(NULL) {
   zeroVertical_ = zeroHorizontal_ = 512;
@@ -40,6 +42,8 @@ void RemoteInput::setDelegate(RemoteInput::Delegate *d) {
 
 
 bool RemoteInput::begin() {
+
+#if 0
   prepareInterruptPin(P_D_BTN_PINKY, bPinkyISR);
   prepareInterruptPin(P_D_BTN_INDEX, bIndexISR);
   prepareInterruptPin(P_D_BTN_JOY, bJoyISR);
@@ -48,18 +52,6 @@ bool RemoteInput::begin() {
   prepareInterruptPin(P_D_BTN_CONFIRM, bConfirmISR);
   prepareInterruptPin(P_D_BTN_TOP_L, bTopLISR);
   prepareInterruptPin(P_D_BTN_TOP_R, bTopRISR);
-
-#if 0
-#if defined(LEFT_REMOTE)
-  pinMode(P_A_ENC, INPUT_PULLUP);
-#else
-  pinMode(P_A_POT1, INPUT_PULLUP);
-  pinMode(P_A_POT2, INPUT_PULLUP);
-#endif
-
-  pinMode(P_A_BATT_CHECK, INPUT_PULLUP);
-  pinMode(P_A_JOY_HOR, INPUT_PULLUP);
-  pinMode(P_A_JOY_VER, INPUT_PULLUP);
 #endif
 
   zeroVertical_ = analogRead(P_A_JOY_VER);

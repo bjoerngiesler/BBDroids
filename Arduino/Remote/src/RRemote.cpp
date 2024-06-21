@@ -5,7 +5,9 @@ RRemote RRemote::remote;
 RRemote::RemoteParams RRemote::params_;
 bb::ConfigStorage::HANDLE RRemote::paramsHandle_;
 
-RRemote::RRemote(): statusPixels_(2, P_NEOPIXEL, NEO_GRB+NEO_KHZ800) {
+RRemote::RRemote(): 
+  statusPixels_(2, P_NEOPIXEL, NEO_GRB+NEO_KHZ800),
+  imu_(IMU_ADDR) {
   name_ = "remote";
   description_ = "Main subsystem for the BB8 remote";
   help_ = "Main subsystem for the BB8 remote"\
@@ -32,9 +34,9 @@ RRemote::RRemote(): statusPixels_(2, P_NEOPIXEL, NEO_GRB+NEO_KHZ800) {
 
 Result RRemote::initialize() { 
   if(!RemoteInput::input.begin()) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
-  if(!IMUFilter::imu.begin()) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+  if(!imu_.begin()) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 
-  paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
+  paramsHandle_ = ConfigStorage::storage.reserveBlock("remote", sizeof(params_));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is valid.\n", paramsHandle_);
     ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
@@ -191,10 +193,6 @@ Result RRemote::stop(ConsoleStream *stream) {
   operationStatus_ = RES_OK;
   started_ = false;
   
-  digitalWrite(LEDR, LOW);
-  digitalWrite(LEDG, LOW);
-  digitalWrite(LEDB, HIGH);
-
   return RES_OK;
 }
 
@@ -211,16 +209,6 @@ Result RRemote::step() {
     if(subsys[i]->isStarted() == false || subsys[i]->operationStatus() != RES_OK) {
       allOK = false;
     }
-  }
-
-  if(allOK) {
-    digitalWrite(LEDR, LOW);
-    digitalWrite(LEDG, HIGH);
-    digitalWrite(LEDB, LOW);
-  } else {
-    digitalWrite(LEDR, HIGH);
-    digitalWrite(LEDG, HIGH);
-    digitalWrite(LEDB, LOW);
   }
 
   if(!started_) return RES_SUBSYS_NOT_STARTED;
@@ -255,10 +243,10 @@ bb::Result RRemote::fillAndSend() {
   Console::console.printfBroadcast("JoyH: %f Axis 0: %f\n", RemoteInput::input.joyH, packet.payload.control.getAxis(0));
   packet.payload.control.setAxis(1, RemoteInput::input.joyV);
 
-  if (IMUFilter::imu.available()) {
+  if (imu_.available()) {
     float roll, pitch, heading;
-    IMUFilter::imu.update();
-    IMUFilter::imu.getFilteredEulerAngles(roll, pitch, heading);
+    imu_.update();
+    imu_.getFilteredRPH(roll, pitch, heading);
 
     roll = -roll;
 
@@ -378,7 +366,7 @@ void RRemote::printStatus(ConsoleStream *stream) {
   char buf[255];
 
   float roll, pitch, yaw;
-  IMUFilter::imu.getRawEulerAngles(roll, pitch, yaw);
+  imu_.getGyroMeasurement(roll, pitch, yaw);
 
   sprintf(buf, "Buttons: P%cI%cJ%cL%cR%cC%cTL%cTR%c Axes: JH%5.2f JV%5.2f R%7.2fd P%7.2fd Y%7.2f Batt%7.2f P1%7.2f P2%7.2f    \n",
     RemoteInput::input.btnPinky ? 'X' : '_',

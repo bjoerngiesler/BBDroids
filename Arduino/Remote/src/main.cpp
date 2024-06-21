@@ -1,12 +1,10 @@
 #include <LibBB.h>
-#include <WiFiNINA.h>
 
 #include "Config.h"
 #include "RRemote.h"
 #include "RemoteInput.h"
 #include "RDisplay.h"
 #include "RMenu.h"
-#include "IMUFilter.h"
 
 uint8_t seqnum = 0;
 
@@ -15,17 +13,12 @@ using namespace bb;
 int getAnalogReadResolution() { return 12; } // whatever
 
 void setup() {
-  rp2040.enableDoubleResetBootloader();
+  //rp2040.enableDoubleResetBootloader();
 
   Serial.begin(2000000);
   //while(!Serial);
 
-  pinMode(LEDR, OUTPUT);
-  pinMode(LEDG, OUTPUT);
-  pinMode(LEDB, OUTPUT);
-  digitalWrite(LEDR, LOW);
-  digitalWrite(LEDG, LOW);
-  digitalWrite(LEDB, HIGH);
+  Wire.begin();
 
   ConfigStorage::storage.initialize();
 
@@ -39,7 +32,8 @@ void setup() {
 #else 
   uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
 #endif
-  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200);
+  Serial1.setPins(D7, D6);
+  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200, &Serial1);
   
   
 #if defined(LEFT_REMOTE)
@@ -61,7 +55,7 @@ void setup() {
   
   RRemote::remote.start();
 
-  XBee::xbee.addPacketReceiver(&RRemote::remote);
+  XBee::xbee.addPacketReceiver(&RRemote::remote); 
   Runloop::runloop.start(); // never returns
 }
 
