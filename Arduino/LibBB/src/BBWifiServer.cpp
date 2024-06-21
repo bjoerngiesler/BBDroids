@@ -4,6 +4,10 @@
 #include <ArduinoOTA.h>
 #endif
 
+#if defined(ARDUINO_ARCH_ESP32)
+#define WL_NO_MODULE WL_NO_SHIELD
+#endif
+
 String IPAddressToString(const IPAddress& addr) {
 	return String(addr[0]) + "." + addr[1] + "." + addr[2] + "." + addr[3];
 }
@@ -60,7 +64,7 @@ bb::WifiServer::WifiServer(): tcp_(DEFAULT_TCP_PORT) {
 bb::Result bb::WifiServer::initialize(const String& ssid, const String& wpakey, bool apmode, uint16_t udpPort, uint16_t tcpPort) {
 	if(operationStatus_ != RES_SUBSYS_NOT_INITIALIZED) return RES_SUBSYS_ALREADY_INITIALIZED;
 
-	paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
+	paramsHandle_ = ConfigStorage::storage.reserveBlock("wifi", sizeof(params_));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
 		ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
 	} else {
@@ -104,7 +108,9 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 		return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 	} 
 
+#if !defined(ARDUINO_ARCH_ESP32)
 	WiFi.noLowPowerMode();
+#endif
 
 	ssid_ = params_.ssid;
 	wpaKey_ = params_.wpaKey;
@@ -116,8 +122,12 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 			stream->printf("Start AP \"%s\"... ", ssid_.c_str());
 		}
 
+#if defined(ARDUINO_ARCH_ESP32)
+		if(WiFi.softAP(ssid_.c_str(), wpaKey_.c_str()) == true) {
+#else
 		uint8_t retval = WiFi.beginAP(ssid_.c_str(), wpaKey_.c_str());
 		if(retval == WL_AP_LISTENING) {
+#endif
 			if(stream) stream->printf("success. ");
 		} else {
 			if(stream) stream->printf("failure.\n");
@@ -162,7 +172,11 @@ bb::Result bb::WifiServer::stop(ConsoleStream* stream) {
 #if !defined(ARDUINO_PICO_VERSION_STR)
 	ArduinoOTA.end();
 #endif
+#if defined(ARDUINO_ARCH_ESP32)
+	// has no WiFi.end()?
+#else
 	WiFi.end();
+#endif
 
 	started_ = false;
 	operationStatus_ = RES_SUBSYS_NOT_STARTED;
@@ -188,7 +202,11 @@ bb::Result bb::WifiServer::step() {
 
 	seqnum++;
 
+#if defined(ARDUINO_ARCH_ESP32)
+	if(client_ == true) {
+#else
 	if(client_ == true && client_.status() == 0) {
+#endif
 		client_.stop();
 		consoleStream_.setClient(client_);
 		Console::console.removeConsoleStream(&consoleStream_);
@@ -240,7 +258,11 @@ bb::Result bb::WifiServer::operationStatus() {
 }
 
 bool bb::WifiServer::isAPStarted() {
+#if defined(ARDUINO_ARCH_ESP32)
+  return WiFi.status() == WL_IDLE_STATUS || WiFi.status() == WL_CONNECTED;
+#else
   return WiFi.status() == WL_AP_LISTENING || WiFi.status() == WL_AP_CONNECTED;
+#endif
 }
 
 bool bb::WifiServer::isConnected() {
@@ -257,7 +279,11 @@ bool bb::WifiServer::broadcastUDPPacket(const uint8_t* packet, size_t len) {
 bool bb::WifiServer::sendUDPPacket(const IPAddress& addr, const uint8_t* packet, size_t len) {
 	static unsigned int failures = 0;
 
+#if defined(ARDUINO_ARCH_ESP32)
+	if(WiFi.status() != WL_CONNECTED) {
+#else
 	if(WiFi.status() != WL_CONNECTED && WiFi.status() != WL_AP_CONNECTED) {
+#endif
 		return false;
 	}
 	if(udp_.beginPacket(addr, params_.udpPort) == false) {
@@ -332,6 +358,7 @@ void bb::WifiServer::printStatus(ConsoleStream *stream) {
     case WL_DISCONNECTED:
     	stream->printf("disconnected");
     	break;
+#if !defined(ARDUINO_ARCH_ESP32)
     case WL_AP_LISTENING:
     	stream->printf("AP listening");
     	break;
@@ -342,6 +369,7 @@ void bb::WifiServer::printStatus(ConsoleStream *stream) {
     case WL_AP_FAILED:
     	stream->printf("AP setup failed");
     	break;
+#endif
     default:
     	stream->printf("unknown");
     	break;

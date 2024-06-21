@@ -4,8 +4,8 @@
 // LibBB - Bavarian Builders Droid Base Library for Arduino
 // Written 2022-2023 by Björn Giesler <bjoern@giesler.de>
 
-#define EPS 0.001
-#define EPSILON(x) ((x>-EPS)&&(x<EPS))
+#define EPS_ 0.001
+#define EPSILON(x) ((x>-EPS_)&&(x<EPS_))
 
 #include "BBSubsystem.h"
 #include "BBXBee.h"

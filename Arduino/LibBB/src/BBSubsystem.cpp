@@ -20,7 +20,7 @@ bb::Result bb::SubsystemManager::registerSubsystem(Subsystem* subsys) {
 	
 bb::Subsystem* bb::SubsystemManager::subsystemWithName(const String& name) {
 	for(size_t i=0; i<subsys_.size(); i++) {
-		if(subsys_[i]->name() == name) return subsys_[i];
+		if(name == subsys_[i]->name()) return subsys_[i];
 	}
 	return NULL;
 }

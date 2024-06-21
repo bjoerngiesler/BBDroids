@@ -50,8 +50,7 @@ BB8::BB8():
           "        calibrate                       Calibrate gyro\r\n"
           "        drive pwm|speed|position <val>  Set drive motor setpoint\r\n"
           "        mode off|roll|speed|speed_roll|pos|kiosk|calib  Set drive mode\r\n"
-          "        set_pixel <num> <r> <g> <b>     Set Neopixel <num> (1-3) to rgb color\r\n"
-          "        scan_i2c                        Scan the i2c bus";
+          "        set_pixel <num> <r> <g> <b>     Set Neopixel <num> (1-3) to rgb color";
   started_ = false;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
 }
@@ -566,16 +565,6 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
     b = words[4].toInt();
 
     BB8StatusPixels::statusPixels.setPixel(p, r, g, b);
-    return RES_OK;
-  }
-
-  else if(words[0] == "scan_i2c") {
-    bb::Runloop::runloop.excuseOverrun();
-    for(uint addr=0x8; addr<=0x77; addr++) {
-      Wire.beginTransmission(addr);
-      uint8_t result = Wire.endTransmission();
-      if(result == 0) stream->printf("Found device at 0x%x\n", addr);
-    }
     return RES_OK;
   }
 

@@ -44,7 +44,7 @@ bb::XBee::~XBee() {
 bb::Result bb::XBee::initialize(uint8_t chan, uint16_t pan, uint16_t station, uint32_t bps, HardwareSerial *uart) {
 	if(operationStatus_ != RES_SUBSYS_NOT_INITIALIZED) return RES_SUBSYS_ALREADY_INITIALIZED;
 
-	paramsHandle_ = ConfigStorage::storage.reserveBlock(sizeof(params_));
+	paramsHandle_ = ConfigStorage::storage.reserveBlock("xbee", sizeof(params_));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
 		Console::console.printfBroadcast("XBee: Storage block is valid\n");
 		ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);

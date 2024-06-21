@@ -2,10 +2,11 @@
 #include "BBConfigStorage.h"
 #include "BBRunloop.h"
 #include <cstdarg>
+#include <Wire.h>
 
 bb::Console bb::Console::console;
 
-bb::SerialConsoleStream::SerialConsoleStream(HardwareSerial& ser): ser_(ser), opened_(false), curStr_("") {
+bb::SerialConsoleStream::SerialConsoleStream(HWSERIAL_CLASS& ser): ser_(ser), opened_(false), curStr_("") {
 	lastCheck_ = micros();
 	checkInterval_ = 1000000;
 	if(ser_) {
@@ -198,6 +199,16 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 		return ConfigStorage::storage.store();
 	} 
 
+	else if(words[0] == "scan_i2c") {
+		bb::Runloop::runloop.excuseOverrun();
+		for(uint8_t addr=0x8; addr<=0x77; addr++) {
+		Wire.beginTransmission(addr);
+		uint8_t result = Wire.endTransmission();
+		if(result == 0) stream->printf("Found device at 0x%x\n", addr);
+		}
+		return RES_OK;
+	}
+
 	else {
 		Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[0]);
 		if(subsys == NULL) {
@@ -236,6 +247,7 @@ void bb::Console::printHelpAllSubsystems(ConsoleStream* stream) {
 	stream->printf("    stop                    Stop all started subsystems (use '<subsys> stop' to stop individual subsystem)\n");
 	stream->printf("    restart                 Restart (stop, then start) all started subsystems\n");
 	stream->printf("    store                   Store all parameters oto flash\n");
+	stream->printf("    scan_i2c                Scan the i2c bus and output all reporting addresses\n");
 	stream->printf("The following standard commands are supported by all subsystems:\n");
 	stream->printf("    <subsys> help\n");
 	stream->printf("    <subsys> status\n");

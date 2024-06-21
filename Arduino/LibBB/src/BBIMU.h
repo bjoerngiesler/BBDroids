@@ -56,7 +56,7 @@ public:
   bool getFilteredRPH(float& r, float& p, float& h);
 
   IMUState getIMUState();
-  void printStats(const arduino::String& prefix = "");
+  void printStats(const String& prefix = "");
 private:  
 
   Madgwick madgwick_;

@@ -38,9 +38,15 @@ public:
 	}
 };
 
+#if defined(ARDUINO_ARCH_ESP32)
+#define HWSERIAL_CLASS HWCDC
+#else
+#define HWSERIAL_CLASS HardwareSerial
+#endif
+
 class SerialConsoleStream: public ConsoleStream {
 public:
-	SerialConsoleStream(HardwareSerial& ser);
+	SerialConsoleStream(HWSERIAL_CLASS& ser);
 
 	bool checkIfOpened();
 	void setCheckInterval(unsigned long microseconds);
@@ -51,7 +57,7 @@ public:
 
 	virtual void printfFinal(const char* str);
 protected:
-	HardwareSerial& ser_;
+	HWSERIAL_CLASS& ser_;
 	bool opened_;
 	String curStr_;
 	unsigned long checkInterval_, lastCheck_;

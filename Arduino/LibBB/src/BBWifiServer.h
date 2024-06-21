@@ -2,7 +2,11 @@
 #define BBWIFISERVER_H
 
 #include <Arduino.h>
+#if defined(ARDUINO_ARCH_ESP32)
+#include <Wifi.h>
+#else
 #include <WiFiNINA.h>
+#endif
 #include "BBSubsystem.h"
 #include "BBConfigStorage.h"
 #include "BBConsole.h"
