@@ -7,11 +7,11 @@
 
 #include "Config.h"
 #include "RDisplay.h"
-#include "RemoteInput.h"
+#include "RInput.h"
 
 using namespace bb;
 
-class RMenu: public RDrawable, public RemoteInput::Delegate {
+class RMenu: public RDrawable, public RInput::Delegate {
 public:
   RMenu(const char* title);
 

@@ -7,7 +7,7 @@
 #endif
 #include <vector>
 
-#include "RemoteInput.h"
+#include "RInput.h"
 
 using namespace bb;
 

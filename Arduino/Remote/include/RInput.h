@@ -1,13 +1,13 @@
-#if !defined(REMOTEINPUT_H)
-#define REMOTEINPUT_H
+#if !defined(RINPUT_H)
+#define RINPUT_H
 
 #include <Adafruit_MCP23X17.h>
 #include "Config.h"
 #include <array>
 
-class RemoteInput {
+class RInput {
 public:
-  static RemoteInput input;
+  static RInput input;
 
   bool begin();
   void update();
@@ -48,7 +48,7 @@ public:
   void setDelegate(Delegate *d);
 
 protected:
-  RemoteInput();
+  RInput();
   Delegate *delegate_;
   uint16_t zeroVertical_, zeroHorizontal_;
 #if defined(ESP32_REMOTE)

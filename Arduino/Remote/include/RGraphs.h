@@ -4,11 +4,11 @@
 #include <LibBB.h>
 
 #include "RDisplay.h"
-#include "RemoteInput.h"
+#include "RInput.h"
 
 using namespace bb;
 
-class RGraphs: public RDrawable, public RemoteInput::Delegate {
+class RGraphs: public RDrawable, public RInput::Delegate {
 public:
   enum Graph {
     TOP     = 0,

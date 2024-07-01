@@ -2,7 +2,7 @@
 
 #include "Config.h"
 #include "RRemote.h"
-#include "RemoteInput.h"
+#include "RInput.h"
 #include "RDisplay.h"
 #include "RMenu.h"
 

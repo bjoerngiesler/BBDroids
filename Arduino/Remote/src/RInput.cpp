@@ -1,11 +1,11 @@
 #include <LibBB.h>
 
-#include "RemoteInput.h"
+#include "RInput.h"
 #include "Config.h"
 
 using namespace bb;
 
-RemoteInput RemoteInput::input;
+RInput RInput::input;
 
 #if !defined(ESP32_REMOTE)
 static void prepareInterruptPin(int pin, void (*isr)(void)) {
@@ -14,50 +14,50 @@ static void prepareInterruptPin(int pin, void (*isr)(void)) {
 }
 
 void bPinkyISR(void) { 
-  RemoteInput::input.buttons[RemoteInput::BUTTON_PINKY] = !digitalRead(P_D_BTN_PINKY); 
+  RInput::input.buttons[RInput::BUTTON_PINKY] = !digitalRead(P_D_BTN_PINKY); 
 }
 
 void bIndexISR(void) { 
-  RemoteInput::input.buttons[RemoteInput::BUTTON_INDEX] = !digitalRead(P_D_BTN_INDEX); 
+  RInput::input.buttons[RInput::BUTTON_INDEX] = !digitalRead(P_D_BTN_INDEX); 
 }
 
 void bJoyISR(void) { 
-  RemoteInput::input.buttons[RemoteInput::BUTTON_JOY] = !digitalRead(P_D_BTN_JOY); 
+  RInput::input.buttons[RInput::BUTTON_JOY] = !digitalRead(P_D_BTN_JOY); 
 }
 
 void bLISR(void) { 
-  RemoteInput::input.buttons[RemoteInput::BUTTON_LEFT] = !digitalRead(P_D_BTN_L); 
+  RInput::input.buttons[RInput::BUTTON_LEFT] = !digitalRead(P_D_BTN_L); 
 }
 
 void bRISR(void) { 
-  RemoteInput::input.buttons[RemoteInput::BUTTON_RIGHT] = !digitalRead(P_D_BTN_R); 
+  RInput::input.buttons[RInput::BUTTON_RIGHT] = !digitalRead(P_D_BTN_R); 
 }
 
 void bConfirmISR(void) { 
-  RemoteInput::input.buttons[RemoteInput::BUTTON_CONFIRM] = !digitalRead(P_D_BTN_CONFIRM); 
-  RemoteInput::input.btnConfirmChanged = true;
+  RInput::input.buttons[RInput::BUTTON_CONFIRM] = !digitalRead(P_D_BTN_CONFIRM); 
+  RInput::input.btnConfirmChanged = true;
 }
 
 void bTopLISR(void) { 
-  RemoteInput::input.buttons[RemoteInput::BUTTON_TOP_LEFT] = !digitalRead(P_D_BTN_TOP_L); 
-  RemoteInput::input.btnTopLChanged = true;
+  RInput::input.buttons[RInput::BUTTON_TOP_LEFT] = !digitalRead(P_D_BTN_TOP_L); 
+  RInput::input.btnTopLChanged = true;
 }
 
 void bTopRISR(void) { 
-  RemoteInput::input.buttons[RemoteInput::BUTTON_TOP_RIGHT] = !digitalRead(P_D_BTN_TOP_R); 
-  RemoteInput::input.btnTopRChanged = true;
+  RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] = !digitalRead(P_D_BTN_TOP_R); 
+  RInput::input.btnTopRChanged = true;
 }
 #endif // ESP32_REMOTE
 
-RemoteInput::RemoteInput(): delegate_(NULL) {
+RInput::RInput(): delegate_(NULL) {
   zeroVertical_ = zeroHorizontal_ = 512;
 }
 
-void RemoteInput::setDelegate(RemoteInput::Delegate *d) {
+void RInput::setDelegate(RInput::Delegate *d) {
   delegate_ = d;
 }
 
-bool RemoteInput::begin() {
+bool RInput::begin() {
   zeroVertical_ = analogRead(P_A_JOY_VER);
   zeroHorizontal_ = analogRead(P_A_JOY_HOR);
 
@@ -78,7 +78,7 @@ bool RemoteInput::begin() {
   return true;
 }
 
-void RemoteInput::update() {
+void RInput::update() {
   joyH = (float)(zeroHorizontal_ - analogRead(P_A_JOY_HOR)) / 2048.0f;
   if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;
   joyH = constrain(joyH, -1.0f, 1.0f);
@@ -138,12 +138,12 @@ void RemoteInput::update() {
   }
 }
 
-bool RemoteInput::anyButtonPressed() {
+bool RInput::anyButtonPressed() {
   for(bool& b: buttons) if(b == true) return true;
   return false;
 }
 
-void RemoteInput::printOnSerial() {
+void RInput::printOnSerial() {
   Serial.print("L:");
   Serial.print(buttons[BUTTON_LEFT]);
   Serial.print(" R:");

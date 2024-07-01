@@ -2,7 +2,7 @@
 #include "Config.h"
 
 #include "RDisplay.h"
-#include "RemoteInput.h"
+#include "RInput.h"
 
 static const int CIRCLE_X = 40;
 static const int TOP_CIRCLE_Y = 50;

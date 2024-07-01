@@ -33,7 +33,7 @@ RRemote::RRemote():
 }
 
 Result RRemote::initialize() { 
-  RemoteInput::input.begin();
+  RInput::input.begin();
   imu_.begin();
 
   paramsHandle_ = ConfigStorage::storage.reserveBlock("remote", sizeof(params_));
@@ -65,7 +65,7 @@ Result RRemote::initialize() {
 
 void RRemote::showMenu(RMenu *menu) {
   currentDrawable_ = menu;
-  RemoteInput::input.setDelegate(menu);
+  RInput::input.setDelegate(menu);
   menu->setNeedsCls(true);
   menu->resetCursor();
   needsDraw_ = true;
@@ -74,13 +74,13 @@ void RRemote::showMenu(RMenu *menu) {
 void RRemote::showGraphs() {
   currentDrawable_ = graphs_;
   graphs_->setNeedsCls(true);
-  RemoteInput::input.setDelegate(graphs_);
+  RInput::input.setDelegate(graphs_);
   needsDraw_ = true;
 }
 
 void RRemote::showDroidsMenu() {
   currentDrawable_ = waitMessage_;
-  RemoteInput::input.setDelegate(NULL);
+  RInput::input.setDelegate(NULL);
   waitMessage_->draw();
 
   droidsMenu_->clear();
@@ -104,7 +104,7 @@ void RRemote::showDroidsMenu() {
 
 void RRemote::showRemotesMenu() {
   currentDrawable_ = waitMessage_;
-  RemoteInput::input.setDelegate(NULL);
+  RInput::input.setDelegate(NULL);
   waitMessage_->draw();
 
   remotesMenu_->clear();
@@ -212,10 +212,13 @@ Result RRemote::step() {
   }
 
   if(!started_) return RES_SUBSYS_NOT_STARTED;
-  RemoteInput::input.update();
+  RInput::input.update();
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
     fillAndSend();
+    if(runningStatus_) {
+      printStatus();
+    }
   }
 
   return RES_OK;
@@ -233,14 +236,14 @@ bb::Result RRemote::fillAndSend() {
   packet.source = PACKET_SOURCE_RIGHT_REMOTE;
 #endif
 
-  packet.payload.control.button0 = RemoteInput::input.buttons[RemoteInput::BUTTON_PINKY];
-  packet.payload.control.button1 = RemoteInput::input.buttons[RemoteInput::BUTTON_INDEX];
-  packet.payload.control.button2 = RemoteInput::input.buttons[RemoteInput::BUTTON_LEFT];
-  packet.payload.control.button3 = RemoteInput::input.buttons[RemoteInput::BUTTON_RIGHT];
-  packet.payload.control.button4 = RemoteInput::input.buttons[RemoteInput::BUTTON_JOY];
+  packet.payload.control.button0 = RInput::input.buttons[RInput::BUTTON_PINKY];
+  packet.payload.control.button1 = RInput::input.buttons[RInput::BUTTON_INDEX];
+  packet.payload.control.button2 = RInput::input.buttons[RInput::BUTTON_LEFT];
+  packet.payload.control.button3 = RInput::input.buttons[RInput::BUTTON_RIGHT];
+  packet.payload.control.button4 = RInput::input.buttons[RInput::BUTTON_JOY];
 
-  packet.payload.control.setAxis(0, RemoteInput::input.joyH);
-  packet.payload.control.setAxis(1, RemoteInput::input.joyV);
+  packet.payload.control.setAxis(0, RInput::input.joyH);
+  packet.payload.control.setAxis(1, RInput::input.joyV);
 
   if (imu_.available()) {
     float roll, pitch, heading;
@@ -368,19 +371,19 @@ void RRemote::printStatus(ConsoleStream *stream) {
   imu_.getGyroMeasurement(roll, pitch, yaw);
 
   sprintf(buf, "Buttons: P%cI%cJ%cL%cR%cC%cTL%cTR%c Axes: JH%5.2f JV%5.2f R%7.2fd P%7.2fd Y%7.2f Batt%7.2f P1%7.2f P2%7.2f    \n",
-    RemoteInput::input.buttons[RemoteInput::BUTTON_PINKY] ? 'X' : '_',
-    RemoteInput::input.buttons[RemoteInput::BUTTON_INDEX] ? 'X' : '_',
-    RemoteInput::input.buttons[RemoteInput::BUTTON_JOY] ? 'X' : '_',
-    RemoteInput::input.buttons[RemoteInput::BUTTON_LEFT] ? 'X' : '_',
-    RemoteInput::input.buttons[RemoteInput::BUTTON_RIGHT] ? 'X' : '_',
-    RemoteInput::input.buttons[RemoteInput::BUTTON_CONFIRM] ? 'X' : '_',
-    RemoteInput::input.buttons[RemoteInput::BUTTON_TOP_LEFT] ? 'X' : '_',
-    RemoteInput::input.buttons[RemoteInput::BUTTON_TOP_RIGHT] ? 'X' : '_',
-    RemoteInput::input.joyH, RemoteInput::input.joyV,
+    RInput::input.buttons[RInput::BUTTON_PINKY] ? 'X' : '_',
+    RInput::input.buttons[RInput::BUTTON_INDEX] ? 'X' : '_',
+    RInput::input.buttons[RInput::BUTTON_JOY] ? 'X' : '_',
+    RInput::input.buttons[RInput::BUTTON_LEFT] ? 'X' : '_',
+    RInput::input.buttons[RInput::BUTTON_RIGHT] ? 'X' : '_',
+    RInput::input.buttons[RInput::BUTTON_CONFIRM] ? 'X' : '_',
+    RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? 'X' : '_',
+    RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? 'X' : '_',
+    RInput::input.joyH, RInput::input.joyV,
     roll, pitch, yaw,
-    RemoteInput::input.battery,
-    RemoteInput::input.pot1, 
-    RemoteInput::input.pot2);
+    RInput::input.battery,
+    RInput::input.pot1, 
+    RInput::input.pot2);
 
   if(stream != NULL) stream->printf(buf);
   else Console::console.printfBroadcast(buf);
