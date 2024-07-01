@@ -29,7 +29,6 @@ const std::vector<bb::Subsystem*>& bb::SubsystemManager::subsystems() {
 	return subsys_;
 }
 
-
 bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
 	if(words[0] == "help") {
 		if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
