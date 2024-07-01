@@ -103,12 +103,12 @@ bb::Result bb::WifiServer::setOTANameAndPassword(const String& name, const Strin
 
 
 bb::Result bb::WifiServer::start(ConsoleStream* stream) {
+#if !defined(ARDUINO_ARCH_ESP32)
 	if(WiFi.status() == WL_NO_MODULE) {
 		if(stream) stream->printf("WL_NO_MODULE!\n");
 		return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 	} 
 
-#if !defined(ARDUINO_ARCH_ESP32)
 	WiFi.noLowPowerMode();
 #endif
 
@@ -118,6 +118,9 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 	wpaKey_.replace("$MAC", macStr_);
 
 	if(params_.ap == true) { // Start Access Point
+#if defined(ARDUINO_ARCH_ESP32)
+		WiFi.mode(WIFI_AP);
+#endif
 		if(stream) {
 			stream->printf("Start AP \"%s\"... ", ssid_.c_str());
 		}
@@ -134,6 +137,9 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 			return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 		}
 	} else { // Connect as client
+#if defined(ARDUINO_ARCH_ESP32)
+		WiFi.mode(WIFI_STA);
+#endif
 		if(stream) { 
 			stream->printf("Connect to \"%s\"... ", ssid_.c_str());
 		}
@@ -147,7 +153,7 @@ bb::Result bb::WifiServer::start(ConsoleStream* stream) {
 		}
 	}
 
-#if !defined(ARDUINO_PICO_VERSION_STR)
+#if !defined(ARDUINO_PICO_VERSION_STR) && !defined(ARDUINO_ARCH_ESP32)
 	ArduinoOTA.begin(WiFi.localIP(), otaName_.c_str(), otaPassword_.c_str(), InternalStorage);
 #endif
 
@@ -169,7 +175,7 @@ bb::Result bb::WifiServer::stop(ConsoleStream* stream) {
 	bb::Console::console.removeConsoleStream(&consoleStream_);
 
 	udp_.stop();
-#if !defined(ARDUINO_PICO_VERSION_STR)
+#if !defined(ARDUINO_PICO_VERSION_STR) && !defined(ARDUINO_ARCH_ESP32)
 	ArduinoOTA.end();
 #endif
 #if defined(ARDUINO_ARCH_ESP32)
@@ -184,17 +190,19 @@ bb::Result bb::WifiServer::stop(ConsoleStream* stream) {
 }
 
 bb::Result bb::WifiServer::step() {
+#if !defined(ARDUINO_ARCH_ESP32)
 	int status = WiFi.status();
 	if(status == WL_NO_MODULE) {
 		Console::console.printfBroadcast("WiFiNINA reports WL_NO_MODULE! Stopping.\n");
 		stop();
 		return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
 	}
+#endif
 
 	static int seqnum = 0;
 
 	if(seqnum == (1e6/Runloop::runloop.cycleTimeMicros())/4) {
-#if !defined(ARDUINO_PICO_VERSION_STR)
+#if !defined(ARDUINO_PICO_VERSION_STR) && !defined(ARDUINO_ARCH_ESP32)
 		ArduinoOTA.poll();
 #endif
 		seqnum = 0;
@@ -202,6 +210,7 @@ bb::Result bb::WifiServer::step() {
 
 	seqnum++;
 
+	//Console::console.printfBroadcast("Checking for client\n");
 #if defined(ARDUINO_ARCH_ESP32)
 	if(client_ == true) {
 #else
@@ -213,6 +222,7 @@ bb::Result bb::WifiServer::step() {
 	}
 
 	WiFiClient c = tcp_.available();
+	if(c == true) Console::console.printfBroadcast("Client connected.\n");
 	if(client_ == false && c == true) {
 		client_ = c;
 		consoleStream_.setClient(client_);
@@ -312,6 +322,7 @@ bool bb::WifiServer::sendUDPPacket(const IPAddress& addr, const uint8_t* packet,
 
 
 unsigned int bb::WifiServer::readDataIfAvailable(uint8_t *buf, unsigned int maxsize, IPAddress& remoteIP) {
+	if(udp_.available() == false) return 0;
 	unsigned int len = udp_.parsePacket();
 	if(!len) return 0;
 	remoteIP = udp_.remoteIP();
