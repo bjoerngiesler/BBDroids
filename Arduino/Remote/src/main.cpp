@@ -12,11 +12,22 @@ using namespace bb;
 
 int getAnalogReadResolution() { return 12; } // whatever
 
-void setup() {
-  //rp2040.enableDoubleResetBootloader();
+#include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiAP.h>
 
-  Serial.begin(2000000);
-  //while(!Serial);
+void setup() {
+  pinMode(P_D_RST_IOEXP, OUTPUT);
+  digitalWrite(P_D_RST_IOEXP, HIGH);
+  delay(50);
+
+
+  //rp2040.enableDoubleResetBootloader();
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
+
+  Serial.begin(115200);
+  while(!Serial);
 
   Wire.begin();
 
@@ -52,8 +63,9 @@ void setup() {
   WifiServer::server.start();
   XBee::xbee.start();
   XBee::xbee.setAPIMode(true);
-  
-  RRemote::remote.start();
+
+  Result res = RRemote::remote.start();
+  Console::console.printfBroadcast("Result starting remote: %s\n", errorMessage(res));
 
   XBee::xbee.addPacketReceiver(&RRemote::remote); 
   Runloop::runloop.start(); // never returns

@@ -6,7 +6,7 @@ RRemote::RemoteParams RRemote::params_;
 bb::ConfigStorage::HANDLE RRemote::paramsHandle_;
 
 RRemote::RRemote(): 
-  statusPixels_(2, P_NEOPIXEL, NEO_GRB+NEO_KHZ800),
+  statusPixels_(2, P_D_NEOPIXEL, NEO_GRB+NEO_KHZ800),
   imu_(IMU_ADDR) {
   name_ = "remote";
   description_ = "Main subsystem for the BB8 remote";
@@ -33,8 +33,8 @@ RRemote::RRemote():
 }
 
 Result RRemote::initialize() { 
-  if(!RemoteInput::input.begin()) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
-  if(!imu_.begin()) return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+  RemoteInput::input.begin();
+  imu_.begin();
 
   paramsHandle_ = ConfigStorage::storage.reserveBlock("remote", sizeof(params_));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
@@ -233,14 +233,13 @@ bb::Result RRemote::fillAndSend() {
   packet.source = PACKET_SOURCE_RIGHT_REMOTE;
 #endif
 
-  packet.payload.control.button0 = RemoteInput::input.btnPinky;
-  packet.payload.control.button1 = RemoteInput::input.btnIndex;
-  packet.payload.control.button2 = RemoteInput::input.btnL;
-  packet.payload.control.button3 = RemoteInput::input.btnR;
-  packet.payload.control.button4 = RemoteInput::input.btnJoy;
+  packet.payload.control.button0 = RemoteInput::input.buttons[RemoteInput::BUTTON_PINKY];
+  packet.payload.control.button1 = RemoteInput::input.buttons[RemoteInput::BUTTON_INDEX];
+  packet.payload.control.button2 = RemoteInput::input.buttons[RemoteInput::BUTTON_LEFT];
+  packet.payload.control.button3 = RemoteInput::input.buttons[RemoteInput::BUTTON_RIGHT];
+  packet.payload.control.button4 = RemoteInput::input.buttons[RemoteInput::BUTTON_JOY];
 
   packet.payload.control.setAxis(0, RemoteInput::input.joyH);
-  Console::console.printfBroadcast("JoyH: %f Axis 0: %f\n", RemoteInput::input.joyH, packet.payload.control.getAxis(0));
   packet.payload.control.setAxis(1, RemoteInput::input.joyV);
 
   if (imu_.available()) {
@@ -369,14 +368,14 @@ void RRemote::printStatus(ConsoleStream *stream) {
   imu_.getGyroMeasurement(roll, pitch, yaw);
 
   sprintf(buf, "Buttons: P%cI%cJ%cL%cR%cC%cTL%cTR%c Axes: JH%5.2f JV%5.2f R%7.2fd P%7.2fd Y%7.2f Batt%7.2f P1%7.2f P2%7.2f    \n",
-    RemoteInput::input.btnPinky ? 'X' : '_',
-    RemoteInput::input.btnIndex ? 'X' : '_',
-    RemoteInput::input.btnJoy ? 'X' : '_',
-    RemoteInput::input.btnL ? 'X' : '_',
-    RemoteInput::input.btnR ? 'X' : '_',
-    RemoteInput::input.btnConfirm ? 'X' : '_',
-    RemoteInput::input.btnTopL ? 'X' : '_',
-    RemoteInput::input.btnTopR ? 'X' : '_',
+    RemoteInput::input.buttons[RemoteInput::BUTTON_PINKY] ? 'X' : '_',
+    RemoteInput::input.buttons[RemoteInput::BUTTON_INDEX] ? 'X' : '_',
+    RemoteInput::input.buttons[RemoteInput::BUTTON_JOY] ? 'X' : '_',
+    RemoteInput::input.buttons[RemoteInput::BUTTON_LEFT] ? 'X' : '_',
+    RemoteInput::input.buttons[RemoteInput::BUTTON_RIGHT] ? 'X' : '_',
+    RemoteInput::input.buttons[RemoteInput::BUTTON_CONFIRM] ? 'X' : '_',
+    RemoteInput::input.buttons[RemoteInput::BUTTON_TOP_LEFT] ? 'X' : '_',
+    RemoteInput::input.buttons[RemoteInput::BUTTON_TOP_RIGHT] ? 'X' : '_',
     RemoteInput::input.joyH, RemoteInput::input.joyV,
     roll, pitch, yaw,
     RemoteInput::input.battery,

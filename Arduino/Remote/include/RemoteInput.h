@@ -1,6 +1,10 @@
 #if !defined(REMOTEINPUT_H)
 #define REMOTEINPUT_H
 
+#include <Adafruit_MCP23X17.h>
+#include "Config.h"
+#include <array>
+
 class RemoteInput {
 public:
   static RemoteInput input;
@@ -14,14 +18,20 @@ public:
   float pot1, pot2;
   float battery;
   float joyH, joyV;
-  bool btnPinky;
-  bool btnIndex;
-  bool btnJoy;
-  bool btnL;
-  bool btnR;
-  bool btnConfirm;
-  bool btnTopL;
-  bool btnTopR;
+
+  // Weird order given by ESP32 layout
+  enum ButtonIndex {
+    BUTTON_PINKY     = 5,
+    BUTTON_INDEX     = 4,
+    BUTTON_JOY       = 1,
+    BUTTON_LEFT      = 3,
+    BUTTON_RIGHT     = 2,
+    BUTTON_CONFIRM   = 7,
+    BUTTON_TOP_LEFT  = 6,
+    BUTTON_TOP_RIGHT = 0
+  };
+
+  std::array<bool,8> buttons;
 
   bool btnTopLChanged, btnTopRChanged, btnConfirmChanged;
 
@@ -41,6 +51,9 @@ protected:
   RemoteInput();
   Delegate *delegate_;
   uint16_t zeroVertical_, zeroHorizontal_;
+#if defined(ESP32_REMOTE)
+  Adafruit_MCP23X17 mcp_; bool mcpOK_;
+#endif
 };
 
 #endif // REMOTEINPUT_H
