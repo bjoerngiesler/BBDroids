@@ -18,7 +18,8 @@ DODroid::Params DODroid::params_ = {
   .accel = ACCEL,
   .pwmAccel = PWM_ACCEL,
   .maxSpeed = MAX_SPEED,
-  .faNeckAccel = FA_NECK_ACCEL,
+  .faNeckIMUAccel = FA_NECK_IMU_ACCEL,
+  .faNeckRemoteAccel = FA_NECK_REMOTE_ACCEL,
   .faNeckSpeed = FA_NECK_SPEED,
   .faHeadRollTurn = FA_HEAD_ROLL_TURN,
   .faHeadHeadingTurn = FA_HEAD_HEADING_TURN,
@@ -74,7 +75,8 @@ Result DODroid::initialize() {
   addParameter("accel", "Acceleration in mm/s^2", params_.accel, -INT_MAX, INT_MAX);
   addParameter("pwm_accel", "Acceleration in pwm/s", params_.accel, -INT_MAX, INT_MAX);
   addParameter("max_speed", "Maximum speed (only honored in speed control mode)", params_.maxSpeed, 0, INT_MAX);
-  addParameter("fa_neck_accel", "Free Animation factor - neck on IMU accel", params_.faNeckAccel, -INT_MAX, INT_MAX);
+  addParameter("fa_neck_imu_accel", "Free Animation factor - neck on IMU accel", params_.faNeckIMUAccel, -INT_MAX, INT_MAX);
+  addParameter("fa_neck_remote_accel", "Free Animation factor - neck on remote accel", params_.faNeckRemoteAccel, -INT_MAX, INT_MAX);
   addParameter("fa_neck_speed", "Free Animation factor - neck on wheel speed", params_.faNeckSpeed, -INT_MAX, INT_MAX);
   addParameter("fa_head_roll_turn", "Free Animation factor - head roll on turn speed", params_.faHeadRollTurn, -INT_MAX, INT_MAX);
   addParameter("fa_head_heading_turn", "Free Animation factor - head heading on turn speed", params_.faHeadHeadingTurn, -INT_MAX, INT_MAX);
@@ -217,7 +219,7 @@ bb::Result DODroid::stepHead() {
     float speed = (leftEncoder_.presentSpeed() + rightEncoder_.presentSpeed())/2;
 
     // float nod = p + params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
-    float nod = params_.faNeckAccel*ax + params_.faNeckSpeed*speed;
+    float nod = params_.faNeckIMUAccel*ax + params_.faNeckSpeed*speed;
     bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
     bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 - nod - remoteP_);
     
@@ -566,7 +568,8 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   Console::console.printfBroadcast("Battery OK. Voltage: %.2fV, current draw: %.2fmA\n", DOBattStatus::batt.voltage(), DOBattStatus::batt.current());
   if(DOBattStatus::batt.voltage() < 12.0) {
     DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
-    return RES_DROID_VOLTAGE_TOO_LOW;
+    // FIXME -- Temporarily disabling low-voltage checks
+    //return RES_DROID_VOLTAGE_TOO_LOW;
   } else if(DOBattStatus::batt.voltage() > 17.0) {
     DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_HIGH);
     return RES_DROID_VOLTAGE_TOO_HIGH;

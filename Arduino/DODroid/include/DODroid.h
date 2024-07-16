@@ -16,7 +16,7 @@ public:
     float pwmBalKp, pwmBalKi, pwmBalKd;
     float accel, pwmAccel;
     float maxSpeed;
-    float faNeckAccel, faNeckSpeed;
+    float faNeckIMUAccel, faNeckRemoteAccel, faNeckSpeed;
     float faHeadRollTurn, faHeadHeadingTurn;
     float faAntennaSpeed;
     float annealHeadTime;
