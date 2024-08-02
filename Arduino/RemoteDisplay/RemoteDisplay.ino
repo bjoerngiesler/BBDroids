@@ -4,8 +4,8 @@
 #include "RDSerialInterface.h"
 
 GFX4dIoD9 gfx = GFX4dIoD9();
-static const unsigned int DISPLAY_WIDTH = 80;
-static const unsigned int DISPLAY_HEIGHT = 160;
+static const uint8_t DISPLAY_WIDTH = 80;
+static const uint8_t DISPLAY_HEIGHT = 160;
 
 void showBitmap(unsigned int xoffs, unsigned int yoffs, const char *bmp_data, unsigned int bmp_width, unsigned int bmp_height, bool greyscale) {
   #define RGBTO16BIT(r,g,b) ((r>>3)<<11 | (g>>2)<<5 | ((b>>3)&0x1f))
