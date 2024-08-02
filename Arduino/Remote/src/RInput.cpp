@@ -49,8 +49,9 @@ void bTopRISR(void) {
 }
 #endif // ESP32_REMOTE
 
-RInput::RInput(): delegate_(NULL) {
-  zeroVertical_ = zeroHorizontal_ = 512;
+RInput::RInput(): 
+  delegate_(NULL) {
+  for(bool& b: buttons) b = false;
 }
 
 void RInput::setDelegate(RInput::Delegate *d) {
@@ -58,9 +59,6 @@ void RInput::setDelegate(RInput::Delegate *d) {
 }
 
 bool RInput::begin() {
-  zeroVertical_ = analogRead(P_A_JOY_VER);
-  zeroHorizontal_ = analogRead(P_A_JOY_HOR);
-
 #if defined(ESP32_REMOTE)
   if(mcp_.begin_I2C(0x27) == 0) {
     Console::console.printfBroadcast("Couldn't initialize MCP!\n");
@@ -73,29 +71,32 @@ bool RInput::begin() {
   }
 #endif
 
-  for(bool& b: buttons) b = false;
+  update();
 
   return true;
 }
 
 void RInput::update() {
-  joyH = (float)(zeroHorizontal_ - analogRead(P_A_JOY_HOR)) / 2048.0f;
+  joyRawH = analogRead(P_A_JOY_HOR);
+  joyRawV = analogRead(P_A_JOY_VER);
+
+  joyH = (float)(hCalib_.center - joyRawH) / 2048.0f;
   if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;
   joyH = constrain(joyH, -1.0f, 1.0f);
 
-  joyV = (float)(zeroVertical_ - analogRead(P_A_JOY_VER)) / 2048.0f;
+  joyV = (float)(vCalib_.center - joyRawV) / 2048.0f;
   if(abs(joyV) < JoystickEpsilon) joyV = 0.0f;
   joyV = constrain(joyV, -1.0f, 1.0f);
   
-  battery = (float)(analogRead(P_A_BATT_CHECK) / 1024.0f);
+  battery = (float)(analogRead(P_A_BATT_CHECK) / 4096.0f);
+  pot1 = (float)(analogRead(P_A_POT1) / 4096.0f); // careful - wraps around on the left remote
 #if !defined(LEFT_REMOTE)
-  pot1 = (float)(analogRead(P_A_POT1) / 1024.0f);
-  pot2 = (float)(analogRead(P_A_POT2) / 1024.0f);
+  pot2 = (float)(analogRead(P_A_POT2) / 4096.0f);
 #else
-  pot1 = pot2 = 0;
+  pot2 = 0;
 #endif
 
-#if defined(ESP32_REMOTE)
+#if defined(ESP32_REMOTE) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
   if(mcpOK_) {
     for(uint8_t i = 0; i < buttons.size(); i++) {
       if (mcp_.digitalRead(i) == LOW) {
@@ -115,8 +116,6 @@ void RInput::update() {
       }
     }
   }
-#else
-
 #endif // ESP32_REMOTE
 
   if(delegate_ != NULL) {

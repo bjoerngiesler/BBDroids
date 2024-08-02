@@ -6,8 +6,8 @@ RRemote::RemoteParams RRemote::params_;
 bb::ConfigStorage::HANDLE RRemote::paramsHandle_;
 
 RRemote::RRemote(): 
-  statusPixels_(2, P_D_NEOPIXEL, NEO_GRB+NEO_KHZ800),
-  imu_(IMU_ADDR) {
+  imu_(IMU_ADDR),
+  mode_(MODE_REGULAR) {
   name_ = "remote";
   description_ = "Main subsystem for the BB8 remote";
   help_ = "Main subsystem for the BB8 remote"\
@@ -33,8 +33,15 @@ RRemote::RRemote():
 }
 
 Result RRemote::initialize() { 
+  if(imu_.begin() == false) {
+    Console::console.printfBroadcast("IMU not available\n");
+  }
+
   RInput::input.begin();
-  imu_.begin();
+  if(RInput::input.buttons[RInput::BUTTON_LEFT] == true &&
+     RInput::input.buttons[RInput::BUTTON_RIGHT] == true) {
+    mode_ = MODE_CALIBRATION;
+  }
 
   paramsHandle_ = ConfigStorage::storage.reserveBlock("remote", sizeof(params_));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
@@ -177,10 +184,8 @@ Result RRemote::start(ConsoleStream *stream) {
   (void)stream;
   runningStatus_ = false;
   operationStatus_ = RES_OK;
-  statusPixels_.begin();
-  statusPixels_.clear();
-  statusPixels_.setPixelColor(0, statusPixels_.Color(150, 150, 0));
-  statusPixels_.show();
+
+  Runloop::runloop.setCycleTimeMicros(1e6/imu_.dataRate());
   started_ = true;
 
   return RES_OK;
@@ -188,8 +193,8 @@ Result RRemote::start(ConsoleStream *stream) {
 
 Result RRemote::stop(ConsoleStream *stream) {
   (void)stream;
-  statusPixels_.clear();
-  statusPixels_.show();
+  RDisplay::display.setLED(RDisplay::LED_BOTH, 150, 150, 0);
+  RDisplay::display.showLEDs();
   operationStatus_ = RES_OK;
   started_ = false;
   
@@ -197,31 +202,185 @@ Result RRemote::stop(ConsoleStream *stream) {
 }
 
 Result RRemote::step() {
-  //Runloop::runloop.excuseOverrun();
   if(needsDraw_) {
     currentDrawable_->draw();
     needsDraw_ = false;
   }
 
-  bool allOK = true;
-  std::vector<Subsystem*> subsys = SubsystemManager::manager.subsystems();
-  for(size_t i=0; i<subsys.size(); i++) {
-    if(subsys[i]->isStarted() == false || subsys[i]->operationStatus() != RES_OK) {
-      allOK = false;
-    }
-  }
-
   if(!started_) return RES_SUBSYS_NOT_STARTED;
+
+  imu_.update();
   RInput::input.update();
+
+  if(mode_ & MODE_CALIBRATION) return stepCalib();
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
     fillAndSend();
     if(runningStatus_) {
       printStatus();
     }
+  } else {
+    RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, 0);
+    RDisplay::display.showLEDs();
   }
 
   return RES_OK;
+}
+
+Result RRemote::stepCalib() {
+  if(mode_ == MODE_CALIBRATION) {
+    if(RInput::input.buttons[RInput::BUTTON_LEFT] == false &&
+       RInput::input.buttons[RInput::BUTTON_RIGHT] == false) {
+      setCalibrationMode(MODE_CALIB_CENTER);
+      rawHBuf.clear();
+      rawVBuf.clear();
+      hCalib = RInput::AxisCalib();
+      vCalib = RInput::AxisCalib();
+      calibRounds = MAX_CALIB_ROUNDS_BEFORE_ABORT;
+    } else Console::console.printfBroadcast("Calibration - Please release front buttons\n");
+    return RES_OK;
+  }
+
+  if(calibRounds-- < 0) {
+    abortCalibration();
+    return RES_OK;
+  }
+
+  while(rawHBuf.size() > MAX_CALIB_BUFSIZE) rawHBuf.pop_front();
+  while(rawVBuf.size() > MAX_CALIB_BUFSIZE) rawVBuf.pop_front();
+  rawHBuf.push_back(RInput::input.joyRawH);
+  rawVBuf.push_back(RInput::input.joyRawV);
+  if(rawHBuf.size() < MAX_CALIB_BUFSIZE || rawVBuf.size() < MAX_CALIB_BUFSIZE) {
+    return RES_OK;
+  }
+
+  uint16_t maxH = *std::max_element(rawHBuf.begin(), rawHBuf.end());
+  uint16_t minH = *std::min_element(rawHBuf.begin(), rawHBuf.end());
+  uint16_t maxV = *std::max_element(rawVBuf.begin(), rawVBuf.end());
+  uint16_t minV = *std::min_element(rawVBuf.begin(), rawVBuf.end());
+
+  Console::console.printfBroadcast("Calibration: Buf size %d/%d H %d..%d (%d), V %d..%d (%d)\n", rawHBuf.size(), rawVBuf.size(), minH, maxH, maxH-minH, minV, maxV, maxV-minV);
+  
+  switch(mode_) {
+  case MODE_CALIB_CENTER:
+    if(maxH - minH < MAX_CALIB_DIFF && maxV - minV < MAX_CALIB_DIFF && 
+       minH > 1024 && maxH < 3072 && minV > 1024 && maxV < 3072) {
+      hCalib.center = (maxH + minH)/2;
+      vCalib.center = (maxV + minV)/2;
+      rawHBuf.clear();
+      rawVBuf.clear();
+      calibRounds = MAX_CALIB_ROUNDS_BEFORE_ABORT;
+      setCalibrationMode(MODE_CALIB_X_NEG);
+    }
+    break;
+
+  case MODE_CALIB_X_NEG:
+    if(maxH - minH < MAX_CALIB_DIFF && maxH < 1024) {
+      hCalib.min = minH;
+      rawHBuf.clear();
+      rawVBuf.clear();
+      calibRounds = MAX_CALIB_ROUNDS_BEFORE_ABORT;
+      setCalibrationMode(MODE_CALIB_X_POS);
+    }
+    break;
+
+  case MODE_CALIB_X_POS:
+    if(maxH - minH < MAX_CALIB_DIFF && minH > 3072) {
+      hCalib.max = maxH;
+      rawHBuf.clear();
+      rawVBuf.clear();
+      calibRounds = MAX_CALIB_ROUNDS_BEFORE_ABORT;
+      setCalibrationMode(MODE_CALIB_Y_NEG);
+    }
+    break;
+
+  case MODE_CALIB_Y_NEG:
+    if(maxV - minV < MAX_CALIB_DIFF && maxV < 1024) {
+      vCalib.min = minV;
+      rawHBuf.clear();
+      rawVBuf.clear();
+      calibRounds = MAX_CALIB_ROUNDS_BEFORE_ABORT;
+      setCalibrationMode(MODE_CALIB_Y_POS);
+    }
+    break;
+  case MODE_CALIB_Y_POS:
+    if(maxV - minV < MAX_CALIB_DIFF && maxV > 3072) {
+      vCalib.max = maxV;
+      finishCalibration();
+    }
+    break;
+  }
+
+  return RES_OK;
+}
+
+void RRemote::setCalibrationMode(Mode mode) {
+  bb::Runloop::runloop.excuseOverrun();
+
+  switch(mode_) {
+  case MODE_CALIB_CENTER:
+    RDisplay::display.flashLED(RDisplay::LED_BOTH, 2, 100, 100, 0, 0, 150);
+    break;
+  case MODE_CALIB_X_NEG:
+    RDisplay::display.flashLED(RDisplay::LED_RIGHT, 2, 100, 100, 150, 0, 150);
+    break;
+  case MODE_CALIB_X_POS:
+    RDisplay::display.flashLED(RDisplay::LED_LEFT, 2, 100, 100, 150, 0, 150);
+    break;
+  case MODE_CALIB_Y_NEG:
+    RDisplay::display.flashLED(RDisplay::LED_BOTH, 2, 100, 100, 150, 0, 150);
+    break;
+  case MODE_CALIB_Y_POS:
+    RDisplay::display.flashLED(RDisplay::LED_BOTH, 2, 100, 100, 0, 0, 150);
+    break;
+  }
+
+  mode_ = mode;
+  Console::console.printfBroadcast("Switching to calibration mode 0x%x\n", mode_);
+
+  switch(mode_) {
+  case MODE_CALIB_CENTER:
+    Console::console.printfBroadcast("Both blue\n");
+    RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, 150);
+    RDisplay::display.showLEDs();
+    break;
+  case MODE_CALIB_X_NEG:
+    Console::console.printfBroadcast("Left violet, right off\n");
+    RDisplay::display.setLED(RDisplay::LED_RIGHT, 150, 0, 150);
+    RDisplay::display.setLED(RDisplay::LED_LEFT, 0, 0, 0);
+    RDisplay::display.showLEDs();
+    break;
+  case MODE_CALIB_X_POS:
+    Console::console.printfBroadcast("Right violet, left off\n");
+    RDisplay::display.setLED(RDisplay::LED_LEFT, 150, 0, 150);
+    RDisplay::display.setLED(RDisplay::LED_RIGHT, 0, 0, 0);
+    RDisplay::display.showLEDs();
+    break;
+  case MODE_CALIB_Y_NEG:
+    Console::console.printfBroadcast("Both violet\n");
+    RDisplay::display.setLED(RDisplay::LED_BOTH, 150, 0, 150);
+    RDisplay::display.showLEDs();
+    break;
+  case MODE_CALIB_Y_POS:
+    Console::console.printfBroadcast("Both blue\n");
+    RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, 150);
+    RDisplay::display.showLEDs();
+    break;
+  }
+}
+
+void RRemote::abortCalibration() {
+  Console::console.printfBroadcast("Aborting calibration\n");
+  mode_ = MODE_REGULAR;
+  RDisplay::display.flashLED(RDisplay::LED_BOTH, 3, 100, 100, 150, 0, 0);
+}
+
+void RRemote::finishCalibration() {
+  Console::console.printfBroadcast("Finishing calibration - H %d..%d..%d, V %d..%d..%d\n", hCalib.min, hCalib.center, hCalib.max, vCalib.min, vCalib.center, vCalib.max);
+  mode_ = MODE_REGULAR;
+  RDisplay::display.flashLED(RDisplay::LED_BOTH, 3, 100, 100, 0, 150, 0);
+  params_.hCalib = hCalib; params_.vCalib = vCalib;
+  RInput::input.setCalibration(hCalib, vCalib);
 }
 
 bb::Result RRemote::fillAndSend() {
@@ -242,15 +401,31 @@ bb::Result RRemote::fillAndSend() {
   packet.payload.control.button3 = RInput::input.buttons[RInput::BUTTON_RIGHT];
   packet.payload.control.button4 = RInput::input.buttons[RInput::BUTTON_JOY];
 
+#if defined(LEFT_REMOTE)
+  // FIXME replace by switches set in menu system
+  packet.payload.control.button5 = false;
+  packet.payload.control.button6 = false;
+  packet.payload.control.button7 = false;
+#else
+  packet.payload.control.button5 = RInput::input.buttons[RInput::BUTTON_TOP_LEFT];
+  packet.payload.control.button6 = RInput::input.buttons[RInput::BUTTON_TOP_RIGHT];
+  packet.payload.control.button7 = RInput::input.buttons[RInput::BUTTON_CONFIRM];
+#endif
+
   packet.payload.control.setAxis(0, RInput::input.joyH);
   packet.payload.control.setAxis(1, RInput::input.joyV);
 
   if (imu_.available()) {
     float roll, pitch, heading;
-    imu_.update();
+    float ax, ay, az;
     imu_.getFilteredRPH(roll, pitch, heading);
+    imu_.getAccelMeasurement(ax, ay, az);
 
-    roll = -roll;
+#if defined(ESP32_REMOTE)
+  float temp = roll;
+  roll = pitch;
+  pitch = temp;
+#endif
 
     if(lastPacketSent_.payload.control.button2 == false && packet.payload.control.button2 == true) {
       deltaR_ = roll; deltaP_ = pitch; deltaH_ = heading;
@@ -259,7 +434,19 @@ bb::Result RRemote::fillAndSend() {
     packet.payload.control.setAxis(2, (roll-deltaR_)/180.0); 
     packet.payload.control.setAxis(3, (pitch-deltaP_)/180.0);
     packet.payload.control.setAxis(4, (heading-deltaH_)/180.0);
+    packet.payload.control.setAxis(5, ax/(2*9.81));
+    packet.payload.control.setAxis(6, ay/(2*9.81));
+    packet.payload.control.setAxis(7, az/(2*9.81));
   }
+
+  packet.payload.control.setAxis(8, RInput::input.pot1);
+
+#if defined(LEFT_REMOTE)
+  packet.payload.control.setAxis(9, 0);
+#else
+  // FIXME replace by values set in menu system
+  packet.payload.control.setAxis(9, RInput::input.pot2);
+#endif
 
 #if defined(LEFT_REMOTE)
   if(currentDrawable_ == graphs_) {
@@ -279,7 +466,17 @@ bb::Result RRemote::fillAndSend() {
   // both remotes send to droid
   if(params_.droidID != 0) {
     res = bb::XBee::xbee.sendTo(params_.droidID, packet, false);
-    if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
+    if(res != RES_OK) {
+      RDisplay::display.setLED(RDisplay::LED_LEFT, 0, 150, 0);
+      RDisplay::display.showLEDs();
+      Console::console.printfBroadcast("%s\n", errorMessage(res)); 
+    } else {
+      RDisplay::display.setLED(RDisplay::LED_LEFT, 150, 0, 0);
+      RDisplay::display.showLEDs();
+    }
+  } else {
+      RDisplay::display.setLED(RDisplay::LED_LEFT, 0, 0, 150);
+      RDisplay::display.showLEDs();
   }
 
   return res;
@@ -292,7 +489,9 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
     printStatus(stream);
     stream->printf("\n");
     return RES_OK;
-  } else if(words[0] == "running_status") {
+  } 
+  
+  else if(words[0] == "running_status") {
     if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
     if(words[1] == "on" || words[1] == "true") {
       runningStatus_ = true;
@@ -303,7 +502,19 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
     }
     return RES_CMD_INVALID_ARGUMENT;
   }
-  return RES_CMD_UNKNOWN_COMMAND;
+
+  else if(words[0] == "calibrate") {
+    setCalibrationMode(MODE_CALIB_CENTER);
+    rawHBuf.clear();
+    rawVBuf.clear();
+    hCalib = RInput::AxisCalib();
+    vCalib = RInput::AxisCalib();
+    calibRounds = MAX_CALIB_ROUNDS_BEFORE_ABORT;
+
+    return RES_OK;
+  }
+
+  return Subsystem::handleConsoleCommand(words, stream);
 } 
 
 Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& packet) {
@@ -367,8 +578,14 @@ Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& pack
 void RRemote::printStatus(ConsoleStream *stream) {
   char buf[255];
 
-  float roll, pitch, yaw;
-  imu_.getGyroMeasurement(roll, pitch, yaw);
+  float roll, pitch, heading;
+  imu_.getFilteredRPH(roll, pitch, heading);
+
+#if defined(ESP32_REMOTE)
+  float temp = roll;
+  roll = pitch;
+  pitch = temp;
+#endif
 
   sprintf(buf, "Buttons: P%cI%cJ%cL%cR%cC%cTL%cTR%c Axes: JH%5.2f JV%5.2f R%7.2fd P%7.2fd Y%7.2f Batt%7.2f P1%7.2f P2%7.2f    \n",
     RInput::input.buttons[RInput::BUTTON_PINKY] ? 'X' : '_',
@@ -380,7 +597,7 @@ void RRemote::printStatus(ConsoleStream *stream) {
     RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? 'X' : '_',
     RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? 'X' : '_',
     RInput::input.joyH, RInput::input.joyV,
-    roll, pitch, yaw,
+    roll, pitch, heading,
     RInput::input.battery,
     RInput::input.pot1, 
     RInput::input.pot2);

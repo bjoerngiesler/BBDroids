@@ -17,19 +17,22 @@ int getAnalogReadResolution() { return 12; } // whatever
 #include <WiFiAP.h>
 
 void setup() {
-  pinMode(P_D_RST_IOEXP, OUTPUT);
-  digitalWrite(P_D_RST_IOEXP, HIGH);
-  delay(50);
-
-
-  //rp2040.enableDoubleResetBootloader();
+#if !defined(ESP32_REMOTE)
+  rp2040.enableDoubleResetBootloader();
+#endif
+  
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
+#if !defined(LEFT_REMOTE)
+  pinMode(P_D_RST_IOEXP, OUTPUT);
+  digitalWrite(P_D_RST_IOEXP, HIGH);
+#endif
+
   Serial.begin(115200);
-  while(!Serial);
 
   Wire.begin();
+  Wire.setClock(400000UL);
 
   ConfigStorage::storage.initialize();
 
@@ -37,16 +40,22 @@ void setup() {
   Console::console.start();
   
   Runloop::runloop.initialize();
+
 #if defined(LEFT_REMOTE)
+#if defined(ESP32_REMOTE)
+  Serial2.setPins(P_D_DISPLAY_RX, P_D_DISPLAY_TX);
+#endif
+#endif
   RDisplay::display.initialize();
+
+#if defined(LEFT_REMOTE)
   uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_L, BUILDER_ID, REMOTE_ID);
 #else 
   uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
 #endif
-  Serial1.setPins(D7, D6);
+  Serial1.setPins(P_D_XBEE_RX, P_D_XBEE_TX);
   XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200, &Serial1);
-  
-  
+
 #if defined(LEFT_REMOTE)
   WifiServer::server.initialize("LRemote-$MAC", "LRemoteKey", true, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
 #else
@@ -54,8 +63,8 @@ void setup() {
 #endif
   RRemote::remote.initialize();
 
-#if defined(LEFT_REMOTE)
   RDisplay::display.start();
+#if defined(LEFT_REMOTE)
   XBee::xbee.setName("LeftRemote");
 #else
   XBee::xbee.setName("RightRemote");

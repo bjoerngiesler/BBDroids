@@ -1,9 +1,12 @@
 #if !defined(RDISPLAY_H)
 #define RDISPLAY_H
 
+#include <Adafruit_NeoPixel.h>
 #include <LibBB.h>
 #if defined(LEFT_REMOTE)
+#if !defined(ESP32_REMOTE)
 #include <SoftwareSerial.h>
+#endif
 #endif
 #include <vector>
 
@@ -33,6 +36,12 @@ public:
   static const uint8_t DISPLAY_WIDTH = 80;
   static const uint8_t DISPLAY_HEIGHT = 160;
 
+  enum WhichLED {
+    LED_LEFT,
+    LED_RIGHT,
+    LED_BOTH
+  };
+
   static RDisplay display;
 
   virtual Result initialize();
@@ -46,6 +55,10 @@ public:
   Result rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color, bool filled=false);
   Result plot(uint8_t x, uint8_t y, uint16_t color);
 
+  Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b);
+  Result flashLED(WhichLED which, uint8_t iterations, uint8_t millisOn, uint8_t millisOff, uint8_t r, uint8_t g, uint8_t b);
+  Result showLEDs();
+
 protected:
   RDisplay();
   virtual ~RDisplay() {}
@@ -55,10 +68,15 @@ protected:
   bool sendStringAndWaitForOK(const String& str, int predelay=0, bool nl=true);
 
 #if defined(LEFT_REMOTE)
+#if defined(ESP32_REMOTE)
+  HardwareSerial& ser_;
+#else
   SerialPIO ser_;
+#endif
 #endif
   bool left_led_state_, right_led_state_;
   unsigned long last_millis_;
+  Adafruit_NeoPixel statusPixels_;
 };
 
 #endif // RDISPLAY_H
