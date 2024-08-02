@@ -3,6 +3,7 @@
 
 #include <BBError.h>
 #include <BBRunloop.h>
+#include <BBConsole.h>
 
 namespace bb {
 
@@ -14,44 +15,69 @@ namespace bb {
 
 struct __attribute__ ((packed)) ControlPacket {
 
-#define AXIS_MAX 511
+#define AXIS_MAX1 511
+#define AXIS_MAX2 127
 
 	int16_t axis0  : 10; // bit 0..9
 	int16_t axis1  : 10; // bit 10..19
 	int16_t axis2  : 10; // bit 20..29
 	int16_t axis3  : 10; // bit 30..39
 	int16_t axis4  : 10; // bit 40..49
-	bool button0    : 1;  // bit 50
-	bool button1    : 1;  // bit 51
-	bool button2    : 1;  // bit 52
-	bool button3    : 1;  // bit 53
-	bool button4    : 1;  // bit 54
-	bool event      : 1;  // bit 55
+	int8_t  axis5;       // bit 50..57
+	int8_t  axis6;       // bit 58..65
+	int8_t  axis7;       // bit 66..73
+	int8_t  axis8;       // bit 74..81
+	int8_t  axis9;       // bit 82..89
+	bool button0    : 1; // bit 90
+	bool button1    : 1; // bit 91
+	bool button2    : 1; // bit 92
+	bool button3    : 1; // bit 93
+	bool button4    : 1; // bit 94
+	bool button5    : 1; // bit 95
+	bool button6    : 1; // bit 96
+	bool button7    : 1; // bit 97
 
 	void setAxis(uint8_t num, float value) {
 		value = constrain(value, -1.0, 1.0);
 		switch(num) {
-		case 0: axis0 = value*AXIS_MAX; 
-		case 1: axis1 = value*AXIS_MAX; 
-		case 2: axis2 = value*AXIS_MAX; 
-		case 3: axis3 = value*AXIS_MAX; 
-		case 4: axis4 = value*AXIS_MAX;
+		case 0: axis0 = value*AXIS_MAX1; break;
+		case 1: axis1 = value*AXIS_MAX1; break;
+		case 2: axis2 = value*AXIS_MAX1; break;
+		case 3: axis3 = value*AXIS_MAX1; break;
+		case 4: axis4 = value*AXIS_MAX1; break;
+		case 5: axis5 = value*AXIS_MAX2; break;
+		case 6: axis6 = value*AXIS_MAX2; break;
+		case 7: axis7 = value*AXIS_MAX2; break;
+		case 8: axis8 = value*AXIS_MAX2; break;
+		case 9: axis9 = value*AXIS_MAX2; break;
 		default: break;
 		}
 	}
 
 	float getAxis(uint8_t num) const {
 		switch(num) {
-		case 0: return ((float)axis0)/AXIS_MAX;
-		case 1: return ((float)axis1)/AXIS_MAX;
-		case 2: return ((float)axis2)/AXIS_MAX;
-		case 3: return ((float)axis3)/AXIS_MAX;
-		case 4: return ((float)axis4)/AXIS_MAX;
+		case 0: return ((float)axis0)/AXIS_MAX1;
+		case 1: return ((float)axis1)/AXIS_MAX1;
+		case 2: return ((float)axis2)/AXIS_MAX1;
+		case 3: return ((float)axis3)/AXIS_MAX1;
+		case 4: return ((float)axis4)/AXIS_MAX1;
+		case 5: return ((float)axis5)/AXIS_MAX2;
+		case 6: return ((float)axis6)/AXIS_MAX2;
+		case 7: return ((float)axis7)/AXIS_MAX2;
+		case 8: return ((float)axis8)/AXIS_MAX2;
+		case 9: return ((float)axis9)/AXIS_MAX2;
 		default: break;
 		}
 		return 0.0;
 	}
-};     // 7 bytes long, maximum should be <=10
+
+	void print() const {
+		Console::console.printfBroadcast("%d %d %d %d %d %d %d %d %d %d %s%s%s%s%s%s%s%s\n",
+			axis0, axis1, axis2, axis3, axis4, axis5, axis6, axis7, axis8, axis9, 
+			button0?"X":"_", button1?"X":"_", button2?"X":"_", button3?"X":"_", button4?"X":"_", button5?"X":"_", button6?"X":"_", button7?"X":"_");
+	}
+
+};     // 13 bytes long
 
 struct __attribute__ ((packed)) ControlMode {
 	enum ControlType {
