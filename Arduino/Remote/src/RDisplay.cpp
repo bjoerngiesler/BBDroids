@@ -148,6 +148,19 @@ Result RDisplay::hline(uint8_t x, uint8_t y, uint8_t width, uint16_t color) {
   return RES_OK;
 }
 
+Result RDisplay::vline(uint8_t x, uint8_t y, uint8_t height, uint16_t color) {
+  String str = String("vline ") + x + " " + y + " " + height + " 0x" + String(color, HEX);
+  if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
+  return RES_OK;
+}
+
+Result RDisplay::line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color) {
+  String str = String("line ") + x1 + " " + y1 + " " + x2 + " " + y2 + " 0x" + String(color, HEX);
+  if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
+  return RES_OK;
+}
+
+
 Result RDisplay::rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color, bool filled) {
   String str;
   if(filled) str = String("rectfilled ") + x1 + " " + y1 + " " + x2 + " " + y2 + " " + " 0x" + String(color, HEX);

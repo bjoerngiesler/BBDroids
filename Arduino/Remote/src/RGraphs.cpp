@@ -10,7 +10,6 @@ RGraphs::RGraphs() {
 }
 
 Result RGraphs::draw(ConsoleStream* stream) {
-  Console::console.printfBroadcast("Drawing\n");
   if(needsCls_) {
     RDisplay::display.cls();
     int y, titlex;

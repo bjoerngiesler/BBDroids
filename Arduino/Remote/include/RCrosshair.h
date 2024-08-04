@@ -1,5 +1,5 @@
-#if !defined(RJOYVIS_H)
-#define RJOYVIS_H
+#if !defined(RCROSSHAIR_H)
+#define RCROSSHAIR_H
 
 #include <LibBB.h>
 
@@ -8,10 +8,10 @@
 
 using namespace bb;
 
-// Joystick Visualization Drawable
-class RJoyVis: public RDrawable {
+// Crosshair Visualization Drawable
+class RCrosshair: public RDrawable {
 public:
-  RJoyVis();
+  RCrosshair();
   virtual Result draw(ConsoleStream* stream = NULL);
   void setHorVer(uint16_t h, uint16_t v);
   void horVerToScreen(uint16_t hor, uint16_t ver, uint8_t& x, uint8_t& y);

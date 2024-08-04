@@ -56,7 +56,9 @@ Result RRemote::initialize() {
   droidsMenu_ = new RMenu("Droids");
   remotesMenu_ = new RMenu("Remotes");
   waitMessage_ = new RMessage("Please wait");
-  graphs_ = new RGraphs();
+  graphs_ = new RGraphs;
+  crosshair_ = new RCrosshair;
+  crosshair_->setSize(78, 78);
 
   mainMenu_->addEntry("Settings...", []() { RRemote::remote.showSettingsMenu(); });
   mainMenu_->addEntry("Back", []() { RRemote::remote.showGraphs(); });
@@ -65,9 +67,15 @@ Result RRemote::initialize() {
   settingsMenu_->addEntry("Droid...", []() { RRemote::remote.showDroidsMenu(); });
   settingsMenu_->addEntry("Back", []() { RRemote::remote.showMainMenu(); });
 
-  showGraphs();
+  showCalib();
 
   return Subsystem::initialize();
+}
+
+void RRemote::showCalib() {
+  currentDrawable_ = crosshair_;
+  crosshair_->setNeedsCls(true);
+  needsDraw_ = true;
 }
 
 void RRemote::showMenu(RMenu *menu) {
@@ -202,10 +210,7 @@ Result RRemote::stop(ConsoleStream *stream) {
 }
 
 Result RRemote::step() {
-  if(needsDraw_) {
-    currentDrawable_->draw();
-    needsDraw_ = false;
-  }
+  // Console::console.printfBroadcast("step()\n");
 
   if(!started_) return RES_SUBSYS_NOT_STARTED;
 
@@ -215,6 +220,12 @@ Result RRemote::step() {
   if(mode_ & MODE_CALIBRATION) return stepCalib();
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
+
+    if(1) { // needsDraw_) {
+      currentDrawable_->draw();
+      needsDraw_ = false;
+    }
+
     fillAndSend();
     if(runningStatus_) {
       printStatus();
@@ -223,6 +234,8 @@ Result RRemote::step() {
     RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, 0);
     RDisplay::display.showLEDs();
   }
+
+  // Console::console.printfBroadcast("Done with step()\n");
 
   return RES_OK;
 }
@@ -259,7 +272,7 @@ Result RRemote::stepCalib() {
   uint16_t maxV = *std::max_element(rawVBuf.begin(), rawVBuf.end());
   uint16_t minV = *std::min_element(rawVBuf.begin(), rawVBuf.end());
 
-  Console::console.printfBroadcast("Calibration: Buf size %d/%d H %d..%d (%d), V %d..%d (%d)\n", rawHBuf.size(), rawVBuf.size(), minH, maxH, maxH-minH, minV, maxV, maxV-minV);
+  // Console::console.printfBroadcast("Calibration: Buf size %d/%d H %d..%d (%d), V %d..%d (%d)\n", rawHBuf.size(), rawVBuf.size(), minH, maxH, maxH-minH, minV, maxV, maxV-minV);
   
   switch(mode_) {
   case MODE_CALIB_CENTER:

@@ -78,7 +78,7 @@ bool RInput::begin() {
 
 void RInput::update() {
   joyRawH = analogRead(P_A_JOY_HOR);
-  joyRawV = analogRead(P_A_JOY_VER);
+  joyRawV = 4096 - analogRead(P_A_JOY_VER);
 
   joyH = (float)(hCalib_.center - joyRawH) / 2048.0f;
   if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;

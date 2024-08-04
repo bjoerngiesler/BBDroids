@@ -7,6 +7,7 @@
 #include "RMenu.h"
 #include "RMessage.h"
 #include "RGraphs.h"
+#include "RCrosshair.h"
 
 using namespace bb;
 
@@ -53,6 +54,7 @@ public:
   void showRemotesMenu();
   void showMenu(RMenu* menu);
   void showGraphs();
+  void showCalib();
 
   void selectDroid(uint16_t stationId);
   void selectRightRemote(uint16_t stationId);
@@ -67,6 +69,7 @@ protected:
   Packet lastPacketSent_;
   RMenu *mainMenu_, *settingsMenu_, *droidsMenu_, *remotesMenu_;
   RGraphs *graphs_;
+  RCrosshair *crosshair_;
   RMessage *waitMessage_;
   RDrawable *currentDrawable_;
   bool needsDraw_;

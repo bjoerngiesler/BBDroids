@@ -1,14 +1,14 @@
-#include "RJoyVis.h"
+#include "RCrosshair.h"
 #include "RDisplay.h"
 
-RJoyVis::RJoyVis():
+RCrosshair::RCrosshair():
     hor_(2048),
     ver_(2048),
     oldHor_(2048),
     oldVer_(2048) {
 }
   
-Result RJoyVis::draw(ConsoleStream* stream) {
+Result RCrosshair::draw(ConsoleStream* stream) {
     if(needsFullRedraw_) {
         RDisplay::display.rect(x_, y_, x_+width_, y_+height_, RDisplay::BLACK, true);
         RDisplay::display.rect(x_, y_, x_+width_, y_+height_, RDisplay::WHITE, false);
@@ -39,12 +39,12 @@ Result RJoyVis::draw(ConsoleStream* stream) {
     return RES_OK;
 }
 
-void RJoyVis::setHorVer(uint16_t h, uint16_t v) {
+void RCrosshair::setHorVer(uint16_t h, uint16_t v) {
     oldHor_ = hor_; oldVer_ = ver_;
     hor_ = h; ver_ = v;
     setNeedsContentsRedraw();
 }
 
-void RJoyVis::horVerToScreen(uint16_t h, uint16_t v, uint8_t& x, uint8_t& y) {
+void RCrosshair::horVerToScreen(uint16_t h, uint16_t v, uint8_t& x, uint8_t& y) {
     x = (h*(width_-2))/4096+x_+1; y = (v*(width_-2))/4096+y_+1;
 }

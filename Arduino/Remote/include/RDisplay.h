@@ -16,10 +16,21 @@ using namespace bb;
 
 class RDrawable {
 public:
+  RDrawable() { 
+    needsFullRedraw_ = needsContentsRedraw_ = true; 
+    x_ = y_ = 1;
+    width_ = height_ = 10;
+  }
+  void setPosition(uint8_t x, uint8_t y) { x_ = x; y_ = y; }
+  void setSize(uint8_t w, uint8_t h) { width_ = w; height_ = h; setNeedsFullRedraw(); setNeedsCls(); }
   virtual Result draw(ConsoleStream* stream = NULL) = 0;
-  void setNeedsCls(bool needs) { needsCls_ = needs; }
+  void setNeedsCls(bool needs = true) { needsCls_ = needs; }
+  void setNeedsFullRedraw(bool needs = true) { needsFullRedraw_ = needs; if(needs) needsContentsRedraw_ = true; }
+  void setNeedsContentsRedraw(bool needs = true) { needsContentsRedraw_ = needs; }
 protected:
-  bool needsCls_;
+  bool needsCls_, needsFullRedraw_, needsContentsRedraw_;
+  uint8_t x_, y_;
+  uint8_t width_, height_;
 };
 
 class RDisplay: public Subsystem {
@@ -30,6 +41,11 @@ public:
   static const uint16_t GREEN = 0x0400;
   static const uint16_t BLUE  = 0x001F;
   static const uint16_t YELLOW = 0xFFE0;
+  static const uint16_t DARKGREY = 0xAD55;
+  static const uint16_t DIMGRAY = 0x6B4D;
+  static const uint16_t DARKBLUE = 0x0011;
+  static const uint16_t LIGHTGREY = 0xD69A;
+  static const uint16_t LIGHTSTEELBLUE = 0xB63B;
 
   static const uint8_t CHAR_WIDTH = 6;
   static const uint8_t CHAR_HEIGHT = 10;
@@ -52,6 +68,8 @@ public:
   Result cls();
   Result text(uint8_t x, uint8_t y, uint16_t color, const String& text);
   Result hline(uint8_t x, uint8_t y, uint8_t width, uint16_t color);
+  Result vline(uint8_t x, uint8_t y, uint8_t height, uint16_t color);
+  Result line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color);
   Result rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color, bool filled=false);
   Result plot(uint8_t x, uint8_t y, uint16_t color);
 
