@@ -5,7 +5,7 @@
 
 #define ESP32_REMOTE
 
-//#define LEFT_REMOTE
+#define LEFT_REMOTE
 
 #if defined(ESP32_REMOTE)
 
@@ -15,8 +15,8 @@
 #if defined(LEFT_REMOTE)
 
 static const uint8_t P_D_NEOPIXEL   = D0;
-static const uint8_t P_A_JOY_HOR    = A1;
-static const uint8_t P_A_JOY_VER    = A2;
+static const uint8_t P_A_JOY_VER    = A1;
+static const uint8_t P_A_JOY_HOR    = A2;
 static const uint8_t P_A_BATT_CHECK = A3;
 static const uint8_t P_D_XBEE_TX    = D6;
 static const uint8_t P_D_XBEE_RX    = D7;
