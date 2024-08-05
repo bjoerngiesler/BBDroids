@@ -692,6 +692,7 @@ bool bb::Servos::setPIDValues(uint8_t id, uint16_t kp, uint16_t ki, uint16_t kd)
   dxl_.writeControlTableItem(ControlTableItem::P_GAIN, id, kp);
   dxl_.writeControlTableItem(ControlTableItem::I_GAIN, id, ki);
   dxl_.writeControlTableItem(ControlTableItem::D_GAIN, id, kd);
+  return true;
 }
 
 
