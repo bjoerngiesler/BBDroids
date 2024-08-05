@@ -41,3 +41,18 @@ void RWidget::setNeedsFullRedraw(bool needs) {
 void RWidget::setNeedsContentsRedraw(bool needs) { 
     needsContentsRedraw_ = needs; 
 }
+
+void RWidget::setBackgroundColor(uint16_t background) {
+    bgCol_ = background;
+    needsFullRedraw_ = true;
+}
+
+void RWidget::setForegroundColor(uint16_t foreground) {
+    fgCol_ = foreground;
+    needsFullRedraw_ = true;
+}
+
+void RWidget::setBorderColor(uint16_t border) {
+    borderCol_ = border;
+    needsFullRedraw_ = true;
+}

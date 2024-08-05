@@ -7,8 +7,7 @@ bb::ConfigStorage::HANDLE RRemote::paramsHandle_;
 
 RRemote::RRemote(): 
   imu_(IMU_ADDR),
-  mode_(MODE_REGULAR),
-  currentWidget_(NULL) {
+  mode_(MODE_REGULAR) {
   name_ = "remote";
   description_ = "Main subsystem for the BB8 remote";
   help_ = "Main subsystem for the BB8 remote"\
@@ -46,6 +45,11 @@ RRemote::RRemote():
   settingsMenu_.addEntry("Back", []() { RRemote::remote.showMainMenu(); });
 
   crosshair_.setSize(77, 77);
+  calibLabel_.setPosition(2, 85);
+  calibLabel_.setSize(76, RDisplay::CHAR_HEIGHT*2);
+  calibLabel_.setDrawsFrame();
+  calibLabel_.setFillsBackground();
+  calibLabel_.setTitle("Hello!");
 }
 
 Result RRemote::initialize() { 
@@ -72,14 +76,37 @@ Result RRemote::initialize() {
   return Subsystem::initialize();
 }
 
+void RRemote::addWidget(RWidget* w) {
+  if(!hasWidget(w)) widgets_.push_back(w);
+}
+  
+bool RRemote::hasWidget(RWidget* w) {
+  return std::find(widgets_.begin(), widgets_.end(), w) != widgets_.end();
+}
+  
+bool RRemote::removeWidget(RWidget* w) {
+  std::vector<RWidget*>::iterator iter = std::find(widgets_.begin(), widgets_.end(), w);
+  if(iter == widgets_.end()) return false;
+  widgets_.erase(iter);
+  return true;
+}
+
+void RRemote::clearWidgets() {
+  widgets_.clear();
+}
+
+
 void RRemote::showCalib() {
-  currentWidget_ = &crosshair_;
+  clearWidgets();
+  addWidget(&crosshair_);
+  addWidget(&calibLabel_);
   crosshair_.setNeedsCls(true);
   needsDraw_ = true;
 }
 
 void RRemote::showMenu(RMenuWidget* menu) {
-  currentWidget_ = menu;
+  clearWidgets();
+  addWidget(menu);
   RInput::input.setDelegate(menu);
   menu->setNeedsCls(true);
   menu->resetCursor();
@@ -87,14 +114,16 @@ void RRemote::showMenu(RMenuWidget* menu) {
 }
 
 void RRemote::showGraphs() {
-  currentWidget_ = &graphs_;
+  clearWidgets();
+  addWidget(&graphs_);
   graphs_.setNeedsCls(true);
   RInput::input.setDelegate(&graphs_);
   needsDraw_ = true;
 }
 
 void RRemote::showDroidsMenu() {
-  currentWidget_ = &waitMessage_;
+  clearWidgets();
+  addWidget(&waitMessage_);
   RInput::input.clearDelegate();
   waitMessage_.draw();
 
@@ -118,7 +147,8 @@ void RRemote::showDroidsMenu() {
 }
 
 void RRemote::showRemotesMenu() {
-  currentWidget_ = &waitMessage_;
+  clearWidgets();
+  addWidget(&waitMessage_);
   RInput::input.clearDelegate();
   waitMessage_.draw();
 
@@ -220,10 +250,10 @@ Result RRemote::step() {
   if(mode_ & MODE_CALIBRATION) return stepCalib();
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
+    calibLabel_.setTitle(String("H") + RInput::input.joyRawH + " V" + RInput::input.joyRawV);
 
     if(1) { // needsDraw_) {
-      if(currentWidget_ != NULL)
-        currentWidget_->draw();
+      for(auto w: widgets_) w->draw();
       needsDraw_ = false;
     }
 

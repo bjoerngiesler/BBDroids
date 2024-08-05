@@ -17,7 +17,7 @@ public:
 
     // Whether or not the widget should fill its background. False by default for most non-graphing widgets.
     virtual void setFillsBackground(bool fills = true) { fillsBg_ = fills; needsContentsRedraw_ = true; }
-    virtual bool fillsBackground() { return fillsBg_; }
+    virtual void setDrawsFrame(bool draws = true) { drawsFrame_ = draws; needsFullRedraw_ = true;}
 
     virtual void setNeedsCls(bool needs = true);
     virtual void setNeedsFullRedraw(bool needs = true);
@@ -31,7 +31,7 @@ protected:
   uint8_t x_, y_;
   uint8_t width_, height_;
   uint16_t bgCol_, fgCol_, borderCol_;
-  bool fillsBg_;
+  bool fillsBg_, drawsFrame_;
 };
 
 #endif // RWIDGET_H

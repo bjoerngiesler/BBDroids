@@ -7,13 +7,15 @@ RCrosshairWidget::RCrosshairWidget():
     oldHor_(2048),
     oldVer_(2048) {
     setFillsBackground();
+    setDrawsFrame();
 }
   
 Result RCrosshairWidget::draw(ConsoleStream* stream) {
     if(needsFullRedraw_) {
         if(fillsBg_)
             RDisplay::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
-        RDisplay::display.rect(x_, y_, x_+width_, y_+height_, borderCol_, false);
+        if(drawsFrame_)
+            RDisplay::display.rect(x_, y_, x_+width_, y_+height_, borderCol_, false);
         needsFullRedraw_ = false;
     }
 

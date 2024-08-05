@@ -4,11 +4,12 @@
 #include <LibBB.h>
 #include <deque>
 #include "Config.h"
+#include "RWidget.h"
 #include "RMenuWidget.h"
 #include "RMessageWidget.h"
 #include "RGraphsWidget.h"
 #include "RCrosshairWidget.h"
-#include "RWidget.h"
+#include "RLabelWidget.h"
 
 using namespace bb;
 
@@ -57,6 +58,11 @@ public:
   void showGraphs();
   void showCalib();
 
+  void addWidget(RWidget* w);
+  bool hasWidget(RWidget* w);
+  bool removeWidget(RWidget* w);
+  void clearWidgets();
+
   void selectDroid(uint16_t stationId);
   void selectRightRemote(uint16_t stationId);
 
@@ -71,8 +77,10 @@ protected:
   RMenuWidget mainMenu_, settingsMenu_, droidsMenu_, remotesMenu_;
   RGraphsWidget graphs_;
   RCrosshairWidget crosshair_;
+  RLabelWidget calibLabel_;
   RMessageWidget waitMessage_;
-  RWidget* currentWidget_;
+
+  std::vector<RWidget*> widgets_;
   bool needsDraw_;
   std::vector<XBee::Node> discoveredNodes_;
   bb::IMU imu_;
