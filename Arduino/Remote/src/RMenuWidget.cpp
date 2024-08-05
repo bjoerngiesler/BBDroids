@@ -1,46 +1,54 @@
-#include "RMenu.h"
+#include "RMenuWidget.h"
 
-RMenu::RMenu(const char* title):
-  title_(title) {
-    cursor_ = 0;
-    needsCls_ = true;
+RMenuWidget::RMenuWidget() {
+  title_ = "(null)";
+  cursor_ = 0;
+  needsCls_ = true;
 }
 
-void RMenu::addEntry(const char* title, std::function<void(void)> callback) {
+void RMenuWidget::setTitle(const char *title) {
+  if(title == NULL)
+    title_ = "(null)";
+  else
+    title_ = title;
+}
+
+void RMenuWidget::addEntry(const char* title, std::function<void(void)> callback) {
   Entry e = {title, callback};
+  if(title == NULL) e = {"(null)", callback};
   entries_.push_back(e);
   needsCls_ = true;
 }
 
-void RMenu::clear() {
+void RMenuWidget::clear() {
   entries_ = std::vector<Entry>();
   cursor_ = 0;
 }
 
-void RMenu::buttonTopLeftPressed() {
+void RMenuWidget::buttonTopLeftPressed() {
   if(cursor_ == 0) return;
   cursor_--;
   draw();
 }
 
-void RMenu::buttonTopRightPressed() {
+void RMenuWidget::buttonTopRightPressed() {
   if(cursor_ >= entries_.size()-1) return;
   cursor_++;
   draw();
 }
   
-void RMenu::buttonConfirmPressed() {
+void RMenuWidget::buttonConfirmPressed() {
   entries_[cursor_].callback();
 }
   
-Result RMenu::draw(ConsoleStream *stream) {
-  Result res;
-  
+Result RMenuWidget::draw(ConsoleStream *stream) {
   if(needsCls_) {
     RDisplay::display.cls();
     needsCls_ = false;
   }
+
   RDisplay::display.text(0, 0, RDisplay::WHITE, title_);
+
   RDisplay::display.hline(0, 12, 80, RDisplay::WHITE);
   for(uint8_t i=0; i<entries_.size(); i++) {
     if(cursor_ == i) {
@@ -50,5 +58,5 @@ Result RMenu::draw(ConsoleStream *stream) {
     }
   }
   RDisplay::display.hline(0, 140, 80, RDisplay::WHITE);
-  return res;
+  return RWidget::draw(stream);
 }

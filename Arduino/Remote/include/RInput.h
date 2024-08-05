@@ -69,11 +69,12 @@ public:
     virtual void buttonConfirmReleased() {}
   };
 
-  void setDelegate(Delegate *d);
+  void setDelegate(Delegate* d);
+  void clearDelegate();
 
 protected:
   RInput();
-  Delegate *delegate_;
+  Delegate* delegate_;
   AxisCalib hCalib_, vCalib_;
 
 #if defined(ESP32_REMOTE)

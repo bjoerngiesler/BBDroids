@@ -1,15 +1,17 @@
-#if !defined(RMESSAGE_H)
-#define RMESSAGE_H
+#if !defined(RMESSAGEWIDGET_H)
+#define RMESSAGEWIDGET_H
 
 #include <LibBB.h>
 
 #include "Config.h"
 #include "RDisplay.h"
+#include "RWidget.h"
 
-class RMessage: public RDrawable {
+class RMessageWidget: public RWidget {
 public:
-  RMessage(const char* title) { title_ = title; }
+  RMessageWidget();
 
+  void setTitle(const char* title);
   Result draw(ConsoleStream* stream = NULL);
 
 protected:

@@ -1,14 +1,15 @@
-#if !defined(RGRAPHS_H)
-#define RGRAPHS_H
+#if !defined(RGRAPHSWIDGET_H)
+#define RGRAPHSWIDGET_H
 
 #include <LibBB.h>
 
 #include "RDisplay.h"
 #include "RInput.h"
+#include "RWidget.h"
 
 using namespace bb;
 
-class RGraphs: public RDrawable, public RInput::Delegate {
+class RGraphsWidget: public RWidget, public RInput::Delegate {
 public:
   enum Graph {
     TOP     = 0,
@@ -22,7 +23,7 @@ public:
   static const int GRAPH0_Y = 3;
   static const int GRAPH_DIST = 3;
 
-  RGraphs();
+  RGraphsWidget();
   virtual Result draw(ConsoleStream* stream = NULL);
   void setTitle(Graph g, const char* t);
   void plotAxisData(Graph g, float a0, float a1, float a2, float a3, float a4);

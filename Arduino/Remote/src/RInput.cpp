@@ -54,8 +54,12 @@ RInput::RInput():
   for(bool& b: buttons) b = false;
 }
 
-void RInput::setDelegate(RInput::Delegate *d) {
+void RInput::setDelegate(RInput::Delegate* d) {
   delegate_ = d;
+}
+
+void RInput::clearDelegate() {
+  delegate_ = NULL;
 }
 
 bool RInput::begin() {
@@ -117,7 +121,6 @@ void RInput::update() {
     }
   }
 #endif // ESP32_REMOTE
-
   if(delegate_ != NULL) {
     if(btnTopLChanged) {
       if(buttons[BUTTON_TOP_LEFT]) delegate_->buttonTopLeftPressed();

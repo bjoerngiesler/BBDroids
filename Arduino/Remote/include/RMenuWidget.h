@@ -1,5 +1,5 @@
-#if !defined(RMENU_H)
-#define RMENU_H
+#if !defined(RMENUWIDGET_H)
+#define RMENUWIDGET_H
 
 #include <vector>
 #include <functional>
@@ -7,14 +7,16 @@
 
 #include "Config.h"
 #include "RDisplay.h"
+#include "RWidget.h"
 #include "RInput.h"
 
 using namespace bb;
 
-class RMenu: public RDrawable, public RInput::Delegate {
+class RMenuWidget: public RWidget, public RInput::Delegate {
 public:
-  RMenu(const char* title);
+  RMenuWidget();
 
+  void setTitle(const char* title);
   void addEntry(const char* title, std::function<void(void)> callback);
   void clear();
 

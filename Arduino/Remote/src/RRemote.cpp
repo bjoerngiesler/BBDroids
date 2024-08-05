@@ -7,7 +7,8 @@ bb::ConfigStorage::HANDLE RRemote::paramsHandle_;
 
 RRemote::RRemote(): 
   imu_(IMU_ADDR),
-  mode_(MODE_REGULAR) {
+  mode_(MODE_REGULAR),
+  currentWidget_(NULL) {
   name_ = "remote";
   description_ = "Main subsystem for the BB8 remote";
   help_ = "Main subsystem for the BB8 remote"\
@@ -30,6 +31,21 @@ RRemote::RRemote():
   params_.rightID = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
   params_.droidID = 0;
 #endif
+
+  mainMenu_.setTitle("Main Menu");
+  settingsMenu_.setTitle("Settings");
+  droidsMenu_.setTitle("Droids");
+  remotesMenu_.setTitle("Remotes");
+  waitMessage_.setTitle("Please wait");
+
+  mainMenu_.addEntry("Settings...", []() { RRemote::remote.showSettingsMenu(); });
+  mainMenu_.addEntry("Back", []() { RRemote::remote.showGraphs(); });
+  
+  settingsMenu_.addEntry("Right Remote...", []() { RRemote::remote.showRemotesMenu(); });
+  settingsMenu_.addEntry("Droid...", []() { RRemote::remote.showDroidsMenu(); });
+  settingsMenu_.addEntry("Back", []() { RRemote::remote.showMainMenu(); });
+
+  crosshair_.setSize(77, 77);
 }
 
 Result RRemote::initialize() { 
@@ -51,35 +67,19 @@ Result RRemote::initialize() {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
   }
 
-  mainMenu_ = new RMenu("Main Menu");
-  settingsMenu_ = new RMenu("Settings");
-  droidsMenu_ = new RMenu("Droids");
-  remotesMenu_ = new RMenu("Remotes");
-  waitMessage_ = new RMessage("Please wait");
-  graphs_ = new RGraphs;
-  crosshair_ = new RCrosshair;
-  crosshair_->setSize(78, 78);
-
-  mainMenu_->addEntry("Settings...", []() { RRemote::remote.showSettingsMenu(); });
-  mainMenu_->addEntry("Back", []() { RRemote::remote.showGraphs(); });
-  
-  settingsMenu_->addEntry("Right Remote...", []() { RRemote::remote.showRemotesMenu(); });
-  settingsMenu_->addEntry("Droid...", []() { RRemote::remote.showDroidsMenu(); });
-  settingsMenu_->addEntry("Back", []() { RRemote::remote.showMainMenu(); });
-
   showCalib();
 
   return Subsystem::initialize();
 }
 
 void RRemote::showCalib() {
-  currentDrawable_ = crosshair_;
-  crosshair_->setNeedsCls(true);
+  currentWidget_ = &crosshair_;
+  crosshair_.setNeedsCls(true);
   needsDraw_ = true;
 }
 
-void RRemote::showMenu(RMenu *menu) {
-  currentDrawable_ = menu;
+void RRemote::showMenu(RMenuWidget* menu) {
+  currentWidget_ = menu;
   RInput::input.setDelegate(menu);
   menu->setNeedsCls(true);
   menu->resetCursor();
@@ -87,18 +87,18 @@ void RRemote::showMenu(RMenu *menu) {
 }
 
 void RRemote::showGraphs() {
-  currentDrawable_ = graphs_;
-  graphs_->setNeedsCls(true);
-  RInput::input.setDelegate(graphs_);
+  currentWidget_ = &graphs_;
+  graphs_.setNeedsCls(true);
+  RInput::input.setDelegate(&graphs_);
   needsDraw_ = true;
 }
 
 void RRemote::showDroidsMenu() {
-  currentDrawable_ = waitMessage_;
-  RInput::input.setDelegate(NULL);
-  waitMessage_->draw();
+  currentWidget_ = &waitMessage_;
+  RInput::input.clearDelegate();
+  waitMessage_.draw();
 
-  droidsMenu_->clear();
+  droidsMenu_.clear();
 
   Result res = XBee::xbee.discoverNodes(discoveredNodes_);
   if(res != RES_OK) {
@@ -106,41 +106,41 @@ void RRemote::showDroidsMenu() {
     return;
   }
 
-  droidsMenu_->clear();
+  droidsMenu_.clear();
   for(auto& n: discoveredNodes_) {
     Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_DROID) continue;
-    droidsMenu_->addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.stationId); });
+    droidsMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.stationId); });
   }
-  droidsMenu_->addEntry("Back", []() { RRemote::remote.showSettingsMenu(); });
+  droidsMenu_.addEntry("Back", []() { RRemote::remote.showSettingsMenu(); });
 
-  showMenu(droidsMenu_);
+  showMenu(&droidsMenu_);
 }
 
 void RRemote::showRemotesMenu() {
-  currentDrawable_ = waitMessage_;
-  RInput::input.setDelegate(NULL);
-  waitMessage_->draw();
+  currentWidget_ = &waitMessage_;
+  RInput::input.clearDelegate();
+  waitMessage_.draw();
 
-  remotesMenu_->clear();
+  remotesMenu_.clear();
 
   Result res = XBee::xbee.discoverNodes(discoveredNodes_);
   if(res != RES_OK) {
     Console::console.printfBroadcast("%s\n", errorMessage(res));
-    showMenu(settingsMenu_);
+    showMenu(&settingsMenu_);
     return;
   }
 
   Console::console.printfBroadcast("Discovered %d nodes\n", discoveredNodes_.size());
 
-  remotesMenu_->clear();
+  remotesMenu_.clear();
   for(auto& n: discoveredNodes_) {
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_REMOTE) continue;
-    remotesMenu_->addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.stationId); });
+    remotesMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.stationId); });
   }
-  remotesMenu_->addEntry("Back", []() { RRemote::remote.showSettingsMenu(); });
+  remotesMenu_.addEntry("Back", []() { RRemote::remote.showSettingsMenu(); });
 
-  showMenu(remotesMenu_);
+  showMenu(&remotesMenu_);
 }
 
 void RRemote::selectDroid(uint16_t droid) {
@@ -160,7 +160,7 @@ void RRemote::selectDroid(uint16_t droid) {
   bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
   bb::ConfigStorage::storage.store();
 
-  showMenu(mainMenu_);
+  showMenu(&mainMenu_);
 #endif
 }
 
@@ -184,7 +184,7 @@ void RRemote::selectRightRemote(uint16_t remote) {
   bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
   bb::ConfigStorage::storage.store();
 
-  showMenu(mainMenu_);
+  showMenu(&mainMenu_);
 #endif
 }
 
@@ -210,7 +210,7 @@ Result RRemote::stop(ConsoleStream *stream) {
 }
 
 Result RRemote::step() {
-  // Console::console.printfBroadcast("step()\n");
+  Console::console.printfBroadcast("step()\n");
 
   if(!started_) return RES_SUBSYS_NOT_STARTED;
 
@@ -222,7 +222,8 @@ Result RRemote::step() {
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
 
     if(1) { // needsDraw_) {
-      currentDrawable_->draw();
+      if(currentWidget_ != NULL)
+        currentWidget_->draw();
       needsDraw_ = false;
     }
 
@@ -235,7 +236,7 @@ Result RRemote::step() {
     RDisplay::display.showLEDs();
   }
 
-  // Console::console.printfBroadcast("Done with step()\n");
+  Console::console.printfBroadcast("Done with step()\n");
 
   return RES_OK;
 }
@@ -462,10 +463,12 @@ bb::Result RRemote::fillAndSend() {
 #endif
 
 #if defined(LEFT_REMOTE)
-  if(currentDrawable_ == graphs_) {
-    graphs_->plotControlPacket(RGraphs::TOP, packet.payload.control);
-    graphs_->advanceCursor(RGraphs::TOP);
+#if 0
+  if(currentWidget_ == graphs_) {
+    graphs_.plotControlPacket(RGraphs::TOP, packet.payload.control);
+    graphs_.advanceCursor(RGraphs::TOP);
   }
+#endif
 #endif
 
   Result res = RES_OK;
@@ -537,10 +540,12 @@ Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& pack
     return RES_OK;
   } else if(source == params_.rightID && params_.rightID != 0) {
     if(packet.type == PACKET_TYPE_CONTROL) {
-      if(currentDrawable_ == graphs_) {
-        graphs_->plotControlPacket(RGraphs::MIDDLE, packet.payload.control);
-        graphs_->advanceCursor(RGraphs::MIDDLE);
+#if 0
+      if(currentWidget_ == &graphs_) {
+        graphs_.plotControlPacket(RGraphs::MIDDLE, packet.payload.control);
+        graphs_.advanceCursor(RGraphs::MIDDLE);
       }
+#endif
       return RES_OK;
     } else {
       Console::console.printfBroadcast("Unknown packet type %d from right remote!\n", packet.type);

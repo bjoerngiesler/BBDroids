@@ -4,10 +4,11 @@
 #include <LibBB.h>
 #include <deque>
 #include "Config.h"
-#include "RMenu.h"
-#include "RMessage.h"
-#include "RGraphs.h"
-#include "RCrosshair.h"
+#include "RMenuWidget.h"
+#include "RMessageWidget.h"
+#include "RGraphsWidget.h"
+#include "RCrosshairWidget.h"
+#include "RWidget.h"
 
 using namespace bb;
 
@@ -48,11 +49,11 @@ public:
   void abortCalibration();
   void finishCalibration();
 
-  void showMainMenu() { showMenu(mainMenu_); }
-  void showSettingsMenu() { showMenu(settingsMenu_); }
+  void showMainMenu() { showMenu(&mainMenu_); }
+  void showSettingsMenu() { showMenu(&settingsMenu_); }
   void showDroidsMenu();
   void showRemotesMenu();
-  void showMenu(RMenu* menu);
+  void showMenu(RMenuWidget* menu);
   void showGraphs();
   void showCalib();
 
@@ -67,14 +68,16 @@ protected:
   bool runningStatus_;
   bool onInitScreen_;
   Packet lastPacketSent_;
-  RMenu *mainMenu_, *settingsMenu_, *droidsMenu_, *remotesMenu_;
-  RGraphs *graphs_;
-  RCrosshair *crosshair_;
-  RMessage *waitMessage_;
-  RDrawable *currentDrawable_;
+  RMenuWidget mainMenu_, settingsMenu_, droidsMenu_, remotesMenu_;
+  RGraphsWidget graphs_;
+  RCrosshairWidget crosshair_;
+  RMessageWidget waitMessage_;
+  RWidget* currentWidget_;
   bool needsDraw_;
   std::vector<XBee::Node> discoveredNodes_;
   bb::IMU imu_;
+
+  RWidget titleWidget;
 
 #if defined(LEFT_REMOTE)
   Packet lastPacketFromDroid_, lastPacketFromRightRemote_;

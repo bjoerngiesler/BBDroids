@@ -4,7 +4,6 @@
 #include "RRemote.h"
 #include "RInput.h"
 #include "RDisplay.h"
-#include "RMenu.h"
 
 uint8_t seqnum = 0;
 

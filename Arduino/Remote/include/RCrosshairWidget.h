@@ -1,17 +1,18 @@
-#if !defined(RCROSSHAIR_H)
-#define RCROSSHAIR_H
+#if !defined(RCROSSHAIRWIDGET_H)
+#define RCROSSHAIRWIDGET_H
 
 #include <LibBB.h>
 
 #include "RDisplay.h"
 #include "RInput.h"
+#include "RWidget.h"
 
 using namespace bb;
 
 // Crosshair Visualization Drawable
-class RCrosshair: public RDrawable {
+class RCrosshairWidget: public RWidget {
 public:
-  RCrosshair();
+  RCrosshairWidget();
   virtual Result draw(ConsoleStream* stream = NULL);
   void setHorVer(uint16_t h, uint16_t v);
   void horVerToScreen(uint16_t hor, uint16_t ver, uint8_t& x, uint8_t& y);

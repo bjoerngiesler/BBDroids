@@ -14,25 +14,6 @@
 
 using namespace bb;
 
-class RDrawable {
-public:
-  RDrawable() { 
-    needsFullRedraw_ = needsContentsRedraw_ = true; 
-    x_ = y_ = 1;
-    width_ = height_ = 10;
-  }
-  void setPosition(uint8_t x, uint8_t y) { x_ = x; y_ = y; }
-  void setSize(uint8_t w, uint8_t h) { width_ = w; height_ = h; setNeedsFullRedraw(); setNeedsCls(); }
-  virtual Result draw(ConsoleStream* stream = NULL) = 0;
-  void setNeedsCls(bool needs = true) { needsCls_ = needs; }
-  void setNeedsFullRedraw(bool needs = true) { needsFullRedraw_ = needs; if(needs) needsContentsRedraw_ = true; }
-  void setNeedsContentsRedraw(bool needs = true) { needsContentsRedraw_ = needs; }
-protected:
-  bool needsCls_, needsFullRedraw_, needsContentsRedraw_;
-  uint8_t x_, y_;
-  uint8_t width_, height_;
-};
-
 class RDisplay: public Subsystem {
 public:
   static const uint16_t BLACK = 0x0000;
