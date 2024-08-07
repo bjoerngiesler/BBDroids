@@ -240,7 +240,7 @@ Result RRemote::stop(ConsoleStream *stream) {
 }
 
 Result RRemote::step() {
-  Console::console.printfBroadcast("step()\n");
+  //Console::console.printfBroadcast("step()\n");
 
   if(!started_) return RES_SUBSYS_NOT_STARTED;
 
@@ -266,7 +266,7 @@ Result RRemote::step() {
     RDisplay::display.showLEDs();
   }
 
-  Console::console.printfBroadcast("Done with step()\n");
+  //Console::console.printfBroadcast("Done with step()\n");
 
   return RES_OK;
 }

@@ -5,7 +5,7 @@ RWidget::RWidget() {
     x_ = y_ = 1;
     width_ = height_ = 10;
     borderCol_ = RDisplay::WHITE;
-    bgCol_ = RDisplay::DIMGRAY;
+    bgCol_ = RDisplay::GREY;
     fgCol_ = RDisplay::WHITE;
     fillsBg_ = false;
 }

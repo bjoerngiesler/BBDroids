@@ -3,6 +3,9 @@
 
 #include "RDisplay.h"
 #include "RInput.h"
+#include "RDSerialInterface.h"
+
+//#define BINARY
 
 static const int CIRCLE_X = 40;
 static const int TOP_CIRCLE_Y = 50;
@@ -56,7 +59,11 @@ Result RDisplay::start(ConsoleStream *stream) {
   ser_.begin(921600);
   ser_.println("");
   while(ser_.available()) ser_.read(); // readEmpty
-  if(sendStringAndWaitForOK("logo backlight") == false) {
+
+#if defined(BINARY)
+#else
+  if(sendStringAndWaitForOK(String((char)rd::CMD_LOGO)+"1") == false) {
+#endif
     Console::console.printfBroadcast("Display failure\n");
     return RES_SUBSYS_COMM_ERROR;
   }
@@ -74,7 +81,10 @@ Result RDisplay::start(ConsoleStream *stream) {
 Result RDisplay::stop(ConsoleStream *stream) {
   Result res = RES_OK;
 
-  if(sendStringAndWaitForOK("logo") == false) res = RES_SUBSYS_COMM_ERROR;
+#if defined(BINARY)
+#else
+  if(sendStringAndWaitForOK(String((char)rd::CMD_LOGO)+"1") == false) res = RES_SUBSYS_COMM_ERROR;
+#endif
 
   started_ = false;
   return res;
@@ -92,7 +102,6 @@ String RDisplay::sendStringAndWaitForResponse(const String& str, int predelay, b
   }
   ser_.flush();
 
-
   if(predelay > 0) delay(predelay);
 
   String retval;
@@ -106,9 +115,23 @@ String RDisplay::sendStringAndWaitForResponse(const String& str, int predelay, b
   
 bool RDisplay::sendStringAndWaitForOK(const String& str, int predelay, bool nl) {
   String result = sendStringAndWaitForResponse(str, predelay, nl);
-  //Serial.println(String("Received \"") + result + "\"");
+  //Console::console.printfBroadcast("\"%s\" ==> \"%s\"", str.c_str(), result.c_str());
   if(result.equals("OK.\r\n")) return true;
   return false;
+}
+
+uint8_t RDisplay::sendBinCommandAndWaitForResponse(const std::vector<uint8_t>& cmd, int predelay) {
+#if defined(LEFT_REMOTE)
+  for(auto byte: cmd) ser_.write(byte);
+  ser_.flush();
+
+  if(predelay > 0) delay(predelay);
+
+  if(!Serial.available()) return 0;
+  return Serial.read();
+#endif
+
+  return 0;
 }
 
 bool RDisplay::readString(String& str, unsigned char terminator) {
@@ -119,6 +142,7 @@ bool RDisplay::readString(String& str, unsigned char terminator) {
 			delay(1);
 			to++;
 			if(to >= 1000) {
+        Console::console.printfBroadcast("Timeout! Read so far: \"%s\"\n", str.c_str());
 				return false;
 			}
 		}
@@ -136,41 +160,41 @@ Result RDisplay::cls() {
   return RES_OK;
 }
 
-Result RDisplay::text(uint8_t x, uint8_t y, uint16_t color, const String& text) {
-  String str = String("print ") + x + " " + y + " 0x" + String(color, HEX) + " \"" + text + "\"";
+Result RDisplay::text(uint8_t x, uint8_t y, uint8_t color, const String& text) {
+  String str = String((char)rd::CMD_TEXT) + x + "," + y + "," + color + ",\"" + text + "\"";
   if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR; 
   return RES_OK;
 }
 
-Result RDisplay::hline(uint8_t x, uint8_t y, uint8_t width, uint16_t color) {
-  String str = String("hline ") + x + " " + y + " " + width + " 0x" + String(color, HEX);
+Result RDisplay::hline(uint8_t x, uint8_t y, uint8_t width, uint8_t color) {
+  String str = String((char)rd::CMD_HLINE) + x + "," + y + "," + width + "," + color;
   if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
   return RES_OK;
 }
 
-Result RDisplay::vline(uint8_t x, uint8_t y, uint8_t height, uint16_t color) {
-  String str = String("vline ") + x + " " + y + " " + height + " 0x" + String(color, HEX);
+Result RDisplay::vline(uint8_t x, uint8_t y, uint8_t height, uint8_t color) {
+  String str = String((char)rd::CMD_VLINE) + x + "," + y + "," + height + "," + color;
   if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
   return RES_OK;
 }
 
-Result RDisplay::line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color) {
-  String str = String("line ") + x1 + " " + y1 + " " + x2 + " " + y2 + " 0x" + String(color, HEX);
+Result RDisplay::line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t color) {
+  String str = String((char)rd::CMD_LINE) + x1 + "," + y1 + "," + x2 + "," + y2 + color;
   if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
   return RES_OK;
 }
 
 
-Result RDisplay::rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color, bool filled) {
+Result RDisplay::rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t color, bool filled) {
   String str;
-  if(filled) str = String("rectfilled ") + x1 + " " + y1 + " " + x2 + " " + y2 + " " + " 0x" + String(color, HEX);
-  else str = String("rect ") + x1 + " " + y1 + " " + x2 + " " + y2 + " " + " 0x" + String(color, HEX);
+  if(filled) str = String((char)rd::CMD_FILLEDRECT) + x1 + "," + y1 + "," + x2 + "," + y2 + "," + color;
+  else str = String((char)rd::CMD_RECT) + x1 + "," + y1 + "," + x2 + "," + y2 + "," + color;
   if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
   return RES_OK;
 }
 
-Result RDisplay::plot(uint8_t x, uint8_t y, uint16_t color) {
-  String str = String("circle ") + x + " " + y + " 0 0x" + String(color, HEX);
+Result RDisplay::plot(uint8_t x, uint8_t y, uint8_t color) {
+  String str = String((char)rd::CMD_POINT) + x + "," + y + "," + color;
   if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR;
   return RES_OK;
 }
@@ -202,3 +226,4 @@ Result RDisplay::showLEDs() {
   return RES_OK;
 }
 
+#

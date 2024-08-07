@@ -14,19 +14,34 @@
 
 using namespace bb;
 
+#define TWOBITRGB_TO_COLOR(r,g,b) ((r&0x3)<<4 | (g&0x3)<<2 | (b&0x3))
+
 class RDisplay: public Subsystem {
 public:
-  static const uint16_t BLACK = 0x0000;
-  static const uint16_t WHITE = 0xffff;
-  static const uint16_t RED   = 0xF800;
-  static const uint16_t GREEN = 0x0400;
-  static const uint16_t BLUE  = 0x001F;
-  static const uint16_t YELLOW = 0xFFE0;
-  static const uint16_t DARKGREY = 0xAD55;
-  static const uint16_t DIMGRAY = 0x6B4D;
-  static const uint16_t DARKBLUE = 0x0011;
-  static const uint16_t LIGHTGREY = 0xD69A;
-  static const uint16_t LIGHTSTEELBLUE = 0xB63B;
+  static const uint8_t BLACK      = TWOBITRGB_TO_COLOR(0, 0, 0);
+  static const uint8_t GREY       = TWOBITRGB_TO_COLOR(1, 1, 1);
+  static const uint8_t LIGHTGREY  = TWOBITRGB_TO_COLOR(2, 2, 2);
+  static const uint8_t WHITE      = TWOBITRGB_TO_COLOR(3, 3, 3);
+
+  static const uint8_t RED        = TWOBITRGB_TO_COLOR(3, 0, 0);
+  static const uint8_t DARKRED    = TWOBITRGB_TO_COLOR(2, 0, 0);
+  static const uint8_t DIMRED     = TWOBITRGB_TO_COLOR(1, 0, 0);
+
+  static const uint8_t GREEN      = TWOBITRGB_TO_COLOR(0, 3, 0);
+  static const uint8_t DARKGREEN  = TWOBITRGB_TO_COLOR(0, 2, 0);
+  static const uint8_t DIMGREEN   = TWOBITRGB_TO_COLOR(0, 1, 0);
+
+  static const uint8_t BLUE       = TWOBITRGB_TO_COLOR(0, 0, 3);
+  static const uint8_t DARKBLUE   = TWOBITRGB_TO_COLOR(0, 0, 2);
+  static const uint8_t DIMBLUE    = TWOBITRGB_TO_COLOR(0, 0, 1);
+
+  static const uint8_t YELLOW     = TWOBITRGB_TO_COLOR(0, 3, 0);
+  static const uint8_t DARKYELLOW = TWOBITRGB_TO_COLOR(0, 2, 0);
+  static const uint8_t DIMYELLOW  = TWOBITRGB_TO_COLOR(0, 1, 0);
+
+  static uint8_t RGBtoColor(uint8_t r, uint8_t g, uint8_t b) {
+    return ((r & 0xc0)>>2) | ((g & 0xc0)>>4) | ((b & 0xc0)>>4);
+  }
 
   static const uint8_t CHAR_WIDTH = 6;
   static const uint8_t CHAR_HEIGHT = 10;
@@ -47,12 +62,12 @@ public:
 	virtual Result step();
 
   Result cls();
-  Result text(uint8_t x, uint8_t y, uint16_t color, const String& text);
-  Result hline(uint8_t x, uint8_t y, uint8_t width, uint16_t color);
-  Result vline(uint8_t x, uint8_t y, uint8_t height, uint16_t color);
-  Result line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color);
-  Result rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint16_t color, bool filled=false);
-  Result plot(uint8_t x, uint8_t y, uint16_t color);
+  Result text(uint8_t x, uint8_t y, uint8_t color, const String& text);
+  Result hline(uint8_t x, uint8_t y, uint8_t width, uint8_t color);
+  Result vline(uint8_t x, uint8_t y, uint8_t height, uint8_t color);
+  Result line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t color);
+  Result rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t color, bool filled=false);
+  Result plot(uint8_t x, uint8_t y, uint8_t color);
 
   Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b);
   Result flashLED(WhichLED which, uint8_t iterations, uint8_t millisOn, uint8_t millisOff, uint8_t r, uint8_t g, uint8_t b);
@@ -65,6 +80,8 @@ protected:
 
   String sendStringAndWaitForResponse(const String& str, int predelay=0, bool nl=true);
   bool sendStringAndWaitForOK(const String& str, int predelay=0, bool nl=true);
+  uint8_t sendBinCommandAndWaitForResponse(const std::vector<uint8_t>& cmd, int predelay);
+
 
 #if defined(LEFT_REMOTE)
 #if defined(ESP32_REMOTE)
