@@ -36,7 +36,7 @@ bool rd::SerialInterface::available() {
 }
 
 uint16_t rd::SerialInterface::lookupColor(uint8_t color) {
-  return gfx.RGBto565((color & 0x30) >> 4, (color & 0xC) >> 2, color & 0x03);
+  return gfx.RGBto565((color & 0x30) << 2, (color & 0xC) << 4, (color & 0x03) << 6);
 }
 
 rd::SerialInterface::Result rd::SerialInterface::execText(uint8_t x, uint8_t y, uint8_t color, const String& text) {
@@ -66,7 +66,7 @@ rd::SerialInterface::Result rd::SerialInterface::readStringUntil(uint8_t delim, 
   int timeout = 10;
   while (timeout > 0) {
     if (Serial.available()) {
-      uint8_t c = Serial.read();
+      char c = Serial.read();
       if (c == delim) return RESULT_OK;
       str += c;
       timeout = 10;
@@ -93,15 +93,20 @@ rd::SerialInterface::Result rd::SerialInterface::execInput(Command cmd, std::vec
       gfx.Cls();
       return RESULT_OK;
 
+    case CMD_POINT:
+      gfx.PutPixel(args[0], args[1], lookupColor(args[2]));
+      return RESULT_OK;
+
     case CMD_HLINE:
       gfx.Hline(args[0], args[1], args[2], lookupColor(args[3]));
       return RESULT_OK;
 
     case CMD_VLINE:
-      gfx.Hline(args[0], args[1], args[2], lookupColor(args[3]));
+      gfx.Vline(args[0], args[1], args[2], lookupColor(args[3]));
       return RESULT_OK;
 
     case CMD_LINE:
+      Serial.println(String("Line (")+args[0]+","+args[1]+")->("+args[2]+","+args[3]+"), color " + String(lookupColor(args[4]), HEX));
       gfx.Line(args[0], args[1], args[2], args[3], lookupColor(args[4]));
       return RESULT_OK;
 
@@ -163,7 +168,6 @@ rd::SerialInterface::Result rd::SerialInterface::handleInput() {
   const char* helpMessage = cmdArgs[cmd].helpMessage;
 
   if (binary) {
-
     // Text command handled separately because of the variable argument list
     if (cmd == CMD_TEXT) {
       if (readArgsBinary(3, args) != RESULT_OK) {
@@ -182,6 +186,7 @@ rd::SerialInterface::Result rd::SerialInterface::handleInput() {
         return RESULT_ERROR;
       }
 
+      Serial.write(CMD_NOP | 0x80);
       return RESULT_OK;
     }
 
@@ -192,25 +197,25 @@ rd::SerialInterface::Result rd::SerialInterface::handleInput() {
     }
 
   } else {  // ASCII
-
     // Read line and split into words
     String str;
     if (readStringUntil('\n', str) != RESULT_OK) {
       return RESULT_ERROR;
     }
     str.trim();
-    std::vector<String> words = split(str);
+    std::vector<String> words = split(str, ',');
 
     // Text again handled separately
     if (cmd == CMD_TEXT) {
       if (words.size() != numArgs) {
-        Serial.println(String("Usage: ") + String(cmdByte) + helpMessage);
+        Serial.println(String("Usage: ") + String((char)cmdByte) + helpMessage);
         return RESULT_ERROR;
       }
       if (execText(words[0].toInt(), words[1].toInt(), words[2].toInt(), words[3]) != RESULT_OK) {
         Serial.println("Error handling text!");
         return RESULT_ERROR;
       }
+      Serial.println("OK.");
       return RESULT_OK;
     }
 
@@ -221,7 +226,10 @@ rd::SerialInterface::Result rd::SerialInterface::handleInput() {
   // Double check correct number of arguments
   if (args.size() != numArgs) {
     if (binary) Serial.write(CMD_ERROR | 0x80);
-    else Serial.println(String("Usage: ") + String(cmdByte) + helpMessage);
+    else {
+      Serial.println(String("Usage: ") + String((char)cmdByte) + helpMessage + " (" + numArgs + " args, got " + args.size() + ")");
+    }
+
     return RESULT_ERROR;
   }
 
@@ -230,6 +238,9 @@ rd::SerialInterface::Result rd::SerialInterface::handleInput() {
   if (res == RESULT_ERROR) {
     if (binary) Serial.write(CMD_ERROR | 0x80);
     else Serial.println("Error.");
+  } else {
+    if(binary) Serial.write(CMD_NOP | 0x80);
+    else Serial.println("OK.");
   }
 
   return res;
