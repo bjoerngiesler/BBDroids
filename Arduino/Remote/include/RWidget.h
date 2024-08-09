@@ -27,11 +27,11 @@ public:
     void setForegroundColor(uint16_t foreground);
     void setBorderColor(uint16_t border);
 protected:
-  bool needsCls_, needsFullRedraw_, needsContentsRedraw_;
-  uint8_t x_, y_;
-  uint8_t width_, height_;
-  uint16_t bgCol_, fgCol_, borderCol_;
-  bool fillsBg_, drawsFrame_;
+    bool needsCls_, needsFullRedraw_, needsContentsRedraw_;
+    uint8_t x_, y_;
+    uint8_t width_, height_;
+    uint16_t bgCol_, fgCol_, borderCol_;
+    bool fillsBg_, drawsFrame_;
 };
 
 #endif // RWIDGET_H
