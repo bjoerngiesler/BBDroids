@@ -44,12 +44,18 @@ RRemote::RRemote():
   settingsMenu_.addEntry("Droid...", []() { RRemote::remote.showDroidsMenu(); });
   settingsMenu_.addEntry("Back", []() { RRemote::remote.showMainMenu(); });
 
-  crosshair_.setSize(77, 77);
+  crosshair_.setSize(69, 69);
+  crosshair_.setPosition(5, 5);
   calibLabel_.setPosition(2, 85);
   calibLabel_.setSize(76, RDisplay::CHAR_HEIGHT*2);
   calibLabel_.setDrawsFrame();
   calibLabel_.setFillsBackground();
   calibLabel_.setTitle("Hello!");
+
+  imuViz_.setSize(69, 69);
+  imuViz_.setPosition(5, 5 + crosshair_.height() + 5);
+  //imuViz_.setShowsText();
+  imuViz_.setCursorColor(RDisplay::LIGHTBLUE2);
 }
 
 Result RRemote::initialize() { 
@@ -99,8 +105,13 @@ void RRemote::clearWidgets() {
 void RRemote::showCalib() {
   clearWidgets();
   addWidget(&crosshair_);
+#if 0
   addWidget(&calibLabel_);
   crosshair_.setNeedsCls(true);
+#endif
+  addWidget(&imuViz_);
+  imuViz_.setNeedsCls(true);
+
   needsDraw_ = true;
 }
 
@@ -251,6 +262,14 @@ Result RRemote::step() {
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
     calibLabel_.setTitle(String("H") + RInput::input.joyRawH + " V" + RInput::input.joyRawV);
+
+    float r, p, h;
+    float ax, ay, az;
+
+    imu_.getFilteredRPH(r, p, h);
+    imu_.getAccelMeasurement(ax, ay, az);
+    imuViz_.setRPH(r, p, h);
+    imuViz_.setAccel(ax, ay, az);
 
     if(1) { // needsDraw_) {
       for(auto w: widgets_) w->draw();

@@ -4,12 +4,14 @@
 #include <LibBB.h>
 #include <deque>
 #include "Config.h"
+
 #include "RWidget.h"
 #include "RMenuWidget.h"
 #include "RMessageWidget.h"
 #include "RGraphsWidget.h"
 #include "RCrosshairWidget.h"
 #include "RLabelWidget.h"
+#include "RIMUWidget.h"
 
 using namespace bb;
 
@@ -75,6 +77,7 @@ protected:
   bool onInitScreen_;
   Packet lastPacketSent_;
   RMenuWidget mainMenu_, settingsMenu_, droidsMenu_, remotesMenu_;
+  RIMUWidget imuViz_;
   RGraphsWidget graphs_;
   RCrosshairWidget crosshair_;
   RLabelWidget calibLabel_;
