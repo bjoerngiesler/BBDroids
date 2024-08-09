@@ -18,26 +18,32 @@ using namespace bb;
 
 class RDisplay: public Subsystem {
 public:
-  static const uint8_t BLACK      = TWOBITRGB_TO_COLOR(0, 0, 0);
-  static const uint8_t GREY       = TWOBITRGB_TO_COLOR(1, 1, 1);
-  static const uint8_t LIGHTGREY  = TWOBITRGB_TO_COLOR(2, 2, 2);
-  static const uint8_t WHITE      = TWOBITRGB_TO_COLOR(3, 3, 3);
+  static const uint8_t BLACK       = TWOBITRGB_TO_COLOR(0, 0, 0);
+  static const uint8_t GREY        = TWOBITRGB_TO_COLOR(1, 1, 1);
+  static const uint8_t LIGHTGREY   = TWOBITRGB_TO_COLOR(2, 2, 2);
+  static const uint8_t WHITE       = TWOBITRGB_TO_COLOR(3, 3, 3);
 
-  static const uint8_t RED        = TWOBITRGB_TO_COLOR(3, 0, 0);
-  static const uint8_t DARKRED    = TWOBITRGB_TO_COLOR(2, 0, 0);
-  static const uint8_t DIMRED     = TWOBITRGB_TO_COLOR(1, 0, 0);
+  static const uint8_t RED         = TWOBITRGB_TO_COLOR(3, 0, 0);
+  static const uint8_t DARKRED     = TWOBITRGB_TO_COLOR(2, 0, 0);
+  static const uint8_t DIMRED      = TWOBITRGB_TO_COLOR(1, 0, 0);
+  static const uint8_t LIGHTRED1   = TWOBITRGB_TO_COLOR(3, 1, 1);
+  static const uint8_t LIGHTRED2   = TWOBITRGB_TO_COLOR(3, 2, 2);
 
-  static const uint8_t GREEN      = TWOBITRGB_TO_COLOR(0, 3, 0);
-  static const uint8_t DARKGREEN  = TWOBITRGB_TO_COLOR(0, 2, 0);
-  static const uint8_t DIMGREEN   = TWOBITRGB_TO_COLOR(0, 1, 0);
+  static const uint8_t GREEN       = TWOBITRGB_TO_COLOR(0, 3, 0);
+  static const uint8_t DARKGREEN   = TWOBITRGB_TO_COLOR(0, 2, 0);
+  static const uint8_t DIMGREEN    = TWOBITRGB_TO_COLOR(0, 1, 0);
+  static const uint8_t LIGHTGREEN1 = TWOBITRGB_TO_COLOR(1, 3, 1);
+  static const uint8_t LIGHTGREEN2 = TWOBITRGB_TO_COLOR(2, 3, 2);
 
-  static const uint8_t BLUE       = TWOBITRGB_TO_COLOR(0, 0, 3);
-  static const uint8_t DARKBLUE   = TWOBITRGB_TO_COLOR(0, 0, 2);
-  static const uint8_t DIMBLUE    = TWOBITRGB_TO_COLOR(0, 0, 1);
+  static const uint8_t BLUE        = TWOBITRGB_TO_COLOR(0, 0, 3);
+  static const uint8_t DARKBLUE    = TWOBITRGB_TO_COLOR(0, 0, 2);
+  static const uint8_t DIMBLUE     = TWOBITRGB_TO_COLOR(0, 0, 1);
+  static const uint8_t LIGHTBLUE1  = TWOBITRGB_TO_COLOR(1, 1, 3);
+  static const uint8_t LIGHTBLUE2  = TWOBITRGB_TO_COLOR(2, 2, 3);
 
-  static const uint8_t YELLOW     = TWOBITRGB_TO_COLOR(0, 3, 0);
-  static const uint8_t DARKYELLOW = TWOBITRGB_TO_COLOR(0, 2, 0);
-  static const uint8_t DIMYELLOW  = TWOBITRGB_TO_COLOR(0, 1, 0);
+  static const uint8_t YELLOW      = TWOBITRGB_TO_COLOR(3, 3, 0);
+  static const uint8_t DARKYELLOW  = TWOBITRGB_TO_COLOR(2, 2, 0);
+  static const uint8_t DIMYELLOW   = TWOBITRGB_TO_COLOR(1, 1, 0);
 
   static uint8_t RGBtoColor(uint8_t r, uint8_t g, uint8_t b) {
     return ((r & 0xc0)>>2) | ((g & 0xc0)>>4) | ((b & 0xc0)>>4);
@@ -67,6 +73,7 @@ public:
   Result vline(uint8_t x, uint8_t y, uint8_t height, uint8_t color);
   Result line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t color);
   Result rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t color, bool filled=false);
+  Result circle(uint8_t x, uint8_t y, uint8_t radius, uint8_t color, bool filled = false);
   Result plot(uint8_t x, uint8_t y, uint8_t color);
 
   Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b);
@@ -78,9 +85,9 @@ protected:
   virtual ~RDisplay() {}
   bool readString(String& str, unsigned char terminator='\n');
 
-  String sendStringAndWaitForResponse(const String& str, int predelay=0, bool nl=true);
-  bool sendStringAndWaitForOK(const String& str, int predelay=0, bool nl=true);
-  uint8_t sendBinCommandAndWaitForResponse(const std::vector<uint8_t>& cmd, int predelay);
+  String sendStringAndWaitForResponse(const String& str, int timeout=0, bool nl=true);
+  bool sendStringAndWaitForOK(const String& str, int timeout=1, bool nl=true);
+  uint8_t sendBinCommand(const std::vector<uint8_t>& cmd, int timeout=1, bool waitForResponse=false);
 
 
 #if defined(LEFT_REMOTE)
