@@ -57,6 +57,8 @@ public:
 
   IMUState getIMUState();
   void printStats(const String& prefix = "");
+
+  void setRotationMatrix(float r11, float r12, float r13, float r21, float r22, float r23, float r31, float r32, float r33);
 private:  
 
   Madgwick madgwick_;
@@ -72,6 +74,8 @@ private:
   int32_t intLastTS_;
   bool intRunning_ = false;
   uint8_t addr_;
+  
+  float r11_, r12_, r13_, r21_, r22_, r23_, r31_, r32_, r33_;
 };
 
 }; // namespace bb
