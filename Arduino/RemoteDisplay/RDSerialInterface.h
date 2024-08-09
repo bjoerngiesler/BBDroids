@@ -25,6 +25,8 @@ enum Command {
   CMD_TEXT         = 't'
 };
 
+#define BINCMD(c) ((uint8_t)(c|0x80))
+
 class SerialInterface {
 public:
   typedef enum {
