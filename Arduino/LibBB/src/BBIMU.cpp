@@ -133,8 +133,13 @@ bool bb::IMU::update(bool block) {
 bool bb::IMU::getFilteredRPH(float &r, float &p, float &h) {
   if(!available_) return false;
 
+#if 0 // FIXME
   r = madgwick_.getRoll();
   p = madgwick_.getPitch();
+#else
+  r = madgwick_.getPitch();
+  p = madgwick_.getRoll();
+#endif
   h = madgwick_.getYaw();
   return true;
 }
