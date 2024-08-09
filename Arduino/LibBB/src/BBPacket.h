@@ -15,19 +15,19 @@ namespace bb {
 
 struct __attribute__ ((packed)) ControlPacket {
 
-#define AXIS_MAX1 511
-#define AXIS_MAX2 127
+#define AXIS_MAX1 1023
+#define AXIS_MAX2 255
 
-	int16_t axis0  : 10; // bit 0..9
-	int16_t axis1  : 10; // bit 10..19
-	int16_t axis2  : 10; // bit 20..29
-	int16_t axis3  : 10; // bit 30..39
-	int16_t axis4  : 10; // bit 40..49
-	int8_t  axis5;       // bit 50..57
-	int8_t  axis6;       // bit 58..65
-	int8_t  axis7;       // bit 66..73
-	int8_t  axis8;       // bit 74..81
-	int8_t  axis9;       // bit 82..89
+	uint16_t axis0 : 10; // bit 0..9
+	uint16_t axis1 : 10; // bit 10..19
+	uint16_t axis2 : 10; // bit 20..29
+	uint16_t axis3 : 10; // bit 30..39
+	uint16_t axis4 : 10; // bit 40..49
+	uint8_t axis5;       // bit 50..57
+	uint8_t axis6;       // bit 58..65
+	uint8_t axis7;       // bit 66..73
+	uint8_t axis8;       // bit 74..81
+	uint8_t axis9;       // bit 82..89
 	bool button0    : 1; // bit 90
 	bool button1    : 1; // bit 91
 	bool button2    : 1; // bit 92
@@ -36,39 +36,95 @@ struct __attribute__ ((packed)) ControlPacket {
 	bool button5    : 1; // bit 95
 	bool button6    : 1; // bit 96
 	bool button7    : 1; // bit 97
+	uint8_t battery : 6; // bit 98..103
 
-	void setAxis(uint8_t num, float value) {
-		value = constrain(value, -1.0, 1.0);
+	enum Unit {
+		UNIT_DEGREES,   
+		UNIT_DEGREES_CENTERED,
+		UNIT_UNITY,
+		UNIT_UNITY_CENTERED,
+		UNIT_RAW
+	};
+
+	void setAxis(uint8_t num, float value, Unit unit = UNIT_UNITY_CENTERED) {
+		uint16_t multiplier = (num < 5) ? AXIS_MAX1 : AXIS_MAX2;
+
+		switch(unit) {
+		case UNIT_DEGREES:
+			value = constrain(value, 0, 360.0);
+			value = (value / 360.0) * multiplier;
+			break;
+		case UNIT_DEGREES_CENTERED:
+			value = constrain(value, -180.0, 180.0);
+			value = ((value + 180.0)/360.0) * multiplier;
+			break;
+		case UNIT_UNITY:
+			value = constrain(value, 0.0, 1.0);
+			value *= multiplier;
+			break;
+		case UNIT_UNITY_CENTERED:
+			value = constrain(value, -1.0, 1.0);
+			value = ((value + 1.0)/2.0) * multiplier;
+			break;
+		case UNIT_RAW:
+		default:
+			value = constrain(value, 0, multiplier);
+			break;
+		}
+
 		switch(num) {
-		case 0: axis0 = value*AXIS_MAX1; break;
-		case 1: axis1 = value*AXIS_MAX1; break;
-		case 2: axis2 = value*AXIS_MAX1; break;
-		case 3: axis3 = value*AXIS_MAX1; break;
-		case 4: axis4 = value*AXIS_MAX1; break;
-		case 5: axis5 = value*AXIS_MAX2; break;
-		case 6: axis6 = value*AXIS_MAX2; break;
-		case 7: axis7 = value*AXIS_MAX2; break;
-		case 8: axis8 = value*AXIS_MAX2; break;
-		case 9: axis9 = value*AXIS_MAX2; break;
-		default: break;
+		case 0: axis0 = value; break;
+		case 1: axis1 = value; break;
+		case 2: axis2 = value; break;
+		case 3: axis3 = value; break;
+		case 4: axis4 = value; break;
+		case 5: axis5 = value; break;
+		case 6: axis6 = value; break;
+		case 7: axis7 = value; break;
+		case 8: axis8 = value; break;
+		case 9: 
+		default:
+			axis9 = value; break;
 		}
 	}
 
-	float getAxis(uint8_t num) const {
+	float getAxis(uint8_t num, Unit unit = UNIT_UNITY_CENTERED) const {
+		uint16_t multiplier = (num < 5) ? AXIS_MAX1 : AXIS_MAX2;
+		float value;
 		switch(num) {
-		case 0: return ((float)axis0)/AXIS_MAX1;
-		case 1: return ((float)axis1)/AXIS_MAX1;
-		case 2: return ((float)axis2)/AXIS_MAX1;
-		case 3: return ((float)axis3)/AXIS_MAX1;
-		case 4: return ((float)axis4)/AXIS_MAX1;
-		case 5: return ((float)axis5)/AXIS_MAX2;
-		case 6: return ((float)axis6)/AXIS_MAX2;
-		case 7: return ((float)axis7)/AXIS_MAX2;
-		case 8: return ((float)axis8)/AXIS_MAX2;
-		case 9: return ((float)axis9)/AXIS_MAX2;
-		default: break;
+		case 0: value = axis0;
+		case 1: value = axis1;
+		case 2: value = axis2;
+		case 3: value = axis3;
+		case 4: value = axis4;
+		case 5: value = axis5;
+		case 6: value = axis6;
+		case 7: value = axis7;
+		case 8: value = axis8;
+		case 9: 
+		default:
+			value = axis9; break;
 		}
-		return 0.0;
+
+		switch(unit) {
+		case UNIT_DEGREES:
+			value = (value / multiplier) * 360.0;
+			break;
+		case UNIT_DEGREES_CENTERED:
+			value = ((value / multiplier) * 360.0) - 180.0;
+			break;
+		case UNIT_UNITY:
+			value = value / multiplier;
+			break;
+		case UNIT_UNITY_CENTERED:
+			value = ((value / multiplier) * 2.0) - 1.0;
+			break;
+		case UNIT_RAW:
+		default:
+			break;
+		}
+
+		return value;
 	}
 
 	void print() const {
