@@ -44,18 +44,21 @@ RRemote::RRemote():
   settingsMenu_.addEntry("Droid...", []() { RRemote::remote.showDroidsMenu(); });
   settingsMenu_.addEntry("Back", []() { RRemote::remote.showMainMenu(); });
 
-  crosshair_.setSize(69, 69);
-  crosshair_.setPosition(5, 5);
-  calibLabel_.setPosition(2, 85);
-  calibLabel_.setSize(76, RDisplay::CHAR_HEIGHT*2);
-  calibLabel_.setDrawsFrame();
-  calibLabel_.setFillsBackground();
-  calibLabel_.setTitle("Hello!");
+  remoteVisL_.setRepresentsLeftRemote(true);
+  remoteVisL_.setPosition(0, 13);
+  remoteVisR_.setRepresentsLeftRemote(false);
+  remoteVisR_.setPosition(0, 13);
 
-  imuViz_.setSize(69, 69);
-  imuViz_.setPosition(5, 5 + crosshair_.height() + 5);
-  //imuViz_.setShowsText();
-  imuViz_.setCursorColor(RDisplay::LIGHTBLUE2);
+  topLabel_.setSize(RDisplay::DISPLAY_WIDTH, RDisplay::CHAR_HEIGHT);
+  topLabel_.setPosition(0, 0);
+  topLabel_.setFrameType(RLabelWidget::FRAME_BOTTOM);
+  topLabel_.setTitle("Top Label");
+
+  bottomLabel_.setSize(RDisplay::DISPLAY_WIDTH, RDisplay::CHAR_HEIGHT+4);
+  bottomLabel_.setPosition(0, RDisplay::DISPLAY_HEIGHT-RDisplay::CHAR_HEIGHT-1);
+  bottomLabel_.setJustification(RLabelWidget::HOR_CENTERED, RLabelWidget::BOTTOM_JUSTIFIED);
+  bottomLabel_.setFrameType(RLabelWidget::FRAME_TOP);
+  bottomLabel_.setTitle(VERSION_STRING);
 }
 
 Result RRemote::initialize() { 
@@ -104,13 +107,8 @@ void RRemote::clearWidgets() {
 
 void RRemote::showCalib() {
   clearWidgets();
-  addWidget(&crosshair_);
-#if 0
-  addWidget(&calibLabel_);
-  crosshair_.setNeedsCls(true);
-#endif
-  addWidget(&imuViz_);
-  imuViz_.setNeedsCls(true);
+  topLabel_.setTitle("Left Remote >");
+  addWidget(&remoteVisL_);
 
   needsDraw_ = true;
 }
@@ -119,7 +117,6 @@ void RRemote::showMenu(RMenuWidget* menu) {
   clearWidgets();
   addWidget(menu);
   RInput::input.setDelegate(menu);
-  menu->setNeedsCls(true);
   menu->resetCursor();
   needsDraw_ = true;
 }
@@ -127,7 +124,6 @@ void RRemote::showMenu(RMenuWidget* menu) {
 void RRemote::showGraphs() {
   clearWidgets();
   addWidget(&graphs_);
-  graphs_.setNeedsCls(true);
   RInput::input.setDelegate(&graphs_);
   needsDraw_ = true;
 }
@@ -272,6 +268,8 @@ Result RRemote::step() {
     imuViz_.setAccel(ax, ay, az);
 
     if(1) { // needsDraw_) {
+      topLabel_.draw();
+      bottomLabel_.draw();
       for(auto w: widgets_) w->draw();
       needsDraw_ = false;
     }
@@ -458,25 +456,28 @@ bb::Result RRemote::fillAndSend() {
   packet.source = PACKET_SOURCE_RIGHT_REMOTE;
 #endif
 
+#if defined(LEFT_REMOTE)
+  packet.payload.control.button0 = RInput::input.buttons[RInput::BUTTON_PINKY];
+  packet.payload.control.button1 = RInput::input.buttons[RInput::BUTTON_INDEX];
+  packet.payload.control.button2 = RInput::input.buttons[RInput::BUTTON_RIGHT];
+  packet.payload.control.button3 = RInput::input.buttons[RInput::BUTTON_LEFT];
+  packet.payload.control.button4 = RInput::input.buttons[RInput::BUTTON_JOY];
+  packet.payload.control.button5 = false;
+  packet.payload.control.button6 = false;
+  packet.payload.control.button7 = false;
+#else
   packet.payload.control.button0 = RInput::input.buttons[RInput::BUTTON_PINKY];
   packet.payload.control.button1 = RInput::input.buttons[RInput::BUTTON_INDEX];
   packet.payload.control.button2 = RInput::input.buttons[RInput::BUTTON_LEFT];
   packet.payload.control.button3 = RInput::input.buttons[RInput::BUTTON_RIGHT];
   packet.payload.control.button4 = RInput::input.buttons[RInput::BUTTON_JOY];
-
-#if defined(LEFT_REMOTE)
-  // FIXME replace by switches set in menu system
-  packet.payload.control.button5 = false;
-  packet.payload.control.button6 = false;
-  packet.payload.control.button7 = false;
-#else
   packet.payload.control.button5 = RInput::input.buttons[RInput::BUTTON_TOP_LEFT];
   packet.payload.control.button6 = RInput::input.buttons[RInput::BUTTON_TOP_RIGHT];
   packet.payload.control.button7 = RInput::input.buttons[RInput::BUTTON_CONFIRM];
 #endif
 
-  packet.payload.control.setAxis(0, RInput::input.joyH);
-  packet.payload.control.setAxis(1, RInput::input.joyV);
+  packet.payload.control.setAxis(0, RInput::input.joyH, bb::ControlPacket::UNIT_UNITY_CENTERED);
+  packet.payload.control.setAxis(1, RInput::input.joyV, bb::ControlPacket::UNIT_UNITY_CENTERED);
 
   if (imu_.available()) {
     float roll, pitch, heading;
@@ -484,32 +485,26 @@ bb::Result RRemote::fillAndSend() {
     imu_.getFilteredRPH(roll, pitch, heading);
     imu_.getAccelMeasurement(ax, ay, az);
 
-#if defined(ESP32_REMOTE)
-  float temp = roll;
-  roll = pitch;
-  pitch = temp;
-#endif
-
-    if(lastPacketSent_.payload.control.button2 == false && packet.payload.control.button2 == true) {
-      deltaR_ = roll; deltaP_ = pitch; deltaH_ = heading;
-    }
-
-    packet.payload.control.setAxis(2, (roll-deltaR_)/180.0); 
-    packet.payload.control.setAxis(3, (pitch-deltaP_)/180.0);
-    packet.payload.control.setAxis(4, (heading-deltaH_)/180.0);
-    packet.payload.control.setAxis(5, ax/(2*9.81));
-    packet.payload.control.setAxis(6, ay/(2*9.81));
-    packet.payload.control.setAxis(7, az/(2*9.81));
+    packet.payload.control.setAxis(2, roll, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
+    packet.payload.control.setAxis(3, pitch, bb::ControlPacket::UNIT_DEGREES_CENTERED);
+    packet.payload.control.setAxis(4, heading, bb::ControlPacket::UNIT_DEGREES);
+    packet.payload.control.setAxis(5, ax, bb::ControlPacket::UNIT_UNITY_CENTERED);
+    packet.payload.control.setAxis(6, bb::ControlPacket::UNIT_UNITY_CENTERED);
+    packet.payload.control.setAxis(7, bb::ControlPacket::UNIT_UNITY_CENTERED);
   }
 
-  packet.payload.control.setAxis(8, RInput::input.pot1);
+  packet.payload.control.setAxis(8, RInput::input.pot1, bb::ControlPacket::UNIT_UNITY);
 
 #if defined(LEFT_REMOTE)
   packet.payload.control.setAxis(9, 0);
 #else
   // FIXME replace by values set in menu system
-  packet.payload.control.setAxis(9, RInput::input.pot2);
+  packet.payload.control.setAxis(9, RInput::input.pot2, bb::ControlPacket::UNIT_UNITY);
 #endif
+
+  packet.payload.control.battery = RInput::input.battery * 63;
+
+  remoteVisL_.visualizeFromPacket(packet.payload.control);
 
 #if defined(LEFT_REMOTE)
 #if 0

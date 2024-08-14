@@ -81,12 +81,14 @@ void runLogoScreen() {
 }
 
 void setup() {
+  pinMode(LED_BUILTIN, OUTPUT);
+  digitalWrite(LED_BUILTIN, LOW);
   rd::SerialInterface::serial.begin();
 
   gfx.begin(); // Initialize the display
   gfx.Cls();
   gfx.ScrollEnable(true);
-  //gfx.BacklightOn(true);
+  gfx.BacklightOn(false);
   gfx.Orientation(PORTRAIT_R); 
   gfx.SmoothScrollSpeed(5);
   gfx.TextColor(WHITE); 

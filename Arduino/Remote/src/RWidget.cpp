@@ -7,11 +7,12 @@ RWidget::RWidget() {
     borderCol_ = RDisplay::WHITE;
     bgCol_ = RDisplay::BLACK;
     fgCol_ = RDisplay::WHITE;
+    cursorCol_ = RDisplay::LIGHTGREEN1;
+    markingCol_ = RDisplay::BLUE;
     fillsBg_ = false;
 }
 
 Result RWidget::draw(ConsoleStream* stream) {
-    needsCls_ = false;
     needsContentsRedraw_ = false;
     needsFullRedraw_ = false;
     return RES_OK;
@@ -26,11 +27,6 @@ void RWidget::setSize(uint8_t w, uint8_t h) {
     width_ = w; 
     height_ = h; 
     setNeedsFullRedraw(); 
-    setNeedsCls(); 
-}
-
-void RWidget::setNeedsCls(bool needs) { 
-    needsCls_ = needs; 
 }
 
 void RWidget::setNeedsFullRedraw(bool needs) { 
@@ -42,17 +38,32 @@ void RWidget::setNeedsContentsRedraw(bool needs) {
     needsContentsRedraw_ = needs; 
 }
 
-void RWidget::setBackgroundColor(uint16_t background) {
+void RWidget::setBackgroundColor(uint8_t background) {
+    if(bgCol_ == background) return;
     bgCol_ = background;
     needsFullRedraw_ = true;
 }
 
-void RWidget::setForegroundColor(uint16_t foreground) {
+void RWidget::setForegroundColor(uint8_t foreground) {
+    if(fgCol_ == foreground) return;
     fgCol_ = foreground;
     needsFullRedraw_ = true;
 }
 
-void RWidget::setBorderColor(uint16_t border) {
+void RWidget::setCursorColor(uint8_t cursor) {
+    if(cursorCol_ == cursor) return;
+    cursorCol_ = cursor;
+    needsFullRedraw_ = true;
+}
+
+void RWidget::setMarkingColor(uint8_t marking) {
+    if(markingCol_ == marking) return;
+    markingCol_ = marking;
+    needsFullRedraw_ = true;
+}
+
+void RWidget::setBorderColor(uint8_t border) {
+    if(borderCol_ == border) return;
     borderCol_ = border;
     needsFullRedraw_ = true;
 }

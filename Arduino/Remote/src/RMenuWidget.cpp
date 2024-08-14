@@ -3,7 +3,6 @@
 RMenuWidget::RMenuWidget() {
   title_ = "(null)";
   cursor_ = 0;
-  needsCls_ = true;
 }
 
 void RMenuWidget::setTitle(const char *title) {
@@ -17,7 +16,6 @@ void RMenuWidget::addEntry(const char* title, std::function<void(void)> callback
   Entry e = {title, callback};
   if(title == NULL) e = {"(null)", callback};
   entries_.push_back(e);
-  needsCls_ = true;
 }
 
 void RMenuWidget::clear() {
@@ -42,11 +40,6 @@ void RMenuWidget::buttonConfirmPressed() {
 }
   
 Result RMenuWidget::draw(ConsoleStream *stream) {
-  if(needsCls_) {
-    RDisplay::display.cls();
-    needsCls_ = false;
-  }
-
   RDisplay::display.text(0, 0, RDisplay::WHITE, title_);
 
   RDisplay::display.hline(0, 12, 80, RDisplay::WHITE);

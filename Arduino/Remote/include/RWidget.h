@@ -19,18 +19,19 @@ public:
     virtual void setFillsBackground(bool fills = true) { fillsBg_ = fills; needsContentsRedraw_ = true; }
     virtual void setDrawsFrame(bool draws = true) { drawsFrame_ = draws; needsFullRedraw_ = true;}
 
-    virtual void setNeedsCls(bool needs = true);
     virtual void setNeedsFullRedraw(bool needs = true);
     virtual void setNeedsContentsRedraw(bool needs = true);
 
-    void setBackgroundColor(uint16_t background);
-    void setForegroundColor(uint16_t foreground);
-    void setBorderColor(uint16_t border);
+    virtual void setBackgroundColor(uint8_t background);
+    virtual void setForegroundColor(uint8_t foreground);
+    virtual void setCursorColor(uint8_t cursor);
+    virtual void setMarkingColor(uint8_t marking);
+    virtual void setBorderColor(uint8_t border);
 protected:
-    bool needsCls_, needsFullRedraw_, needsContentsRedraw_;
+    bool needsFullRedraw_, needsContentsRedraw_;
     uint8_t x_, y_;
     uint8_t width_, height_;
-    uint16_t bgCol_, fgCol_, borderCol_;
+    uint8_t bgCol_, fgCol_, borderCol_, cursorCol_, markingCol_;
     bool fillsBg_, drawsFrame_;
 };
 

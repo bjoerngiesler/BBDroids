@@ -87,7 +87,7 @@ protected:
 
   String sendStringAndWaitForResponse(const String& str, int timeout=0, bool nl=true);
   bool sendStringAndWaitForOK(const String& str, int timeout=1, bool nl=true);
-  uint8_t sendBinCommand(const std::vector<uint8_t>& cmd, int timeout=1, bool waitForResponse=false);
+  uint8_t sendBinCommand(const std::vector<uint8_t>& cmd, int timeout=1000, bool waitForResponse=false);
 
 
 #if defined(LEFT_REMOTE)

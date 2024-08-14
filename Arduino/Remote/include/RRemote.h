@@ -12,6 +12,7 @@
 #include "RCrosshairWidget.h"
 #include "RLabelWidget.h"
 #include "RIMUWidget.h"
+#include "RRemoteVisWidget.h"
 
 using namespace bb;
 
@@ -82,6 +83,8 @@ protected:
   RCrosshairWidget crosshair_;
   RLabelWidget calibLabel_;
   RMessageWidget waitMessage_;
+  RRemoteVisWidget remoteVisL_, remoteVisR_;
+  RLabelWidget topLabel_, bottomLabel_;
 
   std::vector<RWidget*> widgets_;
   bool needsDraw_;

@@ -60,7 +60,9 @@ Result RDisplay::start(ConsoleStream *stream) {
   while(ser_.available()) ser_.read(); // readEmpty
 
 #if defined(BINARY)
-  uint8_t retval = sendBinCommand({rd::CMD_LOGO|0x80, 1}, 1000, true);
+
+  uint8_t retval = sendBinCommand({rd::CMD_LOGO|0x80, 1}, 100000, true);
+  while(ser_.available()) Console::console.printfBroadcast("0x%x\n", ser_.read());
   if(retval != (rd::CMD_NOP|0x80)) {
 #else
   if(sendStringAndWaitForOK(String((char)rd::CMD_LOGO)+"1") == false) {
@@ -131,22 +133,32 @@ bool RDisplay::sendStringAndWaitForOK(const String& str, int timeout, bool nl) {
 
 uint8_t RDisplay::sendBinCommand(const std::vector<uint8_t>& cmd, int timeout, bool waitForResponse) {
 #if defined(LEFT_REMOTE)
-  for(auto byte: cmd) ser_.write(byte);
-  ser_.flush();
+  //Console::console.printfBroadcast("Sending... ");
+  for(auto byte: cmd) {
+    //Console::console.printfBroadcast("%x ", byte);
+    ser_.write(byte);
+  }
+  //Console::console.printfBroadcast("\n");
 
   if(!waitForResponse) return rd::CMD_NOP|0x80;
   
   while(!ser_.available() && timeout >= 0) {
-    delay(1); 
+    delayMicroseconds(100); 
     timeout--;
   }
 
   if(!ser_.available()) {
+    Console::console.printfBroadcast("Timeout waiting for display reply.\n");
     return 0;
   }
 
-  uint8_t retval = ser_.read();
-  //Console::console.printfBroadcast("Read 0x%x\n", retval);
+  //Console::console.printfBroadcast("Available with %dus remaining.\n", timeout);
+
+  uint8_t retval;
+  while(ser_.available()) {
+    retval = ser_.read();
+    //Console::console.printfBroadcast("Read 0x%x\n", retval);
+  }
   return retval;
 #endif
 
@@ -188,8 +200,10 @@ Result RDisplay::text(uint8_t x, uint8_t y, uint8_t color, const String& text) {
   std::vector<uint8_t> vec = {rd::CMD_TEXT|0x80, x, y, color};
   for(int i=0; i<text.length(); i++) vec.push_back(text[i]);
   vec.push_back(0);
-  if(sendBinCommand(vec) != (rd::CMD_NOP|0x80))
+  uint8_t errcode = sendBinCommand(vec, 1000, true);
+  if(errcode != (rd::CMD_NOP|0x80)) {
     return RES_SUBSYS_COMM_ERROR;
+  }
 #else
   String str = String((char)rd::CMD_TEXT) + x + "," + y + "," + color + ",\"" + text + "\"";
   if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR; 
@@ -235,6 +249,7 @@ Result RDisplay::rect(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, uint8_t co
   uint8_t cmd = filled ? rd::CMD_FILLEDRECT : rd::CMD_RECT;
 
 #if defined(BINARY)
+  //if(filled) Console::console.printfBroadcast("R %d %d %d %d 0x%x\n", x1, y1, x2, y2, color);
   if(sendBinCommand({(uint8_t)(cmd|0x80), x1, y1, x2, y2, color}) != (rd::CMD_NOP|0x80))
     return RES_SUBSYS_COMM_ERROR;
 #else
@@ -295,5 +310,3 @@ Result RDisplay::showLEDs() {
   statusPixels_.show();
   return RES_OK;
 }
-
-#

@@ -6,36 +6,31 @@ RGraphsWidget::RGraphsWidget() {
   title_[TOP] = "Left";
   title_[MIDDLE] = "Right";
   title_[BOTTOM] = "Droid";
-  needsCls_ = true;
 }
 
 Result RGraphsWidget::draw(ConsoleStream* stream) {
-  if(needsCls_) {
-    RDisplay::display.cls();
-    int y, titlex;
-    
-    y = GRAPH0_Y;
-    RDisplay::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, RDisplay::WHITE);
-    titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[TOP])*RDisplay::CHAR_WIDTH)/2;
-    RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[TOP]);
+  int y, titlex;
+  
+  y = GRAPH0_Y;
+  RDisplay::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, RDisplay::WHITE);
+  titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[TOP])*RDisplay::CHAR_WIDTH)/2;
+  RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[TOP]);
 
-    y += GRAPH_HEIGHT + GRAPH_DIST;
-    RDisplay::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, RDisplay::WHITE);
-    titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[MIDDLE])*RDisplay::CHAR_WIDTH)/2;
-    RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[MIDDLE]);
+  y += GRAPH_HEIGHT + GRAPH_DIST;
+  RDisplay::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, RDisplay::WHITE);
+  titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[MIDDLE])*RDisplay::CHAR_WIDTH)/2;
+  RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[MIDDLE]);
 
-    y += GRAPH_HEIGHT + GRAPH_DIST;
-    RDisplay::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, RDisplay::WHITE);
-    titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[BOTTOM])*RDisplay::CHAR_WIDTH)/2;
-    RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[BOTTOM]);
-  }
+  y += GRAPH_HEIGHT + GRAPH_DIST;
+  RDisplay::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, RDisplay::WHITE);
+  titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[BOTTOM])*RDisplay::CHAR_WIDTH)/2;
+  RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[BOTTOM]);
 
   return RWidget::draw(stream);
 }
   
 void RGraphsWidget::setTitle(Graph g, const char* t) {
   title_[g] = t;
-  needsCls_ = true;
 }
 
 void RGraphsWidget::plotAxisData(Graph g, float a0, float a1, float a2, float a3, float a4) {

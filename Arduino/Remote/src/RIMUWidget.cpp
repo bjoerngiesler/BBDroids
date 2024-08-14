@@ -6,7 +6,7 @@ RIMUWidget::RIMUWidget() {
     accelX_ = accelY_ = accelZ_ = 0;
     roll_ = pitch_ = heading_ = 0;
     showsText_ = false;
-    cursorCol_ = fgCol_;
+    showsAccel_ = false;
     snprintf(buf_, BUFLEN, "R? P? H?");
 }
 
@@ -109,21 +109,23 @@ Result RIMUWidget::draw(ConsoleStream* stream) {
         headingX2Old_ = headingX2; headingY2Old_ = headingY2;
     }
 
-    float axisX = x, axisY = y-rad/2;
-    float axisMax = rad/2;
-    
-    RDisplay::display.line(axisX, axisY, axOld_, axisY, bgCol_);
-    RDisplay::display.line(axisX, axisY, axisX, ayOld_, bgCol_);
-    RDisplay::display.line(axisX, axisY, azOld_+axisX, axisY-azOld_, bgCol_);
-    float ax = constrain(accelX_, -1.0, 1.0)*axisMax + axisX;
-    float ay = constrain(accelY_, -1.0, 1.0)*axisMax + axisY;
-    float az = (constrain(accelZ_, -1.0, 1.0)/1.414)*axisMax;
-    RDisplay::display.line(axisX, axisY, ax, axisY, RDisplay::LIGHTRED2);
-    RDisplay::display.line(axisX, axisY, axisX, ay, RDisplay::LIGHTGREEN2);
-    RDisplay::display.line(axisX, axisY, az+axisX, axisY-az, RDisplay::LIGHTBLUE2);
-    axOld_ = ax;
-    ayOld_ = ay;
-    azOld_ = az;
+    if(showsAccel_) {
+        int axisX = x, axisY = y-rad/3;
+        int axisMax = rad/2;
+        
+        RDisplay::display.line(axisX, axisY, axOld_, axisY, bgCol_);
+        RDisplay::display.line(axisX, axisY, axisX, ayOld_, bgCol_);
+        RDisplay::display.line(axisX, axisY, azOld_+axisX, axisY-azOld_, bgCol_);
+        int ax = constrain(accelX_, -1.0, 1.0)*axisMax + axisX;
+        int ay = constrain(accelY_, -1.0, 1.0)*axisMax + axisY;
+        int az = (constrain(accelZ_, -1.0, 1.0)/1.414)*axisMax;
+        RDisplay::display.line(axisX, axisY, ax, axisY, RDisplay::LIGHTRED2);
+        RDisplay::display.line(axisX, axisY, axisX, ay, RDisplay::LIGHTGREEN2);
+        RDisplay::display.line(axisX, axisY, az+axisX, axisY-az, RDisplay::LIGHTBLUE2);
+        axOld_ = ax;
+        ayOld_ = ay;
+        azOld_ = az;
+    }
 
     if(showsText_) {
         snprintf(buf_, BUFLEN, "R%d P%d H%d", int(roll_), int(pitch_), int(heading_));
@@ -159,7 +161,7 @@ void RIMUWidget::setShowsText(bool shows) {
     setNeedsContentsRedraw();
 }
 
-void RIMUWidget::setCursorColor(uint8_t col) {
-    cursorCol_ = col;
+void RIMUWidget::setShowsAccel(bool shows) {
+    showsAccel_ = shows;
     setNeedsContentsRedraw();
 }

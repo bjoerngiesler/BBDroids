@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+#define VERSION_STRING "V0.0"
+
 #define ESP32_REMOTE
 
 #define LEFT_REMOTE
@@ -20,8 +22,8 @@ static const uint8_t P_A_JOY_HOR    = A2;
 static const uint8_t P_A_BATT_CHECK = A3;
 static const uint8_t P_D_XBEE_TX    = D6;
 static const uint8_t P_D_XBEE_RX    = D7;
-static const uint8_t P_D_DISPLAY_TX = D8;
-static const uint8_t P_D_DISPLAY_RX = D9;
+static const uint8_t P_D_DISPLAY_RX = D8;
+static const uint8_t P_D_DISPLAY_TX = D9;
 static const uint8_t P_A_POT1       = A10;
  
  
@@ -91,5 +93,9 @@ static const uint8_t BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 
 static const uint8_t REMOTE_ID = 0;
 
 static const uint8_t IMU_ADDR           = 0x6b;
+static const uint8_t MCP_ADDR           = 0x26;
+
+static const uint16_t MAX_ANALOG_IN_VDIV = 2303; // Max battery voltage is 4.2V, with our voltage divider we'll see 2.1V or 2606 out of 4096 possible values.
+static const uint16_t MIN_ANALOG_IN_VDIV = 1936; // Min battery voltage is 3.7V, with our voltage divider we'll see 1.85V or 2296 out of 4096 possible values.
 
 #endif // CONFIG_H

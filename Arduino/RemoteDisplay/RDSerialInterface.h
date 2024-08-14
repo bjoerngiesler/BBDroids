@@ -41,7 +41,7 @@ public:
 
   bool begin();
   Result handleInput();
-  Result execInput(Command cmd, const std::vector<uint8_t> args);
+  Result execInput(Command cmd, const std::vector<uint8_t>& args);
   Result execText(uint8_t x, uint8_t y, uint8_t color, const String& text);
 
   bool available();
@@ -51,7 +51,16 @@ protected:
   Result readArgsBinary(uint8_t num, std::vector<uint8_t>& args);
   Result readStringUntil(unsigned char c, String& str);
   std::vector<String> split(const String& str, unsigned char delim=' ');
+  void enqueue(Command cmd, const std::vector<uint8_t>& args);
+  void runQueue();
+
   SerialInterface();
+
+  struct CmdAndArgs {
+    Command cmd;
+    std::vector<uint8_t> args;
+  };
+  std::vector<CmdAndArgs> queue_;
 };
 
 };

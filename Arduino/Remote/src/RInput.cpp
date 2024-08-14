@@ -64,7 +64,7 @@ void RInput::clearDelegate() {
 
 bool RInput::begin() {
 #if defined(ESP32_REMOTE)
-  if(mcp_.begin_I2C(0x27) == 0) {
+  if(mcp_.begin_I2C(MCP_ADDR) == 0) {
     Console::console.printfBroadcast("Couldn't initialize MCP!\n");
     mcpOK_ = false;
   } else {
@@ -84,7 +84,7 @@ void RInput::update() {
   joyRawH = analogRead(P_A_JOY_HOR);
   joyRawV = 4096 - analogRead(P_A_JOY_VER);
 
-  joyH = (float)(hCalib_.center - joyRawH) / 2048.0f;
+  joyH = (float)(joyRawH - hCalib_.center) / 2048.0f;
   if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;
   joyH = constrain(joyH, -1.0f, 1.0f);
 
@@ -92,7 +92,10 @@ void RInput::update() {
   if(abs(joyV) < JoystickEpsilon) joyV = 0.0f;
   joyV = constrain(joyV, -1.0f, 1.0f);
   
-  battery = (float)(analogRead(P_A_BATT_CHECK) / 4096.0f);
+  battRaw = analogRead(P_A_BATT_CHECK);
+  battRaw = constrain(battRaw, MIN_ANALOG_IN_VDIV, MAX_ANALOG_IN_VDIV);
+  battery = float(battRaw-MIN_ANALOG_IN_VDIV)/float(MAX_ANALOG_IN_VDIV-MIN_ANALOG_IN_VDIV);
+
   pot1 = (float)(analogRead(P_A_POT1) / 4096.0f); // careful - wraps around on the left remote
 #if !defined(LEFT_REMOTE)
   pot2 = (float)(analogRead(P_A_POT2) / 4096.0f);
@@ -119,6 +122,8 @@ void RInput::update() {
         buttons[i] = false;
       }
     }
+  } else {
+    Console::console.printfBroadcast("MCP not OK\n");
   }
 #endif // ESP32_REMOTE
   if(delegate_ != NULL) {

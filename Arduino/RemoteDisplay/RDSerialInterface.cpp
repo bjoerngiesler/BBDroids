@@ -16,8 +16,7 @@ std::map<rd::Command, rd::CmdArgDescription> rd::SerialInterface::cmdArgs = {
   { CMD_FILLEDRECT, { 5, "x1,y1,x2,y2,color" } },
   { CMD_CIRCLE, { 4, "x,y,radius,color" } },
   { CMD_FILLEDCIRCLE, { 4, "x,y,radius,color" } },
-  { CMD_TEXT, { 4, "x,y,color,string (ascii: enclosed in "
-                   ", binary: terminated by \0)" } }
+  { CMD_TEXT, { 4, "x,y,color,string (ascii: enclosed in \"\", binary: terminated by \0)" } }
 };
 
 
@@ -78,17 +77,15 @@ rd::SerialInterface::Result rd::SerialInterface::readStringUntil(uint8_t delim, 
   return RESULT_ERROR;
 }
 
-rd::SerialInterface::Result rd::SerialInterface::execInput(Command cmd, std::vector<uint8_t> args) {
+rd::SerialInterface::Result rd::SerialInterface::execInput(Command cmd, const std::vector<uint8_t>& args) {
   // Double sanity check input; this has been checked before calling, but just to make sure.
   if (cmdArgs.find(cmd) == cmdArgs.end()) return RESULT_ERROR;
   uint8_t numArgs = cmdArgs[cmd].numArgs;
-  if (args.size() != numArgs) return RESULT_ERROR;
+  if ((cmd != CMD_TEXT && args.size() != numArgs) || 
+      (cmd == CMD_TEXT && args.size() < numArgs)) return RESULT_ERROR;
+  String text;
 
   switch (cmd) {
-    case CMD_LOGO:
-      gfx.BacklightOn(args[0]);
-      return RESULT_RUN_LOGO_SCREEN;
-
     case CMD_CLS:
       gfx.Cls();
       return RESULT_OK;
@@ -106,7 +103,6 @@ rd::SerialInterface::Result rd::SerialInterface::execInput(Command cmd, std::vec
       return RESULT_OK;
 
     case CMD_LINE:
-      Serial.println(String("Line (")+args[0]+","+args[1]+")->("+args[2]+","+args[3]+"), color " + String(lookupColor(args[4]), HEX));
       gfx.Line(args[0], args[1], args[2], args[3], lookupColor(args[4]));
       return RESULT_OK;
 
@@ -126,6 +122,11 @@ rd::SerialInterface::Result rd::SerialInterface::execInput(Command cmd, std::vec
       gfx.RectangleFilled(args[0], args[1], args[2], args[3], lookupColor(args[4]));
       return RESULT_OK;
 
+    case CMD_TEXT:
+      text = "";
+      for(unsigned int i=3; i<args.size(); i++) text = text + (char)args[i];
+      return execText(args[0], args[1], args[2], text);
+
     default:
       break;
   }
@@ -134,7 +135,8 @@ rd::SerialInterface::Result rd::SerialInterface::execInput(Command cmd, std::vec
 }
 
 rd::SerialInterface::Result rd::SerialInterface::handleInput() {
-  if (!Serial.available()) {
+  if(!Serial.available()) runQueue();
+  if(!Serial.available()) {
     return RESULT_NOTHING_TO_READ;
   }
 
@@ -181,11 +183,8 @@ rd::SerialInterface::Result rd::SerialInterface::handleInput() {
         return RESULT_ERROR;
       }
 
-      if(execText(args[0], args[1], args[2], text) != RESULT_OK) {
-        Serial.write(CMD_ERROR | 0x80);
-        return RESULT_ERROR;
-      }
-
+      for(int i=0; i<text.length(); i++) args.push_back(text[i]);
+      enqueue(cmd, args);
       Serial.write(CMD_NOP | 0x80);
       return RESULT_OK;
     }
@@ -196,6 +195,15 @@ rd::SerialInterface::Result rd::SerialInterface::handleInput() {
       return RESULT_ERROR;
     }
 
+    if(cmd == CMD_LOGO) {
+      gfx.BacklightOn(args[0]);
+      Serial.write(CMD_NOP | 0x80);
+      return RESULT_RUN_LOGO_SCREEN;
+    }
+
+    enqueue(cmd, args);
+    Serial.write(CMD_NOP | 0x80);
+    return RESULT_OK;
   } else {  // ASCII
     // Read line and split into words
     String str;
@@ -290,4 +298,14 @@ std::vector<String> rd::SerialInterface::split(const String& str, unsigned char 
   }
 
   return words;
+}
+
+void rd::SerialInterface::enqueue(Command cmd, const std::vector<uint8_t>& args) {
+  CmdAndArgs elem = {cmd, args};
+  queue_.push_back(elem);
+}
+
+void rd::SerialInterface::runQueue() {
+  for(auto& ca: queue_) execInput(ca.cmd, ca.args);
+  queue_.clear();
 }

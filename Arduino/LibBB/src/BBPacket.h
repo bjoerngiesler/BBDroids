@@ -16,7 +16,8 @@ namespace bb {
 struct __attribute__ ((packed)) ControlPacket {
 
 #define AXIS_MAX1 1023
-#define AXIS_MAX2 255
+#define AXIS_MAX2   255
+#define BATTERY_MAX 
 
 	uint16_t axis0 : 10; // bit 0..9
 	uint16_t axis1 : 10; // bit 10..19
@@ -89,18 +90,18 @@ struct __attribute__ ((packed)) ControlPacket {
 	}
 
 	float getAxis(uint8_t num, Unit unit = UNIT_UNITY_CENTERED) const {
-		uint16_t multiplier = (num < 5) ? AXIS_MAX1 : AXIS_MAX2;
+		float multiplier = (num < 5) ? AXIS_MAX1 : AXIS_MAX2;
 		float value;
 		switch(num) {
-		case 0: value = axis0;
-		case 1: value = axis1;
-		case 2: value = axis2;
-		case 3: value = axis3;
-		case 4: value = axis4;
-		case 5: value = axis5;
-		case 6: value = axis6;
-		case 7: value = axis7;
-		case 8: value = axis8;
+		case 0: value = axis0; break;
+		case 1: value = axis1; break;
+		case 2: value = axis2; break;
+		case 3: value = axis3; break;
+		case 4: value = axis4; break;
+		case 5: value = axis5; break;
+		case 6: value = axis6; break;
+		case 7: value = axis7; break;
+		case 8: value = axis8; break;
 		case 9: 
 		default:
 			value = axis9; break;

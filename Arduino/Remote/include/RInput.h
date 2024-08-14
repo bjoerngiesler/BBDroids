@@ -23,23 +23,23 @@ public:
 
   bool anyButtonPressed();
 
-  float pot1, pot2;
-  float battery;
-  float joyH, joyV;
-  uint16_t joyRawH, joyRawV;
+  float pot1, pot2; // range: 0 .. 1.0
+  float battery;    // range: 0 .. 1.0
+  float joyH, joyV; // range: -1.0 .. 1.0
+  uint16_t joyRawH, joyRawV, battRaw;
 
   // Weird order given by ESP32 layout
 #if defined(ESP32_REMOTE)
 #if defined(LEFT_REMOTE)
   enum ButtonIndex {
-    BUTTON_PINKY     = 5,
-    BUTTON_INDEX     = 4,
-    BUTTON_JOY       = 1, 
-    BUTTON_LEFT      = 3,
-    BUTTON_RIGHT     = 2,
-    BUTTON_CONFIRM   = 7,
-    BUTTON_TOP_LEFT  = 6,
-    BUTTON_TOP_RIGHT = 0
+    BUTTON_PINKY     = 2, // correct
+    BUTTON_INDEX     = 4, // correct
+    BUTTON_JOY       = 5, // correct
+    BUTTON_LEFT      = 7, // correct
+    BUTTON_RIGHT     = 6, // correct
+    BUTTON_CONFIRM   = 3, // correct
+    BUTTON_TOP_LEFT  = 1, // correct
+    BUTTON_TOP_RIGHT = 0  // correct
   };
 #else
   enum ButtonIndex {
