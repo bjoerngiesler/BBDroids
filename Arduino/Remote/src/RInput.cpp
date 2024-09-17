@@ -75,7 +75,11 @@ bool RInput::begin() {
 
 void RInput::update() {
   joyRawH = analogRead(P_A_JOY_HOR);
+#if defined(LEFT_REMOTE)
   joyRawV = 4096 - analogRead(P_A_JOY_VER);
+#else
+  joyRawV = analogRead(P_A_JOY_VER);
+#endif
 
   joyH = (float)(joyRawH - hCalib_.center) / 2048.0f;
   if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;
@@ -89,9 +93,9 @@ void RInput::update() {
   battRaw = constrain(battRaw, MIN_ANALOG_IN_VDIV, MAX_ANALOG_IN_VDIV);
   battery = float(battRaw-MIN_ANALOG_IN_VDIV)/float(MAX_ANALOG_IN_VDIV-MIN_ANALOG_IN_VDIV);
 
-  pot1 = (float)(analogRead(P_A_POT1) / 4096.0f); // careful - wraps around on the left remote
+  pot1 = (float)((4096-analogRead(P_A_POT1)) / 4096.0f); // careful - wraps around on the left remote
 #if !defined(LEFT_REMOTE)
-  pot2 = (float)(analogRead(P_A_POT2) / 4096.0f);
+  pot2 = (float)((4096-analogRead(P_A_POT2)) / 4096.0f);
 #else
   pot2 = 0;
 #endif
@@ -123,7 +127,7 @@ void RInput::update() {
       }
     }
   } else {
-    Console::console.printfBroadcast("MCP not OK\n");
+    //Console::console.printfBroadcast("MCP not OK\n");
   }
 #endif // ESP32_REMOTE
   if(btnTopLChanged) {

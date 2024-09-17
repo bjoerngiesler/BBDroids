@@ -30,7 +30,7 @@ static const uint8_t btnTopY = 5;
 static const uint8_t potW = 19;
 
 static const uint8_t potXL = 50;
-static const uint8_t potXR = bxr - (bw-6);
+static const uint8_t potXR = bxr-15;
 static const uint8_t pot1Y = 61;
 static const uint8_t pot2Y = pot1Y+potW+3;
 
@@ -93,7 +93,6 @@ void RRemoteVisWidget::setPosition(int x, int y) {
     moveWidgetsAround();
 }
 
-
 void RRemoteVisWidget::moveWidgetsAround() {
     if(left_) {
         crosshair_.setPosition(joyXL, y_+xhairY);
@@ -118,6 +117,7 @@ void RRemoteVisWidget::moveWidgetsAround() {
             batteryState_[i].setPosition(battStateXR + i*(battStateW+1), y_+battStateY);
         }
         pot1_.setPosition(potXR, y_+pot1Y);
+        Console::console.printfBroadcast("Pots at %d, %d/%d\n", potXR, y_+pot1Y, y_+pot2Y);
         pot2_.setPosition(potXR, y_+pot2Y);
     }
 
@@ -141,18 +141,6 @@ Result RRemoteVisWidget::draw(ConsoleStream* stream) {
     }
 
     return RMultiWidget::draw(stream);
-
-#if 0
-    crosshair_.draw(stream);
-    imu_.draw(stream);
-    for(auto& b: mainBtns_) b.draw(stream);
-    for(auto& b: batteryState_) b.draw(stream);
-    pot1_.draw(stream);
-    pot2_.draw(stream);
-    if(!left_) for(auto btn: topButtons_) btn.draw(stream);
-#endif
-
-    return RES_OK;
 }
 
 Result RRemoteVisWidget::visualizeFromPacket(const bb::ControlPacket& packet) {
@@ -200,7 +188,7 @@ Result RRemoteVisWidget::visualizeFromPacket(const bb::ControlPacket& packet) {
     }
 
     pot1_.setAngle(packet.getAxis(8, bb::ControlPacket::UNIT_DEGREES));
-    //pot2_.setAngle(packet.getAxis(9, bb::ControlPacket::UNIT_DEGREES));
+    pot2_.setAngle(packet.getAxis(9, bb::ControlPacket::UNIT_DEGREES));
 
     int batt = (packet.battery / 16) % 5;
     for(int i=1; i<=batt; i++) batteryState_[i-1].setBackgroundColor(RDisplay::LIGHTGREEN1);

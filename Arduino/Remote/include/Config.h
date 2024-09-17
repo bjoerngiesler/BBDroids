@@ -29,8 +29,8 @@ static const uint8_t P_A_POT1       = A10;
  
 #else // !defined(LEFT_REMOTE)
 
-static const uint8_t P_A_POT2       = A0;
-static const uint8_t P_A_POT1       = A1;
+static const uint8_t P_A_POT1       = A0;
+static const uint8_t P_A_POT2       = A1;
 static const uint8_t P_D_RST_IOEXP  = D2;
 static const uint8_t P_A_JOY_HOR    = A3;
 static const uint8_t P_D_XBEE_TX    = D6;
@@ -93,7 +93,11 @@ static const uint8_t BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 
 static const uint8_t REMOTE_ID = 0;
 
 static const uint8_t IMU_ADDR           = 0x6b;
+#if defined(LEFT_REMOTE)
 static const uint8_t MCP_ADDR           = 0x26;
+#else
+static const uint8_t MCP_ADDR           = 0x27;
+#endif
 
 static const uint16_t MAX_ANALOG_IN_VDIV = 2303; // Max battery voltage is 4.2V, with our voltage divider we'll see 2.1V or 2606 out of 4096 possible values.
 static const uint16_t MIN_ANALOG_IN_VDIV = 1936; // Min battery voltage is 3.7V, with our voltage divider we'll see 1.85V or 2296 out of 4096 possible values.

@@ -46,8 +46,8 @@ public:
     BUTTON_PINKY     = 5,
     BUTTON_INDEX     = 4,
     BUTTON_JOY       = 1,
-    BUTTON_LEFT      = 3,
-    BUTTON_RIGHT     = 2,
+    BUTTON_LEFT      = 2,
+    BUTTON_RIGHT     = 3,
     BUTTON_CONFIRM   = 7,
     BUTTON_TOP_LEFT  = 6,
     BUTTON_TOP_RIGHT = 0

@@ -83,8 +83,10 @@ Result RRemote::initialize() {
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is valid.\n", paramsHandle_);
     ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
+    Console::console.printfBroadcast("Remote: leftID 0x%x, rightID 0x%x\n", params_.leftID, params_.rightID);
   } else {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
+    ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
   }
 
   return Subsystem::initialize();
@@ -247,8 +249,6 @@ Result RRemote::stop(ConsoleStream *stream) {
 }
 
 Result RRemote::step() {
-  //Console::console.printfBroadcast("step()\n");
-
   if(!started_) return RES_SUBSYS_NOT_STARTED;
 
   imu_.update();
@@ -574,6 +574,7 @@ Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& pack
     return RES_OK;
   } else if(source == params_.rightID && params_.rightID != 0) {
     if(packet.type == PACKET_TYPE_CONTROL) {
+      remoteVisR_.visualizeFromPacket(packet.payload.control);
       return RES_OK;
     } else {
       Console::console.printfBroadcast("Unknown packet type %d from right remote!\n", packet.type);
@@ -594,6 +595,9 @@ Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& pack
         bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
         bb::ConfigStorage::storage.store();
         Console::console.printfBroadcast("Stored config parameters.\n");
+        memset(&params_, 0, sizeof(params_));
+        bb::ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
+        Console::console.printfBroadcast("Re-read left remote as 0x%x\n", params_.leftID);
         return RES_OK;
       } else if(packet.payload.config.type == bb::ConfigPacket::CONFIG_SET_DROID_ID) {
         Console::console.printfBroadcast("Setting Droid ID to 0x%x.\n", packet.payload.config.parameter.id);

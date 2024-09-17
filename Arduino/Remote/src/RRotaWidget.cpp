@@ -33,7 +33,6 @@ Result RRotaWidget::draw(ConsoleStream* stream) {
 
     if(widgetsChanged_) {
         widgets_[index_]->setNeedsFullRedraw();
-        Console::console.printfBroadcast("Full redraw\n");
         widgetsChanged_ = false;
     }
     return widgets_[index_]->draw(stream);

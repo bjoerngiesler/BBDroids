@@ -28,16 +28,15 @@ void setup() {
   digitalWrite(P_D_RST_IOEXP, HIGH);
 #endif
 
-  Serial.begin(115200);
+  Console::console.initialize();
+  Console::console.start();
+  delay(2000);
 
   Wire.begin();
   Wire.setClock(400000UL);
 
   ConfigStorage::storage.initialize();
 
-  Console::console.initialize();
-  Console::console.start();
-  
   Runloop::runloop.initialize();
 
 #if defined(LEFT_REMOTE)

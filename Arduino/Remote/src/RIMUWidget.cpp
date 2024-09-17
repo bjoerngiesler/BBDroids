@@ -28,7 +28,6 @@ Result RIMUWidget::draw(ConsoleStream* stream) {
     y += y_;
 
     if(needsFullRedraw_) {
-        Console::console.printfBroadcast("Full redraw\n");
         RDisplay::display.circle(x, y, rad, bgCol_, true);
         RDisplay::display.circle(x, y, rad, fgCol_, false);
         needsFullRedraw_ = false;
