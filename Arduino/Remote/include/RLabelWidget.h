@@ -3,7 +3,7 @@
 
 #include "RWidget.h"
 
-class RLabelWidget: virtual public RWidget {
+class RLabelWidget: public RWidget {
 public:
     RLabelWidget();
 
@@ -29,7 +29,7 @@ public:
 
     virtual Result draw(ConsoleStream *stream=NULL);
 
-    void setTitle(const String& title);
+    virtual void setTitle(const String& title);
     void setJustification(HorizontalJustification hor, VerticalJustification ver);
     void setAutoscroll(bool autoscroll = true);
     void setAutoscrollTiming(float leftwait, float pixelwait, float rightwait);

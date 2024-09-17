@@ -31,23 +31,26 @@ RRemote::RRemote():
   params_.droidID = 0;
 #endif
 
-  mainMenu_.setTitle("Main Menu");
-  settingsMenu_.setTitle("Settings");
-  droidsMenu_.setTitle("Droids");
-  remotesMenu_.setTitle("Remotes");
+  mainMenu_.setName("Main Menu");
+  settingsMenu_.setName("Settings");
+  droidsMenu_.setName("Droids");
+  remotesMenu_.setName("Remotes");
+  
   waitMessage_.setTitle("Please wait");
 
   mainMenu_.addEntry("Settings...", []() { RRemote::remote.showSettingsMenu(); });
-  mainMenu_.addEntry("Back", []() { RRemote::remote.showGraphs(); });
+  mainMenu_.addEntry("Back", []() { RRemote::remote.showMain(); });
   
   settingsMenu_.addEntry("Right Remote...", []() { RRemote::remote.showRemotesMenu(); });
   settingsMenu_.addEntry("Droid...", []() { RRemote::remote.showDroidsMenu(); });
   settingsMenu_.addEntry("Back", []() { RRemote::remote.showMainMenu(); });
 
   remoteVisL_.setRepresentsLeftRemote(true);
-  remoteVisL_.setPosition(0, 13);
+  remoteVisL_.setName("Left Remote");
   remoteVisR_.setRepresentsLeftRemote(false);
-  remoteVisR_.setPosition(0, 13);
+  remoteVisR_.setName("Right Remote");
+  mainVis_.addWidget(&remoteVisL_);
+  mainVis_.addWidget(&remoteVisR_);
 
   topLabel_.setSize(RDisplay::DISPLAY_WIDTH, RDisplay::CHAR_HEIGHT);
   topLabel_.setPosition(0, 0);
@@ -55,8 +58,8 @@ RRemote::RRemote():
   topLabel_.setTitle("Top Label");
 
   bottomLabel_.setSize(RDisplay::DISPLAY_WIDTH, RDisplay::CHAR_HEIGHT+4);
-  bottomLabel_.setPosition(0, RDisplay::DISPLAY_HEIGHT-RDisplay::CHAR_HEIGHT-1);
-  bottomLabel_.setJustification(RLabelWidget::HOR_CENTERED, RLabelWidget::BOTTOM_JUSTIFIED);
+  bottomLabel_.setPosition(0, RDisplay::DISPLAY_HEIGHT-RDisplay::CHAR_HEIGHT-3);
+  bottomLabel_.setJustification(RLabelWidget::LEFT_JUSTIFIED, RLabelWidget::BOTTOM_JUSTIFIED);
   bottomLabel_.setFrameType(RLabelWidget::FRAME_TOP);
   bottomLabel_.setTitle(VERSION_STRING);
 }
@@ -70,6 +73,10 @@ Result RRemote::initialize() {
   if(RInput::input.buttons[RInput::BUTTON_LEFT] == true &&
      RInput::input.buttons[RInput::BUTTON_RIGHT] == true) {
     mode_ = MODE_CALIBRATION;
+    showCalib();
+  } else {
+    mode_ = MODE_REGULAR;
+    showMain();
   }
 
   paramsHandle_ = ConfigStorage::storage.reserveBlock("remote", sizeof(params_));
@@ -80,60 +87,44 @@ Result RRemote::initialize() {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
   }
 
-  showCalib();
-
   return Subsystem::initialize();
 }
 
-void RRemote::addWidget(RWidget* w) {
-  if(!hasWidget(w)) widgets_.push_back(w);
-}
-  
-bool RRemote::hasWidget(RWidget* w) {
-  return std::find(widgets_.begin(), widgets_.end(), w) != widgets_.end();
-}
-  
-bool RRemote::removeWidget(RWidget* w) {
-  std::vector<RWidget*>::iterator iter = std::find(widgets_.begin(), widgets_.end(), w);
-  if(iter == widgets_.end()) return false;
-  widgets_.erase(iter);
-  return true;
-}
-
-void RRemote::clearWidgets() {
-  widgets_.clear();
-}
-
-
-void RRemote::showCalib() {
-  clearWidgets();
-  topLabel_.setTitle("Left Remote >");
-  addWidget(&remoteVisL_);
+void RRemote::setMainWidget(RWidget* widget) {
+  widget->setPosition(RDisplay::MAIN_X, RDisplay::MAIN_Y);
+  widget->setSize(RDisplay::MAIN_WIDTH, RDisplay::MAIN_HEIGHT);
+  widget->takeInputFocus();
+  widget->setNeedsFullRedraw();
+  widget->setNeedsContentsRedraw();
+  setTopTitle(widget->name());
+  mainWidget_ = widget;
 
   needsDraw_ = true;
+}
+
+void RRemote::showCalib() {
+  topLabel_.setTitle("Left Remote >");
+  setMainWidget(&remoteVisL_);
+}
+
+void RRemote::showMain() {
+  setMainWidget(&mainVis_);
+  RInput::input.setTopRightLongPressCallback([]{RRemote::remote.showMainMenu();});
 }
 
 void RRemote::showMenu(RMenuWidget* menu) {
-  clearWidgets();
-  addWidget(menu);
-  RInput::input.setDelegate(menu);
+  setMainWidget(menu);
   menu->resetCursor();
-  needsDraw_ = true;
 }
 
 void RRemote::showGraphs() {
-  clearWidgets();
-  addWidget(&graphs_);
-  RInput::input.setDelegate(&graphs_);
-  needsDraw_ = true;
+  setMainWidget(&graphs_);
 }
 
 void RRemote::showDroidsMenu() {
-  clearWidgets();
-  addWidget(&waitMessage_);
-  RInput::input.clearDelegate();
+  waitMessage_.setNeedsFullRedraw();
   waitMessage_.draw();
-
+  
   droidsMenu_.clear();
 
   Result res = XBee::xbee.discoverNodes(discoveredNodes_);
@@ -146,17 +137,18 @@ void RRemote::showDroidsMenu() {
   for(auto& n: discoveredNodes_) {
     Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_DROID) continue;
+    Console::console.printfBroadcast("Adding entry for \"%s\"\n", n.name);
     droidsMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.stationId); });
   }
+  Console::console.printfBroadcast("Adding entry for \"Back\"\n");
   droidsMenu_.addEntry("Back", []() { RRemote::remote.showSettingsMenu(); });
 
+  Console::console.printfBroadcast("Showing droidsMenu\n");
   showMenu(&droidsMenu_);
 }
 
 void RRemote::showRemotesMenu() {
-  clearWidgets();
-  addWidget(&waitMessage_);
-  RInput::input.clearDelegate();
+  waitMessage_.setNeedsFullRedraw();
   waitMessage_.draw();
 
   remotesMenu_.clear();
@@ -170,7 +162,7 @@ void RRemote::showRemotesMenu() {
 
   Console::console.printfBroadcast("Discovered %d nodes\n", discoveredNodes_.size());
 
-  remotesMenu_.clear();
+  remotesMenu_.setName(String(discoveredNodes_.size()) + " Remotes");
   for(auto& n: discoveredNodes_) {
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_REMOTE) continue;
     remotesMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.stationId); });
@@ -178,6 +170,14 @@ void RRemote::showRemotesMenu() {
   remotesMenu_.addEntry("Back", []() { RRemote::remote.showSettingsMenu(); });
 
   showMenu(&remotesMenu_);
+}
+
+void RRemote::setTopTitle(const String& title) {
+  topLabel_.setTitle(title);
+}
+
+void RRemote::setBottomTitle(const String& title) {
+  bottomLabel_.setTitle(title);
 }
 
 void RRemote::selectDroid(uint16_t droid) {
@@ -270,7 +270,7 @@ Result RRemote::step() {
     if(1) { // needsDraw_) {
       topLabel_.draw();
       bottomLabel_.draw();
-      for(auto w: widgets_) w->draw();
+      if(mainWidget_ != NULL) mainWidget_->draw();
       needsDraw_ = false;
     }
 
@@ -282,8 +282,6 @@ Result RRemote::step() {
     RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, 0);
     RDisplay::display.showLEDs();
   }
-
-  //Console::console.printfBroadcast("Done with step()\n");
 
   return RES_OK;
 }
@@ -506,14 +504,6 @@ bb::Result RRemote::fillAndSend() {
 
   remoteVisL_.visualizeFromPacket(packet.payload.control);
 
-#if defined(LEFT_REMOTE)
-#if 0
-  if(currentWidget_ == graphs_) {
-    graphs_.plotControlPacket(RGraphs::TOP, packet.payload.control);
-    graphs_.advanceCursor(RGraphs::TOP);
-  }
-#endif
-#endif
 
   Result res = RES_OK;
 #if !defined(LEFT_REMOTE) // right remote sends to left remote
@@ -584,12 +574,6 @@ Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& pack
     return RES_OK;
   } else if(source == params_.rightID && params_.rightID != 0) {
     if(packet.type == PACKET_TYPE_CONTROL) {
-#if 0
-      if(currentWidget_ == &graphs_) {
-        graphs_.plotControlPacket(RGraphs::MIDDLE, packet.payload.control);
-        graphs_.advanceCursor(RGraphs::MIDDLE);
-      }
-#endif
       return RES_OK;
     } else {
       Console::console.printfBroadcast("Unknown packet type %d from right remote!\n", packet.type);

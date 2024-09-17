@@ -58,28 +58,33 @@ public:
   std::array<bool,8> buttons;
 
   bool btnTopLChanged, btnTopRChanged, btnConfirmChanged;
-
-  class Delegate {
-  public:
-    virtual void buttonTopLeftPressed() {}
-    virtual void buttonTopRightPressed() {}
-    virtual void buttonConfirmPressed() {}
-    virtual void buttonTopLeftReleased() {}
-    virtual void buttonTopRightReleased() {}
-    virtual void buttonConfirmReleased() {}
-  };
-
-  void setDelegate(Delegate* d);
-  void clearDelegate();
+  
+  void setTopLeftShortPressCallback(std::function<void(void)> cb) { tlShortPressCB_ = cb; }
+  void setTopLeftLongPressCallback(std::function<void(void)> cb) { tlLongPressCB_ = cb; }
+  void setTopRightShortPressCallback(std::function<void(void)> cb) { trShortPressCB_ = cb; }
+  void setTopRightLongPressCallback(std::function<void(void)> cb) { trLongPressCB_ = cb; }
+  void setConfirmShortPressCallback(std::function<void(void)> cb) { cShortPressCB_ = cb; }
+  void setConfirmLongPressCallback(std::function<void(void)> cb) { cLongPressCB_ = cb; }
+  void clearCallbacks();
 
 protected:
   RInput();
-  Delegate* delegate_;
   AxisCalib hCalib_, vCalib_;
 
 #if defined(ESP32_REMOTE)
   Adafruit_MCP23X17 mcp_; bool mcpOK_;
 #endif
+
+  void btnTopLeftPressed();
+  void btnTopLeftReleased();
+  void btnTopRightPressed();
+  void btnTopRightReleased();
+  void btnConfirmPressed();
+  void btnConfirmReleased();
+
+  unsigned long tlms_, trms_, cms_;
+  std::function<void(void)> tlShortPressCB_, tlLongPressCB_, trShortPressCB_, trLongPressCB_, cShortPressCB_, cLongPressCB_;
+  unsigned long longPressThresh_;
 };
 
 #endif // REMOTEINPUT_H

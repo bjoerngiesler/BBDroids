@@ -36,10 +36,12 @@ RDisplay::RDisplay():
 
 Result RDisplay::initialize() {
   pinMode(P_D_NEOPIXEL, OUTPUT);
+#if 0
   statusPixels_.begin();
   setLED(LED_LEFT, 0, 0, 150);
   setLED(LED_RIGHT, 150, 150, 150);
   showLEDs();
+#endif
 
  
 #if defined(LEFT_REMOTE)
@@ -285,6 +287,8 @@ Result RDisplay::plot(uint8_t x, uint8_t y, uint8_t color) {
 }
 
 Result RDisplay::setLED(RDisplay::WhichLED which, uint8_t r, uint8_t g, uint8_t b) {
+  return RES_OK;
+
   if(which == LED_LEFT || which == LED_BOTH) {
     statusPixels_.setPixelColor(1, r, g, b);
   } 
@@ -307,6 +311,7 @@ Result RDisplay::flashLED(WhichLED which, uint8_t iterations, uint8_t millisOn, 
 }
 
 Result RDisplay::showLEDs() {
+  return RES_OK;
   statusPixels_.show();
   return RES_OK;
 }

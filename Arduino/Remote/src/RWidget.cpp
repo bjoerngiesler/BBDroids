@@ -1,6 +1,6 @@
 #include "RWidget.h"
 
-RWidget::RWidget() { 
+RWidget::RWidget(): name_("Widget") { 
     needsFullRedraw_ = needsContentsRedraw_ = true; 
     x_ = y_ = 1;
     width_ = height_ = 10;
@@ -10,6 +10,8 @@ RWidget::RWidget() {
     cursorCol_ = RDisplay::LIGHTGREEN1;
     markingCol_ = RDisplay::BLUE;
     fillsBg_ = false;
+    drawsFrame_ = false;
+    action_ = nullptr;
 }
 
 Result RWidget::draw(ConsoleStream* stream) {
@@ -18,7 +20,7 @@ Result RWidget::draw(ConsoleStream* stream) {
     return RES_OK;
 }
 
-void RWidget::setPosition(uint8_t x, uint8_t y) { 
+void RWidget::setPosition(int x, int y) { 
     x_ = x; 
     y_ = y; 
 }
@@ -67,3 +69,26 @@ void RWidget::setBorderColor(uint8_t border) {
     borderCol_ = border;
     needsFullRedraw_ = true;
 }
+
+void RWidget::setName(const String& name) {
+    name_ = name;
+}
+
+void RWidget::takeInputFocus() {
+Console::console.printfBroadcast("Taking input focus in Base Widget\n");
+    RInput::input.clearCallbacks();
+}
+
+void RWidget::setAction(std::function<void(void)> cb) {
+    action_ = cb;
+}
+
+std::function<void(void)> RWidget::action() {
+    return action_;
+}
+
+void RWidget::triggerAction() {
+    if(action_ == nullptr) return;
+    action_();
+}
+

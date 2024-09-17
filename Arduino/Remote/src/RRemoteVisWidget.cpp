@@ -30,7 +30,7 @@ static const uint8_t btnTopY = 5;
 static const uint8_t potW = 19;
 
 static const uint8_t potXL = 50;
-static const uint8_t potXR = potXR + bxr + bw-6;
+static const uint8_t potXR = bxr - (bw-6);
 static const uint8_t pot1Y = 61;
 static const uint8_t pot2Y = pot1Y+potW+3;
 
@@ -40,8 +40,6 @@ static const uint8_t battStateXL = bxl + 7;
 static const uint8_t battStateXR = bxr + 7;
 
 RRemoteVisWidget::RRemoteVisWidget() {
-    left_ = false;
-
     for(auto& b: mainBtns_) {
         b.setDrawsFrame();
         b.setFillsBackground();
@@ -71,15 +69,26 @@ RRemoteVisWidget::RRemoteVisWidget() {
     bgCol_ = RDisplay::LIGHTGREY;
     fgCol_ = RDisplay::GREY;
 
+    setRepresentsLeftRemote(false);
+
     moveWidgetsAround();
 }
 
 void RRemoteVisWidget::setRepresentsLeftRemote(bool left) {
     left_ = left;
+
+    clearWidgets();
+    for(auto& b: mainBtns_) addWidget(&b);
+    for(auto& b: batteryState_) addWidget(&b);
+    addWidget(&crosshair_);
+    addWidget(&imu_);
+    addWidget(&pot1_);
+    if(left_ == false) addWidget(&pot2_);
+
     moveWidgetsAround();
 }
 
-void RRemoteVisWidget::setPosition(uint8_t x, uint8_t y) {
+void RRemoteVisWidget::setPosition(int x, int y) {
     RWidget::setPosition(x, y);
     moveWidgetsAround();
 }
@@ -120,26 +129,28 @@ Result RRemoteVisWidget::draw(ConsoleStream* stream) {
     int bodyHeight_ = 120;
 
     if(needsFullRedraw_) {
-        RDisplay::display.rect(0, y_, w, h, RDisplay::BLACK, true);
+        RDisplay::display.rect(0, y_, w, h+y_, RDisplay::BLACK, true);
         if(left_) {
-            Console::console.printfBroadcast("Rect %d %d %d %d 0x%x\n", bxl, y_+by, bxl+bw, y_+by+bh, fgCol_);
             RDisplay::display.rect(bxl, y_+by, bxl+bw, y_+by+bh, bgCol_, true);
             RDisplay::display.rect(bxl, y_+by, bxl+bw, y_+by+bh, fgCol_, false);
         } else {
-            Console::console.printfBroadcast("Rect %d %d %d %d 0x%x\n", bxr, y_+by, bxr+bw, y_+by+bh, fgCol_);
             RDisplay::display.rect(bxr, y_+by, bxr+bw, y_+by+bh, bgCol_, true);
             RDisplay::display.rect(bxr, y_+by, bxr+bw, y_+by+bh, fgCol_, false);
         }
         needsFullRedraw_ = false;
     }
 
+    return RMultiWidget::draw(stream);
+
+#if 0
     crosshair_.draw(stream);
     imu_.draw(stream);
     for(auto& b: mainBtns_) b.draw(stream);
     for(auto& b: batteryState_) b.draw(stream);
     pot1_.draw(stream);
-    //pot2_.draw(stream);
-    //if(!left_) for(auto btn: topButtons_) btn.draw(stream);
+    pot2_.draw(stream);
+    if(!left_) for(auto btn: topButtons_) btn.draw(stream);
+#endif
 
     return RES_OK;
 }

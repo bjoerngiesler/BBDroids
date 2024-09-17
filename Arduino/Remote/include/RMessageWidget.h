@@ -5,17 +5,11 @@
 
 #include "Config.h"
 #include "RDisplay.h"
-#include "RWidget.h"
+#include "RLabelWidget.h"
 
-class RMessageWidget: public RWidget {
+class RMessageWidget: public RLabelWidget {
 public:
-  RMessageWidget();
-
-  void setTitle(const char* title);
-  Result draw(ConsoleStream* stream = NULL);
-
-protected:
-  const char* title_;
+  virtual void setTitle(const String& title);
 };
 
 #endif // RMESSAGE_H

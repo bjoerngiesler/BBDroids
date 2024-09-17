@@ -9,7 +9,7 @@
 
 using namespace bb;
 
-class RGraphsWidget: public RWidget, public RInput::Delegate {
+class RGraphsWidget: public RWidget {
 public:
   enum Graph {
     TOP     = 0,

@@ -49,17 +49,10 @@ void bTopRISR(void) {
 }
 #endif // ESP32_REMOTE
 
-RInput::RInput(): 
-  delegate_(NULL) {
+RInput::RInput() {
   for(bool& b: buttons) b = false;
-}
-
-void RInput::setDelegate(RInput::Delegate* d) {
-  delegate_ = d;
-}
-
-void RInput::clearDelegate() {
-  delegate_ = NULL;
+  tlms_ = trms_ = cms_ = 0;
+  longPressThresh_ = 500;
 }
 
 bool RInput::begin() {
@@ -105,6 +98,13 @@ void RInput::update() {
 
 #if defined(ESP32_REMOTE) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
   if(mcpOK_) {
+#if 0
+    for(uint8_t i = 0; i<16; i++) {
+      if(mcp_.digitalRead(i) == LOW) Console::console.printfBroadcast("_");
+      else Console::console.printfBroadcast("X");
+    }
+    Console::console.printfBroadcast("\n");
+#endif
     for(uint8_t i = 0; i < buttons.size(); i++) {
       if (mcp_.digitalRead(i) == LOW) {
         if(buttons[i] == false) {
@@ -126,28 +126,79 @@ void RInput::update() {
     Console::console.printfBroadcast("MCP not OK\n");
   }
 #endif // ESP32_REMOTE
-  if(delegate_ != NULL) {
-    if(btnTopLChanged) {
-      if(buttons[BUTTON_TOP_LEFT]) delegate_->buttonTopLeftPressed();
-      else delegate_->buttonTopLeftReleased();
-      btnTopLChanged = false;
-    }
-    if(btnTopRChanged) {
-      if(buttons[BUTTON_TOP_RIGHT]) delegate_->buttonTopRightPressed();
-      else delegate_->buttonTopRightReleased();
-      btnTopRChanged = false;
-    }
-    if(btnConfirmChanged) {
-      if(buttons[BUTTON_CONFIRM]) delegate_->buttonConfirmPressed();
-      else delegate_->buttonConfirmReleased();
-      btnConfirmChanged = false;
-    }
+  if(btnTopLChanged) {
+    if(buttons[BUTTON_TOP_LEFT]) btnTopLeftPressed();
+    else btnTopLeftReleased();
+    btnTopLChanged = false;
+  }
+  if(btnTopRChanged) {
+    if(buttons[BUTTON_TOP_RIGHT]) btnTopRightPressed();
+    else btnTopRightReleased();
+    btnTopRChanged = false;
+  }
+  if(btnConfirmChanged) {
+    Console::console.printfBroadcast("Confirm changed\n");
+    if(buttons[BUTTON_CONFIRM]) btnConfirmPressed();
+    else btnConfirmReleased();
+    btnConfirmChanged = false;
   }
 }
 
 bool RInput::anyButtonPressed() {
   for(bool& b: buttons) if(b == true) return true;
   return false;
+}
+
+void RInput::btnTopLeftPressed() {
+  tlms_ = millis();
+}
+void RInput::btnTopLeftReleased() {
+  if(millis() - tlms_ < longPressThresh_ || tlLongPressCB_ == nullptr) {
+    if(tlShortPressCB_ != nullptr) {
+      tlShortPressCB_();
+    }
+  } else if(tlLongPressCB_ != nullptr) {
+    tlLongPressCB_();
+  }
+}
+
+void RInput::btnTopRightPressed() {
+  trms_ = millis();
+}
+void RInput::btnTopRightReleased() {
+  if(millis() - trms_ < longPressThresh_ || trLongPressCB_ == nullptr) {
+    if(trShortPressCB_ != nullptr) {
+      trShortPressCB_();
+    }
+  } else if(trLongPressCB_ != nullptr) {
+    trLongPressCB_();
+  }
+}
+
+void RInput::btnConfirmPressed() {
+  cms_ = millis();
+}
+
+void RInput::btnConfirmReleased() {
+  if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
+    if(cShortPressCB_ != nullptr) {
+      Console::console.printfBroadcast("Calling confirm short press cb\n");
+      cShortPressCB_();
+    } else {
+      Console::console.printfBroadcast("No confirm short press cb\n");
+    }
+  } else if(cLongPressCB_ != nullptr){
+    cLongPressCB_();
+  }
+}
+
+void RInput::clearCallbacks() {
+  tlShortPressCB_ = nullptr;
+  tlLongPressCB_ = nullptr;
+  trShortPressCB_ = nullptr;
+  trLongPressCB_ = nullptr;
+  cLongPressCB_ = nullptr;
+  cShortPressCB_ = nullptr;
 }
 
 void RInput::printOnSerial() {

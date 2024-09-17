@@ -53,6 +53,10 @@ public:
   static const uint8_t CHAR_HEIGHT = 10;
   static const uint8_t DISPLAY_WIDTH = 80;
   static const uint8_t DISPLAY_HEIGHT = 160;
+  static const uint8_t MAIN_X = 0;
+  static const uint8_t MAIN_Y = 13;
+  static const uint8_t MAIN_WIDTH = DISPLAY_WIDTH;
+  static const uint8_t MAIN_HEIGHT = DISPLAY_HEIGHT-26;
 
   enum WhichLED {
     LED_LEFT,

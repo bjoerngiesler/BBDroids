@@ -13,6 +13,7 @@
 #include "RLabelWidget.h"
 #include "RIMUWidget.h"
 #include "RRemoteVisWidget.h"
+#include "RRotaWidget.h"
 
 using namespace bb;
 
@@ -53,6 +54,8 @@ public:
   void abortCalibration();
   void finishCalibration();
 
+  void setMainWidget(RWidget* widget);
+
   void showMainMenu() { showMenu(&mainMenu_); }
   void showSettingsMenu() { showMenu(&settingsMenu_); }
   void showDroidsMenu();
@@ -60,11 +63,10 @@ public:
   void showMenu(RMenuWidget* menu);
   void showGraphs();
   void showCalib();
+  void showMain();
 
-  void addWidget(RWidget* w);
-  bool hasWidget(RWidget* w);
-  bool removeWidget(RWidget* w);
-  void clearWidgets();
+  void setTopTitle(const String& title);
+  void setBottomTitle(const String& title);
 
   void selectDroid(uint16_t stationId);
   void selectRightRemote(uint16_t stationId);
@@ -83,10 +85,13 @@ protected:
   RCrosshairWidget crosshair_;
   RLabelWidget calibLabel_;
   RMessageWidget waitMessage_;
-  RRemoteVisWidget remoteVisL_, remoteVisR_;
   RLabelWidget topLabel_, bottomLabel_;
 
-  std::vector<RWidget*> widgets_;
+  RRotaWidget mainVis_;
+  RRemoteVisWidget remoteVisL_, remoteVisR_;
+
+  RWidget* mainWidget_;
+
   bool needsDraw_;
   std::vector<XBee::Node> discoveredNodes_;
   bb::IMU imu_;

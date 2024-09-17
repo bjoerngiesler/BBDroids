@@ -7,35 +7,30 @@
 
 #include "Config.h"
 #include "RDisplay.h"
-#include "RWidget.h"
+#include "RMultiWidget.h"
+#include "RLabelWidget.h"
 #include "RInput.h"
 
 using namespace bb;
 
-class RMenuWidget: public RWidget, public RInput::Delegate {
+class RMenuWidget: public RMultiWidget {
 public:
   RMenuWidget();
 
-  void setTitle(const char* title);
-  void addEntry(const char* title, std::function<void(void)> callback);
+  void addEntry(const String& title, std::function<void(void)> callback);
   void clear();
 
-  Result draw(ConsoleStream* stream = NULL);
-  void buttonTopLeftPressed();
-  void buttonTopRightPressed();
-  void buttonConfirmPressed();
+  void up();
+  void down();
+  void select();
+  void resetCursor();
 
-  void resetCursor() { cursor_ = 0; }
+  virtual void takeInputFocus();
+
+  virtual void setSize(uint8_t w, uint8_t h);
 protected:
-  struct Entry {
-    const char* title;
-    std::function<void(void)> callback;
-  };
-
-  const char* title_;
-  std::vector<Entry> entries_;
-  uint8_t numEntries_;
   uint8_t cursor_;
+  uint8_t top_;
 };
 
 

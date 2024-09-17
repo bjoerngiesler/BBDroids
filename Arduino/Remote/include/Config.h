@@ -7,7 +7,7 @@
 
 #define ESP32_REMOTE
 
-#define LEFT_REMOTE
+//#define LEFT_REMOTE
 
 #if defined(ESP32_REMOTE)
 

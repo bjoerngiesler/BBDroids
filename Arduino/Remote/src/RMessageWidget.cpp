@@ -1,18 +1,11 @@
 #include "RMessageWidget.h"
 
-RMessageWidget::RMessageWidget() {
-  title_ = "(null)";
-}
-
-void RMessageWidget::setTitle(const char* title) {
-  if(title == NULL) title_ = "(null)";
-  else title_ = title;
-}
-
-Result RMessageWidget::draw(ConsoleStream* stream) {
-  unsigned int x = (RDisplay::DISPLAY_WIDTH-strlen(title_)*RDisplay::CHAR_WIDTH)/2;
-  unsigned int y = (RDisplay::DISPLAY_HEIGHT-RDisplay::CHAR_HEIGHT)/2;
-  RDisplay::display.text(x, y, RDisplay::WHITE, title_);
-
-  return RWidget::draw(stream);
+void RMessageWidget::setTitle(const String& title) {
+  title_ = title;
+  setSize(title_.length()*RDisplay::CHAR_WIDTH+4, RDisplay::CHAR_HEIGHT+4);
+  setPosition(RDisplay::MAIN_X + (RDisplay::MAIN_WIDTH-width())/2, 
+              RDisplay::MAIN_Y + (RDisplay::MAIN_HEIGHT-height())/2);
+  setFillsBackground();
+  setDrawsFrame(true);
+  setNeedsFullRedraw();
 }

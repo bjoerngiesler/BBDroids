@@ -7,6 +7,7 @@ RLabelWidget::RLabelWidget() {
     autoscroll_ = true;
     leftwait_ = 1.0; pixelwait_ = 0.1; rightwait_ = 1.0;
     fillsBg_ = true;
+    frameType_ = FRAME_NONE;
     xdelta_ = 0;
 }
 
@@ -35,12 +36,12 @@ Result RLabelWidget::draw(ConsoleStream *stream) {
     if(frameType_ & FRAME_LEFT) availWidth-=1;
     if(frameType_ & FRAME_RIGHT) availWidth-=1;
 
-    switch(hor_) {
+    switch(ver_) {
     case TOP_JUSTIFIED:
         if(frameType_&FRAME_TOP) y++;
         break;
-    case HOR_CENTERED:
-        y = (height_-RDisplay::CHAR_HEIGHT)/2;
+    case VER_CENTERED:
+        y = rint(float(height_-RDisplay::CHAR_HEIGHT)/2.0f);
         break;
     case BOTTOM_JUSTIFIED:
     default:
@@ -50,12 +51,12 @@ Result RLabelWidget::draw(ConsoleStream *stream) {
     }
 
     if(pixelwidth <= availWidth) { // we fit - don't bother with autoscroll
-        switch(ver_) {
+        switch(hor_) {
         case LEFT_JUSTIFIED:
             if(frameType_&FRAME_LEFT) x++;
             break;
-        case VER_CENTERED:
-            x = (availWidth-pixelwidth)/2;
+        case HOR_CENTERED:
+            x = rint(float(availWidth-pixelwidth)/2.0f);
             break;
         case RIGHT_JUSTIFIED:
         default:
@@ -67,7 +68,7 @@ Result RLabelWidget::draw(ConsoleStream *stream) {
 
     }
 
-    if(title_.length()>0) RDisplay::display.text(x_+x, y_+y, fgCol_, title_);
+    if(title_.length()>0) RDisplay::display.text(x_+x+1, y_+y+1, fgCol_, title_);
 
     needsContentsRedraw_ = false;
 

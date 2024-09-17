@@ -1,55 +1,91 @@
 #include "RMenuWidget.h"
 
 RMenuWidget::RMenuWidget() {
-  title_ = "(null)";
   cursor_ = 0;
+  top_ = 0;
+  width_ = RDisplay::DISPLAY_WIDTH;
+  setFillsBackground();
 }
 
-void RMenuWidget::setTitle(const char *title) {
-  if(title == NULL)
-    title_ = "(null)";
-  else
-    title_ = title;
-}
+void RMenuWidget::addEntry(const String& title, std::function<void(void)> callback) {
+  RLabelWidget *label = new RLabelWidget;
+  label->setTitle(title);
+  label->setFillsBackground();
+  if(widgets_.size() == 0) {
+    label->setBackgroundColor(fgCol_);
+    label->setForegroundColor(bgCol_);
+    cursor_ = 0;
+  } else {
+    label->setBackgroundColor(bgCol_);
+    label->setForegroundColor(fgCol_);
+  }
+  label->setSize(width(), RDisplay::CHAR_HEIGHT);
+  label->setPosition(0, (widgets_.size()-top_)*RDisplay::CHAR_HEIGHT + y_);
+  label->setJustification(RLabelWidget::LEFT_JUSTIFIED, RLabelWidget::VER_CENTERED);
 
-void RMenuWidget::addEntry(const char* title, std::function<void(void)> callback) {
-  Entry e = {title, callback};
-  if(title == NULL) e = {"(null)", callback};
-  entries_.push_back(e);
+  label->setAction(callback);
+
+  addWidget(label);
 }
 
 void RMenuWidget::clear() {
-  entries_ = std::vector<Entry>();
+  for(RWidget* w: widgets_) {
+    removeWidget(w);
+    delete w;
+  }
+  RMultiWidget::clearWidgets();
   cursor_ = 0;
 }
 
-void RMenuWidget::buttonTopLeftPressed() {
-  if(cursor_ == 0) return;
+void RMenuWidget::up() {
+  if(cursor_ == 0 || widgets_.size() == 0) return;
+  widgets_[cursor_]->setBackgroundColor(bgCol_);
+  widgets_[cursor_]->setForegroundColor(fgCol_);
   cursor_--;
-  draw();
+  widgets_[cursor_]->setBackgroundColor(fgCol_);
+  widgets_[cursor_]->setForegroundColor(bgCol_);
 }
 
-void RMenuWidget::buttonTopRightPressed() {
-  if(cursor_ >= entries_.size()-1) return;
+void RMenuWidget::down() {
+  if(cursor_ >= widgets_.size()-1 || widgets_.size() == 0) return;
+  widgets_[cursor_]->setBackgroundColor(bgCol_);
+  widgets_[cursor_]->setForegroundColor(fgCol_);
   cursor_++;
-  draw();
+  widgets_[cursor_]->setBackgroundColor(fgCol_);
+  widgets_[cursor_]->setForegroundColor(bgCol_);
 }
   
-void RMenuWidget::buttonConfirmPressed() {
-  entries_[cursor_].callback();
+void RMenuWidget::select() {
+  widgets_[cursor_]->triggerAction();
 }
-  
-Result RMenuWidget::draw(ConsoleStream *stream) {
-  RDisplay::display.text(0, 0, RDisplay::WHITE, title_);
 
-  RDisplay::display.hline(0, 12, 80, RDisplay::WHITE);
-  for(uint8_t i=0; i<entries_.size(); i++) {
-    if(cursor_ == i) {
-      RDisplay::display.text(0, 10*(i+2), RDisplay::YELLOW, entries_[i].title);
-    } else {
-      RDisplay::display.text(0, 10*(i+2), RDisplay::WHITE, entries_[i].title);
+void RMenuWidget::takeInputFocus() {
+  RInput::input.clearCallbacks();
+  RInput::input.setTopLeftShortPressCallback([this]{this->up();});
+  RInput::input.setTopRightShortPressCallback([this]{this->down();});
+  RInput::input.setTopRightLongPressCallback([this]{this->select();});
+  resetCursor();
+}
+
+void RMenuWidget::setSize(uint8_t w, uint8_t h) {
+    int deltaW = w - width();
+    for(auto& w: widgets_) {
+        w->setSize(constrain(w->width()+deltaW, 0, 255), w->height());
     }
+    RWidget::setSize(w, h);
+}
+
+void RMenuWidget::resetCursor() { 
+  if(widgets_.size() == 0) {
+    cursor_ = 0;
+    return;
   }
-  RDisplay::display.hline(0, 140, 80, RDisplay::WHITE);
-  return RWidget::draw(stream);
+
+  if(cursor_ <= widgets_.size()-1) {
+    widgets_[cursor_]->setBackgroundColor(bgCol_);
+    widgets_[cursor_]->setForegroundColor(fgCol_);
+  }
+  cursor_ = 0;
+  widgets_[cursor_]->setBackgroundColor(fgCol_);
+  widgets_[cursor_]->setForegroundColor(bgCol_);
 }
