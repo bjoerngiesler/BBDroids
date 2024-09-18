@@ -156,6 +156,19 @@ bb::Result bb::ConfigStorage::store() {
 	return RES_OK;
 }
 
+bb::Result bb::ConfigStorage::factoryReset() {
+#if defined(ARDUINO_ARCH_ESP32)
+	esp_err_t err = nvs_flash_erase();
+	if(err != ESP_OK) {
+		Serial.println(String("Error erasing flash: ") + err);
+		return RES_CONFIG_INVALID_HANDLE;
+	}
+#else
+#warning Factory reset not implemented for current architecture!
+#endif
+	return RES_OK;
+}
+
 bb::ConfigStorage::ConfigStorage() {
 	initialized_ = false;
 }

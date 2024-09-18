@@ -30,7 +30,6 @@ void setup() {
 
   Console::console.initialize();
   Console::console.start();
-  delay(2000);
 
   Wire.begin();
   Wire.setClock(400000UL);

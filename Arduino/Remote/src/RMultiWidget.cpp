@@ -1,13 +1,10 @@
 #include "RMultiWidget.h"
 
 bool RMultiWidget::addWidget(RWidget* w) {
-    Console::console.printfBroadcast("MW: Looking up widget 0x%x\n", w);
     if(std::find(widgets_.begin(), widgets_.end(), w) != widgets_.end()) {
         return false;
     }
-    Console::console.printfBroadcast("MW: Adding widget 0x%x\n", w);
     widgets_.push_back(w);
-    Console::console.printfBroadcast("MW: Added widget 0x%x\n", w);
     return true;
 }
 
@@ -16,7 +13,6 @@ bool RMultiWidget::removeWidget(RWidget* w) {
     if(iter == widgets_.end()) {
         return false;
     }
-    Console::console.printfBroadcast("Removing widget 0x%x\n", *iter);
     widgets_.erase(iter);
     return true;
 }

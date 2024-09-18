@@ -18,6 +18,7 @@ public:
 	Result writeBlock(HANDLE, uint8_t* block);
 	Result readBlock(HANDLE, uint8_t* block);
 	bool blockIsValid(HANDLE);
+	Result factoryReset();
 	Result store();
 
 protected:

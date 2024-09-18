@@ -31,19 +31,8 @@ RRemote::RRemote():
   params_.droidID = 0;
 #endif
 
-  mainMenu_.setName("Main Menu");
-  settingsMenu_.setName("Settings");
-  droidsMenu_.setName("Droids");
-  remotesMenu_.setName("Remotes");
-  
   waitMessage_.setTitle("Please wait");
-
-  mainMenu_.addEntry("Settings...", []() { RRemote::remote.showSettingsMenu(); });
-  mainMenu_.addEntry("Back", []() { RRemote::remote.showMain(); });
-  
-  settingsMenu_.addEntry("Right Remote...", []() { RRemote::remote.showRemotesMenu(); });
-  settingsMenu_.addEntry("Droid...", []() { RRemote::remote.showDroidsMenu(); });
-  settingsMenu_.addEntry("Back", []() { RRemote::remote.showMainMenu(); });
+  restartMessage_.setTitle("Restart now");
 
   remoteVisL_.setRepresentsLeftRemote(true);
   remoteVisL_.setName("Left Remote");
@@ -89,6 +78,8 @@ Result RRemote::initialize() {
     ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
   }
 
+  populateMenus();
+
   return Subsystem::initialize();
 }
 
@@ -111,7 +102,7 @@ void RRemote::showCalib() {
 
 void RRemote::showMain() {
   setMainWidget(&mainVis_);
-  RInput::input.setTopRightLongPressCallback([]{RRemote::remote.showMainMenu();});
+  RInput::input.setTopRightLongPressCallback([=]{RRemote::remote.showMenu(&mainMenu_);});
 }
 
 void RRemote::showMenu(RMenuWidget* menu) {
@@ -123,11 +114,11 @@ void RRemote::showGraphs() {
   setMainWidget(&graphs_);
 }
 
-void RRemote::showDroidsMenu() {
+void RRemote::showPairDroidMenu() {
   waitMessage_.setNeedsFullRedraw();
   waitMessage_.draw();
   
-  droidsMenu_.clear();
+  pairDroidMenu_.clear();
 
   Result res = XBee::xbee.discoverNodes(discoveredNodes_);
   if(res != RES_OK) {
@@ -135,43 +126,72 @@ void RRemote::showDroidsMenu() {
     return;
   }
 
-  droidsMenu_.clear();
+  pairDroidMenu_.clear();
   for(auto& n: discoveredNodes_) {
     Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_DROID) continue;
     Console::console.printfBroadcast("Adding entry for \"%s\"\n", n.name);
-    droidsMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.stationId); });
+    pairDroidMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.stationId); });
   }
   Console::console.printfBroadcast("Adding entry for \"Back\"\n");
-  droidsMenu_.addEntry("Back", []() { RRemote::remote.showSettingsMenu(); });
+  pairDroidMenu_.addEntry("Back", [=]() { RRemote::remote.showMenu(&pairMenu_); });
 
   Console::console.printfBroadcast("Showing droidsMenu\n");
-  showMenu(&droidsMenu_);
+  showMenu(&pairDroidMenu_);
 }
 
-void RRemote::showRemotesMenu() {
+void RRemote::showPairRemoteMenu() {
   waitMessage_.setNeedsFullRedraw();
   waitMessage_.draw();
 
-  remotesMenu_.clear();
+  pairRemoteMenu_.clear();
 
   Result res = XBee::xbee.discoverNodes(discoveredNodes_);
   if(res != RES_OK) {
     Console::console.printfBroadcast("%s\n", errorMessage(res));
-    showMenu(&settingsMenu_);
+    showMenu(&pairMenu_);
     return;
   }
 
-  Console::console.printfBroadcast("Discovered %d nodes\n", discoveredNodes_.size());
-
-  remotesMenu_.setName(String(discoveredNodes_.size()) + " Remotes");
+  pairRemoteMenu_.setName(String(discoveredNodes_.size()) + " Remotes");
   for(auto& n: discoveredNodes_) {
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_REMOTE) continue;
-    remotesMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.stationId); });
+    pairRemoteMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.stationId); });
   }
-  remotesMenu_.addEntry("Back", []() { RRemote::remote.showSettingsMenu(); });
+  pairRemoteMenu_.addEntry("Back", [=]() { RRemote::remote.showMenu(&pairMenu_); });
 
-  showMenu(&remotesMenu_);
+  showMenu(&pairRemoteMenu_);
+}
+
+void RRemote::populateMenus() {
+  mainMenu_.setName("Main Menu");
+  pairMenu_.setName("Pair");
+  leftRemoteMenu_.setName("Left Remote");
+  rightRemoteMenu_.setName("Right Remote");
+  droidMenu_.setName("Droid");
+  
+  mainMenu_.clear();
+  mainMenu_.addEntry("Pair...", [=]() { RRemote::remote.showMenu(&pairMenu_); });
+  if(params_.droidID != 0) mainMenu_.addEntry("Droid...", [=]() { showMenu(&droidMenu_); });
+  mainMenu_.addEntry("Left Remote...", [=]() { showMenu(&leftRemoteMenu_); });
+  if(params_.rightID != 0) mainMenu_.addEntry("Right Remote...", [=]() { showMenu(&rightRemoteMenu_); });
+  mainMenu_.addEntry("Back", []() { RRemote::remote.showMain(); });
+  
+  pairMenu_.clear();
+  pairMenu_.addEntry("Right Remote...", []() { RRemote::remote.showPairRemoteMenu(); });
+  pairMenu_.addEntry("Droid...", []() { RRemote::remote.showPairDroidMenu(); });
+  pairMenu_.addEntry("Back", [=]() { RRemote::remote.showMenu(&mainMenu_); });
+
+  droidMenu_.clear();
+  droidMenu_.addEntry("Back", [=]() {showMenu(&mainMenu_);});
+
+  leftRemoteMenu_.clear();
+  leftRemoteMenu_.addEntry("Factory Reset", [=]() {factoryReset(true);});
+  leftRemoteMenu_.addEntry("Back", [=]() {showMenu(&mainMenu_);});
+
+  rightRemoteMenu_.clear();
+  rightRemoteMenu_.addEntry("Factory Reset", [=]() {factoryReset(false);});
+  rightRemoteMenu_.addEntry("Back", [=]() {showMenu(&mainMenu_);});
 }
 
 void RRemote::setTopTitle(const String& title) {
@@ -225,6 +245,18 @@ void RRemote::selectRightRemote(uint16_t remote) {
 
   showMenu(&mainMenu_);
 #endif
+}
+
+void RRemote::factoryReset(bool leftremote) {
+  if(leftremote) {
+    Console::console.printfBroadcast("Factory reset left remote!\n");
+    bb::ConfigStorage::storage.factoryReset();
+    RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, 150);
+    restartMessage_.draw();
+    while(true);
+  } else {
+    Console::console.printfBroadcast("Factory reset right remote!\n");
+  }
 }
 
 Result RRemote::start(ConsoleStream *stream) {

@@ -56,20 +56,22 @@ public:
 
   void setMainWidget(RWidget* widget);
 
-  void showMainMenu() { showMenu(&mainMenu_); }
-  void showSettingsMenu() { showMenu(&settingsMenu_); }
-  void showDroidsMenu();
-  void showRemotesMenu();
+  void showPairDroidMenu();
+  void showPairRemoteMenu();
   void showMenu(RMenuWidget* menu);
   void showGraphs();
   void showCalib();
   void showMain();
+
+  void populateMenus();
 
   void setTopTitle(const String& title);
   void setBottomTitle(const String& title);
 
   void selectDroid(uint16_t stationId);
   void selectRightRemote(uint16_t stationId);
+
+  void factoryReset(bool leftremote);
 
 protected:
   RRemote();
@@ -79,12 +81,12 @@ protected:
   bool runningStatus_;
   bool onInitScreen_;
   Packet lastPacketSent_;
-  RMenuWidget mainMenu_, settingsMenu_, droidsMenu_, remotesMenu_;
+  RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_, leftRemoteMenu_, rightRemoteMenu_, droidMenu_;
   RIMUWidget imuViz_;
   RGraphsWidget graphs_;
   RCrosshairWidget crosshair_;
   RLabelWidget calibLabel_;
-  RMessageWidget waitMessage_;
+  RMessageWidget waitMessage_, restartMessage_;
   RLabelWidget topLabel_, bottomLabel_;
 
   RRotaWidget mainVis_;

@@ -72,14 +72,14 @@ void RGraphsWidget::advanceCursor(Graph g) {
 }
 
 void RGraphsWidget::buttonTopLeftPressed() {
-  RRemote::remote.showMainMenu();
+  //RRemote::remote.showMainMenu();
 }
 
 void RGraphsWidget::buttonTopRightPressed() {
-  RRemote::remote.showMainMenu();
+  //RRemote::remote.showMainMenu();
 }
 
 void RGraphsWidget::buttonConfirmPressed() {
-  RRemote::remote.showMainMenu();
+  //RRemote::remote.showMainMenu();
 }
 
