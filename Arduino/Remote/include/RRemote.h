@@ -71,7 +71,7 @@ public:
   void selectDroid(uint16_t stationId);
   void selectRightRemote(uint16_t stationId);
 
-  void factoryReset(bool leftremote);
+  void factoryReset(bool thisremote);
 
 protected:
   RRemote();

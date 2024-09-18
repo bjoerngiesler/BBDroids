@@ -212,13 +212,14 @@ void RRemote::selectDroid(uint16_t droid) {
     bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
     packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
 
-    packet.payload.config.parameter.id = params_.droidID;
+    packet.payload.config.parameter = params_.droidID;
     XBee::xbee.sendTo(params_.rightID, packet, true);
   }
 
   bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
   bb::ConfigStorage::storage.store();
 
+  populateMenus();
   showMenu(&mainMenu_);
 #endif
 }
@@ -231,31 +232,53 @@ void RRemote::selectRightRemote(uint16_t remote) {
 
   bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
   packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID;
-  packet.payload.config.parameter.id = params_.leftID;
+  packet.payload.config.parameter = params_.leftID;
   XBee::xbee.sendTo(params_.rightID, packet, true);  
 
   if(params_.droidID != 0) {
     packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
-    packet.payload.config.parameter.id = params_.droidID;
+    packet.payload.config.parameter = params_.droidID;
     XBee::xbee.sendTo(params_.rightID, packet, true);   
   }
 
   bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
   bb::ConfigStorage::storage.store();
 
+  populateMenus();
   showMenu(&mainMenu_);
 #endif
 }
 
-void RRemote::factoryReset(bool leftremote) {
-  if(leftremote) {
-    Console::console.printfBroadcast("Factory reset left remote!\n");
+void RRemote::factoryReset(bool thisremote) {
+  if(thisremote) {
+    Console::console.printfBroadcast("Factory reset this remote!\n");
     bb::ConfigStorage::storage.factoryReset();
-    RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, 150);
     restartMessage_.draw();
-    while(true);
+    int i=0, dir=1;
+    while(true) {
+      RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, i);
+      RDisplay::display.showLEDs();
+      i = i+dir;
+      if(dir > 0 && i>=150) dir = -1;
+      if(dir < 0 && i<=0) dir = 1;
+      delay(10);
+    }
   } else {
-    Console::console.printfBroadcast("Factory reset right remote!\n");
+#if defined(LEFT_REMOTE)
+    Console::console.printfBroadcast("Factory reset other remote!\n");
+    bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
+    packet.payload.config.type = bb::ConfigPacket::CONFIG_FACTORY_RESET;
+    packet.payload.config.parameter = bb::ConfigPacket::FACTORY_RESET_MAGIC_ID;
+    XBee::xbee.sendTo(params_.rightID, packet, true);
+
+    params_.rightID = 0;
+    bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+    bb::ConfigStorage::storage.store();
+
+    populateMenus();
+#else
+    Console::console.printfBroadcast("Factory reset other remote only defined for right remote");
+#endif
   }
 }
 
@@ -519,8 +542,8 @@ bb::Result RRemote::fillAndSend() {
     packet.payload.control.setAxis(3, pitch, bb::ControlPacket::UNIT_DEGREES_CENTERED);
     packet.payload.control.setAxis(4, heading, bb::ControlPacket::UNIT_DEGREES);
     packet.payload.control.setAxis(5, ax, bb::ControlPacket::UNIT_UNITY_CENTERED);
-    packet.payload.control.setAxis(6, bb::ControlPacket::UNIT_UNITY_CENTERED);
-    packet.payload.control.setAxis(7, bb::ControlPacket::UNIT_UNITY_CENTERED);
+    packet.payload.control.setAxis(6, ay, bb::ControlPacket::UNIT_UNITY_CENTERED);
+    packet.payload.control.setAxis(7, az, bb::ControlPacket::UNIT_UNITY_CENTERED);
   }
 
   packet.payload.control.setAxis(8, RInput::input.pot1, bb::ControlPacket::UNIT_UNITY);
@@ -621,29 +644,35 @@ Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& pack
 
   if(source == params_.leftID || params_.leftID == 0) { // if we're not bound, we accept config packets from anyone
     if(packet.type == PACKET_TYPE_CONFIG) {
-      if(packet.payload.config.type == bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID) {
-        Console::console.printfBroadcast("Setting Left Remote ID to 0x%x.\n", packet.payload.config.parameter.id);
-        params_.leftID = packet.payload.config.parameter.id;
+      switch(packet.payload.config.type) {
+      case bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID:
+        Console::console.printfBroadcast("Setting Left Remote ID to 0x%x.\n", packet.payload.config.parameter);
+        params_.leftID = packet.payload.config.parameter;
         bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
         bb::ConfigStorage::storage.store();
-        Console::console.printfBroadcast("Stored config parameters.\n");
-        memset(&params_, 0, sizeof(params_));
-        bb::ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
-        Console::console.printfBroadcast("Re-read left remote as 0x%x\n", params_.leftID);
-        return RES_OK;
-      } else if(packet.payload.config.type == bb::ConfigPacket::CONFIG_SET_DROID_ID) {
-        Console::console.printfBroadcast("Setting Droid ID to 0x%x.\n", packet.payload.config.parameter.id);
-        params_.droidID = packet.payload.config.parameter.id;
+        return RES_OK; 
+
+      case bb::ConfigPacket::CONFIG_SET_DROID_ID:
+        Console::console.printfBroadcast("Setting Droid ID to 0x%x.\n", packet.payload.config.parameter);
+        params_.droidID = packet.payload.config.parameter;
         bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
         bb::ConfigStorage::storage.store();
-        Console::console.printfBroadcast("Stored config parameters.\n");
-        return RES_OK;
-      } else {
+        return RES_OK; 
+
+      case bb::ConfigPacket::CONFIG_FACTORY_RESET:
+        if(packet.payload.config.parameter == bb::ConfigPacket::FACTORY_RESET_MAGIC_ID) { // checks out
+          factoryReset(true);
+          return RES_OK; // HA! This never returns! NEVER! Hahahahahahaaaaa!
+        }
+        Console::console.printfBroadcast("Got factory reset packet but ID 0x%x doesn't check out!\n", packet.payload.config.parameter);
+        return RES_SUBSYS_COMM_ERROR;
+
+      default:
         Console::console.printfBroadcast("Unknown config packet type 0x%x.\n", packet.payload.config.type);
         return RES_SUBSYS_COMM_ERROR;
       }
     } else {
-      Console::console.printfBroadcast("Unknown packet type %d from right remote!\n", packet.type);
+      Console::console.printfBroadcast("Unknown packet type %d from left remote!\n", packet.type);
       return RES_SUBSYS_COMM_ERROR;
     }
   } else {

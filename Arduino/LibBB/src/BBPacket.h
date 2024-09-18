@@ -136,7 +136,14 @@ struct __attribute__ ((packed)) ControlPacket {
 
 };     // 13 bytes long
 
-struct __attribute__ ((packed)) ControlMode {
+struct __attribute__ ((packed)) StatePacket {
+	enum StatusType {
+		STATUS_OK		= 0,
+		STATUS_DEGRADED	= 1,
+		STATUS_ERROR	= 2,
+		STATUS_CRITICAL	= 3
+	};
+
 	enum ControlType {
 		CONTROL_OFF		 	 = 0,
 		CONTROL_RC			 = 1,
@@ -144,42 +151,32 @@ struct __attribute__ ((packed)) ControlMode {
 		CONTROL_AUTOMATIC	 = 3
 	};
 
+	StatusType battery 	: 2;
+	StatusType drive 	: 2;
+	StatusType servos   : 2;
+	StatusType comm		: 2;
+
 	ControlType driveControl : 2;
 	ControlType domeControl	 : 2;
 	ControlType armsControl	 : 2;
 	ControlType soundControl : 2;
 };
 
-struct __attribute__ ((packed)) SubsysStatus {
-	enum StatusType {
-		STATUS_OK		= 0,
-		STATUS_DEGRADED	= 1,
-		STATUS_ERROR	= 2,
-		STATUS_CRITICAL	= 3
-	};
-	StatusType battery 	: 2;
-	StatusType drive 	: 2;
-	StatusType servos   : 2;
-	StatusType comm		: 2;
-};
-
-struct __attribute__ ((packed)) StatePacket {
-	ControlMode controlMode;
-	SubsysStatus subsysStatus;
-};
-
 struct __attribute__ ((packed)) ConfigPacket {
 	enum ConfigType {
-		CONFIG_SET_LEFT_REMOTE_ID = 0,
-		CONFIG_SET_DROID_ID       = 1,
-		CONFIG_SET_CONTROL_MODE   = 2
+		CONFIG_SET_LEFT_REMOTE_ID       = 0,  // set parameter to ID of left remote
+		CONFIG_SET_DROID_ID             = 1,  // set parameter to ID of right remote
+		CONFIG_SET_DRIVE_CONTROL_MODE   = 2,  // set parameter to proper control mode
+		CONFIG_SET_DOME_CONTROL_MODE    = 3,  // set parameter to proper control mode
+		CONFIG_SET_ARMS_CONTROL_MODE    = 4,  // set parameter to proper control mode
+		CONFIG_SET_SOUND_CONTROL_MODE   = 5,  // set parameter to proper control mode
+		CONFIG_FACTORY_RESET      = 255 // set parameter.id to FACTORY_RESET_MAGIC_ID to confirm
 	};
 
 	ConfigType type;
-	union {
-		uint16_t id;
-		ControlMode controlMode;
-	} parameter;
+	uint16_t parameter;
+
+	static const uint16_t FACTORY_RESET_MAGIC_ID = 0xbabe;
 };
 
 struct __attribute__ ((packed)) PairingPacket {

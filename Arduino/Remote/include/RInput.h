@@ -53,6 +53,8 @@ public:
     BUTTON_TOP_RIGHT = 0
   };
 #endif
+
+  bool initMCP();
 #endif
 
   std::array<bool,8> buttons;

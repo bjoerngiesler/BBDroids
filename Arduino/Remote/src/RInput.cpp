@@ -49,6 +49,19 @@ void bTopRISR(void) {
 }
 #endif // ESP32_REMOTE
 
+bool RInput::initMCP() {
+  if(mcp_.begin_I2C(MCP_ADDR) == 0) {
+    Console::console.printfBroadcast("Couldn't initialize MCP!\n");
+    return false;
+  } else {
+    Console::console.printfBroadcast("Successfully initialized MCP!\n");
+    for (uint8_t i = 0; i < 8; i++) {
+      mcp_.pinMode(i, INPUT_PULLUP);
+    }
+    return true;
+  }
+}
+
 RInput::RInput() {
   for(bool& b: buttons) b = false;
   tlms_ = trms_ = cms_ = 0;
@@ -57,15 +70,7 @@ RInput::RInput() {
 
 bool RInput::begin() {
 #if defined(ESP32_REMOTE)
-  if(mcp_.begin_I2C(MCP_ADDR) == 0) {
-    Console::console.printfBroadcast("Couldn't initialize MCP!\n");
-    mcpOK_ = false;
-  } else {
-    for (uint8_t i = 0; i < 8; i++) {
-      mcp_.pinMode(i, INPUT_PULLUP);
-    }
-    mcpOK_ = true;
-  }
+  mcpOK_ = initMCP();
 #endif
 
   update();
@@ -102,13 +107,6 @@ void RInput::update() {
 
 #if defined(ESP32_REMOTE) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
   if(mcpOK_) {
-#if 0
-    for(uint8_t i = 0; i<16; i++) {
-      if(mcp_.digitalRead(i) == LOW) Console::console.printfBroadcast("_");
-      else Console::console.printfBroadcast("X");
-    }
-    Console::console.printfBroadcast("\n");
-#endif
     for(uint8_t i = 0; i < buttons.size(); i++) {
       if (mcp_.digitalRead(i) == LOW) {
         if(buttons[i] == false) {
@@ -127,7 +125,7 @@ void RInput::update() {
       }
     }
   } else {
-    //Console::console.printfBroadcast("MCP not OK\n");
+    mcpOK_ = initMCP();
   }
 #endif // ESP32_REMOTE
   if(btnTopLChanged) {
