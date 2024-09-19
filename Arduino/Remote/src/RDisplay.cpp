@@ -22,7 +22,7 @@ RDisplay RDisplay::display;
 RDisplay::RDisplay():
   statusPixels_(2, P_D_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 #if defined(LEFT_REMOTE)
-#if defined(ESP32_REMOTE)
+#if defined(ARDUINO_ARCH_ESP32)
 , ser_(Serial2)
 #else
 , ser_(P_DISPLAY_RX, P_DISPLAY_TX) 

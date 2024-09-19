@@ -117,7 +117,6 @@ void RRemoteVisWidget::moveWidgetsAround() {
             batteryState_[i].setPosition(battStateXR + i*(battStateW+1), y_+battStateY);
         }
         pot1_.setPosition(potXR, y_+pot1Y);
-        Console::console.printfBroadcast("Pots at %d, %d/%d\n", potXR, y_+pot1Y, y_+pot2Y);
         pot2_.setPosition(potXR, y_+pot2Y);
     }
 

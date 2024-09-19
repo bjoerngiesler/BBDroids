@@ -29,7 +29,7 @@ public:
   uint16_t joyRawH, joyRawV, battRaw;
 
   // Weird order given by ESP32 layout
-#if defined(ESP32_REMOTE)
+#if defined(ARDUINO_ARCH_ESP32)
 #if defined(LEFT_REMOTE)
   enum ButtonIndex {
     BUTTON_PINKY     = 2, // correct
@@ -73,7 +73,7 @@ protected:
   RInput();
   AxisCalib hCalib_, vCalib_;
 
-#if defined(ESP32_REMOTE)
+#if defined(ARDUINO_ARCH_ESP32)
   Adafruit_MCP23X17 mcp_; bool mcpOK_;
 #endif
 

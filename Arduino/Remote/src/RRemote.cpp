@@ -268,7 +268,7 @@ void RRemote::factoryReset(bool thisremote) {
     Console::console.printfBroadcast("Factory reset other remote!\n");
     bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
     packet.payload.config.type = bb::ConfigPacket::CONFIG_FACTORY_RESET;
-    packet.payload.config.parameter = bb::ConfigPacket::FACTORY_RESET_MAGIC_ID;
+    packet.payload.config.parameter = bb::ConfigPacket::MAGIC;
     XBee::xbee.sendTo(params_.rightID, packet, true);
 
     params_.rightID = 0;
@@ -660,7 +660,7 @@ Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& pack
         return RES_OK; 
 
       case bb::ConfigPacket::CONFIG_FACTORY_RESET:
-        if(packet.payload.config.parameter == bb::ConfigPacket::FACTORY_RESET_MAGIC_ID) { // checks out
+        if(packet.payload.config.parameter == bb::ConfigPacket::MAGIC) { // checks out
           factoryReset(true);
           return RES_OK; // HA! This never returns! NEVER! Hahahahahahaaaaa!
         }
@@ -692,7 +692,7 @@ void RRemote::printStatus(ConsoleStream *stream) {
   float roll, pitch, heading;
   imu_.getFilteredRPH(roll, pitch, heading);
 
-#if defined(ESP32_REMOTE)
+#if defined(ARDUINO_ARCH_ESP32)
   float temp = roll;
   roll = pitch;
   pitch = temp;

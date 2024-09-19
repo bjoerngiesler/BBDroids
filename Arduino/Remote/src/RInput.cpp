@@ -7,7 +7,7 @@ using namespace bb;
 
 RInput RInput::input;
 
-#if !defined(ESP32_REMOTE)
+#if !defined(ARDUINO_ARCH_ESP32)
 static void prepareInterruptPin(int pin, void (*isr)(void)) {
   pinMode(pin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(pin), isr, CHANGE);
@@ -47,7 +47,7 @@ void bTopRISR(void) {
   RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] = !digitalRead(P_D_BTN_TOP_R); 
   RInput::input.btnTopRChanged = true;
 }
-#endif // ESP32_REMOTE
+#endif // ARDUINO_ARCH_ESP32
 
 bool RInput::initMCP() {
   if(mcp_.begin_I2C(MCP_ADDR) == 0) {
@@ -69,7 +69,7 @@ RInput::RInput() {
 }
 
 bool RInput::begin() {
-#if defined(ESP32_REMOTE)
+#if defined(ARDUINO_ARCH_ESP32)
   mcpOK_ = initMCP();
 #endif
 
@@ -105,7 +105,7 @@ void RInput::update() {
   pot2 = 0;
 #endif
 
-#if defined(ESP32_REMOTE) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
+#if defined(ARDUINO_ARCH_ESP32) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
   if(mcpOK_) {
     for(uint8_t i = 0; i < buttons.size(); i++) {
       if (mcp_.digitalRead(i) == LOW) {
@@ -127,7 +127,7 @@ void RInput::update() {
   } else {
     mcpOK_ = initMCP();
   }
-#endif // ESP32_REMOTE
+#endif // ARDUINO_ARCH_ESP32
   if(btnTopLChanged) {
     if(buttons[BUTTON_TOP_LEFT]) btnTopLeftPressed();
     else btnTopLeftReleased();

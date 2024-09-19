@@ -3,13 +3,20 @@
 
 #include <Arduino.h>
 
-#define VERSION_STRING "V0.0"
+#if defined(VERSION)
+#define STRINGIFY(x) #x
+#define VERSION_STRING "V" STRINGIFY(VERSION)
+#else
+#error VERSION not defined
+#endif
 
-#define ESP32_REMOTE
+#if defined(LEFT_REMOTE) && defined(RIGHT_REMOTE)
+#error Both LEFT_REMOTE and RIGHT_REMOTE defined, this will not work!
+#elif !defined(LEFT_REMOTE) && !defined(RIGHT_REMOTE)
+#error Neither LEFT_REMOTE nor RIGHT_REMOTE defined, this will not work!
+#endif
 
-#define LEFT_REMOTE
-
-#if defined(ESP32_REMOTE)
+#if defined(ARDUINO_ARCH_ESP32)
 
 // The ESP32 remote uses a different pinout, and much less pins because
 // it employs a MPC23017 i2c I/O expander for the buttons.
@@ -41,7 +48,7 @@ static const uint8_t P_A_BATT_CHECK = A10;
 
 #endif
 
-#else // !defined(ESP32_REMOTE)
+#else // !defined(ARDUINO_ARCH_ESP32)
 
 #if defined(LEFT_REMOTE)
 
@@ -85,7 +92,7 @@ static const uint8_t P_D_BTN_R       = D2;
 
 #endif
 
-#endif // ESP32_REMOTE
+#endif // ARDUINO_ARCH_ESP32
 
 #define JoystickEpsilon             0.01f
 

@@ -4,7 +4,7 @@
 #include <Adafruit_NeoPixel.h>
 #include <LibBB.h>
 #if defined(LEFT_REMOTE)
-#if !defined(ESP32_REMOTE)
+#if !defined(ARDUINO_ARCH_ESP32)
 #include <SoftwareSerial.h>
 #endif
 #endif
@@ -94,7 +94,7 @@ protected:
   uint8_t sendBinCommand(const std::vector<uint8_t>& cmd, int timeout=1000, bool waitForResponse=false);
 
 #if defined(LEFT_REMOTE)
-#if defined(ESP32_REMOTE)
+#if defined(ARDUINO_ARCH_ESP32)
   HardwareSerial& ser_;
 #else
   SerialPIO ser_;
