@@ -164,19 +164,20 @@ struct __attribute__ ((packed)) StatePacket {
 
 struct __attribute__ ((packed)) ConfigPacket {
 	enum ConfigType {
-		CONFIG_SET_LEFT_REMOTE_ID       = 0,  // set parameter to ID of left remote
-		CONFIG_SET_DROID_ID             = 1,  // set parameter to ID of right remote
-		CONFIG_SET_DRIVE_CONTROL_MODE   = 2,  // set parameter to proper control mode
-		CONFIG_SET_DOME_CONTROL_MODE    = 3,  // set parameter to proper control mode
-		CONFIG_SET_ARMS_CONTROL_MODE    = 4,  // set parameter to proper control mode
-		CONFIG_SET_SOUND_CONTROL_MODE   = 5,  // set parameter to proper control mode
-		CONFIG_FACTORY_RESET      = 255 // set parameter.id to FACTORY_RESET_MAGIC_ID to confirm
+		CONFIG_SET_LEFT_REMOTE_ID       = 0,  // L->R - parameter: ID of left remote
+		CONFIG_SET_DROID_ID             = 1,  // L->R - parameter: ID of right remote
+		CONFIG_CALIBRATE                = 2,  // L->R - parameter: MAGIC
+		CONFIG_SET_DRIVE_CONTROL_MODE   = 2,  // L->D - parameter: control mode
+		CONFIG_SET_DOME_CONTROL_MODE    = 3,  // L->D - parameter: control mode
+		CONFIG_SET_ARMS_CONTROL_MODE    = 4,  // L->D - parameter: control mode
+		CONFIG_SET_SOUND_CONTROL_MODE   = 5,  // L->D - parameter: control mode
+		CONFIG_FACTORY_RESET            = 255 // L->R - parameter: MAGIC
 	};
 
 	ConfigType type;
 	uint16_t parameter;
 
-	static const uint16_t FACTORY_RESET_MAGIC_ID = 0xbabe;
+	static const uint16_t MAGIC = 0xbade;
 };
 
 struct __attribute__ ((packed)) PairingPacket {
