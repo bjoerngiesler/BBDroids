@@ -11,13 +11,15 @@ public:
     virtual Result draw(ConsoleStream *stream);
     virtual void takeInputFocus();
 
-    void next();
-    void previous();
+    void showIndex(unsigned int i);
+    void showFirst() { showIndex(0); }
+    void showNext() { if(widgets_.size() > 0 && index_ < widgets_.size()-1) showIndex(index_+1); }
+    void showPrevious() { if(index_>0) showIndex(index_-1); }
 
     virtual RWidget::CursorHint cursorHint();
     virtual const String& name();
 protected:
-    int index_;
+    unsigned int index_;
 };
 
 #endif // RROTAWIDGET_H

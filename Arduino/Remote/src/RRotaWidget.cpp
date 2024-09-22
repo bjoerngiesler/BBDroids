@@ -1,20 +1,9 @@
 #include "RRotaWidget.h"
 #include "RRemote.h"
 
-void RRotaWidget::previous() {
-    index_--;
-    if(index_ >= widgets_.size())
-        index_ = widgets_.size()-1;
-    if(index_ < 0) index_ = 0;
-    RRemote::remote.setTopTitle(name());
-    widgetsChanged_ = true;
-}
-
-void RRotaWidget::next() {
-    index_++;
-    if(index_ >= widgets_.size())
-        index_ = widgets_.size()-1;
-    if(index_ < 0) index_ = 0;
+void RRotaWidget::showIndex(unsigned int i) {
+    if(i >= widgets_.size()) return;
+    index_ = i;
     RRemote::remote.setTopTitle(name());
     widgetsChanged_ = true;
 }
@@ -28,8 +17,7 @@ RWidget::CursorHint RRotaWidget::cursorHint() {
 
 Result RRotaWidget::draw(ConsoleStream* stream) {
     if(widgets_.size() == 0) return RES_OK;
-    if(index_ < 0) index_ = 0;
-    if(index_ >= widgets_.size()) index_ = widgets_.size();
+    if(index_ >= widgets_.size()) index_ = widgets_.size()-1;
 
     if(widgetsChanged_) {
         widgets_[index_]->setNeedsFullRedraw();
@@ -40,11 +28,11 @@ Result RRotaWidget::draw(ConsoleStream* stream) {
 
 void RRotaWidget::takeInputFocus() {
     RInput::input.clearCallbacks();
-    RInput::input.setTopLeftShortPressCallback([this]{this->previous();});
-    RInput::input.setTopRightShortPressCallback([this]{this->next();});
+    RInput::input.setTopLeftShortPressCallback([=]{ showPrevious(); });
+    RInput::input.setTopRightShortPressCallback([=]{ showNext(); });
 }
 
 const String& RRotaWidget::name() {
-    if(widgets_.size() == 0 || index_ < 0 || index_ >= widgets_.size()) return name_;
+    if(widgets_.size() == 0 || index_ >= widgets_.size()) return name_;
     return widgets_[index_]->name();
 }
