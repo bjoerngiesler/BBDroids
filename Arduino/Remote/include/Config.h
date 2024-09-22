@@ -4,8 +4,9 @@
 #include <Arduino.h>
 
 #if defined(VERSION)
-#define STRINGIFY(x) #x
-#define VERSION_STRING "V" STRINGIFY(VERSION)
+#define STRINGIFY(s) #s
+#define XSTRINGIFY(s) STRINGIFY(s)
+#define VERSION_STRING "V" XSTRINGIFY(VERSION)
 #else
 #error VERSION not defined
 #endif
