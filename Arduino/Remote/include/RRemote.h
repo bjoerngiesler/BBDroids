@@ -22,14 +22,9 @@ public:
   static RRemote remote;
 
   enum Mode {
-    MODE_REGULAR       = 0x0,
-    MODE_CONTROLSILENT = 0x1,
-    MODE_CALIBRATION   = 0x10,
-    MODE_CALIB_CENTER  = 0x11,
-    MODE_CALIB_X_NEG   = 0x12,
-    MODE_CALIB_X_POS   = 0x13,
-    MODE_CALIB_Y_NEG   = 0x14,
-    MODE_CALIB_Y_POS   = 0x15
+    MODE_REGULAR       = 0,
+    MODE_CONTROLSILENT = 1,
+    MODE_CALIBRATION   = 2
   };
 
   uint16_t stationID() {
@@ -48,11 +43,9 @@ public:
   Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   Result incomingPacket(uint16_t source, uint8_t rssi, const Packet& packet);
   Result fillAndSend();
+  
+  void updateStatusLED();
   void printStatus(ConsoleStream *stream = NULL);
-
-  void setCalibrationMode(Mode mode);
-  void abortCalibration();
-  void finishCalibration();
 
   void setMainWidget(RWidget* widget);
 
@@ -60,7 +53,6 @@ public:
   void showPairRemoteMenu();
   void showMenu(RMenuWidget* menu);
   void showGraphs();
-  void showCalib();
   void showMain();
 
   void populateMenus();
@@ -72,6 +64,8 @@ public:
   void selectRightRemote(uint16_t stationId);
 
   void factoryReset(bool thisremote);
+  void startCalibration(bool thisremote);
+  void finishCalibration(bool thisremote);
 
 protected:
   RRemote();
@@ -81,14 +75,10 @@ protected:
   bool runningStatus_;
   bool onInitScreen_;
   Packet lastPacketSent_;
+
   RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_, leftRemoteMenu_, rightRemoteMenu_, droidMenu_;
-  RIMUWidget imuViz_;
-  RGraphsWidget graphs_;
-  RCrosshairWidget crosshair_;
-  RLabelWidget calibLabel_;
   RMessageWidget waitMessage_, restartMessage_;
   RLabelWidget topLabel_, bottomLabel_;
-
   RRotaWidget mainVis_;
   RRemoteVisWidget remoteVisL_, remoteVisR_;
 
