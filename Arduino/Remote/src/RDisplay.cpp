@@ -37,9 +37,8 @@ RDisplay::RDisplay():
 Result RDisplay::initialize() {
   pinMode(P_D_NEOPIXEL, OUTPUT);
   statusPixels_.begin();
-  setLED(LED_LEFT, 0, 0, 150);
-  setLED(LED_RIGHT, 150, 150, 150);
-  showLEDs();
+  setLED(LED_COMM, 0, 0, 0);
+  setLED(LED_STATUS, 150, 150, 150);
  
 #if defined(LEFT_REMOTE)
   pinMode(LED_BUILTIN, OUTPUT);
@@ -284,28 +283,29 @@ Result RDisplay::plot(uint8_t x, uint8_t y, uint8_t color) {
 }
 
 Result RDisplay::setLED(RDisplay::WhichLED which, uint8_t r, uint8_t g, uint8_t b) {
-  if(which == LED_LEFT || which == LED_BOTH) {
-    statusPixels_.setPixelColor(1, r, g, b);
-  } 
-  if(which == LED_RIGHT || which == LED_BOTH) {
+  if(which == LED_BOTH) {
     statusPixels_.setPixelColor(0, r, g, b);
+    statusPixels_.setPixelColor(1, r, g, b);
   }
+  else {
+    if(which == LED_STATUS) {
+      statusPixels_.setPixelColor(0, r, g, b);
+    } 
+    if(which == LED_COMM) {
+      statusPixels_.setPixelColor(1, r, g, b);
+    }
+  }
+  
+  statusPixels_.show();
   return RES_OK;
 }
 
 Result RDisplay::flashLED(WhichLED which, uint8_t iterations, uint8_t millisOn, uint8_t millisOff, uint8_t r, uint8_t g, uint8_t b) {
   for(int i=0; i<iterations; i++) {
     setLED(which, r, g, b);
-    showLEDs();
     delay(millisOn);
     setLED(which, 0, 0, 0);
-    showLEDs();
     delay(millisOff);
   }
-  return RES_OK;
-}
-
-Result RDisplay::showLEDs() {
-  statusPixels_.show();
   return RES_OK;
 }

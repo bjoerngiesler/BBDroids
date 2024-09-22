@@ -56,11 +56,11 @@ public:
   static const uint8_t MAIN_X = 0;
   static const uint8_t MAIN_Y = 13;
   static const uint8_t MAIN_WIDTH = DISPLAY_WIDTH;
-  static const uint8_t MAIN_HEIGHT = DISPLAY_HEIGHT-26;
+  static const uint8_t MAIN_HEIGHT = DISPLAY_HEIGHT-28;
 
   enum WhichLED {
-    LED_LEFT,
-    LED_RIGHT,
+    LED_STATUS,
+    LED_COMM,
     LED_BOTH
   };
 
@@ -82,7 +82,6 @@ public:
 
   Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b);
   Result flashLED(WhichLED which, uint8_t iterations, uint8_t millisOn, uint8_t millisOff, uint8_t r, uint8_t g, uint8_t b);
-  Result showLEDs();
 
 protected:
   RDisplay();
