@@ -19,6 +19,7 @@ public:
     virtual Result draw(ConsoleStream* stream);
     virtual Result visualizeFromPacket(const bb::ControlPacket& packet);
 
+    RCrosshairWidget& crosshair() { return crosshair_; }
 
 protected:
     void moveWidgetsAround();
