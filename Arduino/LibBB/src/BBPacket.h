@@ -163,6 +163,8 @@ struct __attribute__ ((packed)) StatePacket {
 };
 
 struct __attribute__ ((packed)) ConfigPacket {
+	static const uint16_t MAGIC = 0xbade;
+
 	enum ConfigType {
 		CONFIG_SET_LEFT_REMOTE_ID       = 0,  // L->R - parameter: ID of left remote
 		CONFIG_SET_DROID_ID             = 1,  // L->R - parameter: ID of right remote
@@ -176,8 +178,6 @@ struct __attribute__ ((packed)) ConfigPacket {
 
 	ConfigType type;
 	uint16_t parameter;
-
-	static const uint16_t MAGIC = 0xbade;
 };
 
 struct __attribute__ ((packed)) PairingPacket {
