@@ -48,8 +48,6 @@ bb::Result bb::XBee::initialize(uint8_t chan, uint16_t pan, uint16_t station, ui
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
 		Console::console.printfBroadcast("XBee: Storage block is valid\n");
 		ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
-		Console::console.printfBroadcast("Params read: channel %x, pan %x, station %x, bps %x, name \"%s\"\n", 
-			params_.chan, params_.pan, params_.station, params_.bps, params_.name);
 	} else {
 		Console::console.printfBroadcast("XBee: Storage block is invalid, using passed parameters\n");
 		memset(&params_, 0, sizeof(params_));
@@ -596,9 +594,6 @@ bb::Result bb::XBee::discoverNodes(std::vector<bb::XBee::Node>& nodes) {
 				Console::console.printfBroadcast("Expected >=%d bytes, found %d\n", APIFrame::ATResponseNDMinLength, length);
 				continue;
 			}
-
-			for(int i=0; i<length; i++) Console::console.printfBroadcast("%d:%x ", i, data[i]);
-			Console::console.printfBroadcast("\n");
 
 			APIFrame::ATResponseND *r = (APIFrame::ATResponseND*)data;
 			Node n;
