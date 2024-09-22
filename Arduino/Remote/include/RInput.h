@@ -11,13 +11,14 @@ public:
 
   struct AxisCalib {
   public:
-    AxisCalib(): min(0), center(2048), max(4096) {}
-    uint16_t min, center, max;
+    AxisCalib(): min(0), max(4096) {}
+    uint16_t min, max;
   };
 
   bool begin();
   void update();
   void printOnSerial();
+  bool isOK();
 
   void setCalibration(const AxisCalib& hCalib, const AxisCalib& vCalib) { hCalib_ = hCalib; vCalib_ = vCalib; }
 
@@ -27,6 +28,7 @@ public:
   float battery;    // range: 0 .. 1.0
   float joyH, joyV; // range: -1.0 .. 1.0
   uint16_t joyRawH, joyRawV, battRaw;
+  uint16_t minJoyRawH, maxJoyRawH, minJoyRawV, maxJoyRawV;
 
   // Weird order given by ESP32 layout
 #if defined(ARDUINO_ARCH_ESP32)
@@ -67,6 +69,14 @@ public:
   void setTopRightLongPressCallback(std::function<void(void)> cb) { trLongPressCB_ = cb; }
   void setConfirmShortPressCallback(std::function<void(void)> cb) { cShortPressCB_ = cb; }
   void setConfirmLongPressCallback(std::function<void(void)> cb) { cLongPressCB_ = cb; }
+  void setAllCallbacks(std::function<void(void)> cb) {
+    tlShortPressCB_ = cb;
+    tlLongPressCB_ = cb;
+    trShortPressCB_ = cb;
+    trLongPressCB_ = cb;
+    cShortPressCB_ = cb;
+    cLongPressCB_ = cb;
+  }
   void clearCallbacks();
 
 protected:

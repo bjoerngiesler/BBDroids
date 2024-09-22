@@ -66,6 +66,10 @@ RInput::RInput() {
   for(bool& b: buttons) b = false;
   tlms_ = trms_ = cms_ = 0;
   longPressThresh_ = 500;
+  minJoyRawH = 2048;
+  maxJoyRawH = 2048;
+  minJoyRawV = 2048;
+  maxJoyRawV = 2048;
 }
 
 bool RInput::begin() {
@@ -79,18 +83,24 @@ bool RInput::begin() {
 }
 
 void RInput::update() {
-  joyRawH = analogRead(P_A_JOY_HOR);
 #if defined(LEFT_REMOTE)
+  joyRawH = analogRead(P_A_JOY_HOR);
   joyRawV = 4096 - analogRead(P_A_JOY_VER);
 #else
+  joyRawH = 4096 - analogRead(P_A_JOY_HOR);
   joyRawV = analogRead(P_A_JOY_VER);
 #endif
 
-  joyH = (float)(joyRawH - hCalib_.center) / 2048.0f;
+  minJoyRawH = min(minJoyRawH, joyRawH);
+  maxJoyRawH = max(maxJoyRawH, joyRawH);
+  minJoyRawV = min(minJoyRawV, joyRawV);
+  maxJoyRawV = max(maxJoyRawV, joyRawV);
+
+  joyH = float(map(joyRawH, hCalib_.min, hCalib_.max, 0, 4096)-2048) / 2048.0f;
   if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;
   joyH = constrain(joyH, -1.0f, 1.0f);
 
-  joyV = (float)(vCalib_.center - joyRawV) / 2048.0f;
+  joyV = float(2048-map(joyRawV, vCalib_.min, vCalib_.max, 0, 4096)) / 2048.0f;
   if(abs(joyV) < JoystickEpsilon) joyV = 0.0f;
   joyV = constrain(joyV, -1.0f, 1.0f);
   
@@ -163,6 +173,12 @@ void RInput::btnTopLeftReleased() {
     tlLongPressCB_();
   }
 }
+
+bool RInput::isOK() {
+  if(mcpOK_) return true;
+  return false;
+}
+
 
 void RInput::btnTopRightPressed() {
   trms_ = millis();
