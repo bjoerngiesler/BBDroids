@@ -399,7 +399,7 @@ void RRemote::finishCalibration(bool thisremote) {
 #if defined(LEFT_REMOTE)
     remoteVisR_.crosshair().showMinMaxRect(false);
 #else
-    Console::console.printfBroadcast("Finish calib other remote only defined for right remote");^
+    Console::console.printfBroadcast("Finish calib other remote only defined for right remote");
 #endif
   }
 }
