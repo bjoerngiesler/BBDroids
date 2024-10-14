@@ -106,20 +106,31 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 	String addrL = sendStringAndWaitForResponse("ATSL"); addrL.trim();
 	String fw = sendStringAndWaitForResponse("ATVR"); fw.trim();
 	if(addrH == "" || addrL == "" || fw == "") return RES_SUBSYS_COMM_ERROR;
+	hwAddress_ = uint64_t(strtol(addrH.c_str(), 0, 16)) << 32 | uint64_t(strtol(addrL.c_str(), 0, 16));
 
 	if(stream) {
-		stream->printf("Found XBee at address: %s:%s Firmware version: %s\n", addrH.c_str(), addrL.c_str(), fw.c_str());
-	}
+		stream->printf("Found XBee at address: %s:%s (0x%llx) Firmware version: %s\n", addrH.c_str(), addrL.c_str(), hwAddress_, fw.c_str());
+	}	
 
 	String retval = sendStringAndWaitForResponse("ATCT"); 
 	if(retval != "") {
 		atmode_timeout_ = strtol(retval.c_str(), 0, 16) * 100;
 	}
 
+
 	if(setConnectionInfo(params_.chan, params_.pan, params_.station, true) != RES_OK) {
 		if(stream) stream->printf("Setting connection info failed.\n");
 		return RES_SUBSYS_COMM_ERROR;
 	}
+
+	uint8_t chan; uint16_t pan; uint16_t station; 
+	if(getConnectionInfo(chan, pan, station, true) != RES_OK) {
+		if(stream) stream->printf("Getting connection info failed.\n");
+		return RES_SUBSYS_COMM_ERROR;
+	}
+	params_.chan = chan;
+	params_.pan = pan;
+	params_.station = station;
 
 	if(strlen(params_.name) != 0) {
 		String str = String("ATNI") + params_.name;
@@ -249,33 +260,6 @@ bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, Cons
 		return send(words[1]);
 	} 
 
-	else if(words[0] == "send_control_packet") {
-		if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT;
-
-		Packet packet;
-		memset(&packet, 0, sizeof(packet));
-		packet.type = PACKET_TYPE_CONTROL;
-		packet.source = PACKET_SOURCE_TEST_ONLY;
-
-		return send(packet);
-	} 
-
-	else if(words[0] == "send_api_packet") {
-		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT;
-		if(!apiMode_) {
-			Console::console.printfBroadcast("Must be in API mode to do this.\n");
-			return RES_SUBSYS_WRONG_MODE;
-		}
-
-		uint16_t dest = words[1].toInt();
-
-		Packet packet;
-		memset(&packet, 0, sizeof(packet));
-		packet.type = PACKET_TYPE_CONTROL;
-		packet.source = PACKET_SOURCE_TEST_ONLY;
-
-		return sendTo(dest, packet, true);
-	} 
 	else if(words[0] == "continuous") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		else {
@@ -658,14 +642,22 @@ bb::Result bb::XBee::send(const bb::Packet& packet) {
 	return RES_OK;
 }
 
-bb::Result bb::XBee::sendTo(uint16_t dest, const bb::Packet& packet, bool ack) {
+bb::Result bb::XBee::sendTo(uint64_t dest, const bb::Packet& packet, bool ack) {
 	uint8_t buf[14+sizeof(packet)];
 
 	buf[0] = 0x10; // transmit request
 	buf[1] = 0x0;  // no response frame
-	for(int i=2; i<10; i++) buf[i] = 0xff; 	// We use 16bit addressing, 64bit dest gets set to 0xffffffffffffffff
-	buf[10] = (dest >> 8) & 0xff;          	// 16bit dest address
-	buf[11] = dest & 0xff;
+	Console::console.printfBroadcast("Sending to 0x%llx\n", dest);
+	buf[2] = (dest >> 56) & 0xff;
+	buf[3] = (dest >> 48) & 0xff;
+	buf[4] = (dest >> 40) & 0xff;
+	buf[5] = (dest >> 32) & 0xff;
+	buf[6] = (dest >> 24) & 0xff;
+	buf[7] = (dest >> 16) & 0xff;
+	buf[8] = (dest >> 8) & 0xff;
+	buf[9] = dest & 0xff;
+	buf[10] = 0xff;
+	buf[11] = 0xfe;
 	buf[12] = 0; 							// broadcast radius - unused
 	if(ack == false) {
 		buf[13] = 1;						// disable ACK
@@ -720,21 +712,52 @@ bb::Result bb::XBee::receiveAndHandleAPIMode() {
 #endif
 
 	if(frame.data()[0] == 0x81) { // 16bit address frame
+#if 0
+		Console::console.printfBroadcast("16bit address frame\n");
+#endif
 		if(frame.length() != sizeof(bb::Packet) + 5) {
-			Console::console.printfBroadcast("Invalid API Mode packet size %d (expected %d)\n", frame.length(), sizeof(bb::Packet) + 5);
+			Console::console.printfBroadcast("Invalid API Mode 16bit addr packet size %d (expected %d)\n", frame.length(), sizeof(bb::Packet) + 5);
 			return RES_SUBSYS_COMM_ERROR;
 		}
-		uint16_t source = (frame.data()[1] << 8) | frame.data()[2];
+		uint16_t srcAddr = (frame.data()[1] << 8) | frame.data()[2];
 		uint8_t rssi = frame.data()[3];
-		uint8_t options = frame.data()[4];
+		// uint8_t options = frame.data()[4]; // Ignored
 
 		bb::Packet packet;
 		memcpy(&packet, &(frame.data()[5]), sizeof(packet));
 
-//		Console::console.printfBroadcast("Sending packet from 0x%x (RSSI %d, options 0x%x) to receivers.\n", source, rssi, options);
-
 		for(auto& r: receivers_) {
-			r->incomingPacket(source, rssi, packet);
+			r->incomingPacket(srcAddr, rssi, packet);
+		}
+	} else if(frame.data()[0] == 0x80) { // 64bit address frame
+#if 0
+		Console::console.printfBroadcast("64bit address frame\n");
+		for(int i=0; i<frame.length(); i++) {
+			Console::console.printfBroadcast("0x%0x ", frame.data()[i]);
+			if(i%16 == 0 && i!=0) Console::console.printfBroadcast("\n");
+		}
+		Console::console.printfBroadcast("\n\n");
+#endif
+		if(frame.length() != sizeof(bb::Packet) + 11) {
+			Console::console.printfBroadcast("Invalid API Mode 64bit addr packet size %d (expected %d)\n", frame.length(), sizeof(bb::Packet) + 11);
+			return RES_SUBSYS_COMM_ERROR;
+		}
+		uint64_t srcAddr = (uint64_t(frame.data()[1]) << 56) | (uint64_t(frame.data()[2]) << 48) |
+		                   (uint64_t(frame.data()[3]) << 40) | (uint64_t(frame.data()[4]) << 32) |
+						   (uint64_t(frame.data()[5]) << 24) | (uint64_t(frame.data()[6]) << 16) |
+						   (uint64_t(frame.data()[7]) <<  8) | uint64_t(frame.data()[8]);
+		uint8_t rssi = frame.data()[9];
+		// uint8_t options = frame.data()[10]; // Ignored
+
+		bb::Packet packet;
+		memcpy(&packet, &(frame.data()[11]), sizeof(packet));
+
+#if 0
+		Console::console.printfBroadcast("Source addr: 0x%lx \n", srcAddr);
+		Console::console.printfBroadcast("Source: %d Type: %d Seqnum: %d\n", packet.source, packet.type, packet.seqnum);
+#endif
+		for(auto& r: receivers_) {
+			r->incomingPacket(srcAddr, rssi, packet);
 		}
 	} else {
 		Console::console.printfBroadcast("Unknown frame type 0x%x\n", frame.data()[0]);
@@ -773,6 +796,7 @@ String bb::XBee::sendStringAndWaitForResponse(const String& str, int predelay, b
 }
   
 bool bb::XBee::sendStringAndWaitForOK(const String& str, int predelay, bool cr) {
+	Console::console.printfBroadcast("Sending \"%s\"\n", str.c_str());
   	String result = sendStringAndWaitForResponse(str, predelay, cr);
   	if(result.equals("OK\r")) return true;
       
@@ -981,7 +1005,14 @@ bool bb::XBee::APIFrame::isATRequest() {
 }
 
 bb::Result bb::XBee::APIFrame::unpackATResponse(uint8_t &frameID, uint16_t &command, uint8_t &status, uint8_t** data, uint16_t &length) {
-	if(data_[0] != ATRESPONSE || length_ < 5) return RES_SUBSYS_COMM_ERROR;
+	if(data_[0] != ATRESPONSE) {
+		Console::console.printfBroadcast("Wrong response type 0x%x\n", data_[0]);
+		return RES_SUBSYS_COMM_ERROR;
+	} 
+	if(length_ < 5) {
+		Console::console.printfBroadcast("AT response too short (%d, need min 5)\n", length_);
+		return RES_SUBSYS_COMM_ERROR;
+	}
 
 	frameID = data_[1];
 	command = (data_[2]<<8)|data_[3];
@@ -1029,13 +1060,18 @@ bb::Result bb::XBee::send(const APIFrame& frame) {
 	writeEscapedByte(uart_, lengthMSB);
 	writeEscapedByte(uart_, lengthLSB);
 
-//	Console::console.printfBroadcast("Writing %d bytes: ", length);
+#if 0
+	Console::console.printfBroadcast("Writing %d bytes: ", length);
 	for(uint16_t i=0; i<length; i++) {
-//		Console::console.printfBroadcast("%x ", data[i]);
+		Console::console.printfBroadcast("%x ", data[i]);
+	}
+	Console::console.printfBroadcast("\n");
+	Console::console.printfBroadcast("Writing checksum %x\n", frame.checksum());
+#endif
+
+	for(uint16_t i=0; i<length; i++) {
 		writeEscapedByte(uart_, data[i]);
 	}
-//	Console::console.printfBroadcast("\n");
-//	Console::console.printfBroadcast("Writing checksum %x\n", frame.checksum());
 	writeEscapedByte(uart_, frame.checksum());
 
 	return RES_OK;

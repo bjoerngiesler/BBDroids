@@ -69,6 +69,7 @@ public:
 		return id&0x7;
 	}
 
+	uint64_t hwAddress() { return hwAddress_; }
 
 	virtual Result start(ConsoleStream *stream = NULL);
 	virtual Result stop(ConsoleStream *stream = NULL);
@@ -109,7 +110,7 @@ public:
 	Result send(const String& str);
 	Result send(const uint8_t *bytes, size_t size);
 	Result send(const Packet& packet);
-	Result sendTo(uint16_t dest, const Packet& packet, bool ack);
+	Result sendTo(uint64_t dest, const Packet& packet, bool ack);
 	bool available();
 	String receive();
 	Result receiveAndHandlePacket();
@@ -132,7 +133,7 @@ protected:
 	unsigned long atmode_millis_, atmode_timeout_;
 	bool atmode_, stayInAT_;
 	HardwareSerial* uart_;
-	unsigned int currentBPS_;
+	int currentBPS_;
 	bool apiMode_;
 
 	typedef struct {
@@ -142,6 +143,7 @@ protected:
 		char name[20];
 	} XBeeParams;
 	XBeeParams params_;
+	uint64_t hwAddress_;
 	ConfigStorage::HANDLE paramsHandle_;
 	std::vector<PacketReceiver*> receivers_;
 
