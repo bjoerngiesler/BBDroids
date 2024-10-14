@@ -51,7 +51,7 @@ public:
   void setControlParameters();
   void switchDrive(bool onoff);
 
-  virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
+  virtual Result incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet);
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   virtual Result setParameterValue(const String& name, const String& stringVal);
 

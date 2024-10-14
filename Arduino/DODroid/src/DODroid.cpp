@@ -322,10 +322,15 @@ void DODroid::printStatus(ConsoleStream *stream) {
   stream->printf("\n");
 }
 
-Result DODroid::incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
+Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
+    Console::console.printfBroadcast("Control packet from left remote (but not primary)\n");
     return RES_OK;
   } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
+    Console::console.printfBroadcast("Control packet from right remote (but not primary)\n");
+    return RES_OK;
+  } else if(source == PACKET_SOURCE_PRIMARY_REMOTE) {
+    //Console::console.printfBroadcast("Control packet from primary remote\n");
     static int numZero = 0;
     if(EPSILON(packet.getAxis(0)) && EPSILON(packet.getAxis(1))) {
       numZero++;
@@ -453,8 +458,8 @@ Result DODroid::fillAndSendStatePacket() {
   float err, errI, errD, control;
 
   if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
-    p.drive[0].errorState = ERROR_OK;
-    p.drive[0].controlMode = driveOn_ ? bb::ControlMode::CONTROL_RC : bb::ControlMode::CONTROL_OFF;
+    p.drive[0].errorState = ERROR_OK;   
+    p.drive[0].controlMode = driveOn_ ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
     if(pwm_) {
       p.drive[0].presentPWM = pwmBalanceController_.present();
       p.drive[0].presentPos = pwmDriveOutput_.present();
@@ -477,7 +482,7 @@ Result DODroid::fillAndSendStatePacket() {
 
   if(leftMotorStatus_ == MOTOR_OK) {
     p.drive[1].errorState = ERROR_OK;
-    p.drive[1].controlMode = driveOn_ ? bb::ControlMode::CONTROL_RC : bb::ControlMode::CONTROL_OFF;
+    p.drive[1].controlMode = driveOn_ ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
     p.drive[1].presentPWM = leftMotor_.present();
     p.drive[1].presentPos = leftEncoder_.presentPosition();
     p.drive[1].presentSpeed = leftEncoder_.presentSpeed();
@@ -493,7 +498,7 @@ Result DODroid::fillAndSendStatePacket() {
 
   if(rightMotorStatus_ == MOTOR_OK) {
     p.drive[2].errorState = ERROR_OK;
-    p.drive[2].controlMode = driveOn_ ? bb::ControlMode::CONTROL_RC : bb::ControlMode::CONTROL_OFF;
+    p.drive[2].controlMode = driveOn_ ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
     p.drive[2].presentPWM = rightMotor_.present();
     p.drive[2].presentPos = rightEncoder_.presentPosition();
     p.drive[2].presentSpeed = rightEncoder_.presentSpeed();

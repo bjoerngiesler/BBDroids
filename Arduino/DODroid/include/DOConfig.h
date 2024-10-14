@@ -30,8 +30,8 @@ static const float POWER_BATT_MIN  = 14.0; // Minimum voltage - below this, ever
 static const float POWER_BATT_MAX  = 16.0; // Maximum voltage - above this, we're overvolting and will probably breal stuff.
 
 // PID Controller Defaults
-static const float WHEEL_SPEED_KP   = 0.1;
-static const float WHEEL_SPEED_KI   = 0.8;
+static const float WHEEL_SPEED_KP   = 0.13;
+static const float WHEEL_SPEED_KI   = 1.0;
 static const float WHEEL_SPEED_KD   = 0;
 static const float WHEEL_SPEED_IMAX = 300;
 
