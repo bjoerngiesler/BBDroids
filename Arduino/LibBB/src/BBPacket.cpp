@@ -47,7 +47,7 @@ uint8_t bb::Packet::calculateCRC() {
 	return calcCRC7((const uint8_t*)this, sizeof(Packet));
 }
 
-bb::Result bb::PacketReceiver::incomingPacket(uint16_t station, uint8_t rssi, const Packet& packet) {
+bb::Result bb::PacketReceiver::incomingPacket(uint64_t station, uint8_t rssi, const Packet& packet) {
 	switch(packet.type) {
 	case bb::PACKET_TYPE_CONTROL:
 		return incomingControlPacket(station, packet.source, rssi, packet.payload.control);
@@ -64,7 +64,7 @@ bb::Result bb::PacketReceiver::incomingPacket(uint16_t station, uint8_t rssi, co
 	}
 }
 
-bb::Result bb::PacketReceiver::incomingControlPacket(uint16_t station, bb::PacketSource source, uint8_t rssi, const bb::ControlPacket& packet) {
+bb::Result bb::PacketReceiver::incomingControlPacket(uint64_t station, bb::PacketSource source, uint8_t rssi, const bb::ControlPacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;
@@ -72,7 +72,7 @@ bb::Result bb::PacketReceiver::incomingControlPacket(uint16_t station, bb::Packe
 	return RES_OK;
 }
 
-bb::Result bb::PacketReceiver::incomingStatePacket(uint16_t station, bb::PacketSource source, uint8_t rssi, const bb::StatePacket& packet) {
+bb::Result bb::PacketReceiver::incomingStatePacket(uint64_t station, bb::PacketSource source, uint8_t rssi, const bb::StatePacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;
@@ -80,7 +80,7 @@ bb::Result bb::PacketReceiver::incomingStatePacket(uint16_t station, bb::PacketS
 	return RES_OK;
 }
 
-bb::Result bb::PacketReceiver::incomingConfigPacket(uint16_t station, bb::PacketSource source, uint8_t rssi, const bb::ConfigPacket& packet) {
+bb::Result bb::PacketReceiver::incomingConfigPacket(uint64_t station, bb::PacketSource source, uint8_t rssi, const bb::ConfigPacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;
@@ -88,7 +88,7 @@ bb::Result bb::PacketReceiver::incomingConfigPacket(uint16_t station, bb::Packet
 	return RES_OK;
 }
 
-bb::Result bb::PacketReceiver::incomingPairingPacket(uint16_t station, bb::PacketSource source, uint8_t rssi, const bb::PairingPacket& packet) {
+bb::Result bb::PacketReceiver::incomingPairingPacket(uint64_t station, bb::PacketSource source, uint8_t rssi, const bb::PairingPacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;

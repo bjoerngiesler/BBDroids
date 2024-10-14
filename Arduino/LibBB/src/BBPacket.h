@@ -163,7 +163,7 @@ struct __attribute__ ((packed)) StatePacket {
 };
 
 struct __attribute__ ((packed)) ConfigPacket {
-	static const uint16_t MAGIC = 0xbade;
+	static const uint64_t MAGIC = 0xbadeaffebabeface;
 
 	enum ConfigType {
 		CONFIG_SET_LEFT_REMOTE_ID       = 0,  // L->R - parameter: ID of left remote
@@ -173,11 +173,12 @@ struct __attribute__ ((packed)) ConfigPacket {
 		CONFIG_SET_DOME_CONTROL_MODE    = 3,  // L->D - parameter: control mode
 		CONFIG_SET_ARMS_CONTROL_MODE    = 4,  // L->D - parameter: control mode
 		CONFIG_SET_SOUND_CONTROL_MODE   = 5,  // L->D - parameter: control mode
-		CONFIG_FACTORY_RESET            = 255 // L->R - parameter: MAGIC
+		CONFIG_FACTORY_RESET            = 127 // L->R - parameter: MAGIC
 	};
 
-	ConfigType type;
-	uint16_t parameter;
+	ConfigType type  : 7;
+	bool       reply : 1;
+	uint64_t parameter;
 };
 
 struct __attribute__ ((packed)) PairingPacket {
@@ -192,13 +193,13 @@ enum PacketType {
 };
 
 enum PacketSource {
-	PACKET_SOURCE_LEFT_REMOTE  = 0,
-	PACKET_SOURCE_RIGHT_REMOTE = 1,
-	PACKET_SOURCE_DROID        = 2,
-	PACKET_SOURCE_TEST_ONLY    = 3
+	PACKET_SOURCE_LEFT_REMOTE    = 0,
+	PACKET_SOURCE_RIGHT_REMOTE   = 1,
+	PACKET_SOURCE_DROID          = 2,
+	PACKET_SOURCE_PRIMARY_REMOTE = 3
 };
 
-struct Packet {
+struct __attribute__ ((packed)) Packet {
 	PacketType type     : 2;
 	PacketSource source : 2;
 	uint8_t seqnum      : 3; // automatically set by Runloop
@@ -211,12 +212,13 @@ struct Packet {
 		PairingPacket pairing;
 	} payload;
 
-	Packet(PacketType t, PacketSource s) {
+	Packet(PacketType t, PacketSource s, unsigned long seq) {
 		type = t;
 		source = s;
-		seqnum = bb::Runloop::runloop.getSequenceNumber()%8;
+		seqnum = seq%8;
+		reserved = 0;
 	}
-	Packet() {}
+	Packet() { }
 	uint8_t calculateCRC();
 };
 
@@ -229,11 +231,11 @@ struct PacketFrame {
 
 class PacketReceiver { 
 public:
-	virtual Result incomingPacket(uint16_t station, uint8_t rssi, const Packet& packet);
-	virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
-	virtual Result incomingStatePacket(uint16_t station, PacketSource source, uint8_t rssi, const StatePacket& packet);
-	virtual Result incomingConfigPacket(uint16_t station, PacketSource source, uint8_t rssi, const ConfigPacket& packet);
-	virtual Result incomingPairingPacket(uint16_t station, PacketSource source, uint8_t rssi, const PairingPacket& packet);
+	virtual Result incomingPacket(uint64_t srcAddr, uint8_t rssi, const Packet& packet);
+	virtual Result incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet);
+	virtual Result incomingStatePacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const StatePacket& packet);
+	virtual Result incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ConfigPacket& packet);
+	virtual Result incomingPairingPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const PairingPacket& packet);
 };
 
 /*
