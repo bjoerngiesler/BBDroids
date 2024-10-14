@@ -22,14 +22,12 @@ RRemote::RRemote():
   deltaR_ = 0; deltaP_ = 0; deltaH_ = 0;
   memset(&lastPacketSent_, 0, sizeof(Packet));
 
+  params_.droidAddress = 0x0;
+  params_.otherRemoteAddress = 0x0;
 #if defined(LEFT_REMOTE)
-  params_.leftID = XBee::makeStationID(XBee::REMOTE_BAVARIAN_L, BUILDER_ID, REMOTE_ID);
-  params_.rightID = 0;
-  params_.droidID = 0;
+  params_.isPrimary = true;
 #else
-  params_.leftID = 0;
-  params_.rightID = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
-  params_.droidID = 0;
+  params_.isPrimary = false;
 #endif
 
   waitMessage_.setTitle("Please wait");
@@ -55,17 +53,14 @@ RRemote::RRemote():
 }
 
 Result RRemote::initialize() { 
-  if(imu_.begin() == false) {
-    Console::console.printfBroadcast("IMU not available\n");
-  }
-
   RInput::input.begin();
 
   paramsHandle_ = ConfigStorage::storage.reserveBlock("remote", sizeof(params_));
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is valid.\n", paramsHandle_);
     ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
-    Console::console.printfBroadcast("Remote: leftID 0x%x, rightID 0x%x\n", params_.leftID, params_.rightID);
+    Console::console.printfBroadcast("Other Remote Address: 0x%llx\n", params_.otherRemoteAddress);
+    Console::console.printfBroadcast("Droid address: 0x%x\n", params_.droidAddress);
     RInput::input.setCalibration(params_.hCalib, params_.vCalib);
   } else {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
@@ -93,6 +88,7 @@ void RRemote::setMainWidget(RWidget* widget) {
 void RRemote::showMain() {
   setMainWidget(&mainVis_);
   RInput::input.setTopRightLongPressCallback([=]{RRemote::remote.showMenu(&mainMenu_);});
+  RInput::input.setConfirmShortPressCallback([=]{RRemote::remote.showMenu(&mainMenu_);});
 }
 
 void RRemote::showMenu(RMenuWidget* menu) {
@@ -106,18 +102,21 @@ void RRemote::showPairDroidMenu() {
   
   pairDroidMenu_.clear();
 
+  Console::console.printfBroadcast("Discovering nodes...\n");
   Result res = XBee::xbee.discoverNodes(discoveredNodes_);
   if(res != RES_OK) {
     Console::console.printfBroadcast("%s\n", errorMessage(res));
     return;
   }
+  Console::console.printfBroadcast("%d nodes discovered.\n", discoveredNodes_.size());
 
   pairDroidMenu_.clear();
+  pairRemoteMenu_.setName(String(discoveredNodes_.size()) + " Droids");
   for(auto& n: discoveredNodes_) {
     Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_DROID) continue;
     Console::console.printfBroadcast("Adding entry for \"%s\"\n", n.name);
-    pairDroidMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.stationId); });
+    pairDroidMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.address); });
   }
   Console::console.printfBroadcast("Adding entry for \"Back\"\n");
   pairDroidMenu_.addEntry("Back", [=]() { RRemote::remote.showMenu(&pairMenu_); });
@@ -142,7 +141,8 @@ void RRemote::showPairRemoteMenu() {
   pairRemoteMenu_.setName(String(discoveredNodes_.size()) + " Remotes");
   for(auto& n: discoveredNodes_) {
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_REMOTE) continue;
-    pairRemoteMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.stationId); });
+    Console::console.printfBroadcast("Adding remote entry 0x%llx\n", n.address);
+    pairRemoteMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.address); });
   }
   pairRemoteMenu_.addEntry("Back", [=]() { RRemote::remote.showMenu(&pairMenu_); });
 
@@ -157,9 +157,9 @@ void RRemote::populateMenus() {
   droidMenu_.setName("Droid");
   
   mainMenu_.clear();
-  if(params_.droidID != 0) mainMenu_.addEntry("Droid...", [=]() { showMenu(&droidMenu_); });
+  if(params_.droidAddress != 0) mainMenu_.addEntry("Droid...", [=]() { showMenu(&droidMenu_); });
   mainMenu_.addEntry("Left Remote...", [=]() { showMenu(&leftRemoteMenu_); });
-  if(params_.rightID != 0) mainMenu_.addEntry("Right Remote...", [=]() { showMenu(&rightRemoteMenu_); });
+  if(params_.otherRemoteAddress != 0) mainMenu_.addEntry("Right Remote...", [=]() { showMenu(&rightRemoteMenu_); });
   mainMenu_.addEntry("Pair...", [=]() { RRemote::remote.showMenu(&pairMenu_); });
   mainMenu_.addEntry("Back", []() { RRemote::remote.showMain(); });
   
@@ -190,18 +190,18 @@ void RRemote::setBottomTitle(const String& title) {
   bottomLabel_.setTitle(title);
 }
 
-void RRemote::selectDroid(uint16_t droid) {
+void RRemote::selectDroid(uint64_t droid) {
 #if defined(LEFT_REMOTE)
   Console::console.printfBroadcast("Selecting droid 0x%x\n", droid);
 
-  params_.droidID = droid;
+  params_.droidAddress = droid;
 
-  if(params_.rightID != 0) {
-    bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
+  if(params_.otherRemoteAddress != 0) {
+    bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
     packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
 
-    packet.payload.config.parameter = params_.droidID;
-    XBee::xbee.sendTo(params_.rightID, packet, true);
+    packet.payload.config.parameter = params_.droidAddress;
+    XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
   }
 
   bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
@@ -212,21 +212,21 @@ void RRemote::selectDroid(uint16_t droid) {
 #endif
 }
 
-void RRemote::selectRightRemote(uint16_t remote) {
+void RRemote::selectRightRemote(uint64_t address) {
 #if defined(LEFT_REMOTE)
-  Console::console.printfBroadcast("Selecting right remote 0x%x\n", remote);
+  Console::console.printfBroadcast("Selecting right remote 0x%llx\n", address);
   
-  params_.rightID = remote;
+  params_.otherRemoteAddress = address;
 
-  bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
+  bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
   packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID;
-  packet.payload.config.parameter = params_.leftID;
-  XBee::xbee.sendTo(params_.rightID, packet, true);  
+  packet.payload.config.parameter = XBee::xbee.hwAddress();
+  XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);  
 
-  if(params_.droidID != 0) {
+  if(params_.droidAddress != 0) {
     packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
-    packet.payload.config.parameter = params_.droidID;
-    XBee::xbee.sendTo(params_.rightID, packet, true);   
+    packet.payload.config.parameter = params_.droidAddress;
+    XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);   
   }
 
   bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
@@ -241,8 +241,6 @@ Result RRemote::start(ConsoleStream *stream) {
   (void)stream;
   runningStatus_ = false;
   operationStatus_ = RES_OK;
-
-  Runloop::runloop.setCycleTimeMicros(1e6/imu_.dataRate());
 
   started_ = true;
 
@@ -313,12 +311,12 @@ void RRemote::factoryReset(bool thisremote) {
   } else {
 #if defined(LEFT_REMOTE)
     Console::console.printfBroadcast("Factory reset other remote!\n");
-    bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
+    bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
     packet.payload.config.type = bb::ConfigPacket::CONFIG_FACTORY_RESET;
     packet.payload.config.parameter = bb::ConfigPacket::MAGIC;
-    XBee::xbee.sendTo(params_.rightID, packet, true);
+    XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
 
-    params_.rightID = 0;
+    params_.otherRemoteAddress = 0;
     bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
     bb::ConfigStorage::storage.store();
 
@@ -347,10 +345,10 @@ void RRemote::startCalibration(bool thisremote) {
     mode_ = MODE_CALIBRATION;
   } else {
 #if defined(LEFT_REMOTE)
-    bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE);
+    bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
     packet.payload.config.type = bb::ConfigPacket::CONFIG_CALIBRATE;
     packet.payload.config.parameter = bb::ConfigPacket::MAGIC;
-    XBee::xbee.sendTo(params_.rightID, packet, true);
+    XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
 
     mainVis_.showIndex(1);
     remoteVisR_.crosshair().setMinMax(1024, 4096-1024, 1024, 4096-1024);
@@ -370,6 +368,7 @@ void RRemote::finishCalibration(bool thisremote) {
     setBottomTitle(VERSION_STRING);
     showMain();
     RInput::input.setTopRightLongPressCallback([=]{RRemote::remote.showMenu(&mainMenu_);});
+    RInput::input.setConfirmShortPressCallback([=]{RRemote::remote.showMenu(&mainMenu_);});
     remoteVisL_.crosshair().showMinMaxRect(false);
 #endif
 
@@ -405,16 +404,14 @@ void RRemote::finishCalibration(bool thisremote) {
 }
 
 bb::Result RRemote::fillAndSend() {
-  Packet packet;
-
-  memset((uint8_t*)&packet, 0, sizeof(packet));
-  packet.type = PACKET_TYPE_CONTROL;
-
 #if defined(LEFT_REMOTE)
-  packet.source = PACKET_SOURCE_LEFT_REMOTE;
+  Packet packet(PACKET_TYPE_CONTROL, PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
 #else
-  packet.source = PACKET_SOURCE_RIGHT_REMOTE;
+  Packet packet(PACKET_TYPE_CONTROL, PACKET_SOURCE_RIGHT_REMOTE, sequenceNumber());
 #endif
+  if(params_.isPrimary) packet.source = PACKET_SOURCE_PRIMARY_REMOTE;
+
+  Console::console.printfBroadcast("Seqnum: %d My seqnum. %d\n", packet.seqnum, seqnum_);
 
 #if defined(LEFT_REMOTE)
   packet.payload.control.button0 = RInput::input.buttons[RInput::BUTTON_PINKY];
@@ -451,6 +448,14 @@ bb::Result RRemote::fillAndSend() {
     packet.payload.control.setAxis(5, ax, bb::ControlPacket::UNIT_UNITY_CENTERED);
     packet.payload.control.setAxis(6, ay, bb::ControlPacket::UNIT_UNITY_CENTERED);
     packet.payload.control.setAxis(7, az, bb::ControlPacket::UNIT_UNITY_CENTERED);
+  } else {
+    if(imu_.begin() == true) {
+      float dr = imu_.dataRate();
+      Console::console.printfBroadcast("Successfully initialized IMU; data rate: %f\n", dr);
+      Runloop::runloop.setCycleTimeMicros(1e6/dr);
+    } else {
+      Console::console.printfBroadcast("IMU not available\n");
+    }
   }
 
   packet.payload.control.setAxis(8, RInput::input.pot1, bb::ControlPacket::UNIT_UNITY);
@@ -468,15 +473,16 @@ bb::Result RRemote::fillAndSend() {
 
   Result res = RES_OK;
 #if !defined(LEFT_REMOTE) // right remote sends to left remote
-  if(params_.leftID != 0) {
-    res = bb::XBee::xbee.sendTo(params_.leftID, packet, false);
+  if(params_.otherRemoteAddress != 0) {
+    Console::console.printfBroadcast("Sending control to 0x%llx\n", params_.otherRemoteAddress);
+    res = bb::XBee::xbee.sendTo(params_.otherRemoteAddress, packet, false);
     if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
   }
 #endif
 
   // both remotes send to droid
-  if(params_.droidID != 0 && mode_ == MODE_REGULAR) {
-    res = bb::XBee::xbee.sendTo(params_.droidID, packet, false);
+  if(params_.droidAddress != 0 && mode_ == MODE_REGULAR) {
+    res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
     if(res != RES_OK) {
       RDisplay::display.setLED(RDisplay::LED_COMM, 0, 150, 0);
       Console::console.printfBroadcast("%s\n", errorMessage(res)); 
@@ -525,81 +531,87 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
   return Subsystem::handleConsoleCommand(words, stream);
 } 
 
-Result RRemote::incomingPacket(uint16_t source, uint8_t rssi, const Packet& packet) {
+Result RRemote::incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
 #if defined(LEFT_REMOTE)
-  if(source == params_.droidID && params_.droidID != 0) {
-    Console::console.printfBroadcast("Packet from droid!\n");
-    return RES_OK;
-  } else if(source == params_.rightID && params_.rightID != 0) {
-    if(packet.type == PACKET_TYPE_CONTROL) {
-      remoteVisR_.visualizeFromPacket(packet.payload.control);
-      if(packet.payload.control.button5 == true ||
-         packet.payload.control.button6 == true ||
-         packet.payload.control.button7 == true) {
+  //if(srcAddr == params_.otherRemoteAddress && params_.otherRemoteAddress != 0) {
+  if(source == PACKET_SOURCE_RIGHT_REMOTE) {
+      remoteVisR_.visualizeFromPacket(packet);
+      if(packet.button5 == true ||
+         packet.button6 == true ||
+         packet.button7 == true) {
           remoteVisR_.crosshair().showMinMaxRect(false);
       }
-      return RES_OK;
-    } else {
-      Console::console.printfBroadcast("Unknown packet type %d from right remote!\n", packet.type);
-      return RES_SUBSYS_COMM_ERROR;
-    }
-  } else {
-    Console::console.printfBroadcast("Unknown packet source %d!\n", source);
-    return RES_SUBSYS_COMM_ERROR;
+      return RES_OK;    
   }
+  Console::console.printfBroadcast("Unknown address 0x%llx sent Control packet to left remote\n", srcAddr);
+  return RES_SUBSYS_COMM_ERROR;
+#else
+  Console::console.printfBroadcast("Address 0x%llx sent Control packet to right remote - should never happen\n", srcAddr);
+  return RES_SUBSYS_COMM_ERROR;
+#endif
+}
 
-#else // Right remote
+Result RRemote::incomingStatePacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const StatePacket& packet) {
+#if defined(LEFT_REMOTE)
+  return RES_OK; // Ignore for now
+#else
+  Console::console.printfBroadcast("Address 0x%llx sent State packet to right remote - should never happen\n", srcAddr);
+  return RES_SUBSYS_COMM_ERROR;
+#endif
+}
 
-  if(source == params_.leftID || params_.leftID == 0) { // if we're not bound, we accept config packets from anyone
-    if(packet.type == PACKET_TYPE_CONFIG) {
-      switch(packet.payload.config.type) {
-      case bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID:
-        Console::console.printfBroadcast("Setting Left Remote ID to 0x%x.\n", packet.payload.config.parameter);
-        params_.leftID = packet.payload.config.parameter;
-        bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
-        bb::ConfigStorage::storage.store();
-        return RES_OK; 
-
-      case bb::ConfigPacket::CONFIG_SET_DROID_ID:
-        Console::console.printfBroadcast("Setting Droid ID to 0x%x.\n", packet.payload.config.parameter);
-        params_.droidID = packet.payload.config.parameter;
-        bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
-        bb::ConfigStorage::storage.store();
-        return RES_OK; 
-
-      case bb::ConfigPacket::CONFIG_FACTORY_RESET:
-        if(packet.payload.config.parameter == bb::ConfigPacket::MAGIC) { // checks out
-          factoryReset(true);
-          return RES_OK; // HA! This never returns! NEVER! Hahahahahahaaaaa!
-        }
-        Console::console.printfBroadcast("Got factory reset packet but ID 0x%x doesn't check out!\n", packet.payload.config.parameter);
-        return RES_SUBSYS_COMM_ERROR;
-
-      case bb::ConfigPacket::CONFIG_CALIBRATE:
-        if(packet.payload.config.parameter == bb::ConfigPacket::MAGIC) { // checks out
-          startCalibration(true);
-          return RES_OK;
-        }
-        Console::console.printfBroadcast("Got factory reset packet but ID 0x%x doesn't check out!\n", packet.payload.config.parameter);
-        return RES_SUBSYS_COMM_ERROR;
-
-      default:
-        Console::console.printfBroadcast("Unknown config packet type 0x%x.\n", packet.payload.config.type);
+Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ConfigPacket& packet) {
+#if defined(LEFT_REMOTE)
+  Console::console.printfBroadcast("Address 0x%llx sent Config packet to left remote - should never happen\n", srcAddr);
+  return RES_OK; // Ignore for now
+  return RES_SUBSYS_COMM_ERROR;
+#else
+  Console::console.printfBroadcast("Got config packet from 0x%llx, type %d, payload 0x%llx\n", srcAddr, packet.type, packet.parameter);
+  if(source == params_.otherRemoteAddress || params_.otherRemoteAddress == 0) { // if we're not bound, we accept config packets from anyone
+    switch(packet.type) {
+    case bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID:
+      if(packet.parameter != srcAddr) {
+        Console::console.printfBroadcast("Error: Pairing packet source 0x%llx and payload 0x%llx don't match\n", srcAddr, packet.parameter);
         return RES_SUBSYS_COMM_ERROR;
       }
-    } else {
-      Console::console.printfBroadcast("Unknown packet type %d from left remote!\n", packet.type);
+
+      Console::console.printfBroadcast("Setting Left Remote ID to 0x%llx.\n", packet.parameter);
+      params_.otherRemoteAddress = packet.parameter;
+      bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+      bb::ConfigStorage::storage.store();
+      return RES_OK; 
+
+    case bb::ConfigPacket::CONFIG_SET_DROID_ID:
+      Console::console.printfBroadcast("Setting Droid ID to 0x%llx.\n", packet.parameter);
+      params_.droidAddress = packet.parameter;
+      bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+      bb::ConfigStorage::storage.store();
+      return RES_OK; 
+
+    case bb::ConfigPacket::CONFIG_FACTORY_RESET:
+      if(packet.parameter == bb::ConfigPacket::MAGIC) { // checks out
+        factoryReset(true);
+        return RES_OK; // HA! This never returns! NEVER! Hahahahahahaaaaa!
+      }
+      Console::console.printfBroadcast("Got factory reset packet but Magic 0x%llx doesn't check out!\n", packet.parameter);
+      return RES_SUBSYS_COMM_ERROR;
+
+    case bb::ConfigPacket::CONFIG_CALIBRATE:
+      if(packet.parameter == bb::ConfigPacket::MAGIC) { // checks out
+        startCalibration(true);
+        return RES_OK;
+      }
+      Console::console.printfBroadcast("Got factory reset packet but ID 0x%x doesn't check out!\n", packet.parameter);
+      return RES_SUBSYS_COMM_ERROR;
+
+    default:
+      Console::console.printfBroadcast("Unknown config packet type 0x%x.\n", packet.type);
       return RES_SUBSYS_COMM_ERROR;
     }
-  } else {
-    Console::console.printfBroadcast("Unknown packet source %d!\n", source);
-    return RES_SUBSYS_COMM_ERROR;
   }
-
-#endif
-
   Console::console.printfBroadcast("Should never get here.\n");
   return RES_SUBSYS_COMM_ERROR;
+#endif
 }
 
 void RRemote::printStatus(ConsoleStream *stream) {

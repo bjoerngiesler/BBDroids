@@ -64,6 +64,7 @@ void RMenuWidget::takeInputFocus() {
   RInput::input.setTopLeftShortPressCallback([this]{this->up();});
   RInput::input.setTopRightShortPressCallback([this]{this->down();});
   RInput::input.setTopRightLongPressCallback([this]{this->select();});
+  RInput::input.setConfirmShortPressCallback([this]{this->select();});
   resetCursor();
 }
 

@@ -27,21 +27,15 @@ public:
     MODE_CALIBRATION   = 2
   };
 
-  uint16_t stationID() {
-#if defined(LEFT_REMOTE)
-    return params_.leftID;
-#else
-    return params_.rightID;
-#endif
-  }
-
   Result initialize();
   Result start(ConsoleStream *stream = NULL);
   Result stop(ConsoleStream *stream = NULL);
   Result step();
   Result stepCalib();
   Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
-  Result incomingPacket(uint16_t source, uint8_t rssi, const Packet& packet);
+  Result incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet);
+  Result incomingStatePacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const StatePacket& packet);
+  Result incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ConfigPacket& packet);
   Result fillAndSend();
   
   void updateStatusLED();
@@ -60,8 +54,8 @@ public:
   void setTopTitle(const String& title);
   void setBottomTitle(const String& title);
 
-  void selectDroid(uint16_t stationId);
-  void selectRightRemote(uint16_t stationId);
+  void selectDroid(uint64_t address);
+  void selectRightRemote(uint64_t address);
 
   void factoryReset(bool thisremote);
   void startCalibration(bool thisremote);
@@ -104,10 +98,10 @@ protected:
   int16_t calibRounds;
 
   struct RemoteParams {
-    uint16_t leftID;
-    uint16_t rightID;
-    uint16_t droidID;
+    uint64_t otherRemoteAddress;
+    uint64_t droidAddress;
     RInput::AxisCalib hCalib, vCalib;
+    bool isPrimary;
   };
 
   static RemoteParams params_;

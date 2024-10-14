@@ -50,16 +50,21 @@ void bTopRISR(void) {
 #endif // ARDUINO_ARCH_ESP32
 
 bool RInput::initMCP() {
-  if(mcp_.begin_I2C(MCP_ADDR) == 0) {
-    Console::console.printfBroadcast("Couldn't initialize MCP!\n");
-    return false;
-  } else {
-    Console::console.printfBroadcast("Successfully initialized MCP!\n");
-    for (uint8_t i = 0; i < 8; i++) {
-      mcp_.pinMode(i, INPUT_PULLUP);
+  Console::console.printfBroadcast("Initializing MCP\n");
+
+  Console::console.printfBroadcast("Trying address 1\n");
+  if(mcp_.begin_I2C(MCP_ADDR1) == 0) {
+    Console::console.printfBroadcast("Trying address 2\n");
+    if(mcp_.begin_I2C(MCP_ADDR2) == 0) { // HAAAAAACK!!! to fix my stupid right remote with a bad solder joint
+      Console::console.printfBroadcast("Couldn't initialize MCP!\n");
+      return false;
     }
-    return true;
   }
+  Console::console.printfBroadcast("Successfully initialized MCP!\n");
+  for (uint8_t i = 0; i < 8; i++) {
+    mcp_.pinMode(i, INPUT_PULLUP);
+  }
+  return true;
 }
 
 RInput::RInput() {
@@ -73,12 +78,6 @@ RInput::RInput() {
 }
 
 bool RInput::begin() {
-#if defined(ARDUINO_ARCH_ESP32)
-  mcpOK_ = initMCP();
-#endif
-
-  update();
-
   return true;
 }
 
@@ -149,7 +148,6 @@ void RInput::update() {
     btnTopRChanged = false;
   }
   if(btnConfirmChanged) {
-    Console::console.printfBroadcast("Confirm changed\n");
     if(buttons[BUTTON_CONFIRM]) btnConfirmPressed();
     else btnConfirmReleased();
     btnConfirmChanged = false;
@@ -200,10 +198,8 @@ void RInput::btnConfirmPressed() {
 void RInput::btnConfirmReleased() {
   if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
     if(cShortPressCB_ != nullptr) {
-      Console::console.printfBroadcast("Calling confirm short press cb\n");
       cShortPressCB_();
     } else {
-      Console::console.printfBroadcast("No confirm short press cb\n");
     }
   } else if(cLongPressCB_ != nullptr){
     cLongPressCB_();
