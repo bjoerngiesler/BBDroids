@@ -38,6 +38,7 @@ public:
 	virtual Result step() = 0;
 	virtual bool isStarted() { return started_; }
 	virtual Result operationStatus() { return operationStatus_; }
+	virtual unsigned long sequenceNumber(bool autoincrement = true) { unsigned long s = seqnum_; if(autoincrement) seqnum_++; return s; }
 
 	virtual Result registerWithManager() { return SubsystemManager::manager.registerSubsystem(this); }
 
@@ -170,7 +171,9 @@ protected:
 	bool started_;
 	Result operationStatus_;
 	const char *name_, *description_, *help_;
-	Subsystem(): started_(false), operationStatus_(RES_SUBSYS_NOT_INITIALIZED), name_(""), description_(""), help_("") {}
+	unsigned long seqnum_;
+
+	Subsystem(): started_(false), operationStatus_(RES_SUBSYS_NOT_INITIALIZED), name_(""), description_(""), help_(""), seqnum_(0) {}
 	virtual ~Subsystem() { }
 };
 
