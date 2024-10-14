@@ -46,7 +46,8 @@ void setup() {
   RDisplay::display.initialize();
 
 #if defined(LEFT_REMOTE)
-  uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_L, BUILDER_ID, REMOTE_ID);
+  //uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_L, BUILDER_ID, REMOTE_ID);
+  uint16_t station = 0xffff;
 #else 
   uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
 #endif
