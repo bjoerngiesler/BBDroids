@@ -57,10 +57,11 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		// ...find out how long we took...
 		unsigned long micros_end_loop = micros();
 		unsigned long looptime;
-		if(micros_end_loop >= micros_start_loop)
+		if(micros_end_loop >= micros_start_loop) {
 			looptime = micros_end_loop - micros_start_loop;
-		else
+		} else {
 			looptime = ULONG_MAX - micros_start_loop + micros_end_loop;
+		}
 		if(runningStatus_) Console::console.printfBroadcast("Total: %dus", looptime);
 
 		// ...and bicker if we overran the allotted time.
@@ -103,11 +104,11 @@ bb::Result bb::Runloop::handleConsoleCommand(const std::vector<String>& words, C
 	return bb::Subsystem::handleConsoleCommand(words, stream);;
 }
 
-void bb::Runloop::setCycleTimeMicros(unsigned int t) {
+void bb::Runloop::setCycleTimeMicros(unsigned long t) {
  	cycleTime_ = t;
 }
 
-unsigned int bb::Runloop::cycleTimeMicros() {
+unsigned long bb::Runloop::cycleTimeMicros() {
 	return cycleTime_;
 }
 

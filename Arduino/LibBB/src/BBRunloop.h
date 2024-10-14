@@ -20,10 +20,10 @@ public:
 
 	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
-	uint64_t getSequenceNumber() { return seqnum_; }
+	unsigned long getSequenceNumber() { return seqnum_; }
 
-	void setCycleTimeMicros(unsigned int microseconds); // not milli, micro.
-	unsigned int cycleTimeMicros();
+	void setCycleTimeMicros(unsigned long microseconds); // not milli, micro.
+	unsigned long cycleTimeMicros();
 	float cycleTimeSeconds() { return ((float)cycleTimeMicros())/1e6; }
 
 	// Make clear that the current cycle will likely overrun the time budget, and suppress message.
@@ -53,9 +53,9 @@ protected:
 
 	Runloop();
 	bool running_;
-	uint64_t seqnum_;
-	uint64_t cycleTime_;
-	uint64_t startTime_;
+	unsigned long seqnum_;
+	unsigned long cycleTime_;
+	unsigned long startTime_;
 	bool runningStatus_;
 	bool excuseOverrun_;
 };
