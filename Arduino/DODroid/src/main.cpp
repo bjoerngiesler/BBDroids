@@ -56,10 +56,12 @@ void startSubsystems() {
   Console::console.start();
   WifiServer::server.start();
   XBee::xbee.addPacketReceiver(&DODroid::droid);
-  XBee::xbee.start();
+  XBee::xbee.start(Console::console.serialStream());
   XBee::xbee.setAPIMode(true);
-  Servos::servos.start();
-  DODroid::droid.start();
+  Console::console.printfBroadcast("Starting servos\n");
+  Servos::servos.start(Console::console.serialStream());
+  Console::console.printfBroadcast("Starting droid\n");
+  DODroid::droid.start(Console::console.serialStream());
   // sometimes this doesn't work on the first try for whatever reason
   if(WifiServer::server.isStarted() == false) WifiServer::server.start(); 
 }
