@@ -55,28 +55,27 @@ Result RCrosshairWidget::draw(ConsoleStream* stream) {
         horVerToScreen(hor_, ver_, x, y);
         RDisplay::display.hline(x_+1, y, width_-2, cursorCol_);
         RDisplay::display.vline(x, y_+1, height_-2, cursorCol_);
+
+        oldHor_ = hor_; oldVer_ = ver_;
+        oldMinHor_ = minHor_; oldMaxHor_ = maxHor_;
+        oldMinVer_ = minVer_; oldMaxVer_ = maxVer_;
     }
 
     return RWidget::draw(stream);
 }
 
 void RCrosshairWidget::setHorVer(uint16_t h, uint16_t v) {
-    oldHor_ = hor_; oldVer_ = ver_;
     hor_ = h; ver_ = v;
     if(hor_ < minHor_) {
-        oldMinHor_ = minHor_;
         minHor_ = hor_;
     }
     if(hor_ > maxHor_) {
-        oldMaxHor_ = maxHor_;
         maxHor_ = hor_;
     }
     if(ver_ < minVer_) {
-        oldMinVer_ = minVer_;
         minVer_ = ver_;
     }
     if(ver_ > maxVer_) {
-        oldMaxVer_ = maxVer_;
         maxVer_ = ver_;
     }
     setNeedsContentsRedraw();

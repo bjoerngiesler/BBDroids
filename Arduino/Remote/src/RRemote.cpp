@@ -617,8 +617,9 @@ Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint
 void RRemote::printStatus(ConsoleStream *stream) {
   char buf[255];
 
-  float roll, pitch, heading;
+  float roll, pitch, heading, ax, ay, az;
   imu_.getFilteredRPH(roll, pitch, heading);
+  imu_.getAccelMeasurement(ax, ay, az);
 
 #if defined(ARDUINO_ARCH_ESP32)
   float temp = roll;
@@ -626,21 +627,21 @@ void RRemote::printStatus(ConsoleStream *stream) {
   pitch = temp;
 #endif
 
-  sprintf(buf, "Buttons: P%cI%cJ%cL%cR%cC%cTL%cTR%c Axes: JH%5.2f %d JV%5.2f %d R%7.2fd P%7.2fd Y%7.2f Batt%7.2f P1%7.2f P2%7.2f    \n",
-    RInput::input.buttons[RInput::BUTTON_PINKY] ? 'X' : '_',
-    RInput::input.buttons[RInput::BUTTON_INDEX] ? 'X' : '_',
-    RInput::input.buttons[RInput::BUTTON_JOY] ? 'X' : '_',
-    RInput::input.buttons[RInput::BUTTON_LEFT] ? 'X' : '_',
-    RInput::input.buttons[RInput::BUTTON_RIGHT] ? 'X' : '_',
-    RInput::input.buttons[RInput::BUTTON_CONFIRM] ? 'X' : '_',
-    RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? 'X' : '_',
-    RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? 'X' : '_',
-    RInput::input.joyH, RInput::input.joyRawH,
-    RInput::input.joyV, RInput::input.joyRawV,
+  sprintf(buf, "S%d H%d V%d R%d P%d Y%d AX%d AY%d AZ%d P1%d P2%d Batt%d B%c%c%c%c%c%c%c%c\n",
+    seqnum_,
+    RInput::input.joyRawH, RInput::input.joyRawV,
     roll, pitch, heading,
+    ax, ay, az,
+    RInput::input.pot1, RInput::input.pot2,
     RInput::input.battery,
-    RInput::input.pot1, 
-    RInput::input.pot2);
+    RInput::input.buttons[RInput::BUTTON_PINKY] ? '0' : '1',
+    RInput::input.buttons[RInput::BUTTON_INDEX] ? '0' : '1',
+    RInput::input.buttons[RInput::BUTTON_JOY] ? '0' : '1',
+    RInput::input.buttons[RInput::BUTTON_LEFT] ? '0' : '1',
+    RInput::input.buttons[RInput::BUTTON_RIGHT] ? '0' : '1',
+    RInput::input.buttons[RInput::BUTTON_CONFIRM] ? '0' : '1',
+    RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? '0' : '1',
+    RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? '0' : '1');
 
   if(stream != NULL) stream->printf(buf);
   else Console::console.printfBroadcast(buf);
