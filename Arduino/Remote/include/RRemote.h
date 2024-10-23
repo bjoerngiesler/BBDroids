@@ -61,6 +61,8 @@ public:
   void startCalibration(bool thisremote);
   void finishCalibration(bool thisremote);
 
+  void runTestsuite();
+
 protected:
   RRemote();
 
@@ -71,6 +73,7 @@ protected:
   Packet lastPacketSent_;
 
   RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_, leftRemoteMenu_, rightRemoteMenu_, droidMenu_;
+  RMenuWidget lRIncrRotMenu_;
   RMessageWidget waitMessage_, restartMessage_;
   RLabelWidget topLabel_, bottomLabel_;
   RRotaWidget mainVis_;
@@ -80,7 +83,6 @@ protected:
 
   bool needsDraw_;
   std::vector<XBee::Node> discoveredNodes_;
-  bb::IMU imu_;
 
   RWidget titleWidget;
 

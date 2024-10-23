@@ -6,7 +6,6 @@ RRemote::RemoteParams RRemote::params_;
 bb::ConfigStorage::HANDLE RRemote::paramsHandle_;
 
 RRemote::RRemote(): 
-  imu_(IMU_ADDR),
   mode_(MODE_REGULAR) {
   name_ = "remote";
   description_ = "Main subsystem for the BB8 remote";
@@ -14,6 +13,7 @@ RRemote::RRemote():
 "Available commands:\r\n"\
 "\tstatus                 Prints current status (buttons, axes, etc.)\r\n"\
 "\trunning_status on|off  Continuously prints status\r\n"\
+"\ttestsuite              Run test suite\r\n"\
 "\treset                  Factory reset";
 
   started_ = false;
@@ -171,10 +171,20 @@ void RRemote::populateMenus() {
   droidMenu_.clear();
   droidMenu_.addEntry("Back", [=]() {showMenu(&mainMenu_);});
 
+  lRIncrRotMenu_.clear();
+  lRIncrRotMenu_.setName("Set Incr Rot");
+  lRIncrRotMenu_.addEntry("Off", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_NONE);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Pinky Btn", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_PINKY);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Index Btn", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_INDEX);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Back", [=]{showMenu(&leftRemoteMenu_);});
+
   leftRemoteMenu_.clear();
   leftRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibration(true);});
+  leftRemoteMenu_.addEntry("Set Incr Rot", [=]{showMenu(&lRIncrRotMenu_);});
   leftRemoteMenu_.addEntry("Factory Reset", [=]{factoryReset(true);});
   leftRemoteMenu_.addEntry("Back", [=]() {showMenu(&mainMenu_);});
+
+
 
   rightRemoteMenu_.clear();
   rightRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibration(false);});
@@ -259,9 +269,9 @@ Result RRemote::stop(ConsoleStream *stream) {
 void RRemote::updateStatusLED() {
   if(mode_ == MODE_CALIBRATION) {
     RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 0, 150);
-  } else if(Console::console.isStarted() && XBee::xbee.isStarted() && isStarted() && RInput::input.isOK() && imu_.available()) {
+  } else if(Console::console.isStarted() && XBee::xbee.isStarted() && isStarted() && RInput::input.isOK()) {
     RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 150, 0);
-  } else if(!XBee::xbee.isStarted() || !RInput::input.isOK() || !imu_.available()) {
+  } else if(!XBee::xbee.isStarted() || !RInput::input.isOK()) {
     RDisplay::display.setLED(RDisplay::LED_STATUS, 150, 0, 0);
   } else {
     RDisplay::display.setLED(RDisplay::LED_STATUS, 150, 150, 0);
@@ -271,7 +281,6 @@ void RRemote::updateStatusLED() {
 Result RRemote::step() {
   if(!started_) return RES_SUBSYS_NOT_STARTED;
 
-  imu_.update();
   RInput::input.update();
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
@@ -411,63 +420,7 @@ bb::Result RRemote::fillAndSend() {
 #endif
   if(params_.isPrimary) packet.source = PACKET_SOURCE_PRIMARY_REMOTE;
 
-  Console::console.printfBroadcast("Seqnum: %d My seqnum. %d\n", packet.seqnum, seqnum_);
-
-#if defined(LEFT_REMOTE)
-  packet.payload.control.button0 = RInput::input.buttons[RInput::BUTTON_PINKY];
-  packet.payload.control.button1 = RInput::input.buttons[RInput::BUTTON_INDEX];
-  packet.payload.control.button2 = RInput::input.buttons[RInput::BUTTON_RIGHT];
-  packet.payload.control.button3 = RInput::input.buttons[RInput::BUTTON_LEFT];
-  packet.payload.control.button4 = RInput::input.buttons[RInput::BUTTON_JOY];
-  packet.payload.control.button5 = false;
-  packet.payload.control.button6 = false;
-  packet.payload.control.button7 = false;
-#else
-  packet.payload.control.button0 = RInput::input.buttons[RInput::BUTTON_PINKY];
-  packet.payload.control.button1 = RInput::input.buttons[RInput::BUTTON_INDEX];
-  packet.payload.control.button2 = RInput::input.buttons[RInput::BUTTON_LEFT];
-  packet.payload.control.button3 = RInput::input.buttons[RInput::BUTTON_RIGHT];
-  packet.payload.control.button4 = RInput::input.buttons[RInput::BUTTON_JOY];
-  packet.payload.control.button5 = RInput::input.buttons[RInput::BUTTON_TOP_LEFT];
-  packet.payload.control.button6 = RInput::input.buttons[RInput::BUTTON_TOP_RIGHT];
-  packet.payload.control.button7 = RInput::input.buttons[RInput::BUTTON_CONFIRM];
-#endif
-
-  packet.payload.control.setAxis(0, RInput::input.joyH, bb::ControlPacket::UNIT_UNITY_CENTERED);
-  packet.payload.control.setAxis(1, RInput::input.joyV, bb::ControlPacket::UNIT_UNITY_CENTERED);
-
-  if (imu_.available()) {
-    float roll, pitch, heading;
-    float ax, ay, az;
-    imu_.getFilteredRPH(roll, pitch, heading);
-    imu_.getAccelMeasurement(ax, ay, az);
-
-    packet.payload.control.setAxis(2, roll, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
-    packet.payload.control.setAxis(3, pitch, bb::ControlPacket::UNIT_DEGREES_CENTERED);
-    packet.payload.control.setAxis(4, heading, bb::ControlPacket::UNIT_DEGREES);
-    packet.payload.control.setAxis(5, ax, bb::ControlPacket::UNIT_UNITY_CENTERED);
-    packet.payload.control.setAxis(6, ay, bb::ControlPacket::UNIT_UNITY_CENTERED);
-    packet.payload.control.setAxis(7, az, bb::ControlPacket::UNIT_UNITY_CENTERED);
-  } else {
-    if(imu_.begin() == true) {
-      float dr = imu_.dataRate();
-      Console::console.printfBroadcast("Successfully initialized IMU; data rate: %f\n", dr);
-      Runloop::runloop.setCycleTimeMicros(1e6/dr);
-    } else {
-      Console::console.printfBroadcast("IMU not available\n");
-    }
-  }
-
-  packet.payload.control.setAxis(8, RInput::input.pot1, bb::ControlPacket::UNIT_UNITY);
-
-#if defined(LEFT_REMOTE)
-  packet.payload.control.setAxis(9, 0);
-#else
-  // FIXME replace by values set in menu system
-  packet.payload.control.setAxis(9, RInput::input.pot2, bb::ControlPacket::UNIT_UNITY);
-#endif
-
-  packet.payload.control.battery = RInput::input.battery * 63;
+  RInput::input.fillControlPacket(packet.payload.control);
 
   remoteVisL_.visualizeFromPacket(packet.payload.control);
 
@@ -525,6 +478,11 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
 
   else if(words[0] == "reset") {
     factoryReset(true);
+    return RES_OK;
+  }
+
+  else if(words[0] == "testsuite") {
+    runTestsuite();
     return RES_OK;
   }
 
@@ -618,8 +576,8 @@ void RRemote::printStatus(ConsoleStream *stream) {
   char buf[255];
 
   float roll, pitch, heading, ax, ay, az;
-  imu_.getFilteredRPH(roll, pitch, heading);
-  imu_.getAccelMeasurement(ax, ay, az);
+  RInput::input.imu().getFilteredRPH(roll, pitch, heading);
+  RInput::input.imu().getAccelMeasurement(ax, ay, az);
 
 #if defined(ARDUINO_ARCH_ESP32)
   float temp = roll;
@@ -647,3 +605,6 @@ void RRemote::printStatus(ConsoleStream *stream) {
   else Console::console.printfBroadcast(buf);
 }
 
+void RRemote::runTestsuite() {
+  RInput::input.testMatrix();
+}

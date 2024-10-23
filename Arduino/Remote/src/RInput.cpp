@@ -67,7 +67,7 @@ bool RInput::initMCP() {
   return true;
 }
 
-RInput::RInput() {
+RInput::RInput(): imu_(IMU_ADDR) {
   for(bool& b: buttons) b = false;
   tlms_ = trms_ = cms_ = 0;
   longPressThresh_ = 500;
@@ -75,10 +75,99 @@ RInput::RInput() {
   maxJoyRawH = 2048;
   minJoyRawV = 2048;
   maxJoyRawV = 2048;
+  incrementalAccel_ = BUTTON_NONE;
+  incrementalRot_ = BUTTON_NONE;
+  incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
 }
 
 bool RInput::begin() {
   return true;
+}
+
+void RInput::setIncrementalAccel(ButtonIndex btn) {
+  incrementalAccel_ = btn;
+}
+  
+void RInput::setIncrementalRot(ButtonIndex btn) {
+  incrementalRot_ = btn;
+}
+
+static BLA::Matrix<3,3> eulerToRot(const float& r, const float &p, const float& h) {
+  BLA::Matrix<3,3> Ax, Ay, Az;
+
+  Ax.Fill(0);
+  Ax(0, 0) = 1; Ax(0, 1) = 0;                 Ax(0, 2) = 0;
+  Ax(1, 0) = 0; Ax(1, 1) = cos(DEG_TO_RAD*r); Ax(1, 2) = -sin(DEG_TO_RAD*r);
+  Ax(2, 0) = 0; Ax(2, 1) = sin(DEG_TO_RAD*r); Ax(2, 2) = cos(DEG_TO_RAD*r);
+
+  Ay.Fill(0);
+  Ay(0, 0) = cos(DEG_TO_RAD*p);  Ay(0, 1) = 0; Ay(0, 2) = sin(DEG_TO_RAD*p);
+  Ay(1, 0) = 0;                  Ay(1, 1) = 1; Ay(1, 2) = 0;
+  Ay(2, 0) = -sin(DEG_TO_RAD*p); Ay(2, 1) = 0; Ay(2, 2) = cos(DEG_TO_RAD*p);
+
+  Az.Fill(0);
+  Az(0, 0) = cos(DEG_TO_RAD*h); Az(0, 1) = -sin(DEG_TO_RAD*h); Az(0, 2) = 0;
+  Az(1, 0) = sin(DEG_TO_RAD*h); Az(1, 1) = cos(DEG_TO_RAD*h);  Az(1, 2) = 0;
+  Az(2, 0) = 0;                 Az(2, 1) = 0;                  Az(2, 2) = 1;
+
+  return Az*Ay*Ax;
+}
+
+static void rotToEuler(const BLA::Matrix<3, 3>& A, float& r, float& p, float& h) {
+  if(!EPSILON(fabs(A(2, 0))-1.0)) {
+    float p1 = -asin(A(2, 0));
+    float p2 = M_PI - p1;
+    float r1 = atan2(A(2,1)/cos(p1), A(2,2)/cos(p1));
+    float r2 = atan2(A(2,1)/cos(p2), A(2,2)/cos(p2));
+    float h1 = atan2(A(1,0)/cos(p1), A(0,0)/cos(p1));
+    float h2 = atan2(A(1,0)/cos(p2), A(0,0)/cos(p2));
+
+    Console::console.printfBroadcast("r1:%f p1:%f h1:%f r2:%f p2:%f h2:%f\n", r1, p1, h1, r2, p2, h2);
+
+    r = RAD_TO_DEG*r1; p = RAD_TO_DEG*p1; h = RAD_TO_DEG*h1;
+  } else {
+    h = 0;
+    if(EPSILON(fabs(A(2,0))+1)) {
+      p = 90;
+      r = RAD_TO_DEG*atan2(A(0,1), A(0,2));
+    } else {
+      p = -90;
+      r = RAD_TO_DEG*atan2(-A(0,1), -A(0,2));
+    }
+  }
+}
+
+void RInput::transformRotation(const float& rIn, const float &pIn, const float& hIn,
+                               const float& rXf, const float &pXf, const float& hXf,
+                               float& rOut, float& pOut, float& hOut, bool inverse) {
+  BLA::Matrix<3,3> A, B, C;
+
+  A = eulerToRot(rIn, pIn, hIn);
+  B = eulerToRot(rXf, pXf, hXf);
+  if(inverse) B = BLA::Inverse(B);
+  C = B*A;
+  rotToEuler(C, rOut, pOut, hOut);
+}
+
+void RInput::testMatrix() {
+  float r, p, h, rXf, pXf, hXf, r1, p1, h1;
+
+  Console::console.printfBroadcast("Testing eulerToRot() and rotToEuler\n");
+  r = 45; p = -45; h = 10;
+  Console::console.printfBroadcast("In: r: %f p: %f h: %f\n", r, p, h);
+  BLA::Matrix<3,3> R1 = eulerToRot(r, p, h);
+  R1.printTo(Serial);
+  Serial.println();
+  r1 = 0; p1 = 0; h1 = 0;
+  rotToEuler(R1, r1, p1, h1);
+  Console::console.printfBroadcast("Out: r: %f p: %f h: %f\n", r1, p1, h1);
+
+  Console::console.printfBroadcast("Rotating by 90° around z axis\n");
+  r = 0; p = 0; h = 0;
+  rXf = 0; pXf = 0; hXf = 90;
+  r1 = 0; p1 = 0; h1 = 0;
+  transformRotation(r, p, h, rXf, pXf, hXf, r1, p1, h1, false);
+  Console::console.printfBroadcast("Out: r: %f p: %f h: %f\n", r1, p1, h1);
 }
 
 void RInput::update() {
@@ -114,22 +203,29 @@ void RInput::update() {
   pot2 = 0;
 #endif
 
+  if(imu_.available()) {
+    imu_.update();
+  } else {
+    if(imu_.begin() == true) {
+      float dr = imu_.dataRate();
+      Console::console.printfBroadcast("Successfully initialized IMU; data rate: %f\n", dr);
+      Runloop::runloop.setCycleTimeMicros(1e6/dr);
+    } else {
+      Console::console.printfBroadcast("IMU not available\n");
+    }
+  }
+
+
 #if defined(ARDUINO_ARCH_ESP32) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
   if(mcpOK_) {
     for(uint8_t i = 0; i < buttons.size(); i++) {
       if (mcp_.digitalRead(i) == LOW) {
-        if(buttons[i] == false) {
-          if(i==BUTTON_TOP_LEFT) btnTopLChanged = true;
-          else if(i==BUTTON_TOP_RIGHT) btnTopRChanged = true;
-          else if(i==BUTTON_CONFIRM) btnConfirmChanged = true;
-        }
+        if(buttons[i] == false) buttonsChanged[i] = true;
+        else buttonsChanged[i] = false;
         buttons[i] = true;
       } else {
-        if(buttons[i] == true) {
-          if(i==BUTTON_TOP_LEFT) btnTopLChanged = true;
-          else if(i==BUTTON_TOP_RIGHT) btnTopRChanged = true;
-          else if(i==BUTTON_CONFIRM) btnConfirmChanged = true;
-        }
+        if(buttons[i] == true) buttonsChanged[i] = true;
+        else buttonsChanged[i] = false;
         buttons[i] = false;
       }
     }
@@ -137,20 +233,37 @@ void RInput::update() {
     mcpOK_ = initMCP();
   }
 #endif // ARDUINO_ARCH_ESP32
-  if(btnTopLChanged) {
+  if(buttonsChanged[BUTTON_TOP_LEFT]) {
     if(buttons[BUTTON_TOP_LEFT]) btnTopLeftPressed();
     else btnTopLeftReleased();
-    btnTopLChanged = false;
   }
-  if(btnTopRChanged) {
+  if(buttonsChanged[BUTTON_TOP_RIGHT]) {
     if(buttons[BUTTON_TOP_RIGHT]) btnTopRightPressed();
     else btnTopRightReleased();
-    btnTopRChanged = false;
   }
-  if(btnConfirmChanged) {
+  if(buttonsChanged[BUTTON_CONFIRM]) {
     if(buttons[BUTTON_CONFIRM]) btnConfirmPressed();
     else btnConfirmReleased();
-    btnConfirmChanged = false;
+  }
+
+  if(incrementalAccel_ < buttons.size()) {
+    if(buttonsChanged[incrementalAccel_]) {
+
+    }
+  }
+  
+  if(incrementalRot_ < buttons.size()) {
+    if(buttonsChanged[incrementalRot_]) {
+      incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
+      if(buttons[incrementalRot_]) {
+        if(imu_.available()) {
+          imu_.getFilteredRPH(incRotR_, incRotP_, incRotH_);
+        } else {
+          Console::console.printfBroadcast("IMU not available!\n");
+        }
+      }
+      Console::console.printfBroadcast("Inc Rot R:%f P:%f H:%f\n", incRotR_, incRotP_, incRotH_);
+    }
   }
 }
 
@@ -173,10 +286,75 @@ void RInput::btnTopLeftReleased() {
 }
 
 bool RInput::isOK() {
-  if(mcpOK_) return true;
+  if(mcpOK_ && imu_.available()) return true;
   return false;
 }
 
+Result RInput::fillControlPacket(ControlPacket& packet) {
+#if defined(LEFT_REMOTE)
+  packet.button0 = buttons[BUTTON_PINKY];
+  packet.button1 = buttons[BUTTON_INDEX];
+  packet.button2 = buttons[BUTTON_RIGHT];
+  packet.button3 = buttons[BUTTON_LEFT];
+  packet.button4 = buttons[BUTTON_JOY];
+  packet.button5 = false;
+  packet.button6 = false;
+  packet.button7 = false;
+#else
+  packet.button0 = RInput::input.buttons[BUTTON_PINKY];
+  packet.button1 = RInput::input.buttons[BUTTON_INDEX];
+  packet.button2 = RInput::input.buttons[BUTTON_LEFT];
+  packet.button3 = RInput::input.buttons[BUTTON_RIGHT];
+  packet.button4 = RInput::input.buttons[BUTTON_JOY];
+  packet.button5 = RInput::input.buttons[BUTTON_TOP_LEFT];
+  packet.button6 = RInput::input.buttons[BUTTON_TOP_RIGHT];
+  packet.button7 = RInput::input.buttons[BUTTON_CONFIRM];
+#endif
+
+  packet.setAxis(0, joyH, bb::ControlPacket::UNIT_UNITY_CENTERED);
+  packet.setAxis(1, joyV, bb::ControlPacket::UNIT_UNITY_CENTERED);
+
+  if (imu_.available()) {
+    float roll, pitch, heading;
+    float ax, ay, az;
+    imu_.getFilteredRPH(roll, pitch, heading);
+    imu_.getAccelMeasurement(ax, ay, az);
+
+    if(incrementalRot_ < buttons.size()) {
+      if(buttons[incrementalRot_]) {
+        float rollOut, pitchOut, headingOut;
+        transformRotation(roll, pitch, heading, incRotR_, incRotP_, incRotH_, rollOut, pitchOut, headingOut, true);
+        packet.setAxis(2, rollOut, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
+        packet.setAxis(3, pitchOut, bb::ControlPacket::UNIT_DEGREES_CENTERED);
+        packet.setAxis(4, headingOut, bb::ControlPacket::UNIT_DEGREES_CENTERED);
+      } else {
+        packet.setAxis(2, 0, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
+        packet.setAxis(3, 0, bb::ControlPacket::UNIT_DEGREES_CENTERED);
+        packet.setAxis(4, 0, bb::ControlPacket::UNIT_DEGREES);
+      }
+    } else {
+      packet.setAxis(2, roll, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
+      packet.setAxis(3, pitch, bb::ControlPacket::UNIT_DEGREES_CENTERED);
+      packet.setAxis(4, heading, bb::ControlPacket::UNIT_DEGREES);
+    }
+    packet.setAxis(5, ax, bb::ControlPacket::UNIT_UNITY_CENTERED);
+    packet.setAxis(6, ay, bb::ControlPacket::UNIT_UNITY_CENTERED);
+    packet.setAxis(7, az, bb::ControlPacket::UNIT_UNITY_CENTERED);
+  }
+
+  packet.setAxis(8, RInput::input.pot1, bb::ControlPacket::UNIT_UNITY);
+
+#if defined(LEFT_REMOTE)
+  packet.setAxis(9, 0);
+#else
+  // FIXME replace by values set in menu system
+  packet.setAxis(9, pot2, bb::ControlPacket::UNIT_UNITY);
+#endif
+
+  packet.battery = RInput::input.battery * 63;
+  
+  return RES_OK;
+}
 
 void RInput::btnTopRightPressed() {
   trms_ = millis();
