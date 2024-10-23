@@ -113,13 +113,11 @@ void RRemote::showPairDroidMenu() {
   pairDroidMenu_.clear();
   pairRemoteMenu_.setName(String(discoveredNodes_.size()) + " Droids");
   for(auto& n: discoveredNodes_) {
-    Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_DROID) continue;
-    Console::console.printfBroadcast("Adding entry for \"%s\"\n", n.name);
+    Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
     pairDroidMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.address); });
   }
-  Console::console.printfBroadcast("Adding entry for \"Back\"\n");
-  pairDroidMenu_.addEntry("Back", [=]() { RRemote::remote.showMenu(&pairMenu_); });
+  pairDroidMenu_.addEntry("<--", [=]() { RRemote::remote.showMenu(&pairMenu_); });
 
   Console::console.printfBroadcast("Showing droidsMenu\n");
   showMenu(&pairDroidMenu_);
@@ -144,7 +142,7 @@ void RRemote::showPairRemoteMenu() {
     Console::console.printfBroadcast("Adding remote entry 0x%llx\n", n.address);
     pairRemoteMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.address); });
   }
-  pairRemoteMenu_.addEntry("Back", [=]() { RRemote::remote.showMenu(&pairMenu_); });
+  pairRemoteMenu_.addEntry("<--", [=]() { RRemote::remote.showMenu(&pairMenu_); });
 
   showMenu(&pairRemoteMenu_);
 }
@@ -161,35 +159,35 @@ void RRemote::populateMenus() {
   mainMenu_.addEntry("Left Remote...", [=]() { showMenu(&leftRemoteMenu_); });
   if(params_.otherRemoteAddress != 0) mainMenu_.addEntry("Right Remote...", [=]() { showMenu(&rightRemoteMenu_); });
   mainMenu_.addEntry("Pair...", [=]() { RRemote::remote.showMenu(&pairMenu_); });
-  mainMenu_.addEntry("Back", []() { RRemote::remote.showMain(); });
+  mainMenu_.addEntry("<--", []() { RRemote::remote.showMain(); });
   
   pairMenu_.clear();
   pairMenu_.addEntry("Right Remote...", []() { RRemote::remote.showPairRemoteMenu(); });
   pairMenu_.addEntry("Droid...", []() { RRemote::remote.showPairDroidMenu(); });
-  pairMenu_.addEntry("Back", [=]() { RRemote::remote.showMenu(&mainMenu_); });
+  pairMenu_.addEntry("<--", [=]() { RRemote::remote.showMenu(&mainMenu_); });
 
   droidMenu_.clear();
-  droidMenu_.addEntry("Back", [=]() {showMenu(&mainMenu_);});
+  droidMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
 
   lRIncrRotMenu_.clear();
-  lRIncrRotMenu_.setName("Set Incr Rot");
-  lRIncrRotMenu_.addEntry("Off", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_NONE);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Pinky Btn", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_PINKY);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Index Btn", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_INDEX);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Back", [=]{showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.setName("Incr Rotation");
+  lRIncrRotMenu_.addEntry("Disable", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_NONE);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Pinky Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_PINKY);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Index Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_INDEX);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
 
   leftRemoteMenu_.clear();
+  leftRemoteMenu_.addEntry("Incr Rot...", [=]{showMenu(&lRIncrRotMenu_);});
   leftRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibration(true);});
-  leftRemoteMenu_.addEntry("Set Incr Rot", [=]{showMenu(&lRIncrRotMenu_);});
   leftRemoteMenu_.addEntry("Factory Reset", [=]{factoryReset(true);});
-  leftRemoteMenu_.addEntry("Back", [=]() {showMenu(&mainMenu_);});
+  leftRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
 
 
 
   rightRemoteMenu_.clear();
   rightRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibration(false);});
   rightRemoteMenu_.addEntry("Factory Reset", [=]() {factoryReset(false);});
-  rightRemoteMenu_.addEntry("Back", [=]() {showMenu(&mainMenu_);});
+  rightRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
 }
 
 void RRemote::setTopTitle(const String& title) {
