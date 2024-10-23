@@ -26,12 +26,12 @@ static const float HEAD_ROLL_OFFSET    = 0.0;
 static const float GYRO_PITCH_DEADBAND = 1.0;
 
 static const float POWER_BATT_NONE = 5.0;  // Everything under this means we're connected to USB.
-static const float POWER_BATT_MIN  = 14.0; // Minimum voltage - below this, everything switches off to save the LiPos.
+static const float POWER_BATT_MIN  = 12.5; // Minimum voltage - below this, everything switches off to save the LiPos.
 static const float POWER_BATT_MAX  = 16.0; // Maximum voltage - above this, we're overvolting and will probably breal stuff.
 
 // PID Controller Defaults
 static const float WHEEL_SPEED_KP   = 0.13;
-static const float WHEEL_SPEED_KI   = 1.0;
+static const float WHEEL_SPEED_KI   = 0.6;
 static const float WHEEL_SPEED_KD   = 0;
 static const float WHEEL_SPEED_IMAX = 300;
 
@@ -43,14 +43,14 @@ static const float PWM_BAL_KP = 0;
 static const float PWM_BAL_KI = 0;
 static const float PWM_BAL_KD = 0;
 
-static const float MAX_SPEED  = 500;
-static const float ACCEL      = MAX_SPEED*2;
+static const float MAX_SPEED  = 800;
+static const float ACCEL      = MAX_SPEED*3;
 static const float PWM_ACCEL  = 0; //512;
 
 static const float PITCH_BIAS = 1.35;
 static const float PITCH_DEADBAND = .5;
 static const float SPEED_REMOTE_FACTOR = 1.0;
-static const float ROT_REMOTE_FACTOR = 1.0;
+static const float ROT_REMOTE_FACTOR = 0.5;
 static const float BAL_SPEED_REMOTE_FACTOR = MAX_SPEED;
 static const float BAL_ROT_REMOTE_FACTOR = MAX_SPEED/2.0;
 

@@ -647,7 +647,7 @@ bb::Result bb::XBee::sendTo(uint64_t dest, const bb::Packet& packet, bool ack) {
 
 	buf[0] = 0x10; // transmit request
 	buf[1] = 0x0;  // no response frame
-	Console::console.printfBroadcast("Sending to 0x%llx\n", dest);
+	//Console::console.printfBroadcast("Sending to 0x%llx\n", dest);
 	buf[2] = (dest >> 56) & 0xff;
 	buf[3] = (dest >> 48) & 0xff;
 	buf[4] = (dest >> 40) & 0xff;

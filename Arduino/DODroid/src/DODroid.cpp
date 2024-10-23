@@ -379,19 +379,22 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
     lastBtn4_ = packet.button4;
 
     if(driveOn_ == true) {
+      float vel = packet.getAxis(1);
+      float rot = packet.getAxis(0);
+      if(fabs(vel)<0.1) vel = 0;
+      if(fabs(rot)<0.1) rot = 0;
       if(pwm_ == true) {
         if(numZero > 5) {
           pwmBalanceController_.reset();
         }
-        pwmDriveOutput_.setGoalVelocity(255*packet.getAxis(1));
-        pwmDriveOutput_.setGoalRotation(255*packet.getAxis(0));
+        pwmDriveOutput_.setGoalVelocity(255*vel);
+        pwmDriveOutput_.setGoalRotation(255*rot);
       } else {
         if(numZero > 5) {
           balanceController_.reset();
         }
-        //Console::console.printfBroadcast("Setting goal vel to %f\n", params_.maxSpeed*packet.getAxis(1));
-        driveOutput_.setGoalVelocity(params_.maxSpeed*packet.getAxis(1));
-        driveOutput_.setGoalRotation(params_.maxSpeed*packet.getAxis(0)/2);
+        driveOutput_.setGoalVelocity(params_.maxSpeed*vel);
+        driveOutput_.setGoalRotation(params_.maxSpeed*rot*ROT_REMOTE_FACTOR);
       }
     }
 

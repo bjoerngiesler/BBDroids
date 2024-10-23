@@ -24,11 +24,20 @@ float bb::IMUControlInput::present() {
   float retval=0;
 
   switch(pt_) {
+#if 0
+// FIXMEEEEEEEE
   case IMU_ROLL:
     retval = filter_.filter(r-bias_);
     break;
   case IMU_PITCH:
     retval = filter_.filter(p-bias_);
+    break;
+#endif
+  case IMU_ROLL:
+    retval = filter_.filter(p-bias_);
+    break;
+  case IMU_PITCH:
+    retval = filter_.filter(bias_-r);
     break;
   case IMU_HEADING:
     retval = filter_.filter(h-bias_);
@@ -117,7 +126,7 @@ bool bb::IMU::update(bool block) {
     timeout--;
     delayMicroseconds(1);
     if(timeout < 0 && block==false) {
-      Console::console.printfBroadcast("No gyro or accel data available\n");
+      //Console::console.printfBroadcast("No gyro or accel data available\n");
       return false;
     }
   }
