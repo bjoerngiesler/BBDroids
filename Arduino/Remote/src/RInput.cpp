@@ -92,63 +92,6 @@ void RInput::setIncrementalRot(ButtonIndex btn) {
   incrementalRot_ = btn;
 }
 
-static BLA::Matrix<3,3> eulerToRot(const float& r, const float &p, const float& h) {
-  BLA::Matrix<3,3> Ax, Ay, Az;
-
-  Ax.Fill(0);
-  Ax(0, 0) = 1; Ax(0, 1) = 0;                 Ax(0, 2) = 0;
-  Ax(1, 0) = 0; Ax(1, 1) = cos(DEG_TO_RAD*r); Ax(1, 2) = -sin(DEG_TO_RAD*r);
-  Ax(2, 0) = 0; Ax(2, 1) = sin(DEG_TO_RAD*r); Ax(2, 2) = cos(DEG_TO_RAD*r);
-
-  Ay.Fill(0);
-  Ay(0, 0) = cos(DEG_TO_RAD*p);  Ay(0, 1) = 0; Ay(0, 2) = sin(DEG_TO_RAD*p);
-  Ay(1, 0) = 0;                  Ay(1, 1) = 1; Ay(1, 2) = 0;
-  Ay(2, 0) = -sin(DEG_TO_RAD*p); Ay(2, 1) = 0; Ay(2, 2) = cos(DEG_TO_RAD*p);
-
-  Az.Fill(0);
-  Az(0, 0) = cos(DEG_TO_RAD*h); Az(0, 1) = -sin(DEG_TO_RAD*h); Az(0, 2) = 0;
-  Az(1, 0) = sin(DEG_TO_RAD*h); Az(1, 1) = cos(DEG_TO_RAD*h);  Az(1, 2) = 0;
-  Az(2, 0) = 0;                 Az(2, 1) = 0;                  Az(2, 2) = 1;
-
-  return Az*Ay*Ax;
-}
-
-static void rotToEuler(const BLA::Matrix<3, 3>& A, float& r, float& p, float& h) {
-  if(!EPSILON(fabs(A(2, 0))-1.0)) {
-    float p1 = -asin(A(2, 0));
-    float p2 = M_PI - p1;
-    float r1 = atan2(A(2,1)/cos(p1), A(2,2)/cos(p1));
-    float r2 = atan2(A(2,1)/cos(p2), A(2,2)/cos(p2));
-    float h1 = atan2(A(1,0)/cos(p1), A(0,0)/cos(p1));
-    float h2 = atan2(A(1,0)/cos(p2), A(0,0)/cos(p2));
-
-    Console::console.printfBroadcast("r1:%f p1:%f h1:%f r2:%f p2:%f h2:%f\n", r1, p1, h1, r2, p2, h2);
-
-    r = RAD_TO_DEG*r1; p = RAD_TO_DEG*p1; h = RAD_TO_DEG*h1;
-  } else {
-    h = 0;
-    if(EPSILON(fabs(A(2,0))+1)) {
-      p = 90;
-      r = RAD_TO_DEG*atan2(A(0,1), A(0,2));
-    } else {
-      p = -90;
-      r = RAD_TO_DEG*atan2(-A(0,1), -A(0,2));
-    }
-  }
-}
-
-void RInput::transformRotation(const float& rIn, const float &pIn, const float& hIn,
-                               const float& rXf, const float &pXf, const float& hXf,
-                               float& rOut, float& pOut, float& hOut, bool inverse) {
-  BLA::Matrix<3,3> A, B, C;
-
-  A = eulerToRot(rIn, pIn, hIn);
-  B = eulerToRot(rXf, pXf, hXf);
-  if(inverse) B = BLA::Inverse(B);
-  C = B*A;
-  rotToEuler(C, rOut, pOut, hOut);
-}
-
 void RInput::testMatrix() {
   float r, p, h, rXf, pXf, hXf, r1, p1, h1;
 

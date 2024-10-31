@@ -24,7 +24,6 @@ float bb::IMUControlInput::present() {
   float retval=0;
 
   switch(pt_) {
-#if 0
 // FIXMEEEEEEEE
   case IMU_ROLL:
     retval = filter_.filter(r-bias_);
@@ -32,13 +31,14 @@ float bb::IMUControlInput::present() {
   case IMU_PITCH:
     retval = filter_.filter(p-bias_);
     break;
-#endif
+#if 0
   case IMU_ROLL:
     retval = filter_.filter(p-bias_);
     break;
   case IMU_PITCH:
     retval = filter_.filter(bias_-r);
     break;
+#endif
   case IMU_HEADING:
     retval = filter_.filter(h-bias_);
     break;
@@ -58,6 +58,8 @@ bb::IMU::IMU(uint8_t addr) {
   calR_ = calP_ = calH_ = 0.0f;
   intRunning_ = false;
   addr_ = addr;
+  xfR_ = xfP_ = xfH_ = 0;
+  rot_ = ROTATE_0;
 }
 
 bool bb::IMU::begin() {
@@ -142,14 +144,20 @@ bool bb::IMU::update(bool block) {
 bool bb::IMU::getFilteredRPH(float &r, float &p, float &h) {
   if(!available_) return false;
 
-#if 0 // FIXME
   r = madgwick_.getRoll();
   p = madgwick_.getPitch();
-#else
-  r = madgwick_.getPitch();
-  p = madgwick_.getRoll();
-#endif
   h = madgwick_.getYaw();
+  float temp;
+
+  switch(rot_) {
+    case ROTATE_90: temp = r; r = p; p = -temp; break;
+    case ROTATE_180: r = -r; p = -p; break;
+    case ROTATE_270: temp = r; r = -p; p = temp; break;    
+    case ROTATE_0: 
+    default:
+    break;
+  }
+
   return true;
 }
 
@@ -162,7 +170,17 @@ bool bb::IMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) 
     p += calP_;
     h += calH_;
   }
-  
+  float temp;
+
+  switch(rot_) {
+    case ROTATE_90: temp = r; r = p; p = -temp; break;
+    case ROTATE_180: r = -r; p = -p; break;
+    case ROTATE_270: temp = r; r = -p; p = temp; break;    
+    case ROTATE_0: 
+    default:
+    break;
+  }
+
   return true;
 }
 
@@ -172,7 +190,17 @@ bool bb::IMU::getAccelMeasurement(float &x, float &y, float &z) {
   x = lastX_;
   y = lastY_;
   z = lastZ_;
+  float temp;
   
+  switch(rot_) {
+    case ROTATE_90: temp = x; x = y; y = -temp; break;
+    case ROTATE_180: x = -x; y = -y; break;
+    case ROTATE_270: temp = x; x = -y; y = temp; break;    
+    case ROTATE_0: 
+    default:
+    break;
+  }
+
   return true;
 }
 

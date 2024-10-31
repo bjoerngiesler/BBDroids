@@ -3,7 +3,6 @@
 
 #include <LibBB.h>
 #include <Adafruit_MCP23X17.h>
-#include <BasicLinearAlgebra.h>
 #include "Config.h"
 #include <array>
 
@@ -73,10 +72,6 @@ public:
   void setIncrementalRot(ButtonIndex btn);
 
   bool anyButtonPressed();
-
-  void transformRotation(const float& rIn, const float &pIn, const float& hIn,
-                         const float& rXf, const float &pXf, const float& hXf,
-                         float& rOut, float& pOut, float& hOut, bool inverse);
 
   void testMatrix();
 

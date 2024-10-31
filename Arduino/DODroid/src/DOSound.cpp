@@ -1,5 +1,4 @@
 #include "DOSound.h"
-#include "DOConfig.h"
 #include <LibBB.h>
 
 using namespace bb;
@@ -33,14 +32,14 @@ bool DOSound::begin(Uart *ser) {
   }
 }
 
-bool DOSound::playFolder(int foldernumber, int filenumber, bool block) {
+bool DOSound::playFolder(Folder folder, int filenumber, bool block) {
   if(!available_) return false;
-  bool debug = false;
 
-  dfp_.playFolder(foldernumber, filenumber);
+  dfp_.playFolder(int(folder), filenumber);
   if(block) {
     delay(1000);
 #if 0
+    bool debug = false;
     delay(200);
     int timeout = 500, state = 0;
     if(debug) Serial.print("Wait for start...");
@@ -74,19 +73,18 @@ bool DOSound::playFolder(int foldernumber, int filenumber, bool block) {
   return true;
 }
 
-bool DOSound::playFolderRandom(int foldernumber, bool block) {
+bool DOSound::playFolderRandom(Folder folder, bool block) {
   return false;
   if(!available_) return false;
-  bool debug = false;
 
-  int num = dfp_.readFileCountsInFolder(foldernumber);
+  int num = dfp_.readFileCountsInFolder(int(folder));
   if(num == 0) {
     Console::console.printfBroadcast("Folder %d empty!\n", num);
     return false;
   }
   num = random(1, num);
-  Console::console.printfBroadcast("Playing folder %d file %d", foldernumber, num);
-  return playFolder(foldernumber, num, block);
+  Console::console.printfBroadcast("Playing folder %d file %d", int(folder), num);
+  return playFolder(folder, num, block);
 }
 
 

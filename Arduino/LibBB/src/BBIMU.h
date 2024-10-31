@@ -58,7 +58,16 @@ public:
   IMUState getIMUState();
   void printStats(const String& prefix = "");
 
-  void setRotationMatrix(float r11, float r12, float r13, float r21, float r22, float r23, float r31, float r32, float r33);
+  void setTransformRotation(float r, float p, float h) { xfR_ = r; xfP_ = p; xfH_ = h; }
+
+  enum RotationAroundZ {
+    ROTATE_0,
+    ROTATE_90,
+    ROTATE_180,
+    ROTATE_270
+  };
+  void setRotationAroundZ(RotationAroundZ rot) { rot_ = rot; }
+
 private:  
 
   Madgwick madgwick_;
@@ -75,7 +84,8 @@ private:
   bool intRunning_ = false;
   uint8_t addr_;
   
-  float r11_, r12_, r13_, r21_, r22_, r23_, r31_, r32_, r33_;
+  float xfR_, xfP_, xfH_;
+  RotationAroundZ rot_;
 };
 
 }; // namespace bb

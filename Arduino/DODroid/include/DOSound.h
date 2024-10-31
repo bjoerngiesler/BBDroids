@@ -9,24 +9,20 @@ class DOSound {
 public:
   static DOSound sound;
 
-  enum SystemSound {
-    SYSTEM_SOUND_OK          = 1,
-    SYSTEM_SOUND_DEGRADED    = 2,
-    SYSTEM_SOUND_UNAVAILABLE = 3,
-    SYSTEM_SOUND_POWER       = 10,
-    SYSTEM_SOUND_IMU         = 11,
-    SYSTEM_SOUND_SERVOS      = 12,
-    SYSTEM_SOUND_DRIVESYSTEM = 13,
-    SYSTEM_SOUND_STARTUP     = 20,
-    SYSTEM_SOUND_SELFTEST    = 21
+  enum Folder {
+    FOLDER_SYSTEM   = 1,
+    FOLDER_GREETING = 2,
+    FOLDER_POSITIVE = 3,
+    FOLDER_NEGATIVE = 4,
+    FOLDER_CURIOUS  = 5
   };
 
   DOSound();
   bool begin(Uart *ser);
   bool available() { return available_; }
-  bool playFolder(int folderNumber, int fileNumber, bool block = true);
-  bool playFolderRandom(int foldernumber, bool block = true);
-  bool playSystemSound(int snd, bool block = true) { return playFolder(1, (int)snd, block); }
+  bool playFolder(Folder folder, int fileNumber, bool block = true);
+  bool playFolderRandom(Folder folder, bool block = true);
+  bool playSystemSound(int snd, bool block = true) { return playFolder(FOLDER_SYSTEM, (int)snd, block); }
   bool setVolume(uint8_t vol);
 
 private:

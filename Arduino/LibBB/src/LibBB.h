@@ -21,5 +21,6 @@
 #if defined(ARDUINO_ARCH_SAMD)
 #include "BBEncoder.h"
 #endif
+#include "BBLinAlg.h"
 
 #endif // LIBBB8_H

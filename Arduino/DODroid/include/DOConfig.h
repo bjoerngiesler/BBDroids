@@ -7,63 +7,67 @@
 // Droid Config
 static const bb::DroidType DROID_TYPE = bb::DroidType::DROID_DO;
 static const char*         DROID_NAME = "Generic D-O";
-static const uint8_t       BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 2 - Micke, 3 - Brad
+static const uint8_t       BUILDER_ID = 0; // Reserved values: 0 Bjoern, 1 Felix, 2 Micke, 3 Brad, 4 Lars, 5 Lukas
 static const uint8_t       DROID_ID = 0;
-static const float         WHEEL_CIRCUMFERENCE = 722.566310325652445;
-static const float         WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
-static const float         WHEEL_DISTANCE = 95.0;
+static const float         WHEEL_CIRCUMFERENCE = 722.566;              // Wheel circumference in mm for D-O, required to convert between speed over ground to encoder ticks
+static const float         WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979.2 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
+static const float         WHEEL_DISTANCE = 95.0;                      // Distance between the drive wheels
 
 // Motion Limits
-static const float NECK_RANGE          = 30.0;
-static const float NECK_OFFSET         = 7.0;
-static const float HEAD_PITCH_RANGE    = 45.0;
-static const float HEAD_PITCH_OFFSET   = 0.0;
-static const float HEAD_HEADING_RANGE  = 90.0;
-static const float HEAD_HEADING_OFFSET = 0.0;
-static const float HEAD_ROLL_RANGE     = 45.0;
-static const float HEAD_ROLL_OFFSET    = 0.0;
+struct DOParams {
+    float neckRange         = 30.0; // Careful with this, easy to nosedive if the drive controller and neck aren't working together well.
+    float neckOffset        = 0.0;  
+    float headRollRange     = 45.0;
+    float headRollOffset    = 0.0;
+    float headPitchRange    = 45.0; 
+    float headPitchOffset   = 0.0;
+    float headHeadingRange  = 90.0;
+    float headHeadingOffset = 0.0;
 
-static const float GYRO_PITCH_DEADBAND = 1.0;
+    float gyroPitchDeadband = 1.0;
 
+    float wheelSpeedKp      = 0.13;
+    float wheelSpeedKi      = 0.6;
+    float wheelSpeedKd      = 0.0;
+    float wheelSpeedImax    = 255;
+
+    float balKp             = 22;
+    float balKi             = 0;
+    float balKd             = 0;
+
+    float balNeckMix        = 0;
+    float maxSpeed          = 800;
+    float accel             = 2500;
+
+    float antennaOffset     = -70;  
+
+    float speedAxisGain     = 1.0;
+    float speedAxisDeadband = 0.01;
+    float rotAxisGain       = 0.5;
+    float rotAxisDeadband   = 0.01;
+
+    // Free animation parameters. 
+    // Be aware of the units!!! E.g. target unit for servo free animation is always degrees, but input may be something else.
+    // Example - faNeckSpeed has input unit of mm/s, going up to maxSpeed, so is probably much below 1.
+    float faNeckRemoteAccel = 0;    // Move neck by acceleration from the remote (basically wheelSpeedSetpoint - wheelSpeedCurrent)
+    float faNeckIMUAccel    = -25;  // Move neck by acceleration from the IMU
+    float faNeckSpeed       = -.02; // Move neck by absolute speed over ground
+    float faNeckSpeedSP     = -.02; // Move neck by speed *setpoint* over ground. Good idea to interpolate this with faNeckSpeed!
+    float faHeadRollTurn    = .15;  // Move head roll by IMU turn speed
+    float faHeadHeadingTurn = .2;   // Move head heading by IMU turn speed
+    float faAntennaSpeed    = .2;   // Move antennas by speed over ground
+    float faHeadAnnealTime  = .5;   // Time it takes for all head axes ot return to 0 after control has been relinquished.
+};
+
+// Battery constants
 static const float POWER_BATT_NONE = 5.0;  // Everything under this means we're connected to USB.
 static const float POWER_BATT_MIN  = 12.5; // Minimum voltage - below this, everything switches off to save the LiPos.
 static const float POWER_BATT_MAX  = 16.0; // Maximum voltage - above this, we're overvolting and will probably breal stuff.
 
-// PID Controller Defaults
-static const float WHEEL_SPEED_KP   = 0.13;
-static const float WHEEL_SPEED_KI   = 0.6;
-static const float WHEEL_SPEED_KD   = 0;
-static const float WHEEL_SPEED_IMAX = 300;
-
-static const float BAL_KP = 22;
-static const float BAL_KI = 0;
-static const float BAL_KD = 0;
-
-static const float PWM_BAL_KP = 0;
-static const float PWM_BAL_KI = 0;
-static const float PWM_BAL_KD = 0;
-
-static const float MAX_SPEED  = 800;
-static const float ACCEL      = MAX_SPEED*3;
-static const float PWM_ACCEL  = 0; //512;
-
 static const float PITCH_BIAS = 1.35;
 static const float PITCH_DEADBAND = .5;
-static const float SPEED_REMOTE_FACTOR = 1.0;
-static const float ROT_REMOTE_FACTOR = 0.5;
-static const float BAL_SPEED_REMOTE_FACTOR = MAX_SPEED;
-static const float BAL_ROT_REMOTE_FACTOR = MAX_SPEED/2.0;
-
-// Free Anim Weights
-static const float FA_NECK_IMU_ACCEL    = -25;  // Turn this up to move the neck with the droid's absolute acceleration
-static const float FA_NECK_REMOTE_ACCEL = 0;    // Turn this up to move the neck with the accel coming from the remote
-static const float FA_NECK_SPEED        = -.04; // Turn this up to move the neck with the droid's speed over ground
-static const float FA_HEAD_ROLL_TURN    = .15;    // Turn this up to roll the head with the droid's turn speed ("lean into" the turn)
-static const float FA_HEAD_HEADING_TURN = .2;    // Turn this up to change head heading with the droid's turn speed ("look into" the turn)
-static const float FA_ANTENNA_SPEED     = .2;
-static const float FA_ANTENNA_BIAS      = -70;
-
-static const float ANNEAL_HEAD_TIME     = 0.5;
+//static const float BAL_SPEED_REMOTE_FACTOR = 800;
+//static const float BAL_ROT_REMOTE_FACTOR = 800/2.0;
 
 // Selftest Constants
 static const float ST_MIN_PWM              = 40.0;

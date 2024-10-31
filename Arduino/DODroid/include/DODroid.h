@@ -3,25 +3,14 @@
 
 #include <LibBB.h>
 #include "DODriveController.h"
+#include "DOConfig.h"
 
 using namespace bb;
 
 class DODroid: public Subsystem, public PacketReceiver {
 public:
   static DODroid droid;
-
-  struct Params {
-    float wheelSpeedKp, wheelSpeedKi, wheelSpeedKd;
-    float balKp, balKi, balKd;
-    float pwmBalKp, pwmBalKi, pwmBalKd;
-    float accel, pwmAccel;
-    float maxSpeed;
-    float faNeckIMUAccel, faNeckRemoteAccel, faNeckSpeed;
-    float faHeadRollTurn, faHeadHeadingTurn;
-    float faAntennaSpeed;
-    float annealHeadTime;
-  };
-  static Params params_;
+  static DOParams params_;
 
 
   enum MotorStatus { // FIXME this probably needs to go somewhere else, closer to DCMotor or EncoderMotor?
@@ -71,17 +60,15 @@ protected:
   bb::PIDController lSpeedController_, rSpeedController_;
 
   bb::IMUControlInput balanceInput_;
-  DODriveControlOutput driveOutput_, pwmDriveOutput_;
-  bb::PIDController balanceController_, pwmBalanceController_;
+  DODriveControlOutput driveOutput_;
+  bb::PIDController balanceController_;
   
   MotorStatus leftMotorStatus_, rightMotorStatus_;
   
-  bool pwm_;
   bool driveOn_;
   bool servosOK_, antennasOK_;
   bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
   float remoteP_, remoteH_, remoteR_;
-  float remoteP0_, remoteH0_, remoteR0_;
   float annealP_, annealH_, annealR_;
 };
 
