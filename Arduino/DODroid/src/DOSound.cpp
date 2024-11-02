@@ -74,15 +74,17 @@ bool DOSound::playFolder(Folder folder, int filenumber, bool block) {
 }
 
 bool DOSound::playFolderRandom(Folder folder, bool block) {
-  return false;
   if(!available_) return false;
 
-  int num = dfp_.readFileCountsInFolder(int(folder));
+  int num;
+  num = dfp_.readFileCountsInFolder(int(folder));
+  num = dfp_.readFileCountsInFolder(int(folder));
   if(num == 0) {
     Console::console.printfBroadcast("Folder %d empty!\n", num);
     return false;
   }
-  num = random(1, num);
+  Console::console.printfBroadcast("%d files in folder\n", num);
+  num = random(1, num+1);
   Console::console.printfBroadcast("Playing folder %d file %d", int(folder), num);
   return playFolder(folder, num, block);
 }
@@ -90,6 +92,7 @@ bool DOSound::playFolderRandom(Folder folder, bool block) {
 
 bool DOSound::setVolume(uint8_t vol) {
   if(!available_) return false;
+  Console::console.printfBroadcast("Setting volume to %d\n", vol);
   dfp_.volume(vol);
   return true;
 }

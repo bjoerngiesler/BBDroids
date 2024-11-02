@@ -61,7 +61,7 @@ Result DODroid::initialize() {
   addParameter("antenna_offset", "Offset for antennas", params_.antennaOffset, -INT_MAX, INT_MAX);
   addParameter("gyro_pitch_deadband", "Deadband for gyro pitch", params_.gyroPitchDeadband, -INT_MAX, INT_MAX);
 
-  addParameter("fa_neck_remote_accel", "Free Anim - neck on remote accel", params_.faNeckRemoteAccel, -INT_MAX, INT_MAX);
+
   addParameter("fa_neck_imu_accel", "Free Anim - neck on IMU accel", params_.faNeckIMUAccel, -INT_MAX, INT_MAX);
   addParameter("fa_neck_speed", "Free Anim - neck on wheel speed", params_.faNeckSpeed, -INT_MAX, INT_MAX);
   addParameter("fa_neck_speed_sp", "Free Anim - neck on wheel speed setpoint", params_.faNeckSpeedSP, -INT_MAX, INT_MAX);
@@ -200,9 +200,8 @@ bb::Result DODroid::stepHead() {
 
   if(servosOK_) {
     float speed = (leftEncoder_.presentSpeed() + rightEncoder_.presentSpeed())/2;
-    float accel = ((lSpeedController_.goal() - lSpeedController_.present()) + (rSpeedController_.goal() - rSpeedController_.present()))/2;
 
-    float nod = params_.faNeckRemoteAccel*accel + params_.faNeckIMUAccel*ax + params_.faNeckSpeed*speed + params_.faNeckSpeedSP*speed;
+    float nod = params_.faNeckIMUAccel*ax + params_.faNeckSpeed*speed + params_.faNeckSpeedSP*speed;
     bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
     bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 - nod - remoteP_);
     
@@ -303,7 +302,7 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
     Console::console.printfBroadcast("Control packet from left remote (but not primary)\n");
     return RES_OK;
-  } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
+  } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {    
     Console::console.printfBroadcast("Control packet from right remote (but not primary)\n");
     return RES_OK;
   } else if(source == PACKET_SOURCE_PRIMARY_REMOTE) {
@@ -317,15 +316,13 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
 
     if(packet.button4 && !lastBtn4_) {
       if(driveOn_ == false) {
-        Console::console.printfBroadcast("Switching drive system on\n");
         switchDrive(true);
       } else {
-        Console::console.printfBroadcast("Switching drive system off\n");
         switchDrive(false);
       }
     }
 
-    if(packet.button0) {
+    if(packet.button3) {
       remoteR_ = -packet.getAxis(2, ControlPacket::UNIT_DEGREES_CENTERED);
       remoteP_ = packet.getAxis(3, ControlPacket::UNIT_DEGREES_CENTERED);
       remoteH_ = -packet.getAxis(4, ControlPacket::UNIT_DEGREES_CENTERED);
@@ -334,8 +331,9 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
       annealH_ = fabs(remoteH_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
     }
 
-    if(packet.button2 && !lastBtn1_) DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING, false);
-    else if(packet.button3 && !lastBtn2_) DOSound::sound.playFolderRandom(DOSound::FOLDER_POSITIVE, false);
+    if(packet.button0 && !lastBtn0_) DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING, false);
+    else if(packet.button1 && !lastBtn1_) DOSound::sound.playFolderRandom(DOSound::FOLDER_POSITIVE, false);
+    else if(packet.button2 && !lastBtn2_) DOSound::sound.playFolderRandom(DOSound::FOLDER_NEGATIVE, false);
 
     lastBtn0_ = packet.button0;
     lastBtn1_ = packet.button1;
@@ -359,7 +357,9 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
       driveOutput_.setGoalRotation(rot);
     }
 
-  } // right remote
+    DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
+  } // Primary Remote
+  
   return RES_OK;
 }
 

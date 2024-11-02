@@ -75,7 +75,7 @@ void setup() {
   setupBoardComm();
   
   DOSound::sound.begin(dfplayerSerial);
-  DOSound::sound.setVolume(100);
+  DOSound::sound.setVolume(30);
   DOSound::sound.playSystemSound(1);
 
   initializeSubsystems();
