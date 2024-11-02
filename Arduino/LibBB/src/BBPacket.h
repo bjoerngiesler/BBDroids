@@ -164,6 +164,7 @@ struct __attribute__ ((packed)) StatePacket {
 
 struct __attribute__ ((packed)) ConfigPacket {
 	static const uint64_t MAGIC = 0xbadeaffebabeface;
+#define CONFIG_TYPE_BITS 6
 
 	enum ConfigType {
 		CONFIG_SET_LEFT_REMOTE_ID       = 0,  // L->R - parameter: ID of left remote
@@ -173,11 +174,19 @@ struct __attribute__ ((packed)) ConfigPacket {
 		CONFIG_SET_DOME_CONTROL_MODE    = 3,  // L->D - parameter: control mode
 		CONFIG_SET_ARMS_CONTROL_MODE    = 4,  // L->D - parameter: control mode
 		CONFIG_SET_SOUND_CONTROL_MODE   = 5,  // L->D - parameter: control mode
-		CONFIG_FACTORY_RESET            = 127 // L->R - parameter: MAGIC
+		CONFIG_SET_PRIMARY_REMOTE       = 6,  // L->D - parameter: 0 for secondary remote, 1 to become primary
+		CONFIG_FACTORY_RESET            = (1<<CONFIG_TYPE_BITS-1) // L->R - parameter: MAGIC
 	};
 
-	ConfigType type  : 7;
-	bool       reply : 1;
+	enum ConfigReplyType {
+		CONFIG_TRANSMIT       = 0, // transmission
+		CONFIG_REPLY_OK       = 1, // OK reply
+		CONFIG_REPLY_ERROR    = 2, // something went wrong
+		CONFIG_REPLY_RESERVED = 3
+	};
+
+	ConfigType type  : CONFIG_TYPE_BITS;
+	bool       reply : 8-CONFIG_TYPE_BITS;
 	uint64_t parameter;
 };
 
