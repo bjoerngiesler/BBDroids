@@ -127,11 +127,17 @@ void RInput::update() {
   minJoyRawV = min(minJoyRawV, joyRawV);
   maxJoyRawV = max(maxJoyRawV, joyRawV);
 
-  joyH = float(map(joyRawH, hCalib_.min, hCalib_.max, 0, 4096)-2048) / 2048.0f;
+  if(joyRawH < hCalib.center)
+    joyH = float(map(joyRawH, hCalib.min, hCalib.center, 0, 2047)-2047) / 2048.0f;
+  else
+    joyH = float(map(joyRawH, hCalib.center, hCalib.max, 2047, 4095)-2047) / 2048.0f;
   if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;
   joyH = constrain(joyH, -1.0f, 1.0f);
 
-  joyV = float(2048-map(joyRawV, vCalib_.min, vCalib_.max, 0, 4096)) / 2048.0f;
+  if(joyRawV < vCalib.center)
+    joyV = float(2047-map(joyRawV, vCalib.min, vCalib.center, 0, 2047)) / 2048.0f;
+  else
+    joyV = float(2047-map(joyRawV, vCalib.center, vCalib.max, 2047, 4095)) / 2048.0f;
   if(abs(joyV) < JoystickEpsilon) joyV = 0.0f;
   joyV = constrain(joyV, -1.0f, 1.0f);
   

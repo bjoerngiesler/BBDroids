@@ -56,8 +56,8 @@ public:
 #endif
   struct AxisCalib {
   public:
-    AxisCalib(): min(0), max(4096) {}
-    uint16_t min, max;
+    AxisCalib(): min(0), max(4096), center(2048) {}
+    uint16_t min, max, center;
   };
 
   bool begin();
@@ -65,9 +65,9 @@ public:
   void printOnSerial();
   bool isOK();
   Result fillControlPacket(ControlPacket& packet);
-  bb::IMU imu() { return imu_; }
+  bb::IMU& imu() { return imu_; }
 
-  void setCalibration(const AxisCalib& hCalib, const AxisCalib& vCalib) { hCalib_ = hCalib; vCalib_ = vCalib; }
+  void setCalibration(const AxisCalib& hc, const AxisCalib& vc) { hCalib = hc; vCalib = vc; }
   void setIncrementalAccel(ButtonIndex btn);
   void setIncrementalRot(ButtonIndex btn);
 
@@ -80,6 +80,7 @@ public:
   float joyH, joyV; // range: -1.0 .. 1.0
   uint16_t joyRawH, joyRawV, battRaw;
   uint16_t minJoyRawH, maxJoyRawH, minJoyRawV, maxJoyRawV;
+  AxisCalib hCalib, vCalib;
 
   std::array<bool,8> buttons, buttonsChanged;
 
@@ -103,7 +104,6 @@ public:
 
 protected:
   RInput();
-  AxisCalib hCalib_, vCalib_;
 
 #if defined(ARDUINO_ARCH_ESP32)
   Adafruit_MCP23X17 mcp_; bool mcpOK_;

@@ -60,6 +60,7 @@ public:
   void factoryReset(bool thisremote);
   void startCalibration(bool thisremote);
   void finishCalibration(bool thisremote);
+  void setPrimary(bool thisremote);
 
   void runTestsuite();
 
@@ -73,7 +74,7 @@ protected:
   Packet lastPacketSent_;
 
   RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_, leftRemoteMenu_, rightRemoteMenu_, droidMenu_;
-  RMenuWidget lRIncrRotMenu_;
+  RMenuWidget lRIncrRotMenu_, rRIncrRotMenu_;
   RMessageWidget waitMessage_, restartMessage_;
   RLabelWidget topLabel_, bottomLabel_;
   RRotaWidget mainVis_;

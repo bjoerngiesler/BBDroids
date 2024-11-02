@@ -172,20 +172,32 @@ void RRemote::populateMenus() {
   lRIncrRotMenu_.clear();
   lRIncrRotMenu_.setName("Incr Rotation");
   lRIncrRotMenu_.addEntry("Disable", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_NONE);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Left Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_LEFT);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Right Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_RIGHT);showMenu(&leftRemoteMenu_);});
   lRIncrRotMenu_.addEntry("Pinky Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_PINKY);showMenu(&leftRemoteMenu_);});
   lRIncrRotMenu_.addEntry("Index Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_INDEX);showMenu(&leftRemoteMenu_);});
   lRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
 
+  rRIncrRotMenu_.clear();
+  rRIncrRotMenu_.setName("Incr Rotation");
+  rRIncrRotMenu_.addEntry("Disable", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_NONE);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Left Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_LEFT);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Right Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_RIGHT);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Pinky Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_PINKY);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Index Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_INDEX);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
+
   leftRemoteMenu_.clear();
   leftRemoteMenu_.addEntry("Incr Rot...", [=]{showMenu(&lRIncrRotMenu_);});
   leftRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibration(true);});
+  leftRemoteMenu_.addEntry("Set Primary", [=]{setPrimary(true);});
   leftRemoteMenu_.addEntry("Factory Reset", [=]{factoryReset(true);});
   leftRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
 
-
-
   rightRemoteMenu_.clear();
+  rightRemoteMenu_.addEntry("Incr Rot...", [=]{showMenu(&rRIncrRotMenu_);});
   rightRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibration(false);});
+  rightRemoteMenu_.addEntry("Set Primary", [=]{setPrimary(false);});
   rightRemoteMenu_.addEntry("Factory Reset", [=]() {factoryReset(false);});
   rightRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
 }
@@ -383,14 +395,18 @@ void RRemote::finishCalibration(bool thisremote) {
     uint16_t hMax = RInput::input.maxJoyRawH;
     uint16_t vMin = RInput::input.minJoyRawV;
     uint16_t vMax = RInput::input.maxJoyRawV;
+    uint16_t hCur = RInput::input.joyRawH;
+    uint16_t vCur = RInput::input.joyRawV;
 
-    Console::console.printfBroadcast("hMin: %d hMax: %d vMin: %d vMax: %d\n", hMin, hMax, vMin, vMax);
+    Console::console.printfBroadcast("Hor: [%d..%d..%d] Ver: [%d..%d..%d] \n", hMin, hCur, hMax, vMin, vCur, vMax);
     if(hMin < 800 && hMax > 4096-800 && vMin < 800 && vMax > 4096-800) { 
       // accept calibration
       params_.hCalib.min = hMin;
       params_.hCalib.max = hMax;
+      params_.hCalib.center = hCur;
       params_.vCalib.min = vMin;
       params_.vCalib.max = vMax;
+      params_.vCalib.center = vCur;
       RInput::input.setCalibration(params_.hCalib, params_.vCalib);
       bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
       bb::ConfigStorage::storage.store();
@@ -410,6 +426,19 @@ void RRemote::finishCalibration(bool thisremote) {
   }
 }
 
+void RRemote::setPrimary(bool thisremote) {
+  params_.isPrimary = thisremote;
+
+#if defined(LEFT_REMOTE)
+  bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
+  packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_PRIMARY_REMOTE;
+  if(thisremote) packet.payload.config.parameter = 0;
+  else packet.payload.config.parameter = 1;
+  XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
+#endif
+}
+
+
 bb::Result RRemote::fillAndSend() {
 #if defined(LEFT_REMOTE)
   Packet packet(PACKET_TYPE_CONTROL, PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
@@ -425,7 +454,7 @@ bb::Result RRemote::fillAndSend() {
   Result res = RES_OK;
 #if !defined(LEFT_REMOTE) // right remote sends to left remote
   if(params_.otherRemoteAddress != 0) {
-    Console::console.printfBroadcast("Sending control to 0x%llx\n", params_.otherRemoteAddress);
+    //Console::console.printfBroadcast("Sending control to right remote 0x%llx\n", params_.otherRemoteAddress);
     res = bb::XBee::xbee.sendTo(params_.otherRemoteAddress, packet, false);
     if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
   }
@@ -433,6 +462,7 @@ bb::Result RRemote::fillAndSend() {
 
   // both remotes send to droid
   if(params_.droidAddress != 0 && mode_ == MODE_REGULAR) {
+    //Console::console.printfBroadcast("Sending control to droid 0x%llx\n", params_.droidAddress);
     res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
     if(res != RES_OK) {
       RDisplay::display.setLED(RDisplay::LED_COMM, 0, 150, 0);
@@ -523,7 +553,7 @@ Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint
   return RES_SUBSYS_COMM_ERROR;
 #else
   Console::console.printfBroadcast("Got config packet from 0x%llx, type %d, payload 0x%llx\n", srcAddr, packet.type, packet.parameter);
-  if(source == params_.otherRemoteAddress || params_.otherRemoteAddress == 0) { // if we're not bound, we accept config packets from anyone
+  if(srcAddr == params_.otherRemoteAddress || params_.otherRemoteAddress == 0) { // if we're not bound, we accept config packets from anyone
     switch(packet.type) {
     case bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID:
       if(packet.parameter != srcAddr) {
@@ -560,10 +590,21 @@ Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint
       Console::console.printfBroadcast("Got factory reset packet but ID 0x%x doesn't check out!\n", packet.parameter);
       return RES_SUBSYS_COMM_ERROR;
 
+    case bb::ConfigPacket::CONFIG_SET_PRIMARY_REMOTE:
+      if(packet.parameter != 0) {
+        params_.isPrimary = true;
+      } else {
+        params_.isPrimary = false;
+      }
+      bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+      bb::ConfigStorage::storage.store();
+      return RES_OK; 
     default:
       Console::console.printfBroadcast("Unknown config packet type 0x%x.\n", packet.type);
       return RES_SUBSYS_COMM_ERROR;
     }
+  } else {
+    Console::console.printfBroadcast("Config packet from unknown source\n");
   }
   Console::console.printfBroadcast("Should never get here.\n");
   return RES_SUBSYS_COMM_ERROR;
@@ -571,7 +612,8 @@ Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint
 }
 
 void RRemote::printStatus(ConsoleStream *stream) {
-  char buf[255];
+  const unsigned int bufsize = 255;
+  char buf[bufsize];
 
   float roll, pitch, heading, ax, ay, az;
   RInput::input.imu().getFilteredRPH(roll, pitch, heading);
@@ -583,9 +625,10 @@ void RRemote::printStatus(ConsoleStream *stream) {
   pitch = temp;
 #endif
 
-  sprintf(buf, "S%d H%d V%d R%d P%d Y%d AX%d AY%d AZ%d P1%d P2%d Batt%d B%c%c%c%c%c%c%c%c\n",
+  snprintf(buf, bufsize, "S%d H%d [%d..%d..%d] %.2f V%d [%d..%d..%d] %.2f R%.1f P%.1f Y%.1f AX%.1f AY%.1f AZ%.1f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c\n",
     seqnum_,
-    RInput::input.joyRawH, RInput::input.joyRawV,
+    RInput::input.joyRawH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max, RInput::input.joyH,
+    RInput::input.joyRawV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max, RInput::input.joyV,
     roll, pitch, heading,
     ax, ay, az,
     RInput::input.pot1, RInput::input.pot2,
