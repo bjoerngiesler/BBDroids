@@ -14,6 +14,10 @@ Hardware concept, layout and realization by Felix Beyer, software concept and re
 
 *Watch this space for official releases!*
 
+## If you want to build D-Ov2Evo...
+
+...please refer to the documentation collection on the Wiki page: https://github.com/bjoerngiesler/BBDroids/wiki/91-Individual-Droid:-D%E2%80%90Ov2Evo
+
 ## About
 
 The project started with the plan to build a RC BB-8 replica, and has since evolved to a general-purpose remote control, a slightly less general-purpose droid control board, and a very much general-purpose software system and architecture. It can be used to realize and control almost arbitrary droids, e.g. BB-8, R2-D2, B2EMO, and many others, although this repository currently contains complete applications for only D-O and BB-8.
