@@ -111,6 +111,7 @@ public:
 	Result send(const uint8_t *bytes, size_t size);
 	Result send(const Packet& packet);
 	Result sendTo(uint64_t dest, const Packet& packet, bool ack);
+	//Result sendConfigPacket(uint64_t dest, bb::PacketSource src,  ConfigPacket& packet, bool waitForReply = true);
 	bool available();
 	String receive();
 	Result receiveAndHandlePacket();

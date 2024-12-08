@@ -17,8 +17,8 @@ class IMU;
 class IMUControlInput: public bb::ControlInput {
 public:
   typedef enum {
-    IMU_ROLL,
     IMU_PITCH,
+    IMU_ROLL,
     IMU_HEADING
   } ProbeType;
 
@@ -43,22 +43,19 @@ public:
   IMU(uint8_t addr);
 
   bool begin();
-
   bool available() { return available_; }
+  bool calibrate(ConsoleStream *stream=NULL, int milliseconds = 2000, int step = 10);
 
-  bool calibrateGyro(ConsoleStream *stream=NULL, int milliseconds = 2000, int step = 10);
-
-  bool getGyroMeasurement(float& dr, float& dp, float& dh, bool calibrated=true);
-  bool getAccelMeasurement(float& ax, float& ay, float& az);
+  bool getGyroMeasurement(float& dp, float& dr, float& dh, bool calibrated=true);
+  bool getAccelMeasurement(float& ax, float& ay, float& az, bool calibrated=true);
+  bool getGravCorrectedAccel(float& ax, float& ay, float& az);
   float dataRate() { return dataRate_; }
 
   virtual bool update(bool block=false);
-  bool getFilteredRPH(float& r, float& p, float& h);
+  bool getFilteredPRH(float& p, float& r, float& h);
 
   IMUState getIMUState();
   void printStats(const String& prefix = "");
-
-  void setTransformRotation(float r, float p, float h) { xfR_ = r; xfP_ = p; xfH_ = h; }
 
   enum RotationAroundZ {
     ROTATE_0,
@@ -74,7 +71,7 @@ private:
   bool available_;
   Adafruit_ISM330DHCX imu_;
   Adafruit_Sensor *temp_, *accel_, *gyro_;
-  float calR_, calP_, calH_;
+  float calR_, calP_, calH_, calX_, calY_, calZ_;
   float lastR_, lastP_, lastH_;
   float lastX_, lastY_, lastZ_;
   float intR_, intP_, intH_;
@@ -84,7 +81,6 @@ private:
   bool intRunning_ = false;
   uint8_t addr_;
   
-  float xfR_, xfP_, xfH_;
   RotationAroundZ rot_;
 };
 

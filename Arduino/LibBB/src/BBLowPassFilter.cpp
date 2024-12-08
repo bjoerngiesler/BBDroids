@@ -79,3 +79,14 @@ float bb::LowPassFilter::filter(float xn) {
 	// Return the filtered value    
 	return y_[0];
 }
+
+bb::HighPassFilter::HighPassFilter(float cutoff, float freq) {
+	gain_ = cutoff/(2*M_PI*freq);
+	state_ = 0;
+}
+
+float bb::HighPassFilter::filter(float xn) {
+	float retval = xn-state_;
+	state_ += gain_*retval;
+	return retval;
+}

@@ -18,27 +18,18 @@ bb::Result bb::IMUControlInput::update() {
 }
 
 float bb::IMUControlInput::present() {
-  float r, p, h;
-  if(imu_.getFilteredRPH(r, p, h) == false) return 0.0f;
+  float p, r, h;
+  if(imu_.getFilteredPRH(p, r, h) == false) return 0.0f;
   
   float retval=0;
 
   switch(pt_) {
-// FIXMEEEEEEEE
+  case IMU_PITCH:
+    retval = filter_.filter(p-bias_);
+    break;
   case IMU_ROLL:
     retval = filter_.filter(r-bias_);
     break;
-  case IMU_PITCH:
-    retval = filter_.filter(p-bias_);
-    break;
-#if 0
-  case IMU_ROLL:
-    retval = filter_.filter(p-bias_);
-    break;
-  case IMU_PITCH:
-    retval = filter_.filter(bias_-r);
-    break;
-#endif
   case IMU_HEADING:
     retval = filter_.filter(h-bias_);
     break;
@@ -55,16 +46,15 @@ void bb::IMUControlInput::setFilterCutoff(float frequency) {
 
 bb::IMU::IMU(uint8_t addr) {
   available_ = false;
-  calR_ = calP_ = calH_ = 0.0f;
+  calP_ = calR_ = calH_ = 0.0f;
+  calX_ = calY_ = calZ_ = 0.0f;
   intRunning_ = false;
   addr_ = addr;
-  xfR_ = xfP_ = xfH_ = 0;
   rot_ = ROTATE_0;
 }
 
 bool bb::IMU::begin() {
   if(available_) return true;
-  Console::console.printfBroadcast("Setting up Body IMU...");
 
   // Check whether we exist
   int err;
@@ -77,7 +67,7 @@ bool bb::IMU::begin() {
   }
 
   if(!imu_.begin_I2C(addr_)) {
-    Console::console.printfBroadcast("failed!\n");
+    Console::console.printfBroadcast("IMU setup at 0x%x failed!\n", addr_);
     return false;
   }
 
@@ -99,13 +89,10 @@ bool bb::IMU::begin() {
 
   imu_.setAccelDataRate(LSM6DS_RATE_104_HZ);
   imu_.setGyroDataRate(LSM6DS_RATE_104_HZ);
-
   dataRate_ = 104.0;
-  Runloop::runloop.setCycleTimeMicros(1000000/104);
-  
+  Runloop::runloop.setCycleTimeMicros(1000000/dataRate_);
   madgwick_.begin(dataRate_);
 
-  Console::console.printfBroadcast("ok\n");
   available_ = true;
   return true;
 }
@@ -125,27 +112,27 @@ bool bb::IMU::update(bool block) {
 
   int timeout = 3;
   while(!imu_.gyroscopeAvailable() && !imu_.accelerationAvailable()) {
-    timeout--;
-    delayMicroseconds(1);
-    if(timeout < 0 && block==false) {
-      //Console::console.printfBroadcast("No gyro or accel data available\n");
+    if(timeout < 0 || block==false) {
       return false;
     }
+    timeout--;
+    delayMicroseconds(1);
   }
   
-  imu_.readGyroscope(lastR_, lastP_, lastH_);
+  imu_.readGyroscope(lastP_, lastR_, lastH_);
   imu_.readAcceleration(lastX_, lastY_, lastZ_);
 
-  madgwick_.updateIMU(lastR_ + calR_, lastP_ + calP_, lastH_ + calH_, lastX_, lastY_, lastZ_);
+  madgwick_.updateIMU(lastP_+calP_, lastR_+calR_, lastH_+calH_, lastX_, lastY_, lastZ_);
 
   return true;
 }
 
-bool bb::IMU::getFilteredRPH(float &r, float &p, float &h) {
+bool bb::IMU::getFilteredPRH(float &p, float &r, float &h) {
   if(!available_) return false;
 
-  r = madgwick_.getRoll();
-  p = madgwick_.getPitch();
+  // Madgwick filter switches axes
+  r = madgwick_.getPitch();
+  p = madgwick_.getRoll();
   h = madgwick_.getYaw();
   float temp;
 
@@ -158,16 +145,22 @@ bool bb::IMU::getFilteredRPH(float &r, float &p, float &h) {
     break;
   }
 
+  if(isnan(p) || isnan(r) || isnan(h)) {
+    Console::console.printfBroadcast("IMU returns NAN!!!\n");
+    available_ = false;
+    p = 0; r = 0; h = 0;
+  }
+
   return true;
 }
 
-bool bb::IMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) {
+bool bb::IMU::getGyroMeasurement(float& p, float& r, float& h, bool calibrated) {
   if(!available_) return false;
 
-  r = lastR_; p = lastP_; h = lastH_;
+  p = lastP_; r = lastR_; h = lastH_;
   if(calibrated) {
-    r += calR_;
     p += calP_;
+    r += calR_;
     h += calH_;
   }
   float temp;
@@ -184,12 +177,13 @@ bool bb::IMU::getGyroMeasurement(float& r, float& p, float& h, bool calibrated) 
   return true;
 }
 
-bool bb::IMU::getAccelMeasurement(float &x, float &y, float &z) {
+bool bb::IMU::getAccelMeasurement(float &x, float &y, float &z, bool calibrated) {
   if(!available_) return false;
 
-  x = lastX_;
-  y = lastY_;
-  z = lastZ_;
+  x = lastX_; y = lastY_; z = lastZ_;
+  if(calibrated) {
+    x += calX_; y += calY_; z += calZ_;
+  }
   float temp;
   
   switch(rot_) {
@@ -204,40 +198,53 @@ bool bb::IMU::getAccelMeasurement(float &x, float &y, float &z) {
   return true;
 }
 
+bool bb::IMU::getGravCorrectedAccel(float& ax, float& ay, float& az) {
+  if(!available_) return false;
+  float p, r, h, gravx, gravy, gravz;
+  getAccelMeasurement(ax, ay, az);
+  getFilteredPRH(p, r, h);
+  bb::transformVector(0, 0, 1, p, r, h, gravx, gravy, gravz, true);
+  ax -= gravx;
+  ay -= gravy;
+  az -= gravz;
+  return true;
+}
 
-bool bb::IMU::calibrateGyro(ConsoleStream *stream, int milliseconds, int step) {
+
+bool bb::IMU::calibrate(ConsoleStream *stream, int milliseconds, int step) {
   if(!available_) return false;
 
-  double avgTemp = 0.0, avgR = 0.0, avgP = 0.0, avgH = 0.0;
+  double avgTemp = 0.0, avgR = 0.0, avgP = 0.0, avgH = 0.0, avgX = 0.0, avgY = 0.0, avgZ = 0.0;
   int count = 0;
 
   sensors_event_t t;
 
   for(int ms = milliseconds; ms>0; ms -= step, count++) {
-    float r, p, h;
-    if(imu_.gyroscopeAvailable()) imu_.readGyroscope(r, p, h);
+    float r, p, h, x, y, z;
+    if(imu_.gyroscopeAvailable()) imu_.readGyroscope(p, r, h);
+    if(imu_.accelerationAvailable()) imu_.readAcceleration(x, y, z);
 
     temp_->getEvent(&t);
 
     avgTemp += t.temperature;
-    avgR += r;
-    avgP += p;
-    avgH += h;
+    avgP += p; avgR += r; avgH += h;
+    avgX += x; avgY += y; avgZ += z;
 
     delay(step);
   }
   
   avgTemp /= count;
-  avgR /= count;
-  avgP /= count;
-  avgH /= count;
+  avgP /= count; avgR /= count; avgH /= count;
+  avgX /= count; avgY /= count; avgZ /= count;
+  avgZ -= 1.0;
 
   if(stream) {
-    stream->printf("Gyro calib finished (%d cycles, avg temp %f°C)\n", count, avgTemp);
-    stream->printf("R=%.6f P=%.6f H=%.6f\n", avgR, avgP, avgH);
+    stream->printf("Calib finished (%d cycles, avg temp %f°C)\n", count, avgTemp);
+    stream->printf("P=%.6f R=%.6f H=%.6f X=%.6f Y=%.6f Z=%.6f\n", avgP, avgR, avgH, avgX, avgY, avgZ);
   }
 
-  calR_ = -avgR; calP_ = -avgP; calH_ = -avgH;
+  calP_ = -avgP; calR_ = -avgR; calH_ = -avgH;
+  calX_ = -avgX; calY_ = -avgY; calZ_ = -avgZ;
 
   return true;
 }
@@ -250,11 +257,11 @@ bb::IMUState bb::IMU::getIMUState() {
   }
 
   imuState.errorState = ERROR_OK;
-  imuState.r = madgwick_.getRoll();
   imuState.p = madgwick_.getPitch();
+  imuState.r = madgwick_.getRoll();
   imuState.h = madgwick_.getYaw();
-  imuState.dr = lastR_;
   imuState.dp = lastP_;
+  imuState.dr = lastR_;
   imuState.dh = lastH_;
   imuState.ax = lastX_;
   imuState.ay = lastY_;

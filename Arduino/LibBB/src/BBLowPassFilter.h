@@ -35,6 +35,15 @@ protected:
 	bool needsRecalc_;
 };
 
+class HighPassFilter {
+public:
+	HighPassFilter(float cutoff = 1.0, float sampleFreq=100);
+
+	float filter(float xn);
+protected:
+	float state_, gain_;
+};
+
 }
 
 #endif // BBFILTER_H

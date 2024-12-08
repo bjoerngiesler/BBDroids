@@ -351,11 +351,14 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 	int numDiscardedBytes = 0;
 
 	for(int timeout = 0; timeout < 1000; timeout++) {
-		while(uart_->available())  {
-			char c = uart_->read();
-
-			Console::console.printfBroadcast("Discarding 0x%x '%c'\n", c, c);
-			numDiscardedBytes++;
+		if(uart_->available()) {
+			Console::console.printfBroadcast("Discarding ");
+			while(uart_->available())  {
+				uart_->read();
+				Console::console.printfBroadcast(".");
+				numDiscardedBytes++;
+			}
+			Console::console.printfBroadcast("\n");
 		}
 		delay(1);
 	}
@@ -383,15 +386,15 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 						success = true;
 						break;
 					} else {
-						Console::console.printfBroadcast("Discarding 0x%x '%c'\n", c, c);
+						//Console::console.printfBroadcast("Discarding 0x%x '%c'\n", c, c);
 						numDiscardedBytes++;
 					}
 				} else {
-					Console::console.printfBroadcast("Discarding 0x%x '%c'\n", c, c);
+					//Console::console.printfBroadcast("Discarding 0x%x '%c'\n", c, c);
 					numDiscardedBytes++;
 				}
 			} else {
-				Console::console.printfBroadcast("Discarding 0x%x '%c'\n", c, c);
+				//Console::console.printfBroadcast("Discarding 0x%x '%c'\n", c, c);
 				numDiscardedBytes++;
 			}
 		}
@@ -670,7 +673,14 @@ bb::Result bb::XBee::sendTo(uint64_t dest, const bb::Packet& packet, bool ack) {
 	APIFrame frame(buf, 14+sizeof(packet));
 	return send(frame);
 }
-	
+#if 0
+bb::Result bb::XBee::sendConfigPacket(uint64_t dest, bb::PacketSource src, ConfigPacket& cfg, bool waitForReply) {
+	bb::Packet packet(bb::PACKET_TYPE_CONFIG, src, sequenceNumber());
+	packet.payload = cfg;
+}
+#endif
+
+
 bool bb::XBee::available() {
 	if(operationStatus_ != RES_OK) return false;
 	if(isInATMode()) leaveATMode();
@@ -1085,7 +1095,7 @@ bb::Result bb::XBee::receive(APIFrame& frame) {
 		if(byte == 0x7e) {
 			break;
 		} else {
-			Console::console.printfBroadcast("Read garbage '%c' 0x%x\n", byte, byte);
+			// Console::console.printfBroadcast("Read garbage '%c' 0x%x\n", byte, byte);
 		}
 	}
 	if(byte != 0x7e) {
@@ -1120,7 +1130,7 @@ bb::Result bb::XBee::receive(APIFrame& frame) {
 	uint8_t checksum = readEscapedByte(uart_);
 
 	if(frame.checksum() != checksum) {
-		Console::console.printfBroadcast("Checksum invalid - expected 0x%x, got 0x%x\n", frame.checksum(), checksum);
+		//Console::console.printfBroadcast("Checksum invalid - expected 0x%x, got 0x%x\n", frame.checksum(), checksum);
 		return RES_SUBSYS_COMM_ERROR;
 	}
 

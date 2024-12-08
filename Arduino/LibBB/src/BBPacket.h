@@ -15,9 +15,9 @@ namespace bb {
 
 struct __attribute__ ((packed)) ControlPacket {
 
-#define AXIS_MAX1 1023
+#define AXIS_MAX1   1023
 #define AXIS_MAX2   255
-#define BATTERY_MAX 
+#define BATTERY_MAX 31
 
 	uint16_t axis0 : 10; // bit 0..9
 	uint16_t axis1 : 10; // bit 10..19
@@ -37,7 +37,8 @@ struct __attribute__ ((packed)) ControlPacket {
 	bool button5    : 1; // bit 95
 	bool button6    : 1; // bit 96
 	bool button7    : 1; // bit 97
-	uint8_t battery : 6; // bit 98..103
+	uint8_t battery : 5; // bit 98..102
+	bool primary    : 1; // bit 103
 
 	enum Unit {
 		UNIT_DEGREES,   
@@ -175,7 +176,7 @@ struct __attribute__ ((packed)) ConfigPacket {
 		CONFIG_SET_ARMS_CONTROL_MODE    = 4,  // L->D - parameter: control mode
 		CONFIG_SET_SOUND_CONTROL_MODE   = 5,  // L->D - parameter: control mode
 		CONFIG_SET_PRIMARY_REMOTE       = 6,  // L->D - parameter: 0 for secondary remote, 1 to become primary
-		CONFIG_FACTORY_RESET            = (1<<CONFIG_TYPE_BITS-1) // L->R - parameter: MAGIC
+		CONFIG_FACTORY_RESET            = (1<<(CONFIG_TYPE_BITS-1)) // L->R - parameter: MAGIC
 	};
 
 	enum ConfigReplyType {
