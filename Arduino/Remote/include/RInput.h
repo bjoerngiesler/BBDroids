@@ -24,7 +24,7 @@ public:
     BUTTON_CONFIRM   = 3,
     BUTTON_TOP_LEFT  = 1,
     BUTTON_TOP_RIGHT = 0,
-    BUTTON_NONE      = 255
+    BUTTON_NONE      = 8
   };
 #else
   enum ButtonIndex {
@@ -36,7 +36,7 @@ public:
     BUTTON_CONFIRM   = 7,
     BUTTON_TOP_LEFT  = 6,
     BUTTON_TOP_RIGHT = 0,
-    BUTTON_NONE      = 255
+    BUTTON_NONE      = 8
   };
 #endif
 
@@ -51,7 +51,7 @@ public:
     BUTTON_CONFIRM   = 5,
     BUTTON_TOP_LEFT  = 6,
     BUTTON_TOP_RIGHT = 7,
-    BUTTON_NONE      = 255
+    BUTTON_NONE      = 8
   };
 #endif
   struct AxisCalib {

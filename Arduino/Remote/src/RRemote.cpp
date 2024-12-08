@@ -451,11 +451,13 @@ void RRemote::setPrimary(bool thisremote) {
   params_.isPrimary = thisremote;
 
 #if defined(LEFT_REMOTE)
+#if 0
   bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
   packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_PRIMARY_REMOTE;
   if(thisremote) packet.payload.config.parameter = 0;
   else packet.payload.config.parameter = 1;
   XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
+#endif
 #endif
     bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
     bb::ConfigStorage::storage.store();
@@ -656,7 +658,7 @@ void RRemote::printStatus(ConsoleStream *stream) {
 #if 0
   snprintf(buf, bufsize, "S%ld AX%f AY%f AZ%f\n", seqnum_, ax, ay, az);
 #else
-  snprintf(buf, bufsize, "S%d H%d [%d..%d..%d] %.2f V%d [%d..%d..%d] %.2f P%.1f R%.1f H%.1f AX%f AY%f AZ%f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c\n",
+  snprintf(buf, bufsize, "S%ld H%d [%d..%d..%d] %.2f V%d [%d..%d..%d] %.2f P%.1f R%.1f H%.1f AX%f AY%f AZ%f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c\n",
     seqnum_,
     RInput::input.joyRawH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max, RInput::input.joyH,
     RInput::input.joyRawV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max, RInput::input.joyV,
