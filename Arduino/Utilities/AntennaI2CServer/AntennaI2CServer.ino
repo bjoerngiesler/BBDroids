@@ -43,7 +43,7 @@ void receiveEvent(int howmany) {
   if(!WIRE.available()) return;
   if(howmany == 3) {
     for(int i=0; i<3; i++) {
-      servoSetpoints[i] = map(Wire.read(), 0, 180, SERVO_MIN, SERVO_MAX);
+      servoSetpoints[i] = map(WIRE.read(), 0, 180, SERVO_MIN, SERVO_MAX);
     }
   }
 }
