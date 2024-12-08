@@ -625,6 +625,7 @@ Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint
       Console::console.printfBroadcast("Got factory reset packet but ID 0x%x doesn't check out!\n", packet.parameter);
       return RES_SUBSYS_COMM_ERROR;
 
+#if 0
     case bb::ConfigPacket::CONFIG_SET_PRIMARY_REMOTE:
       if(packet.parameter != 0) {
         params_.isPrimary = true;
@@ -634,6 +635,7 @@ Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint
       bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
       bb::ConfigStorage::storage.store();
       return RES_OK; 
+#endif
     default:
       Console::console.printfBroadcast("Unknown config packet type 0x%x.\n", packet.type);
       return RES_SUBSYS_COMM_ERROR;
