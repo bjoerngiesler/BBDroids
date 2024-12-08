@@ -7,6 +7,7 @@ DOSound DOSound::sound;
 
 DOSound::DOSound() {
   available_ = false;
+  fileCountsSetup_ = false;
 }
 
 bool DOSound::begin(Uart *ser) {
@@ -24,15 +25,31 @@ bool DOSound::begin(Uart *ser) {
     available_ = true;
     return true;
   } else {
+    int errcode = dfp_.readType(); 
     Serial.print("error code ");
-    Serial.print(dfp_.readType());
+    Serial.print(errcode);
     Serial.println("... failed!");
-    available_ = false;
-    return false;
+    if(errcode != 0) {
+      available_ = false;
+      return false;
+    } else {
+      available_ = true;
+      return true;
+    }
   }
+
 }
 
+bool DOSound::playSound(int fileNumber) {
+  if(!available_) return false;
+  dfp_.play(fileNumber);
+  return true;
+}
+
+
 bool DOSound::playFolder(Folder folder, int filenumber, bool block) {
+  return true;
+
   if(!available_) return false;
 
   dfp_.playFolder(int(folder), filenumber);
@@ -74,25 +91,41 @@ bool DOSound::playFolder(Folder folder, int filenumber, bool block) {
 }
 
 bool DOSound::playFolderRandom(Folder folder, bool block) {
-  if(!available_) return false;
+  return true;
 
-  int num;
-  num = dfp_.readFileCountsInFolder(int(folder));
-  num = dfp_.readFileCountsInFolder(int(folder));
-  if(num == 0) {
-    Console::console.printfBroadcast("Folder %d empty!\n", num);
-    return false;
-  }
-  Console::console.printfBroadcast("%d files in folder\n", num);
-  num = random(1, num+1);
-  Console::console.printfBroadcast("Playing folder %d file %d", int(folder), num);
+  if(!available_) return false;
+  if(!fileCountsSetup_) setupFileCounts();
+
+  Console::console.printfBroadcast("%d files in folder %d\n", fileCounts_[folder], folder);
+  int num = random(1, fileCounts_[folder]+1);
+  Console::console.printfBroadcast("Playing file %d\n", num);
   return playFolder(folder, num, block);
 }
 
 
 bool DOSound::setVolume(uint8_t vol) {
   if(!available_) return false;
-  Console::console.printfBroadcast("Setting volume to %d\n", vol);
   dfp_.volume(vol);
   return true;
+}
+
+void DOSound::setupFileCounts() {
+  Serial.print("Reading file counts...");
+  for(int i=1; i<=FOLDER_MAX; i++) {
+#if 0
+    int num;
+    num = dfp_.readFileCountsInFolder(i);
+    num = dfp_.readFileCountsInFolder(i);
+    num = dfp_.readFileCountsInFolder(i);
+    Serial.print(" Folder ");
+    Serial.print(i);
+    Serial.print(": ");
+    Serial.print(num);
+
+    fileCounts_[Folder(i)] = num;
+#endif
+    fileCounts_[Folder(i)] = 0;
+  }
+
+  fileCountsSetup_ = true;
 }

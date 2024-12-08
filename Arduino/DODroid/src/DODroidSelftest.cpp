@@ -11,34 +11,6 @@ Result DODroid::selfTest(ConsoleStream *stream) {
 
   Console::console.printfBroadcast("D-O Self Test\n=============\n");
   
-  // Check IMU
-  DOSound::sound.playSystemSound(SystemSounds::IMU);
-  if(imu_.available() == false) {
-    Console::console.printfBroadcast("Critical error: IMU not available!\n");
-    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
-    return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  }
-  imu_.update(true);
-  float ax, ay, az;
-  imu_.getAccelMeasurement(ax, ay, az);
-  if(fabs(ax) > 0.1 || fabs(ay) > 0.1 || fabs(az) < 0.9) {
-    Console::console.printfBroadcast("Critical error: Droid not upright (ax %f, ay %f, az %f)!\n", ax, ay, az);
-    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
-    return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  }
-  Console::console.printfBroadcast("IMU OK. Down vector: %.2f %.2f %.2f\n", ax, ay, az);
-
-  DOSound::sound.playSystemSound(SystemSounds::CALIBRATING);
-  imu_.calibrateGyro(stream);
-  for(int i=0; i<100; i++) {
-    imu_.update(true);
-  }
-  float r, p, h;
-  imu_.getFilteredRPH(r, p, h);
-  balanceController_.setGoal(-p);
-  Console::console.printfBroadcast("IMU calibrated. Pitch angle at rest: %f\n", p);
-  DOSound::sound.playSystemSound(SystemSounds::OK);
-
   // Check battery
   DOSound::sound.playSystemSound(SystemSounds::POWER);
   if(!DOBattStatus::batt.available()) {
@@ -75,20 +47,49 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   } else {
     uint8_t step=4, d=25;
     antennasOK_ = true;
-    for(uint8_t val = 127; val < 255; val+=step) {
+    for(uint8_t val = 0; val < 180; val+=step) {
       setAntennas(val, val, val);
       delay(d);
     }
-    for(uint8_t val = 255; val > 64; val-=step) {
+    for(uint8_t val = 180; val > 0; val-=step) {
       setAntennas(val, val, val);
       delay(d);
     }
-    for(uint8_t val = 64; val < 127; val+=step) {
+    for(uint8_t val = 0; val < 90; val+=step) {
       setAntennas(val, val, val);
       delay(d);
     }
-    setAntennas(127, 127, 127);
+    setAntennas(90, 90, 90);
   }
+
+  // Check IMU
+  DOSound::sound.playSystemSound(SystemSounds::IMU);
+  if(imu_.available() == false) {
+    Console::console.printfBroadcast("Critical error: IMU not available!\n");
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
+  imu_.update(true);
+  float ax, ay, az;
+  imu_.getAccelMeasurement(ax, ay, az);
+  if(fabs(ax) > 0.1 || fabs(ay) > 0.1 || fabs(az) < 0.9) {
+    Console::console.printfBroadcast("Critical error: Droid not upright (ax %f, ay %f, az %f)!\n", ax, ay, az);
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  }
+  Console::console.printfBroadcast("IMU OK. Down vector: %.2f %.2f %.2f\n", ax, ay, az);
+
+  DOSound::sound.playSystemSound(SystemSounds::CALIBRATING);
+  imu_.calibrate(stream);
+  for(int i=0; i<100; i++) {
+    imu_.update(true);
+  }
+  float p, r, h;
+  imu_.getFilteredPRH(p, r, h);
+  balanceController_.setGoal(-p);
+  Console::console.printfBroadcast("IMU calibrated. Pitch angle at rest: %f\n", p);
+  DOSound::sound.playSystemSound(SystemSounds::OK);
+
 
   // Check Motors
   DOSound::sound.playSystemSound(SystemSounds::LEFT_MOTOR);
@@ -179,7 +180,6 @@ Result DODroid::servoTest(ConsoleStream *stream) {
   } else {
     bb::Servos::servos.setRange(SERVO_NECK, 180-params_.neckRange, 180+params_.neckRange);
     bb::Servos::servos.setOffset(SERVO_NECK, params_.neckOffset);
-    bb::Servos::servos.setProfileVelocity(SERVO_NECK, 50);
   }
 
   if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_PITCH) == false) {
@@ -190,7 +190,6 @@ Result DODroid::servoTest(ConsoleStream *stream) {
   } else {
     bb::Servos::servos.setRange(SERVO_HEAD_PITCH, 180-params_.headPitchRange, 180+params_.headPitchRange);
     bb::Servos::servos.setOffset(SERVO_HEAD_PITCH, params_.headPitchOffset);
-    bb::Servos::servos.setProfileVelocity(SERVO_HEAD_PITCH, 50);
   }
 
   if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_HEADING) == false) {
@@ -228,12 +227,12 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
 
   int pwmStep = 1, pwm;
 
-  float r, p, h, h0, ax, ay, az, axmax=0, aymax=0, hdiffmax=0;
+  float p, r, h, h0, ax, ay, az, axmax=0, aymax=0, hdiffmax=0;
   unsigned int blockedcount = 0;
   float distance = 0;
 
   imu_.update();
-  imu_.getFilteredRPH(r, p, h0);
+  imu_.getFilteredPRH(p, r, h0);
 
   unsigned long microsPerLoop = (unsigned long)(1e6 / imu_.dataRate());
 
@@ -246,7 +245,7 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     float mA = DOBattStatus::batt.current();
     
     imu_.update();
-    imu_.getFilteredRPH(r, p, h);
+    imu_.getFilteredPRH(p, r, h);
     float hdiff = h-h0;
     if(hdiff < -180) hdiff += 360;
     else if(hdiff > 180) hdiff -= 360;

@@ -69,7 +69,7 @@ protected:
   bool servosOK_, antennasOK_;
   bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
   float remoteP_, remoteH_, remoteR_;
-  float annealP_, annealH_, annealR_;
+  float annealP_, annealH_, annealR_, annealTime_;
 };
 
 #endif

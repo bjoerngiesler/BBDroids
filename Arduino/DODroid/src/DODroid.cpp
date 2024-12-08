@@ -35,12 +35,22 @@ DODroid::DODroid():
   description_ = "D-O Main System";
   help_ = "Available commands:\r\n"\
 "\tstatus\t\tPrint Status\r\n"\
-"\tselftest\tRun self test\r\n";
+"\tselftest\tRun self test\r\n"\
+"\tplay_sound [<folder>] <num>\tPlay sound\r\n";
   started_ = false;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
 }
 
 Result DODroid::initialize() {
+  addParameter("neck_range", "Neck servo movement range", params_.neckRange, -INT_MAX, INT_MAX);
+  addParameter("neck_offset", "Neck servo offset", params_.neckOffset, -INT_MAX, INT_MAX);
+  addParameter("head_roll_range", "Head roll servo movement range", params_.headRollRange, -INT_MAX, INT_MAX);
+  addParameter("head_roll_offset", "Head roll servo servo offset", params_.headRollOffset, -INT_MAX, INT_MAX);
+  addParameter("head_pitch_range", "Head pitch servo movement range", params_.headPitchRange, -INT_MAX, INT_MAX);
+  addParameter("head_pitch_offset", "Head pitch servo servo offset", params_.headPitchOffset, -INT_MAX, INT_MAX);
+  addParameter("head_heading_range", "Head heading servo movement range", params_.headHeadingRange, -INT_MAX, INT_MAX);
+  addParameter("head_heading_offset", "Head heading servo servo offset", params_.headHeadingOffset, -INT_MAX, INT_MAX);
+
   addParameter("wheel_kp", "Proportional constant for wheel speed PID controller", params_.wheelSpeedKp, -INT_MAX, INT_MAX);
   addParameter("wheel_ki", "Integrative constant for wheel speed PID controller", params_.wheelSpeedKi, -INT_MAX, INT_MAX);
   addParameter("wheel_kd", "Derivative constant for wheel speed PID controller", params_.wheelSpeedKd, -INT_MAX, INT_MAX);
@@ -61,13 +71,14 @@ Result DODroid::initialize() {
   addParameter("antenna_offset", "Offset for antennas", params_.antennaOffset, -INT_MAX, INT_MAX);
   addParameter("gyro_pitch_deadband", "Deadband for gyro pitch", params_.gyroPitchDeadband, -INT_MAX, INT_MAX);
 
-
   addParameter("fa_neck_imu_accel", "Free Anim - neck on IMU accel", params_.faNeckIMUAccel, -INT_MAX, INT_MAX);
+  addParameter("fa_neck_sp_accel", "Free Anim - neck on accel setpoint", params_.faNeckSPAccel, -INT_MAX, INT_MAX);
   addParameter("fa_neck_speed", "Free Anim - neck on wheel speed", params_.faNeckSpeed, -INT_MAX, INT_MAX);
   addParameter("fa_neck_speed_sp", "Free Anim - neck on wheel speed setpoint", params_.faNeckSpeedSP, -INT_MAX, INT_MAX);
+  addParameter("fa_head_pitch_speed_sp", "Free Anim - head pitch on wheel speed setpoint", params_.faHeadPitchSpeedSP, -INT_MAX, INT_MAX);
   addParameter("fa_head_roll_turn", "Free Anim: Head roll on turn speed", params_.faHeadRollTurn, -INT_MAX, INT_MAX);
   addParameter("fa_head_heading_turn", "Free Anim: Head heading on turn speed", params_.faHeadHeadingTurn, -INT_MAX, INT_MAX);
-  addParameter("fa_antenna_speed", "Free Anim: Antenna position on wheel speed", params_.faAntennaSpeed, -INT_MAX, INT_MAX);
+  addParameter("fa_antenna_speed", "Free Anim: Antenna position on wheel speed setpoint", params_.faAntennaSpeedSP, -INT_MAX, INT_MAX);
   addParameter("fa_head_anneal_time", "Free Anim: Head anneal time", params_.faHeadAnnealTime, -INT_MAX, INT_MAX);
 
   lSpeedController_.setAutoUpdate(false);
@@ -75,8 +86,9 @@ Result DODroid::initialize() {
 
   balanceController_.setAutoUpdate(false);
   balanceController_.setReverse(true); // FIXME Not quite sure anymore why we're reversing here, we should be forwarding. Check!
-
-  imu_.setRotationAroundZ(bb::IMU::ROTATE_180);
+  balanceController_.setDebug(false);
+ 
+  imu_.setRotationAroundZ(bb::IMU::ROTATE_90);
 
   return Subsystem::initialize();
 }
@@ -93,6 +105,7 @@ Result DODroid::start(ConsoleStream* stream) {
   DOBattStatus::batt.begin();
 
   operationStatus_ = selfTest();
+  
 
   if(operationStatus_ == RES_DROID_VOLTAGE_TOO_LOW) {
     if(DOBattStatus::batt.voltage() < 1.0) {
@@ -191,29 +204,39 @@ bb::Result DODroid::stepPowerProtect() {
 }
 
 bb::Result DODroid::stepHead() {
-  float r, p, h, dr, dp, dh, ax, ay, az;
-  imu_.getFilteredRPH(r, p, h);
+  float p, r, h, dr, dp, dh, ax, ay, az;
+  imu_.getFilteredPRH(p, r, h);
   imu_.getAccelMeasurement(ax, ay, az);
-  imu_.getGyroMeasurement(dr, dp, dh);
+  imu_.getGyroMeasurement(dp, dr, dh);
 
   //Console::console.printfBroadcast("R:%f P:%f H:%f AX:%f AY:%f AZ:%f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, dr, dp, dh);
 
+  float speed = (leftEncoder_.presentSpeed() + rightEncoder_.presentSpeed())/2;
+  float speedSP = (lSpeedController_.goal() + rSpeedController_.goal())/2;
+  float accelSP = (speedSP-speed);
+  if(speedSP == 0) accelSP = 0;
+
   if(servosOK_) {
-    float speed = (leftEncoder_.presentSpeed() + rightEncoder_.presentSpeed())/2;
-
-    float nod = params_.faNeckIMUAccel*ax + params_.faNeckSpeed*speed + params_.faNeckSpeedSP*speed;
+    float nod = params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
+    if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
+    else nod += params_.faNeckSpeedSP*speedSP/2;
+    nod += params_.neckOffset;
     bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
-    bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 - nod - remoteP_);
-    
-    bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh - remoteH_);
-    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 + params_.faHeadRollTurn * dh + remoteR_);
 
-    float ant = 127 + params_.antennaOffset + speed*params_.faAntennaSpeed;
-    ant = constrain(ant, 0, 255);
+    float headPitch = -nod + remoteP_ - params_.neckOffset - params_.headPitchOffset;
+    headPitch += params_.faHeadPitchSpeedSP*speedSP;
+    bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 + headPitch);
+    bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh - remoteH_ + params_.headHeadingOffset);
+    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh - remoteR_ + params_.headRollOffset);
+  }
+
+  if(antennasOK_) {
+    float ant = 90 + params_.antennaOffset + speedSP*params_.faAntennaSpeedSP;
+    ant = constrain(ant, 0, 180);
     setAntennas(ant, ant, ant);
   }
 
-  if(lastBtn0_ == false) {
+  if(lastBtn3_ == false && (float(millis())/1000.0f > annealTime_ + params_.faHeadAnnealDelay)) {
     if(remoteP_ > 0.5) {
       remoteP_ -= annealP_;
       if(remoteP_ < 0) remoteP_ = 0;
@@ -237,6 +260,8 @@ bb::Result DODroid::stepHead() {
       remoteR_ += annealR_;
       if(remoteR_ > 0) remoteR_ = 0;
     } else remoteR_ = 0;
+  } else if(lastBtn3_ == true){
+    annealTime_ = float(millis()) / 1000.0f;
   }
   
   return RES_OK;
@@ -260,6 +285,7 @@ void DODroid::switchDrive(bool onoff) {
   rSpeedController_.reset();
   rSpeedController_.setGoal(0);
   balanceController_.reset();
+  balanceController_.setGoal(0);
 
   driveOn_ = onoff;
 }
@@ -295,17 +321,20 @@ void DODroid::printStatus(ConsoleStream *stream) {
   else stream->printf("R Err %d", rightMotorStatus_);
   stream->printf(", enc %.1f", rightEncoder_.presentPosition());
 
+  float p, r, h;
+  imu_.getFilteredPRH(p, r, h);
+  stream->printf(", IMU: P%f R%f H%f", p, r, h);
+
   stream->printf("\n");
 }
 
 Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
     Console::console.printfBroadcast("Control packet from left remote (but not primary)\n");
-    return RES_OK;
   } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {    
     Console::console.printfBroadcast("Control packet from right remote (but not primary)\n");
-    return RES_OK;
-  } else if(source == PACKET_SOURCE_PRIMARY_REMOTE) {
+  } 
+  if(packet.primary == true) {
     //Console::console.printfBroadcast("Control packet from primary remote\n");
     static int numZero = 0;
     if(EPSILON(packet.getAxis(0)) && EPSILON(packet.getAxis(1))) {
@@ -331,9 +360,13 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
       annealH_ = fabs(remoteH_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
     }
 
-    if(packet.button0 && !lastBtn0_) DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING, false);
-    else if(packet.button1 && !lastBtn1_) DOSound::sound.playFolderRandom(DOSound::FOLDER_POSITIVE, false);
-    else if(packet.button2 && !lastBtn2_) DOSound::sound.playFolderRandom(DOSound::FOLDER_NEGATIVE, false);
+    if(driveOn_ == false) { // doesn't work while driving
+      if(packet.button0 && !lastBtn0_) {
+        DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING, false);
+      } 
+      else if(packet.button1 && !lastBtn1_) DOSound::sound.playFolderRandom(DOSound::FOLDER_POSITIVE, false);
+      else if(packet.button2 && !lastBtn2_) DOSound::sound.playFolderRandom(DOSound::FOLDER_NEGATIVE, false);
+    }
 
     lastBtn0_ = packet.button0;
     lastBtn1_ = packet.button1;
@@ -359,7 +392,7 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
 
     DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
   } // Primary Remote
-  
+
   return RES_OK;
 }
 
@@ -370,7 +403,17 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
     if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
     Runloop::runloop.excuseOverrun();
     return selfTest(stream);
-  } 
+  } else if(words[0] == "play_sound") {
+    if(words.size() == 1 || words.size() > 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    if(words.size() == 2) {
+      bool retval = DOSound::sound.playSound(words[1].toInt());
+      if(retval == false) stream->printf("Error\n");      
+    } if(words.size() == 3) {
+      bool retval = DOSound::sound.playFolder(DOSound::Folder(words[1].toInt()), words[2].toInt());
+      if(retval == false) stream->printf("Error\n");
+    }
+    return RES_OK;
+  }
   
   return bb::Subsystem::handleConsoleCommand(words, stream);
 }
@@ -467,6 +510,8 @@ bool DODroid::setAntennas(uint8_t a1, uint8_t a2, uint8_t a3) {
   Wire.beginTransmission(0x17);
   Wire.write(antennas, sizeof(antennas));
   if(Wire.endTransmission() == 0) return true;
+  Console::console.printfBroadcast("Error moving antennas\n");
+  antennasOK_ = false;
   return false;
 }
 

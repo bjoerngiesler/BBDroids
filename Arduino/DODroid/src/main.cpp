@@ -73,10 +73,12 @@ void setup() {
   Wire.begin();
 
   setupBoardComm();
-  
+
+#if 0
   DOSound::sound.begin(dfplayerSerial);
-  DOSound::sound.setVolume(30);
-  DOSound::sound.playSystemSound(1);
+  DOSound::sound.setVolume(25);
+  DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING);
+#endif
 
   initializeSubsystems();
   startSubsystems();

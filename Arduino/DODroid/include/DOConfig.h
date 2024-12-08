@@ -4,34 +4,34 @@
 #include <Arduino.h>
 #include <BBPacket.h>
 
-// Droid Config
+// Basic Droid Config
 static const bb::DroidType DROID_TYPE = bb::DroidType::DROID_DO;
 static const char*         DROID_NAME = "Generic D-O";
 static const uint8_t       BUILDER_ID = 0; // Reserved values: 0 Bjoern, 1 Felix, 2 Micke, 3 Brad, 4 Lars, 5 Lukas
-static const uint8_t       DROID_ID = 0;
+static const uint8_t       DROID_ID   = 0;
 static const float         WHEEL_CIRCUMFERENCE = 722.566;              // Wheel circumference in mm for D-O, required to convert between speed over ground to encoder ticks
 static const float         WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979.2 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
 static const float         WHEEL_DISTANCE = 95.0;                      // Distance between the drive wheels
 
-// Motion Limits
+// Parameters - all of these can be set from the commandline and stored in flash.
 struct DOParams {
     float neckRange         = 30.0; // Careful with this, easy to nosedive if the drive controller and neck aren't working together well.
     float neckOffset        = 0.0;  
     float headRollRange     = 45.0;
     float headRollOffset    = 0.0;
     float headPitchRange    = 45.0; 
-    float headPitchOffset   = 0.0;
+    float headPitchOffset   = 3.0;
     float headHeadingRange  = 90.0;
     float headHeadingOffset = 0.0;
 
     float gyroPitchDeadband = 1.0;
 
-    float wheelSpeedKp      = 0.13;
-    float wheelSpeedKi      = 0.6;
+    float wheelSpeedKp      = 0.11;
+    float wheelSpeedKi      = 0.8;
     float wheelSpeedKd      = 0.0;
     float wheelSpeedImax    = 255;
 
-    float balKp             = 22;
+    float balKp             = 20;
     float balKi             = 0;
     float balKd             = 0;
 
@@ -39,34 +39,32 @@ struct DOParams {
     float maxSpeed          = 800;
     float accel             = 2500;
 
-    float antennaOffset     = -70;  
+    float antennaOffset     = 0;  
 
     float speedAxisGain     = 1.0;
-    float speedAxisDeadband = 0.01;
-    float rotAxisGain       = 0.5;
-    float rotAxisDeadband   = 0.01;
+    float speedAxisDeadband = 0.05;
+    float rotAxisGain       = 0.4;
+    float rotAxisDeadband   = 0.05;
 
     // Free animation parameters. 
     // Be aware of the units!!! E.g. target unit for servo free animation is always degrees, but input may be something else.
     // Example - faNeckSpeed has input unit of mm/s, going up to maxSpeed, so is probably much below 1.
-    float faNeckIMUAccel    = -25;  // Move neck by acceleration from the IMU
-    float faNeckSpeed       = -.01; // Move neck by absolute speed over ground
-    float faNeckSpeedSP     = -.03; // Move neck by speed *setpoint* over ground. Good idea to interpolate this with faNeckSpeed!
-    float faHeadRollTurn    = .15;  // Move head roll by IMU turn speed
-    float faHeadHeadingTurn = .2;   // Move head heading by IMU turn speed
-    float faAntennaSpeed    = .2;   // Move antennas by speed over ground
-    float faHeadAnnealTime  = .5;   // Time it takes for all head axes ot return to 0 after control has been relinquished.
+    float faNeckIMUAccel     = -30;   // Move neck by acceleration from the IMU
+    float faNeckSPAccel      = 0;    // Move neck by acceleration from speed setpoint
+    float faNeckSpeed        = 0.01;     // Move neck by absolute speed over ground
+    float faNeckSpeedSP      = -0.06; // Move neck by speed *setpoint* over ground. Good idea to interpolate this with faNeckSpeed!
+    float faHeadPitchSpeedSP = 0.03;  // Pitch up head at higher speeds to counteract the neck speed setpoint
+    float faHeadRollTurn     = .10;   // Move head roll by IMU turn speed
+    float faHeadHeadingTurn  = .14;   // Move head heading by IMU turn speed
+    float faAntennaSpeedSP   = .05;    // Move antennas by speed over ground
+    float faHeadAnnealTime   = .5;    // Time it takes for all head axes ot return to 0 after control has been relinquished.
+    float faHeadAnnealDelay  = .3;    // Delay before we anneal
 };
 
 // Battery constants
 static const float POWER_BATT_NONE = 5.0;  // Everything under this means we're connected to USB.
 static const float POWER_BATT_MIN  = 12.5; // Minimum voltage - below this, everything switches off to save the LiPos.
 static const float POWER_BATT_MAX  = 16.0; // Maximum voltage - above this, we're overvolting and will probably breal stuff.
-
-static const float PITCH_BIAS = 1.35;
-static const float PITCH_DEADBAND = .5;
-//static const float BAL_SPEED_REMOTE_FACTOR = 800;
-//static const float BAL_ROT_REMOTE_FACTOR = 800/2.0;
 
 // Selftest Constants
 static const float ST_MIN_PWM              = 40.0;
