@@ -20,14 +20,14 @@ static const int CURSOR_SIZE = 5;
 RDisplay RDisplay::display;
 
 RDisplay::RDisplay():
-  statusPixels_(2, P_D_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 #if defined(LEFT_REMOTE)
 #if defined(ARDUINO_ARCH_ESP32)
-, ser_(Serial2)
+  ser_(Serial2),
 #else
-, ser_(P_DISPLAY_RX, P_DISPLAY_TX) 
+  ser_(P_DISPLAY_RX, P_DISPLAY_TX),
 #endif
 #endif // LEFT_REMOTE
+  statusPixels_(2, P_D_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 {
   name_ = "display";
 	description_ = "Display";
@@ -152,7 +152,7 @@ uint8_t RDisplay::sendBinCommand(const std::vector<uint8_t>& cmd, int timeout, b
 
   //Console::console.printfBroadcast("Available with %dus remaining.\n", timeout);
 
-  uint8_t retval;
+  uint8_t retval = 0;
   while(ser_.available()) {
     retval = ser_.read();
     //Console::console.printfBroadcast("Read 0x%x\n", retval);
@@ -186,7 +186,7 @@ bool RDisplay::readString(String& str, unsigned char terminator) {
 
 Result RDisplay::cls() {
 #if defined(BINARY)
-  if(sendBinCommand({rd::CMD_CLS|0x80}) != rd::CMD_NOP|0x80) return RES_SUBSYS_COMM_ERROR;
+  if(sendBinCommand({rd::CMD_CLS|0x80}) != (rd::CMD_NOP|0x80)) return RES_SUBSYS_COMM_ERROR;
 #else
   if(!sendStringAndWaitForOK(String((char)rd::CMD_CLS))) return RES_SUBSYS_COMM_ERROR;
 #endif

@@ -54,9 +54,12 @@ public:
   void setTopTitle(const String& title);
   void setBottomTitle(const String& title);
 
+  // Pairing callbacks
   void selectDroid(uint64_t address);
   void selectRightRemote(uint64_t address);
 
+  // Other callbacks
+  void setIncrRotButton(bool thisremote, RInput::ButtonIndex button);
   void factoryReset(bool thisremote);
   void startCalibration(bool thisremote);
   void finishCalibration(bool thisremote);
@@ -101,10 +104,16 @@ protected:
   int16_t calibRounds;
 
   struct RemoteParams {
-    uint64_t otherRemoteAddress;
-    uint64_t droidAddress;
-    RInput::AxisCalib hCalib, vCalib;
-    bool isPrimary;
+    uint64_t otherRemoteAddress = 0x0;
+    uint64_t droidAddress = 0x0;
+    RInput::AxisCalib hCalib = RInput::AxisCalib();
+    RInput::AxisCalib vCalib = RInput::AxisCalib();
+  #if defined(LEFT_REMOTE)
+    bool isPrimary = true;
+  #else
+    bool isPrimary = false;
+  #endif
+    RInput::ButtonIndex incrRotButton = RInput::BUTTON_NONE;
   };
 
   static RemoteParams params_;

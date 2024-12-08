@@ -75,17 +75,25 @@ RInput::RInput(): imu_(IMU_ADDR) {
   maxJoyRawH = 2048;
   minJoyRawV = 2048;
   maxJoyRawV = 2048;
-  incrementalAccel_ = BUTTON_NONE;
+  incrementalPos_ = BUTTON_RIGHT;
   incrementalRot_ = BUTTON_NONE;
   incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
+  imu_.setRotationAroundZ(bb::IMU::ROTATE_180);
 }
 
 bool RInput::begin() {
   return true;
 }
 
-void RInput::setIncrementalAccel(ButtonIndex btn) {
-  incrementalAccel_ = btn;
+void RInput::setIncrementalPos(ButtonIndex btn) {
+  incrementalPos_ = btn;
+}
+
+void RInput::resetIncrementalPos() {
+  incAccX_ = 0; incAccY_ = 0; incAccZ_ = 0;
+  incVelX_ = 0; incVelY_ = 0; incVelZ_ = 0;
+  incPosX_ = 0; incPosY_ = 0; incPosZ_ = 0;
+  lastIncPosMicros_ = 0;
 }
   
 void RInput::setIncrementalRot(ButtonIndex btn) {
@@ -154,6 +162,29 @@ void RInput::update() {
 
   if(imu_.available()) {
     imu_.update();
+
+    float ax, ay, az;
+    imu_.getGravCorrectedAccel(ax, ay, az);
+    incAccX_ = accXFilter_.filter(ax); if(fabs(incAccX_)<.1) incAccX_=0; 
+    incAccY_ = accYFilter_.filter(ay); if(fabs(incAccY_)<.1) incAccY_=0; 
+    incAccZ_ = accZFilter_.filter(az); if(fabs(incAccZ_)<.1) incAccZ_=0; 
+        
+    if(lastIncPosMicros_ != 0) {
+      double dt = (micros() - lastIncPosMicros_)/1e6;
+      incVelX_ += incAccX_*dt; incVelY_ += incAccY_*dt; incVelZ_ += incAccZ_*dt;
+      incPosX_ += incVelX_*dt + (incAccX_*dt)*(incAccX_*dt)/2.0;
+      incPosY_ += incVelY_*dt + (incAccY_*dt)*(incAccY_*dt)/2.0;
+      incPosZ_ += incVelZ_*dt + (incAccZ_*dt)*(incAccZ_*dt)/2.0;
+      if(incrementalPos_ != BUTTON_NONE && buttons[incrementalPos_] == true) {
+#if 0
+      Console::console.printfBroadcast("ax:%f,ay:%f,az:%f,p:%f,r:%f,h:%f,gx:%f,gy:%f,gz:%f,ax:%f,ay:%f,az:%f,X:%f,Y:%f,Z:%f\n", 
+      ax, ay, az, p, r, h, gravx, gravy, gravz, incAccX_, incAccY_, incAccZ_, incPosX_, incPosY_, incPosZ_);
+#else
+      //Console::console.printfBroadcast("ax:%f,ay:%f,az:%f,X:%f,Y:%f,Z:%f\n", incAccX_, incAccY_, incAccZ_, incPosX_, incPosY_, incPosZ_);
+#endif
+      }
+    }
+    lastIncPosMicros_ = micros();
   } else {
     if(imu_.begin() == true) {
       float dr = imu_.dataRate();
@@ -195,23 +226,24 @@ void RInput::update() {
     else btnConfirmReleased();
   }
 
-  if(incrementalAccel_ < buttons.size()) {
-    if(buttonsChanged[incrementalAccel_]) {
-
+  if(incrementalPos_ < buttons.size()) {
+    if(buttonsChanged[incrementalPos_]) {
+      resetIncrementalPos();
+    } else if(buttons[incrementalPos_]) {
     }
   }
   
   if(incrementalRot_ < buttons.size()) {
     if(buttonsChanged[incrementalRot_]) {
-      incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
+      incRotP_ = 0; incRotR_ = 0; incRotH_ = 0;
       if(buttons[incrementalRot_]) {
         if(imu_.available()) {
-          imu_.getFilteredRPH(incRotR_, incRotP_, incRotH_);
+          imu_.getFilteredPRH(incRotP_, incRotR_, incRotH_);
         } else {
           Console::console.printfBroadcast("IMU not available!\n");
         }
       }
-      Console::console.printfBroadcast("Inc Rot R:%f P:%f H:%f\n", incRotR_, incRotP_, incRotH_);
+      Console::console.printfBroadcast("Inc Rot P:%f R:%f H:%f\n", incRotP_, incRotR_, incRotH_);
     }
   }
 }
@@ -264,17 +296,17 @@ Result RInput::fillControlPacket(ControlPacket& packet) {
   packet.setAxis(1, joyV, bb::ControlPacket::UNIT_UNITY_CENTERED);
 
   if (imu_.available()) {
-    float roll, pitch, heading;
+    float pitch, roll, heading;
     float ax, ay, az;
-    imu_.getFilteredRPH(roll, pitch, heading);
+    imu_.getFilteredPRH(pitch, roll, heading);
     imu_.getAccelMeasurement(ax, ay, az);
 
     if(incrementalRot_ < buttons.size()) {
       if(buttons[incrementalRot_]) {
-        float rollOut, pitchOut, headingOut;
-        transformRotation(roll, pitch, heading, incRotR_, incRotP_, incRotH_, rollOut, pitchOut, headingOut, true);
-        packet.setAxis(2, rollOut, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
-        packet.setAxis(3, pitchOut, bb::ControlPacket::UNIT_DEGREES_CENTERED);
+        float pitchOut, rollOut, headingOut;
+        transformRotation(pitch, roll, heading, incRotP_, incRotR_, incRotH_, pitchOut, rollOut, headingOut, true);
+        packet.setAxis(2, pitchOut, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
+        packet.setAxis(3, rollOut, bb::ControlPacket::UNIT_DEGREES_CENTERED);
         packet.setAxis(4, headingOut, bb::ControlPacket::UNIT_DEGREES_CENTERED);
       } else {
         packet.setAxis(2, 0, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
@@ -282,8 +314,8 @@ Result RInput::fillControlPacket(ControlPacket& packet) {
         packet.setAxis(4, 0, bb::ControlPacket::UNIT_DEGREES);
       }
     } else {
-      packet.setAxis(2, roll, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
-      packet.setAxis(3, pitch, bb::ControlPacket::UNIT_DEGREES_CENTERED);
+      packet.setAxis(2, pitch, bb::ControlPacket::UNIT_DEGREES_CENTERED); 
+      packet.setAxis(3, roll, bb::ControlPacket::UNIT_DEGREES_CENTERED);
       packet.setAxis(4, heading, bb::ControlPacket::UNIT_DEGREES);
     }
     packet.setAxis(5, ax, bb::ControlPacket::UNIT_UNITY_CENTERED);

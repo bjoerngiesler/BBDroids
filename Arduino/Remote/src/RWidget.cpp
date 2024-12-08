@@ -14,6 +14,9 @@ RWidget::RWidget(): name_("Widget") {
     action_ = nullptr;
 }
 
+RWidget::~RWidget() {
+}
+
 Result RWidget::draw(ConsoleStream* stream) {
     needsContentsRedraw_ = false;
     needsFullRedraw_ = false;

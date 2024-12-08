@@ -68,7 +68,8 @@ public:
   bb::IMU& imu() { return imu_; }
 
   void setCalibration(const AxisCalib& hc, const AxisCalib& vc) { hCalib = hc; vCalib = vc; }
-  void setIncrementalAccel(ButtonIndex btn);
+  void setIncrementalPos(ButtonIndex btn);
+  void resetIncrementalPos();
   void setIncrementalRot(ButtonIndex btn);
 
   bool anyButtonPressed();
@@ -119,8 +120,14 @@ protected:
   unsigned long tlms_, trms_, cms_;
   std::function<void(void)> tlShortPressCB_, tlLongPressCB_, trShortPressCB_, trLongPressCB_, cShortPressCB_, cLongPressCB_;
   unsigned long longPressThresh_;
-  ButtonIndex incrementalAccel_, incrementalRot_; 
+  ButtonIndex incrementalPos_, incrementalRot_; 
   float incRotR_, incRotP_, incRotH_;
+  
+  unsigned long lastIncPosMicros_;
+  double incAccX_, incVelX_, incPosX_;
+  double incAccY_, incVelY_, incPosY_;
+  double incAccZ_, incVelZ_, incPosZ_;
+  bb::HighPassFilter accXFilter_, accYFilter_, accZFilter_;
   bb::IMU imu_;
 };
 

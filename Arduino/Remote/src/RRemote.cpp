@@ -14,13 +14,14 @@ RRemote::RRemote():
 "\tstatus                 Prints current status (buttons, axes, etc.)\r\n"\
 "\trunning_status on|off  Continuously prints status\r\n"\
 "\ttestsuite              Run test suite\r\n"\
+"\tcalibrate_imu          Run IMU calibration\r\n"\
 "\treset                  Factory reset";
 
   started_ = false;
   onInitScreen_ = true;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
   deltaR_ = 0; deltaP_ = 0; deltaH_ = 0;
-  memset(&lastPacketSent_, 0, sizeof(Packet));
+  memset((void*)&lastPacketSent_, 0, sizeof(Packet));
 
   params_.droidAddress = 0x0;
   params_.otherRemoteAddress = 0x0;
@@ -298,13 +299,16 @@ Result RRemote::step() {
     topLabel_.draw();
     bottomLabel_.draw();
     if(mainWidget_ != NULL) mainWidget_->draw();
+  } else {
+    RDisplay::display.setLED(RDisplay::LED_COMM, 0, 0, 0);
+  }
 
-    fillAndSend();
+  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
     if(runningStatus_) {
       printStatus();
     }
-  } else {
-    RDisplay::display.setLED(RDisplay::LED_COMM, 0, 0, 0);
+
+    fillAndSend();
   }
 
   return RES_OK;
@@ -313,6 +317,22 @@ Result RRemote::step() {
 Result RRemote::stepCalib() {
   return RES_OK;
 }
+
+void RRemote::setIncrRotButton(bool thisremote, RInput::ButtonIndex button) {
+  if(thisremote) {
+    RInput::input.setIncrementalRot(button);
+    params_.incrRotButton = button;
+    bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+    bb::ConfigStorage::storage.store();
+  } else {
+#if defined(LEFT_REMOTE)
+    Console::console.printfBroadcast("Incr Rot other remote not yet implemented\n");
+#else
+    Console::console.printfBroadcast("Incr Rot other remote only defined for left remote\n");
+#endif
+  }
+}
+
 
 void RRemote::factoryReset(bool thisremote) {
   if(thisremote) {
@@ -341,7 +361,7 @@ void RRemote::factoryReset(bool thisremote) {
 
     populateMenus();
 #else
-    Console::console.printfBroadcast("Factory reset other remote only defined for right remote");
+    Console::console.printfBroadcast("Factory reset other remote only defined for left remote\m");
 #endif
   }
 }
@@ -436,6 +456,8 @@ void RRemote::setPrimary(bool thisremote) {
   else packet.payload.config.parameter = 1;
   XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
 #endif
+    bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+    bb::ConfigStorage::storage.store();
 }
 
 
@@ -445,7 +467,10 @@ bb::Result RRemote::fillAndSend() {
 #else
   Packet packet(PACKET_TYPE_CONTROL, PACKET_SOURCE_RIGHT_REMOTE, sequenceNumber());
 #endif
-  if(params_.isPrimary) packet.source = PACKET_SOURCE_PRIMARY_REMOTE;
+  if(params_.isPrimary) {
+    packet.source = PACKET_SOURCE_PRIMARY_REMOTE;
+    packet.payload.control.primary = true;
+  }
 
   RInput::input.fillControlPacket(packet.payload.control);
 
@@ -463,6 +488,8 @@ bb::Result RRemote::fillAndSend() {
   // both remotes send to droid
   if(params_.droidAddress != 0 && mode_ == MODE_REGULAR) {
     //Console::console.printfBroadcast("Sending control to droid 0x%llx\n", params_.droidAddress);
+    res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
+    res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
     res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
     if(res != RES_OK) {
       RDisplay::display.setLED(RDisplay::LED_COMM, 0, 150, 0);
@@ -501,6 +528,11 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
   else if(words[0] == "calibrate") {
     startCalibration(true);
 
+    return RES_OK;
+  }
+
+  else if(words[0] == "calibrate_imu") {
+    RInput::input.imu().calibrate();
     return RES_OK;
   }
 
@@ -615,21 +647,20 @@ void RRemote::printStatus(ConsoleStream *stream) {
   const unsigned int bufsize = 255;
   char buf[bufsize];
 
-  float roll, pitch, heading, ax, ay, az;
-  RInput::input.imu().getFilteredRPH(roll, pitch, heading);
-  RInput::input.imu().getAccelMeasurement(ax, ay, az);
+  float pitch, roll, heading, ax, ay, az;
+  RInput::input.imu().getFilteredPRH(pitch, roll, heading);
+  //RInput::input.imu().getAccelMeasurement(ax, ay, az);
+  RInput::input.imu().getGravCorrectedAccel(ax, ay, az);
 
-#if defined(ARDUINO_ARCH_ESP32)
-  float temp = roll;
-  roll = pitch;
-  pitch = temp;
-#endif
+  snprintf(buf, bufsize, "S%ld AX%f AY%f AZ%f\n", seqnum_, ax, ay, az);
 
-  snprintf(buf, bufsize, "S%d H%d [%d..%d..%d] %.2f V%d [%d..%d..%d] %.2f R%.1f P%.1f Y%.1f AX%.1f AY%.1f AZ%.1f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c\n",
+
+#if 0
+  snprintf(buf, bufsize, "S%d H%d [%d..%d..%d] %.2f V%d [%d..%d..%d] %.2f P%.1f R%.1f H%.1f AX%f AY%f AZ%f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c\n",
     seqnum_,
     RInput::input.joyRawH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max, RInput::input.joyH,
     RInput::input.joyRawV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max, RInput::input.joyV,
-    roll, pitch, heading,
+    pitch, roll, heading,
     ax, ay, az,
     RInput::input.pot1, RInput::input.pot2,
     RInput::input.battery,
@@ -641,6 +672,7 @@ void RRemote::printStatus(ConsoleStream *stream) {
     RInput::input.buttons[RInput::BUTTON_CONFIRM] ? '0' : '1',
     RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? '0' : '1',
     RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? '0' : '1');
+#endif
 
   if(stream != NULL) stream->printf(buf);
   else Console::console.printfBroadcast(buf);

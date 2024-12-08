@@ -51,7 +51,7 @@ Result RIMUWidget::draw(ConsoleStream* stream) {
     // horizon line
     // y = ax+b
     float a = tan(DEG_TO_RAD*heading_);
-    float b = -sin(DEG_TO_RAD*pitch_) * r;
+    float b = -sin(DEG_TO_RAD*roll_) * r;
 
     // circle equation: r^2 = x^2+y^2
     // put y=ax+b into this and multiply out
@@ -75,7 +75,7 @@ Result RIMUWidget::draw(ConsoleStream* stream) {
     horizX1Old_ = horizX1; horizY1Old_ = horizY1;
     horizX2Old_ = horizX2; horizY2Old_ = horizY2;
 
-    float headingposx = sin(DEG_TO_RAD*roll_)*cos(DEG_TO_RAD*heading_)*r;
+    float headingposx = sin(DEG_TO_RAD*pitch_)*cos(DEG_TO_RAD*heading_)*r;
     float headingposy = a*headingposx + b;
 
     // hy = a'hx+b' ==> b = hy - a'hx
@@ -137,8 +137,8 @@ Result RIMUWidget::draw(ConsoleStream* stream) {
 }   
 
 void RIMUWidget::setRPH(float r, float p, float h) {
-    roll_ = -r;
-    pitch_ = -p;
+    roll_ = r;
+    pitch_ = p;
     heading_ = h;
 
     //Console::console.printfBroadcast("R:%.2f P:%.2f H:%.2f\n", r, p, h);

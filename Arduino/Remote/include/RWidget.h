@@ -6,6 +6,7 @@
 class RWidget {
 public:
     RWidget();
+    virtual ~RWidget();
 
     virtual Result draw(ConsoleStream* stream = NULL);
 
