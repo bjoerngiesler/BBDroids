@@ -59,7 +59,7 @@ public:
   void selectRightRemote(uint64_t address);
 
   // Other callbacks
-  void setIncrRotButton(bool thisremote, RInput::ButtonIndex button);
+  void setIncrRotButton(RInput::ButtonIndex button, bool thisremote = true);
   void factoryReset(bool thisremote);
   void startCalibration(bool thisremote);
   void finishCalibration(bool thisremote);

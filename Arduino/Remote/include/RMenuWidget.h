@@ -17,7 +17,7 @@ class RMenuWidget: public RMultiWidget {
 public:
   RMenuWidget();
 
-  void addEntry(const String& title, std::function<void(void)> callback);
+  void addEntry(const String& title, std::function<void(void)> callback, bool highlight = false);
   void clear();
 
   void up();

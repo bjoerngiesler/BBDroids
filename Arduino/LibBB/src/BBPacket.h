@@ -163,6 +163,11 @@ struct __attribute__ ((packed)) StatePacket {
 	ControlType soundControl : 2;
 };
 
+struct __attribute__((packed)) RemoteConfigPacket {
+	bool isPrimary        : 1;
+	uint8_t incrRotButton : 4;
+};
+
 struct __attribute__ ((packed)) ConfigPacket {
 	static const uint64_t MAGIC = 0xbadeaffebabeface;
 #define CONFIG_TYPE_BITS 6
@@ -171,11 +176,11 @@ struct __attribute__ ((packed)) ConfigPacket {
 		CONFIG_SET_LEFT_REMOTE_ID       = 0,  // L->R - parameter: ID of left remote
 		CONFIG_SET_DROID_ID             = 1,  // L->R - parameter: ID of right remote
 		CONFIG_CALIBRATE                = 2,  // L->R - parameter: MAGIC
-		CONFIG_SET_DRIVE_CONTROL_MODE   = 2,  // L->D - parameter: control mode
-		CONFIG_SET_DOME_CONTROL_MODE    = 3,  // L->D - parameter: control mode
-		CONFIG_SET_ARMS_CONTROL_MODE    = 4,  // L->D - parameter: control mode
-		CONFIG_SET_SOUND_CONTROL_MODE   = 5,  // L->D - parameter: control mode
-		CONFIG_SET_PRIMARY_REMOTE       = 6,  // L->D - parameter: 0 for secondary remote, 1 to become primary
+		CONFIG_SET_DRIVE_CONTROL_MODE   = 3,  // L->D - parameter: control mode
+		CONFIG_SET_DOME_CONTROL_MODE    = 4,  // L->D - parameter: control mode
+		CONFIG_SET_ARMS_CONTROL_MODE    = 5,  // L->D - parameter: control mode
+		CONFIG_SET_SOUND_CONTROL_MODE   = 6,  // L->D - parameter: control mode
+		CONFIG_SET_REMOTE_PARAMS        = 7,  // L->D - parameter: 0 for secondary remote, 1 to become primary
 		CONFIG_FACTORY_RESET            = (1<<(CONFIG_TYPE_BITS-1)) // L->R - parameter: MAGIC
 	};
 

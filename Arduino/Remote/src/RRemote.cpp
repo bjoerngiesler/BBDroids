@@ -30,6 +30,7 @@ RRemote::RRemote():
 #else
   params_.isPrimary = false;
 #endif
+  params_.incrRotButton = RInput::BUTTON_NONE;
 
   waitMessage_.setTitle("Please wait");
   restartMessage_.setTitle("Restart now");
@@ -172,20 +173,20 @@ void RRemote::populateMenus() {
 
   lRIncrRotMenu_.clear();
   lRIncrRotMenu_.setName("Incr Rotation");
-  lRIncrRotMenu_.addEntry("Disable", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_NONE);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Left Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_LEFT);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Right Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_RIGHT);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Pinky Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_PINKY);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Index Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_INDEX);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButton(RInput::BUTTON_NONE, true);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButton(RInput::BUTTON_LEFT, true);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButton(RInput::BUTTON_RIGHT, true);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButton(RInput::BUTTON_PINKY, true);showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButton(RInput::BUTTON_INDEX, true);showMenu(&leftRemoteMenu_);});
   lRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
 
   rRIncrRotMenu_.clear();
   rRIncrRotMenu_.setName("Incr Rotation");
-  rRIncrRotMenu_.addEntry("Disable", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_NONE);showMenu(&rightRemoteMenu_);});
-  rRIncrRotMenu_.addEntry("Left Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_LEFT);showMenu(&rightRemoteMenu_);});
-  rRIncrRotMenu_.addEntry("Right Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_RIGHT);showMenu(&rightRemoteMenu_);});
-  rRIncrRotMenu_.addEntry("Pinky Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_PINKY);showMenu(&rightRemoteMenu_);});
-  rRIncrRotMenu_.addEntry("Index Button", [=]{RInput::input.setIncrementalRot(RInput::BUTTON_INDEX);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButton(RInput::BUTTON_NONE, false);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButton(RInput::BUTTON_LEFT, false);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButton(RInput::BUTTON_RIGHT, false);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButton(RInput::BUTTON_PINKY, false);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButton(RInput::BUTTON_INDEX, false);showMenu(&rightRemoteMenu_);});
   rRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
 
   leftRemoteMenu_.clear();
@@ -318,7 +319,7 @@ Result RRemote::stepCalib() {
   return RES_OK;
 }
 
-void RRemote::setIncrRotButton(bool thisremote, RInput::ButtonIndex button) {
+void RRemote::setIncrRotButton(RInput::ButtonIndex button, bool thisremote) {
   if(thisremote) {
     RInput::input.setIncrementalRot(button);
     params_.incrRotButton = button;
