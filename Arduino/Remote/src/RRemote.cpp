@@ -653,10 +653,9 @@ void RRemote::printStatus(ConsoleStream *stream) {
   //RInput::input.imu().getAccelMeasurement(ax, ay, az);
   RInput::input.imu().getGravCorrectedAccel(ax, ay, az);
 
-  snprintf(buf, bufsize, "S%ld AX%f AY%f AZ%f\n", seqnum_, ax, ay, az);
-
-
 #if 0
+  snprintf(buf, bufsize, "S%ld AX%f AY%f AZ%f\n", seqnum_, ax, ay, az);
+#else
   snprintf(buf, bufsize, "S%d H%d [%d..%d..%d] %.2f V%d [%d..%d..%d] %.2f P%.1f R%.1f H%.1f AX%f AY%f AZ%f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c\n",
     seqnum_,
     RInput::input.joyRawH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max, RInput::input.joyH,
