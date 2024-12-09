@@ -17,7 +17,7 @@ class RMenuWidget: public RMultiWidget {
 public:
   RMenuWidget();
 
-  void addEntry(const String& title, std::function<void(void)> callback, bool highlight = false);
+  void addEntry(const String& title, std::function<void(void)> callback, int tag=0);
   void clear();
 
   void up();
@@ -28,6 +28,7 @@ public:
   virtual void takeInputFocus();
 
   virtual void setSize(uint8_t w, uint8_t h);
+
 protected:
   uint8_t cursor_;
   uint8_t top_;

@@ -59,11 +59,20 @@ public:
   void selectRightRemote(uint64_t address);
 
   // Other callbacks
-  void setIncrRotButton(RInput::ButtonIndex button, bool thisremote = true);
-  void factoryReset(bool thisremote);
-  void startCalibration(bool thisremote);
-  void finishCalibration(bool thisremote);
-  void setPrimary(bool thisremote);
+  void setIncrRotButtonCB(RInput::ButtonIndex button, bool left);
+  void factoryResetCB(bool left);
+  void startCalibrationCB(bool left);
+  void finishCalibrationCB(bool left);
+  void setLeftIsPrimaryCB(bool yesno);
+
+  void factoryReset();
+  void startCalibration();
+  void finishCalibration();
+  void setLeftIsPrimary();
+
+#if defined(LEFT_REMOTE)
+  Result sendConfigToRightRemote();
+#endif
 
   void runTestsuite();
 
@@ -108,12 +117,7 @@ protected:
     uint64_t droidAddress = 0x0;
     RInput::AxisCalib hCalib = RInput::AxisCalib();
     RInput::AxisCalib vCalib = RInput::AxisCalib();
-  #if defined(LEFT_REMOTE)
-    bool isPrimary = true;
-  #else
-    bool isPrimary = false;
-  #endif
-    RInput::ButtonIndex incrRotButton = RInput::BUTTON_NONE;
+    bb::RemoteConfigPacket config;
   };
 
   static RemoteParams params_;

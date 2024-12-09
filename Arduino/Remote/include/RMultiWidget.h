@@ -17,6 +17,8 @@ public:
     virtual void setPosition(int x, int y);
 
     virtual Result draw(ConsoleStream* stream = NULL);
+
+    virtual void highlightWidgetsWithTag(int tag);
 protected:
     std::deque<RWidget*> widgets_;
     bool widgetsChanged_;

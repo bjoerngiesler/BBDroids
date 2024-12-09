@@ -30,6 +30,7 @@ public:
     virtual void setCursorColor(uint8_t cursor);
     virtual void setMarkingColor(uint8_t marking);
     virtual void setBorderColor(uint8_t border);
+    virtual void setHighlightColor(uint8_t highlight);
 
     virtual void takeInputFocus();
 
@@ -47,14 +48,24 @@ public:
     virtual const String& name() { return name_; }
 
     virtual CursorHint cursorHint() { return CURSOR_NONE; }
+
+    //! Highlighted widgets draw their fg in hlCol_ instead of fgCol_
+    virtual void setHighlighted(bool yesno); 
+    virtual bool isHighlighted() { return highlighted_; }
+
+    void setTag(int tag) { tag_ = tag; }
+    int tag() { return tag_; }
+
 protected:
     bool needsFullRedraw_, needsContentsRedraw_;
     int x_, y_;
     uint8_t width_, height_;
-    uint8_t bgCol_, fgCol_, borderCol_, cursorCol_, markingCol_;
+    uint8_t bgCol_, fgCol_, borderCol_, cursorCol_, markingCol_, hlCol_;
     bool fillsBg_, drawsFrame_;
     String name_;
     std::function<void(void)> action_;
+    bool highlighted_;
+    int tag_;
 };
 
 #endif // RWIDGET_H

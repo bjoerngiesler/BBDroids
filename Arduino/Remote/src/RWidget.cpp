@@ -7,11 +7,14 @@ RWidget::RWidget(): name_("Widget") {
     borderCol_ = RDisplay::WHITE;
     bgCol_ = RDisplay::BLACK;
     fgCol_ = RDisplay::WHITE;
+    hlCol_ = RDisplay::LIGHTBLUE2;
     cursorCol_ = RDisplay::LIGHTGREEN1;
     markingCol_ = RDisplay::BLUE;
     fillsBg_ = false;
     drawsFrame_ = false;
     action_ = nullptr;
+    highlighted_ = false;
+    tag_ = 0;
 }
 
 RWidget::~RWidget() {
@@ -70,6 +73,18 @@ void RWidget::setMarkingColor(uint8_t marking) {
 void RWidget::setBorderColor(uint8_t border) {
     if(borderCol_ == border) return;
     borderCol_ = border;
+    needsFullRedraw_ = true;
+}
+
+void RWidget::setHighlightColor(uint8_t highlight) {
+    if(hlCol_ == highlight) return;
+    hlCol_ = highlight;
+    needsFullRedraw_ = true;
+}
+
+void RWidget::setHighlighted(bool yesno) {
+    if(yesno == highlighted_) return;
+    highlighted_ = yesno;
     needsFullRedraw_ = true;
 }
 

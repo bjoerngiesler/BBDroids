@@ -62,6 +62,7 @@ void setup() {
   RRemote::remote.initialize();
 
   RDisplay::display.start();
+  RDisplay::display.setLEDBrightness(16);
 #if defined(LEFT_REMOTE)
   XBee::xbee.setName("LeftRemote");
 #else

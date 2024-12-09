@@ -309,3 +309,8 @@ Result RDisplay::flashLED(WhichLED which, uint8_t iterations, uint8_t millisOn, 
   }
   return RES_OK;
 }
+
+void RDisplay::setLEDBrightness(uint8_t brightness) {
+  statusPixels_.setBrightness(brightness);
+  statusPixels_.show();
+}

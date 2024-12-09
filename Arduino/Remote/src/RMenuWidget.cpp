@@ -7,20 +7,19 @@ RMenuWidget::RMenuWidget() {
   setFillsBackground();
 }
 
-void RMenuWidget::addEntry(const String& title, std::function<void(void)> callback, bool highlight) {
+void RMenuWidget::addEntry(const String& title, std::function<void(void)> callback, int tag) {
   RLabelWidget *label = new RLabelWidget;
   label->setTitle(title);
   label->setFillsBackground();
+  label->setTag(tag);
 
   if(widgets_.size() == 0) {
     label->setBackgroundColor(fgCol_);
-    if(highlight) label->setForegroundColor(markingCol_);
-    else label->setForegroundColor(bgCol_);
+    label->setForegroundColor(bgCol_);
     cursor_ = 0;
   } else {
     label->setBackgroundColor(bgCol_);
-    if(highlight) label->setForegroundColor(markingCol_);
-    else label->setForegroundColor(fgCol_);
+    label->setForegroundColor(fgCol_);
   }
   label->setSize(width(), RDisplay::CHAR_HEIGHT);
   label->setPosition(0, (widgets_.size()-top_)*RDisplay::CHAR_HEIGHT + y_);
@@ -93,3 +92,4 @@ void RMenuWidget::resetCursor() {
   widgets_[cursor_]->setBackgroundColor(fgCol_);
   widgets_[cursor_]->setForegroundColor(bgCol_);
 }
+

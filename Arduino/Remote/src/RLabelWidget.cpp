@@ -68,7 +68,7 @@ Result RLabelWidget::draw(ConsoleStream *stream) {
 
     }
 
-    if(title_.length()>0) RDisplay::display.text(x_+x+1, y_+y+1, fgCol_, title_);
+    if(title_.length()>0) RDisplay::display.text(x_+x+1, y_+y+1, highlighted_ ? hlCol_ : fgCol_, title_);
 
     needsContentsRedraw_ = false;
 

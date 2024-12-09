@@ -25,12 +25,13 @@ RRemote::RRemote():
 
   params_.droidAddress = 0x0;
   params_.otherRemoteAddress = 0x0;
-#if defined(LEFT_REMOTE)
-  params_.isPrimary = true;
-#else
-  params_.isPrimary = false;
-#endif
-  params_.incrRotButton = RInput::BUTTON_NONE;
+  params_.config.leftIsPrimary = true;
+  params_.config.ledBrightness = 7;
+  params_.config.sendRepeats = 2;
+  params_.config.lIncrRotBtn = RInput::BUTTON_NONE;
+  params_.config.rIncrRotBtn = RInput::BUTTON_NONE;
+  params_.config.lIncrTransBtn = RInput::BUTTON_NONE;
+  params_.config.rIncrTransBtn = RInput::BUTTON_NONE;
 
   waitMessage_.setTitle("Please wait");
   restartMessage_.setTitle("Restart now");
@@ -173,34 +174,37 @@ void RRemote::populateMenus() {
 
   lRIncrRotMenu_.clear();
   lRIncrRotMenu_.setName("Incr Rotation");
-  lRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButton(RInput::BUTTON_NONE, true);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButton(RInput::BUTTON_LEFT, true);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButton(RInput::BUTTON_RIGHT, true);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButton(RInput::BUTTON_PINKY, true);showMenu(&leftRemoteMenu_);});
-  lRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButton(RInput::BUTTON_INDEX, true);showMenu(&leftRemoteMenu_);});
+  Console::console.printfBroadcast("lIncrRotButton is %d\n", params_.config.lIncrRotBtn);
+  lRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButtonCB(RInput::BUTTON_NONE, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_NONE);
+  lRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButtonCB(RInput::BUTTON_LEFT, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_LEFT);
+  lRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButtonCB(RInput::BUTTON_RIGHT, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_RIGHT);
+  lRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButtonCB(RInput::BUTTON_PINKY, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_PINKY);
+  lRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButtonCB(RInput::BUTTON_INDEX, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_INDEX);
   lRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
+  lRIncrRotMenu_.highlightWidgetsWithTag(params_.config.lIncrRotBtn);
 
   rRIncrRotMenu_.clear();
   rRIncrRotMenu_.setName("Incr Rotation");
-  rRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButton(RInput::BUTTON_NONE, false);showMenu(&rightRemoteMenu_);});
-  rRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButton(RInput::BUTTON_LEFT, false);showMenu(&rightRemoteMenu_);});
-  rRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButton(RInput::BUTTON_RIGHT, false);showMenu(&rightRemoteMenu_);});
-  rRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButton(RInput::BUTTON_PINKY, false);showMenu(&rightRemoteMenu_);});
-  rRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButton(RInput::BUTTON_INDEX, false);showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButtonCB(RInput::BUTTON_NONE, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_NONE);
+  rRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButtonCB(RInput::BUTTON_LEFT, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_LEFT);
+  rRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButtonCB(RInput::BUTTON_RIGHT, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_RIGHT);
+  rRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButtonCB(RInput::BUTTON_PINKY, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_PINKY);
+  rRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButtonCB(RInput::BUTTON_INDEX, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_INDEX);
   rRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
+  rRIncrRotMenu_.highlightWidgetsWithTag(params_.config.lIncrRotBtn);
 
   leftRemoteMenu_.clear();
   leftRemoteMenu_.addEntry("Incr Rot...", [=]{showMenu(&lRIncrRotMenu_);});
-  leftRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibration(true);});
-  leftRemoteMenu_.addEntry("Set Primary", [=]{setPrimary(true);});
-  leftRemoteMenu_.addEntry("Factory Reset", [=]{factoryReset(true);});
+  leftRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibrationCB(true);});
+  leftRemoteMenu_.addEntry("Set Primary", [=]{setLeftIsPrimaryCB(true);});
+  leftRemoteMenu_.addEntry("Factory Reset", [=]{factoryResetCB(true);});
   leftRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
 
   rightRemoteMenu_.clear();
   rightRemoteMenu_.addEntry("Incr Rot...", [=]{showMenu(&rRIncrRotMenu_);});
-  rightRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibration(false);});
-  rightRemoteMenu_.addEntry("Set Primary", [=]{setPrimary(false);});
-  rightRemoteMenu_.addEntry("Factory Reset", [=]() {factoryReset(false);});
+  rightRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibrationCB(false);});
+  rightRemoteMenu_.addEntry("Set Primary", [=]{setLeftIsPrimaryCB(false);});
+  rightRemoteMenu_.addEntry("Factory Reset", [=]() {factoryResetCB(false);});
   rightRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
 }
 
@@ -222,7 +226,7 @@ void RRemote::selectDroid(uint64_t droid) {
     bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
     packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
 
-    packet.payload.config.parameter = params_.droidAddress;
+    packet.payload.config.cfgPayload.address = params_.droidAddress;
     XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
   }
 
@@ -242,12 +246,12 @@ void RRemote::selectRightRemote(uint64_t address) {
 
   bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
   packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID;
-  packet.payload.config.parameter = XBee::xbee.hwAddress();
+  packet.payload.config.cfgPayload.address = XBee::xbee.hwAddress();
   XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);  
 
   if(params_.droidAddress != 0) {
     packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
-    packet.payload.config.parameter = params_.droidAddress;
+    packet.payload.config.cfgPayload.address = params_.droidAddress;
     XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);   
   }
 
@@ -271,7 +275,7 @@ Result RRemote::start(ConsoleStream *stream) {
 
 Result RRemote::stop(ConsoleStream *stream) {
   (void)stream;
-  RDisplay::display.setLED(RDisplay::LED_BOTH, 150, 150, 0);
+  RDisplay::display.setLED(RDisplay::LED_BOTH, 255, 255, 0);
   operationStatus_ = RES_OK;
   started_ = false;
   
@@ -280,13 +284,13 @@ Result RRemote::stop(ConsoleStream *stream) {
 
 void RRemote::updateStatusLED() {
   if(mode_ == MODE_CALIBRATION) {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 0, 150);
+    RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 0, 255);
   } else if(Console::console.isStarted() && XBee::xbee.isStarted() && isStarted() && RInput::input.isOK()) {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 150, 0);
+    RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 255, 0);
   } else if(!XBee::xbee.isStarted() || !RInput::input.isOK()) {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, 150, 0, 0);
+    RDisplay::display.setLED(RDisplay::LED_STATUS, 255, 0, 0);
   } else {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, 150, 150, 0);
+    RDisplay::display.setLED(RDisplay::LED_STATUS, 255, 255, 0);
   }
 }
 
@@ -319,41 +323,36 @@ Result RRemote::stepCalib() {
   return RES_OK;
 }
 
-void RRemote::setIncrRotButton(RInput::ButtonIndex button, bool thisremote) {
-  if(thisremote) {
-    RInput::input.setIncrementalRot(button);
-    params_.incrRotButton = button;
-    bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
-    bb::ConfigStorage::storage.store();
-  } else {
+void RRemote::setIncrRotButtonCB(RInput::ButtonIndex button, bool left) {
 #if defined(LEFT_REMOTE)
-    Console::console.printfBroadcast("Incr Rot other remote not yet implemented\n");
-#else
-    Console::console.printfBroadcast("Incr Rot other remote only defined for left remote\n");
-#endif
+  if(left) {
+    if(params_.config.lIncrRotBtn == button) return;
+    RInput::input.setIncrementalRot(button);
+    params_.config.lIncrRotBtn = button;
+    lRIncrRotMenu_.highlightWidgetsWithTag(button);
+  } else {
+    if(params_.config.rIncrRotBtn == button) return;
+    params_.config.rIncrRotBtn = button;
+    rRIncrRotMenu_.highlightWidgetsWithTag(button);
   }
+  bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+  bb::ConfigStorage::storage.store();
+  sendConfigToRightRemote();
+#else
+  Console::console.printfBroadcast("setIncrRotButtonCB() is left remote only!\n");
+#endif
 }
 
 
-void RRemote::factoryReset(bool thisremote) {
-  if(thisremote) {
-    Console::console.printfBroadcast("Factory reset this remote!\n");
-    bb::ConfigStorage::storage.factoryReset();
-    restartMessage_.draw();
-    int i=0, dir=1;
-    while(true) {
-      RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, i);
-      i = i+dir;
-      if(dir > 0 && i>=150) dir = -1;
-      if(dir < 0 && i<=0) dir = 1;
-      delay(10);
-    }
-  } else {
+void RRemote::factoryResetCB(bool left) {
 #if defined(LEFT_REMOTE)
-    Console::console.printfBroadcast("Factory reset other remote!\n");
+  if(left) {
+    factoryReset();
+  } else {
+    Console::console.printfBroadcast("Factory reset right remote!\n");
     bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
     packet.payload.config.type = bb::ConfigPacket::CONFIG_FACTORY_RESET;
-    packet.payload.config.parameter = bb::ConfigPacket::MAGIC;
+    packet.payload.config.cfgPayload.magic = bb::ConfigPacket::MAGIC;
     XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
 
     params_.otherRemoteAddress = 0;
@@ -361,33 +360,20 @@ void RRemote::factoryReset(bool thisremote) {
     bb::ConfigStorage::storage.store();
 
     populateMenus();
-#else
-    Console::console.printfBroadcast("Factory reset other remote only defined for left remote\m");
-#endif
   }
+#else
+  Console::console.printfBroadcast("setIncrRotButtonCB() is left remote only!\n");
+#endif
 }
 
-void RRemote::startCalibration(bool thisremote) {
-  if(thisremote == true) {
+void RRemote::startCalibrationCB(bool left) {
 #if defined(LEFT_REMOTE)
-    mainVis_.showIndex(0);
-    setMainWidget(&mainVis_);
-
-    setTopTitle("Calibrating");
-    setBottomTitle("Button=End");
-    remoteVisL_.crosshair().setMinMax(RInput::input.minJoyRawH, RInput::input.maxJoyRawH,
-                                      RInput::input.minJoyRawV, RInput::input.maxJoyRawV);
-    remoteVisL_.crosshair().showMinMaxRect();
-    remoteVisL_.crosshair().setMinMaxRectColor(RDisplay::RED);
-#endif
-    RInput::input.setCalibration(RInput::AxisCalib(), RInput::AxisCalib());
-    RInput::input.setAllCallbacks([=]{finishCalibration(true);});
-    mode_ = MODE_CALIBRATION;
+  if(left) {
+    startCalibration();
   } else {
-#if defined(LEFT_REMOTE)
     bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
     packet.payload.config.type = bb::ConfigPacket::CONFIG_CALIBRATE;
-    packet.payload.config.parameter = bb::ConfigPacket::MAGIC;
+    packet.payload.config.cfgPayload.magic = bb::ConfigPacket::MAGIC;
     XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
 
     mainVis_.showIndex(1);
@@ -395,23 +381,78 @@ void RRemote::startCalibration(bool thisremote) {
     remoteVisR_.crosshair().showMinMaxRect();
     remoteVisR_.crosshair().setMinMaxRectColor(RDisplay::RED);
     showMain();
-#else
-    Console::console.printfBroadcast("Factory reset other remote only defined for right remote");
-#endif
   }
+#else
+  Console::console.printfBroadcast("startCalibrationCB() is left remote only!\n");
+#endif
 }
 
-void RRemote::finishCalibration(bool thisremote) {
-  Runloop::runloop.excuseOverrun();
-  if(thisremote == true) {
+void RRemote::finishCalibrationCB(bool left) {
 #if defined(LEFT_REMOTE)
+  Runloop::runloop.excuseOverrun();
+  if(left) {
     setBottomTitle(VERSION_STRING);
     showMain();
     RInput::input.setTopRightLongPressCallback([=]{RRemote::remote.showMenu(&mainMenu_);});
     RInput::input.setConfirmShortPressCallback([=]{RRemote::remote.showMenu(&mainMenu_);});
     remoteVisL_.crosshair().showMinMaxRect(false);
-#endif
 
+    finishCalibration();
+  } else {
+    remoteVisR_.crosshair().showMinMaxRect(false);
+  }
+#else
+  if(!left) {
+    RInput::input.clearCallbacks();
+    finishCalibration();
+  }
+#endif
+}
+
+void RRemote::setLeftIsPrimaryCB(bool yesno) {
+  params_.config.leftIsPrimary = yesno;
+
+#if defined(LEFT_REMOTE)
+  sendConfigToRightRemote();
+#endif
+  
+  bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+  bb::ConfigStorage::storage.store();
+}
+
+void RRemote::factoryReset() {
+  bb::ConfigStorage::storage.factoryReset();
+  restartMessage_.draw();
+  int i=0, dir=1;
+  while(true) {
+    RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, i);
+    i = i+dir;
+    if(dir > 0 && i>=255) dir = -1;
+    if(dir < 0 && i<=0) dir = 1;
+    delay(10);
+  }
+}
+
+void RRemote::startCalibration() {
+#if defined(LEFT_REMOTE)
+  mainVis_.showIndex(0);
+  setMainWidget(&mainVis_);
+
+  setTopTitle("Calibrating");
+  setBottomTitle("Button=End");
+  remoteVisL_.crosshair().setMinMax(RInput::input.minJoyRawH, RInput::input.maxJoyRawH,
+                                    RInput::input.minJoyRawV, RInput::input.maxJoyRawV);
+  remoteVisL_.crosshair().showMinMaxRect();
+  remoteVisL_.crosshair().setMinMaxRectColor(RDisplay::RED);
+  RInput::input.setAllCallbacks([=]{finishCalibrationCB(true);});
+#else // LEFT_REMOTE
+  RInput::input.setAllCallbacks([=]{finishCalibration();});
+#endif
+  RInput::input.setCalibration(RInput::AxisCalib(), RInput::AxisCalib());
+  mode_ = MODE_CALIBRATION;
+}
+
+void RRemote::finishCalibration() {
     uint16_t hMin = RInput::input.minJoyRawH;
     uint16_t hMax = RInput::input.maxJoyRawH;
     uint16_t vMin = RInput::input.minJoyRawV;
@@ -438,31 +479,16 @@ void RRemote::finishCalibration(bool thisremote) {
       RDisplay::display.flashLED(RDisplay::LED_BOTH, 2, 250, 250, 150, 0, 0);
     }
     mode_ = MODE_REGULAR;
-  } else {
-#if defined(LEFT_REMOTE)
-    remoteVisR_.crosshair().showMinMaxRect(false);
-#else
-    Console::console.printfBroadcast("Finish calib other remote only defined for right remote");
-#endif
-  }
 }
 
-void RRemote::setPrimary(bool thisremote) {
-  params_.isPrimary = thisremote;
-
 #if defined(LEFT_REMOTE)
-#if 0
+Result RRemote::sendConfigToRightRemote() {
   bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
-  packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_PRIMARY_REMOTE;
-  if(thisremote) packet.payload.config.parameter = 0;
-  else packet.payload.config.parameter = 1;
-  XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
-#endif
-#endif
-    bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
-    bb::ConfigStorage::storage.store();
+  packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_REMOTE_PARAMS;
+  packet.payload.config.cfgPayload.remoteConfig = params_.config;
+  return XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
 }
-
+#endif
 
 bb::Result RRemote::fillAndSend() {
 #if defined(LEFT_REMOTE)
@@ -470,19 +496,36 @@ bb::Result RRemote::fillAndSend() {
 #else
   Packet packet(PACKET_TYPE_CONTROL, PACKET_SOURCE_RIGHT_REMOTE, sequenceNumber());
 #endif
-  if(params_.isPrimary) {
-    packet.source = PACKET_SOURCE_PRIMARY_REMOTE;
+  if(params_.config.leftIsPrimary == true) {
+#if defined(LEFT_REMOTE)
     packet.payload.control.primary = true;
+#else
+    packet.payload.control.primary = false;
+#endif
+  } else {
+#if defined(LEFT_REMOTE)
+    packet.payload.control.primary = false;
+#else
+    packet.payload.control.primary = true;
+#endif
   }
 
   RInput::input.fillControlPacket(packet.payload.control);
-
   remoteVisL_.visualizeFromPacket(packet.payload.control);
 
   Result res = RES_OK;
+  int r=0, g=0, b=0;
+
+  if(params_.droidAddress != 0 && params_.otherRemoteAddress != 0) {        // both set -- white
+    r = 255; g = 255; b = 255;
+  } else if(params_.droidAddress != 0) {                                    // only droid set -- blue
+    r = 0; g = 0; b = 255;
+  } else if(params_.otherRemoteAddress != 0) {
+    r = 255; g = 0; b = 255;
+  }
+
 #if !defined(LEFT_REMOTE) // right remote sends to left remote
   if(params_.otherRemoteAddress != 0) {
-    //Console::console.printfBroadcast("Sending control to right remote 0x%llx\n", params_.otherRemoteAddress);
     res = bb::XBee::xbee.sendTo(params_.otherRemoteAddress, packet, false);
     if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
   }
@@ -490,19 +533,15 @@ bb::Result RRemote::fillAndSend() {
 
   // both remotes send to droid
   if(params_.droidAddress != 0 && mode_ == MODE_REGULAR) {
-    //Console::console.printfBroadcast("Sending control to droid 0x%llx\n", params_.droidAddress);
-    res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
-    res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
-    res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
-    if(res != RES_OK) {
-      RDisplay::display.setLED(RDisplay::LED_COMM, 0, 150, 0);
-      Console::console.printfBroadcast("%s\n", errorMessage(res)); 
-    } else {
-      RDisplay::display.setLED(RDisplay::LED_COMM, 150, 0, 0);
+    for(int i=0; i<params_.config.sendRepeats+1; i++) {
+      res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
     }
-  } else {
-      RDisplay::display.setLED(RDisplay::LED_COMM, 0, 0, 150);
+    if(res != RES_OK) {
+      r = 255; g = 0; b = 0;
+    }
   }
+
+  RDisplay::display.setLED(RDisplay::LED_COMM, r, g, b);
 
   return res;
 }
@@ -529,7 +568,7 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
   }
 
   else if(words[0] == "calibrate") {
-    startCalibration(true);
+    startCalibration();
 
     return RES_OK;
   }
@@ -540,7 +579,7 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
   }
 
   else if(words[0] == "reset") {
-    factoryReset(true);
+    factoryReset();
     return RES_OK;
   }
 
@@ -584,58 +623,58 @@ Result RRemote::incomingStatePacket(uint64_t srcAddr, PacketSource source, uint8
 Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ConfigPacket& packet) {
 #if defined(LEFT_REMOTE)
   Console::console.printfBroadcast("Address 0x%llx sent Config packet to left remote - should never happen\n", srcAddr);
-  return RES_OK; // Ignore for now
   return RES_SUBSYS_COMM_ERROR;
 #else
-  Console::console.printfBroadcast("Got config packet from 0x%llx, type %d, payload 0x%llx\n", srcAddr, packet.type, packet.parameter);
+  Console::console.printfBroadcast("Got config packet from 0x%llx, type %d\n", srcAddr, packet.type);
   if(srcAddr == params_.otherRemoteAddress || params_.otherRemoteAddress == 0) { // if we're not bound, we accept config packets from anyone
     switch(packet.type) {
     case bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID:
-      if(packet.parameter != srcAddr) {
-        Console::console.printfBroadcast("Error: Pairing packet source 0x%llx and payload 0x%llx don't match\n", srcAddr, packet.parameter);
+      if(packet.cfgPayload.address != srcAddr) {
+        Console::console.printfBroadcast("Error: Pairing packet source 0x%llx and payload 0x%llx don't match\n", srcAddr, packet.cfgPayload.address);
         return RES_SUBSYS_COMM_ERROR;
       }
 
-      Console::console.printfBroadcast("Setting Left Remote ID to 0x%llx.\n", packet.parameter);
-      params_.otherRemoteAddress = packet.parameter;
+      Console::console.printfBroadcast("Setting Left Remote ID to 0x%llx.\n", packet.cfgPayload.address);
+      params_.otherRemoteAddress = packet.cfgPayload.address;
       bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
       bb::ConfigStorage::storage.store();
       return RES_OK; 
 
     case bb::ConfigPacket::CONFIG_SET_DROID_ID:
-      Console::console.printfBroadcast("Setting Droid ID to 0x%llx.\n", packet.parameter);
-      params_.droidAddress = packet.parameter;
+      Console::console.printfBroadcast("Setting Droid ID to 0x%llx.\n", packet.cfgPayload.address);
+      params_.droidAddress = packet.cfgPayload.address;
+      bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+      bb::ConfigStorage::storage.store();
+      return RES_OK; 
+
+    case bb::ConfigPacket::CONFIG_SET_REMOTE_PARAMS:
+      Console::console.printfBroadcast("Setting remote params: LPrimary %d LED %d Repeats %d LIncrR %d RIncrR %d LIncrT %d RIncrT %d\n", 
+                                       packet.cfgPayload.remoteConfig.leftIsPrimary, packet.cfgPayload.remoteConfig.ledBrightness, 
+                                       packet.cfgPayload.remoteConfig.sendRepeats,
+                                       packet.cfgPayload.remoteConfig.lIncrRotBtn, packet.cfgPayload.remoteConfig.rIncrRotBtn, 
+                                       packet.cfgPayload.remoteConfig.lIncrTransBtn, packet.cfgPayload.remoteConfig.rIncrTransBtn);
+      params_.config = packet.cfgPayload.remoteConfig;
+      RInput::input.setIncrementalRot(RInput::ButtonIndex(params_.config.rIncrRotBtn));
       bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
       bb::ConfigStorage::storage.store();
       return RES_OK; 
 
     case bb::ConfigPacket::CONFIG_FACTORY_RESET:
-      if(packet.parameter == bb::ConfigPacket::MAGIC) { // checks out
-        factoryReset(true);
+      if(packet.cfgPayload.magic == bb::ConfigPacket::MAGIC) { // checks out
+        factoryReset();
         return RES_OK; // HA! This never returns! NEVER! Hahahahahahaaaaa!
       }
-      Console::console.printfBroadcast("Got factory reset packet but Magic 0x%llx doesn't check out!\n", packet.parameter);
+      Console::console.printfBroadcast("Got factory reset packet but Magic 0x%llx doesn't check out!\n", packet.cfgPayload.magic);
       return RES_SUBSYS_COMM_ERROR;
 
     case bb::ConfigPacket::CONFIG_CALIBRATE:
-      if(packet.parameter == bb::ConfigPacket::MAGIC) { // checks out
-        startCalibration(true);
+      if(packet.cfgPayload.magic == bb::ConfigPacket::MAGIC) { // checks out
+        startCalibration();
         return RES_OK;
       }
-      Console::console.printfBroadcast("Got factory reset packet but ID 0x%x doesn't check out!\n", packet.parameter);
+      Console::console.printfBroadcast("Got factory reset packet but Magic 0x%llx doesn't check out!\n", packet.cfgPayload.magic);
       return RES_SUBSYS_COMM_ERROR;
 
-#if 0
-    case bb::ConfigPacket::CONFIG_SET_PRIMARY_REMOTE:
-      if(packet.parameter != 0) {
-        params_.isPrimary = true;
-      } else {
-        params_.isPrimary = false;
-      }
-      bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
-      bb::ConfigStorage::storage.store();
-      return RES_OK; 
-#endif
     default:
       Console::console.printfBroadcast("Unknown config packet type 0x%x.\n", packet.type);
       return RES_SUBSYS_COMM_ERROR;

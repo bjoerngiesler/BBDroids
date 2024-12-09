@@ -47,3 +47,11 @@ Result RMultiWidget::draw(ConsoleStream* stream) {
     for(auto w: widgets_) w->draw(stream);
     return RES_OK;
 }
+
+void RMultiWidget::highlightWidgetsWithTag(int tag) {
+  if(widgets_.size() == 0) return;
+  for(auto& w: widgets_) {
+    if(w->tag() == tag) w->setHighlighted(true);
+    else w->setHighlighted(false);
+  }
+}
