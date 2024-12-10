@@ -49,6 +49,37 @@ void bTopRISR(void) {
 }
 #endif // ARDUINO_ARCH_ESP32
 
+int RInput::htonBtn(ButtonIndex index) {
+  switch(index) {
+    case BUTTON_PINKY:     return 0; break;
+    case BUTTON_INDEX:     return 1; break;
+    case BUTTON_JOY:       return 2; break;
+    case BUTTON_LEFT:      return 3; break;
+    case BUTTON_RIGHT:     return 4; break;
+    case BUTTON_CONFIRM:   return 5; break;
+    case BUTTON_TOP_LEFT:  return 6; break;
+    case BUTTON_TOP_RIGHT: return 7; break;
+    default: break;
+  }
+  return 8;
+}
+
+RInput::ButtonIndex RInput::ntohBtn(int index) {
+  switch(index) {
+    case 0: return BUTTON_PINKY; break;
+    case 1: return BUTTON_INDEX; break;
+    case 2: return BUTTON_JOY; break;
+    case 3: return BUTTON_LEFT; break;
+    case 4: return BUTTON_RIGHT; break;
+    case 5: return BUTTON_CONFIRM; break;
+    case 6: return BUTTON_TOP_LEFT; break;
+    case 7: return BUTTON_TOP_RIGHT; break;
+    default: break;
+  }
+  return BUTTON_NONE;
+}
+
+
 bool RInput::initMCP() {
   Console::console.printfBroadcast("Initializing MCP\n");
 
@@ -75,7 +106,7 @@ RInput::RInput(): imu_(IMU_ADDR) {
   maxJoyRawH = 2048;
   minJoyRawV = 2048;
   maxJoyRawV = 2048;
-  incrementalPos_ = BUTTON_RIGHT;
+  incrementalPos_ = BUTTON_NONE;
   incrementalRot_ = BUTTON_NONE;
   incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
   imu_.setRotationAroundZ(bb::IMU::ROTATE_180);

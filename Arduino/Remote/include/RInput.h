@@ -60,6 +60,9 @@ public:
     uint16_t min, max, center;
   };
 
+  static int htonBtn(ButtonIndex index);
+  static ButtonIndex ntohBtn(int index);
+
   bool begin();
   void update();
   void printOnSerial();

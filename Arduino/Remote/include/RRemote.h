@@ -68,7 +68,10 @@ public:
   void factoryReset();
   void startCalibration();
   void finishCalibration();
-  void setLeftIsPrimary();
+
+  void storeParams();
+
+  void showMessage(const String& str, unsigned int delayms=0);
 
 #if defined(LEFT_REMOTE)
   Result sendConfigToRightRemote();
@@ -79,6 +82,8 @@ public:
 protected:
   RRemote();
 
+  static const unsigned int MSGDELAY = 2000;
+
   Mode mode_;
   
   bool runningStatus_;
@@ -87,7 +92,7 @@ protected:
 
   RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_, leftRemoteMenu_, rightRemoteMenu_, droidMenu_;
   RMenuWidget lRIncrRotMenu_, rRIncrRotMenu_;
-  RMessageWidget waitMessage_, restartMessage_;
+  RMessageWidget message_;
   RLabelWidget topLabel_, bottomLabel_;
   RRotaWidget mainVis_;
   RRemoteVisWidget remoteVisL_, remoteVisR_;
