@@ -185,8 +185,8 @@ void RRemote::populateMenus() {
   rRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButtonCB(RInput::BUTTON_RIGHT, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_RIGHT);
   rRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButtonCB(RInput::BUTTON_PINKY, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_PINKY);
   rRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButtonCB(RInput::BUTTON_INDEX, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_INDEX);
-  rRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
-  rRIncrRotMenu_.highlightWidgetsWithTag(params_.config.lIncrRotBtn);
+  rRIncrRotMenu_.addEntry("<--", [=]{showMenu(&rightRemoteMenu_);});
+  rRIncrRotMenu_.highlightWidgetsWithTag(params_.config.rIncrRotBtn);
 
   leftRemoteMenu_.clear();
   leftRemoteMenu_.addEntry("Incr Rot...", [=]{showMenu(&lRIncrRotMenu_);});
@@ -498,8 +498,8 @@ void RRemote::finishCalibration() {
 }
 
 void RRemote::storeParams() {
-  //bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
-  //bb::ConfigStorage::storage.store();
+  bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+  bb::ConfigStorage::storage.store();
 }
 
 void RRemote::showMessage(const String& msg, unsigned int delayms) {
@@ -511,10 +511,25 @@ void RRemote::showMessage(const String& msg, unsigned int delayms) {
 
 #if defined(LEFT_REMOTE)
 Result RRemote::sendConfigToRightRemote() {
-  bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
-  packet.payload.config.type = bb::ConfigPacket::CONFIG_SET_REMOTE_PARAMS;
-  packet.payload.config.cfgPayload.remoteConfig = params_.config;
-  return XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
+  ConfigPacket packet;
+  ConfigPacket::ConfigReplyType reply;
+  packet.type = bb::ConfigPacket::CONFIG_SET_REMOTE_PARAMS;
+  packet.cfgPayload.remoteConfig = params_.config;
+
+  Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
+  if(res != RES_OK) {
+    showMessage(String("Error ") + res, MSGDELAY);
+    return res;
+  } 
+  if(reply != ConfigPacket::CONFIG_REPLY_OK) {
+    showMessage(String("Failed ") + int(reply), MSGDELAY);
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
+  showMessage("Success", MSGDELAY);
+  populateMenus();
+  storeParams();
+  return RES_OK;
 }
 #endif
 
