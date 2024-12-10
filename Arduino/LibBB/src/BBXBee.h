@@ -111,11 +111,12 @@ public:
 	Result send(const uint8_t *bytes, size_t size);
 	Result send(const Packet& packet);
 	Result sendTo(uint64_t dest, const Packet& packet, bool ack);
-	//Result sendConfigPacket(uint64_t dest, bb::PacketSource src,  ConfigPacket& packet, bool waitForReply = true);
+	Result sendConfigPacket(uint64_t dest, bb::PacketSource src, const ConfigPacket& packet, ConfigPacket::ConfigReplyType& replyType,
+	                        uint8_t seqnum, bool waitForReply = true);
+	
 	bool available();
 	String receive();
-	Result receiveAndHandlePacket();
-	Result receiveAndHandleAPIMode();
+	Result receiveAPIMode(uint64_t& srcAddr, uint8_t& rssi, Packet& packet);
 
 	typedef enum {
 		DEBUG_SILENT = 0,
@@ -148,8 +149,6 @@ protected:
 	ConfigStorage::HANDLE paramsHandle_;
 	std::vector<PacketReceiver*> receivers_;
 
-	bool sendContinuous_;
-	int continuous_;
 	uint8_t packetBuf_[255];
 	size_t packetBufPos_;
 

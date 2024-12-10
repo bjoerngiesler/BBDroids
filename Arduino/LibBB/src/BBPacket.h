@@ -186,18 +186,18 @@ struct __attribute__ ((packed)) ConfigPacket {
 		CONFIG_SET_DOME_CONTROL_MODE    = 5,  // L->D - parameter: control mode
 		CONFIG_SET_ARMS_CONTROL_MODE    = 6,  // L->D - parameter: control mode
 		CONFIG_SET_SOUND_CONTROL_MODE   = 7,  // L->D - parameter: control mode
-		CONFIG_FACTORY_RESET            = (1<<(CONFIG_TYPE_BITS-1)) // L->R - parameter: MAGIC
+		CONFIG_FACTORY_RESET            = (1<<CONFIG_TYPE_BITS)-1 // L->R - parameter: MAGIC
 	};
 
 	enum ConfigReplyType {
-		CONFIG_TRANSMIT       = 0, // transmission
-		CONFIG_REPLY_OK       = 1, // OK reply
-		CONFIG_REPLY_ERROR    = 2, // something went wrong
-		CONFIG_REPLY_RESERVED = 3
+		CONFIG_TRANSMIT_NOREPLY       = 0, // transmission
+		CONFIG_TRANSMIT_REPLY         = 1, // OK reply
+		CONFIG_REPLY_OK               = 2, // something went wrong
+		CONFIG_REPLY_ERROR            = 3
 	};
 
-	ConfigType type  : CONFIG_TYPE_BITS;
-	bool       reply : 8-CONFIG_TYPE_BITS;
+	ConfigType      type  : CONFIG_TYPE_BITS;
+	ConfigReplyType reply : 8-CONFIG_TYPE_BITS;
 	union {
 		uint64_t address;
 		uint64_t magic;
@@ -220,7 +220,7 @@ enum PacketSource {
 	PACKET_SOURCE_LEFT_REMOTE    = 0,
 	PACKET_SOURCE_RIGHT_REMOTE   = 1,
 	PACKET_SOURCE_DROID          = 2,
-	PACKET_SOURCE_PRIMARY_REMOTE = 3
+	PACKET_SOURCE_TEST_ONLY      = 3
 };
 
 struct __attribute__ ((packed)) Packet {

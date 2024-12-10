@@ -27,7 +27,6 @@ bb::XBee::XBee() {
 	description_ = "Communication via XBee 802.5.14";
 	help_ = "In order for communication to work, the PAN and channel numbers must be identical.\r\n" \
 	"Available commands:\r\n" \
-	"\tcontinuous on|off:  Start or stop sending a continuous stream of numbers (or zero command packets when in packet mode)\r\n"\
 	"\tpacket_mode on|off: Switch to packet mode\r\n" \
 	"\tapi_mode on|off: Enter / leave API mode\r\n" \
 	"\tsend_api_packet <dest>: Send zero control packet to destination\r\n";
@@ -199,16 +198,17 @@ bb::Result bb::XBee::stop(ConsoleStream *stream) {
 bb::Result bb::XBee::step() {
 	while(available()) {
 		if(apiMode_) {
-			Result retval = receiveAndHandleAPIMode();
+			uint64_t srcAddr;
+			uint8_t rssi;
+			Packet packet;
+			Result retval = receiveAPIMode(srcAddr, rssi, packet);
 			if(retval != RES_OK) return retval;
+			for(auto& r: receivers_) {
+				r->incomingPacket(srcAddr, rssi, packet);
+			}
 		} else {
 			bb::Console::console.printfBroadcast("%s\n", receive().c_str());
 		}
-	}
-
-	if(sendContinuous_) {
-		String str(continuous_++);
-		send(str);			
 	}
 
 	return RES_OK;
@@ -258,22 +258,6 @@ bb::Result bb::XBee::handleConsoleCommand(const std::vector<String>& words, Cons
 	if(words[0] == "send") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		return send(words[1]);
-	} 
-
-	else if(words[0] == "continuous") {
-		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
-		else {
-			if(words[1] == "on" || words[1] == "true") {
-				sendContinuous_ = true;
-				continuous_ = 0;
-				return RES_OK;
-			}
-			else if(words[1] == "off" || words[1] == "false") {
-				sendContinuous_ = false;
-				return RES_OK;
-			}
-			else return RES_CMD_INVALID_ARGUMENT;	
-		}
 	} 
 
 	else if(words[0] == "api_mode") {
@@ -568,7 +552,6 @@ bb::Result bb::XBee::discoverNodes(std::vector<bb::XBee::Node>& nodes) {
 
 			res = response.unpackATResponse(frameID, command, status, &data, length);
 			if(res != RES_OK) {
-				Console::console.printfBroadcast("Error unpacking response: %s\n", errorMessage(res));
 				continue;
 			}
 
@@ -587,7 +570,6 @@ bb::Result bb::XBee::discoverNodes(std::vector<bb::XBee::Node>& nodes) {
 			n.stationId = r->my;
 			n.address = r->address;
 			n.rssi = r->rssi;
-			Console::console.printfBroadcast("%x\n", r->name[0]);
 			memset(n.name, 0, sizeof(n.name));
 			if(length > APIFrame::ATResponseNDMinLength) {
 				strncpy(n.name, r->name, strlen(r->name));
@@ -673,12 +655,59 @@ bb::Result bb::XBee::sendTo(uint64_t dest, const bb::Packet& packet, bool ack) {
 	APIFrame frame(buf, 14+sizeof(packet));
 	return send(frame);
 }
-#if 0
-bb::Result bb::XBee::sendConfigPacket(uint64_t dest, bb::PacketSource src, ConfigPacket& cfg, bool waitForReply) {
-	bb::Packet packet(bb::PACKET_TYPE_CONFIG, src, sequenceNumber());
-	packet.payload = cfg;
+
+bb::Result bb::XBee::sendConfigPacket(uint64_t dest, bb::PacketSource src, const ConfigPacket& cfg, ConfigPacket::ConfigReplyType& replyType,
+									  uint8_t seqnum, bool waitForReply) {
+	bb::Packet sPacket(bb::PACKET_TYPE_CONFIG, src, seqnum);
+	sPacket.payload.config = cfg;
+	if(waitForReply == false) sPacket.payload.config.reply = ConfigPacket::CONFIG_TRANSMIT_NOREPLY;
+	else sPacket.payload.config.reply = ConfigPacket::CONFIG_TRANSMIT_REPLY;
+
+	Result res = sendTo(dest, sPacket, false);
+	if(res != RES_OK) {
+		Console::console.printfBroadcast("sendConfigPacket(): sendTo(): %s\n", errorMessage(res));
+		return res;
+	}
+
+	if(waitForReply == false) return res;
+
+	int timeout = 50;
+	while(true) {
+		while(uart_->available() == false) {
+			timeout--;
+			delay(1);
+			if(timeout < 0) {
+				Console::console.printfBroadcast("Timeout.\n");
+				return RES_COMM_TIMEOUT;
+			}
+		}
+		uint64_t srcAddr;
+		uint8_t rssi;
+		Packet rPacket;
+		Result res = receiveAPIMode(srcAddr, rssi, rPacket);
+		if(res != RES_OK) {
+			Console::console.printfBroadcast("sendConfigPacket(): receiveAPIMode(): %s\n", errorMessage(res));
+			return res;
+		}
+
+		if(rPacket.type != PACKET_TYPE_CONFIG) {
+			Console::console.printfBroadcast("sendConfigPacket(): Discarding packet of type %d while waiting for reply\n", rPacket.type);
+			continue;
+		}
+		if(rPacket.seqnum != sPacket.seqnum) {
+			Console::console.printfBroadcast("sendConfigPacket(): Discarding packet with seqnum %d while waiting for %d\n", rPacket.seqnum, sPacket.seqnum);
+			continue;
+		}
+		if(rPacket.payload.config.type != sPacket.payload.config.type) {
+			Console::console.printfBroadcast("sendConfigPacket(): Discarding packet with type %d while waiting for %d\n", 
+			rPacket.payload.config.type, sPacket.payload.config.type);
+			continue;
+		}
+
+		replyType = rPacket.payload.config.reply;
+		return RES_OK;
+	}
 }
-#endif
 
 
 bool bb::XBee::available() {
@@ -698,79 +727,44 @@ String bb::XBee::receive() {
 	return retval;
 }
 
-bb::Result bb::XBee::receiveAndHandleAPIMode() {
+bb::Result bb::XBee::receiveAPIMode(uint64_t& srcAddr, uint8_t& rssi, Packet& packet) {
 	if(!apiMode_) {
 		bb::Console::console.printfBroadcast("Wrong mode.\n");
 		return RES_SUBSYS_WRONG_MODE;
 	} 
 
 	APIFrame frame;
-
 	Result retval;
 
-	while(uart_->available()) {
-		retval = receive(frame);
-		if(retval != RES_OK) return retval;
-	}
-
-#if 0
-	Console::console.printfBroadcast("Received packet of length %d: ", frame.length());
-	for(uint16_t i=0; i<frame.length(); i++) {
-		Console::console.printfBroadcast("%x ", frame.data()[i]);
-	}
-	Console::console.printfBroadcast("\n");
-#endif
+	retval = receive(frame);
+	if(retval != RES_OK) return retval;
 
 	if(frame.data()[0] == 0x81) { // 16bit address frame
-#if 0
-		Console::console.printfBroadcast("16bit address frame\n");
-#endif
 		if(frame.length() != sizeof(bb::Packet) + 5) {
 			Console::console.printfBroadcast("Invalid API Mode 16bit addr packet size %d (expected %d)\n", frame.length(), sizeof(bb::Packet) + 5);
 			return RES_SUBSYS_COMM_ERROR;
 		}
-		uint16_t srcAddr = (frame.data()[1] << 8) | frame.data()[2];
-		uint8_t rssi = frame.data()[3];
-		// uint8_t options = frame.data()[4]; // Ignored
-
-		bb::Packet packet;
+		srcAddr = (frame.data()[1] << 8) | frame.data()[2];
+		rssi = frame.data()[3];
 		memcpy(&packet, &(frame.data()[5]), sizeof(packet));
-
-		for(auto& r: receivers_) {
-			r->incomingPacket(srcAddr, rssi, packet);
-		}
 	} else if(frame.data()[0] == 0x80) { // 64bit address frame
-#if 0
-		Console::console.printfBroadcast("64bit address frame\n");
-		for(int i=0; i<frame.length(); i++) {
-			Console::console.printfBroadcast("0x%0x ", frame.data()[i]);
-			if(i%16 == 0 && i!=0) Console::console.printfBroadcast("\n");
-		}
-		Console::console.printfBroadcast("\n\n");
-#endif
 		if(frame.length() != sizeof(bb::Packet) + 11) {
 			Console::console.printfBroadcast("Invalid API Mode 64bit addr packet size %d (expected %d)\n", frame.length(), sizeof(bb::Packet) + 11);
 			return RES_SUBSYS_COMM_ERROR;
 		}
-		uint64_t srcAddr = (uint64_t(frame.data()[1]) << 56) | (uint64_t(frame.data()[2]) << 48) |
-		                   (uint64_t(frame.data()[3]) << 40) | (uint64_t(frame.data()[4]) << 32) |
-						   (uint64_t(frame.data()[5]) << 24) | (uint64_t(frame.data()[6]) << 16) |
-						   (uint64_t(frame.data()[7]) <<  8) | uint64_t(frame.data()[8]);
-		uint8_t rssi = frame.data()[9];
-		// uint8_t options = frame.data()[10]; // Ignored
-
-		bb::Packet packet;
+		srcAddr = (uint64_t(frame.data()[1]) << 56) | (uint64_t(frame.data()[2]) << 48) |
+				  (uint64_t(frame.data()[3]) << 40) | (uint64_t(frame.data()[4]) << 32) |
+				  (uint64_t(frame.data()[5]) << 24) | (uint64_t(frame.data()[6]) << 16) |
+				  (uint64_t(frame.data()[7]) <<  8) | uint64_t(frame.data()[8]);
+		rssi = frame.data()[9];
 		memcpy(&packet, &(frame.data()[11]), sizeof(packet));
-
 #if 0
 		Console::console.printfBroadcast("Source addr: 0x%lx \n", srcAddr);
 		Console::console.printfBroadcast("Source: %d Type: %d Seqnum: %d\n", packet.source, packet.type, packet.seqnum);
 #endif
-		for(auto& r: receivers_) {
-			r->incomingPacket(srcAddr, rssi, packet);
-		}
 	} else {
 		Console::console.printfBroadcast("Unknown frame type 0x%x\n", frame.data()[0]);
+		return RES_SUBSYS_COMM_ERROR;
 	}
 
 	return RES_OK;
@@ -1016,7 +1010,6 @@ bool bb::XBee::APIFrame::isATRequest() {
 
 bb::Result bb::XBee::APIFrame::unpackATResponse(uint8_t &frameID, uint16_t &command, uint8_t &status, uint8_t** data, uint16_t &length) {
 	if(data_[0] != ATRESPONSE) {
-		Console::console.printfBroadcast("Wrong response type 0x%x\n", data_[0]);
 		return RES_SUBSYS_COMM_ERROR;
 	} 
 	if(length_ < 5) {

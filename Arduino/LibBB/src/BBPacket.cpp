@@ -1,4 +1,5 @@
 #include "BBPacket.h"
+#include "BBXBee.h"
 
 static const uint8_t crc7Table[256] = {
 	0x00, 0x12, 0x24, 0x36, 0x48, 0x5a, 0x6c, 0x7e,
@@ -48,6 +49,9 @@ uint8_t bb::Packet::calculateCRC() {
 }
 
 bb::Result bb::PacketReceiver::incomingPacket(uint64_t station, uint8_t rssi, const Packet& packet) {
+	Result res;
+	ConfigPacket::ConfigReplyType reply = packet.payload.config.reply;
+	Packet packet2 = packet;
 	switch(packet.type) {
 	case bb::PACKET_TYPE_CONTROL:
 		return incomingControlPacket(station, packet.source, rssi, packet.payload.control);
@@ -56,7 +60,25 @@ bb::Result bb::PacketReceiver::incomingPacket(uint64_t station, uint8_t rssi, co
 		return incomingStatePacket(station, packet.source, rssi, packet.payload.state);
 		break;
 	case bb::PACKET_TYPE_CONFIG:
-		return incomingConfigPacket(station, packet.source, rssi, packet.payload.config);
+		if(reply == ConfigPacket::CONFIG_REPLY_ERROR || reply == ConfigPacket::CONFIG_REPLY_OK) {
+			Console::console.printfBroadcast("This is a Reply packet! Discarding.\n");
+			return RES_SUBSYS_COMM_ERROR;
+		}
+		res = incomingConfigPacket(station, packet.source, rssi, packet.payload.config);
+		if(reply == ConfigPacket::CONFIG_TRANSMIT_NOREPLY) {
+			Console::console.printfBroadcast("Config packet but wants no reply\n"); 
+			return res;
+		}
+		if(res == RES_OK) {
+			Console::console.printfBroadcast("Sending reply with OK flag set\n");
+			packet2.payload.config.reply = ConfigPacket::CONFIG_REPLY_OK;
+		}
+		else {
+			Console::console.printfBroadcast("Sending reply with ERROR flag set\n");
+			packet2.payload.config.reply = ConfigPacket::CONFIG_REPLY_ERROR;
+		}
+
+		return XBee::xbee.sendTo(packet.source, packet2, false);
 		break;
 	case bb::PACKET_TYPE_PAIRING:
 	default:
