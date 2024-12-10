@@ -10,22 +10,22 @@ static const char* messages[] = {
 	
 	"Hardware dependency missing (eg specify serial port in code)", // 5
 	"Hardware dependency locked (shutdown subsys first)", // 6
-	"Subsystem already registered", // 7
-	"No such subsystem", // 8
+	"Subsys already registered", // 7
+	"No such subsys", // 8
 	"Resource not available", // 9
-	"Communication error", // 10
+	"Comm error", // 10
 	"Protocol error", // 11
-	"Subsystem already started", // 12
-	"Subsystem not started", // 13
-	"Subsystem not operational", // 14
-	"Subsystem not stoppable", // 15
-	"Subsystem not initialized", // 16
-	"Subsystem already initialized", // 17
+	"Subsys already started", // 12
+	"Subsys not started", // 13
+	"Subsys not operational", // 14
+	"Subsys not stoppable", // 15
+	"Subsys not initialized", // 16
+	"Subsys already initialized", // 17
 	"Wrong mode", // 18
 
 	"Invalid handle", // 19
 
-	"Communication timeout", // 20
+	"Comm timeout", // 20
 
 	"Unknown command", // 21
 	"Invalid number of arguments", // 22
