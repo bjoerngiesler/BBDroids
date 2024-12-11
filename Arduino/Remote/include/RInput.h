@@ -12,37 +12,7 @@ class RInput {
 public:
   static RInput input;
 
-  // Weird order given by ESP32 layout
-#if defined(ARDUINO_ARCH_ESP32)
-#if defined(LEFT_REMOTE)
-  enum ButtonIndex {
-    BUTTON_PINKY     = 2,
-    BUTTON_INDEX     = 4,
-    BUTTON_JOY       = 5,
-    BUTTON_LEFT      = 7,
-    BUTTON_RIGHT     = 6,
-    BUTTON_CONFIRM   = 3,
-    BUTTON_TOP_LEFT  = 1,
-    BUTTON_TOP_RIGHT = 0,
-    BUTTON_NONE      = 8
-  };
-#else
-  enum ButtonIndex {
-    BUTTON_PINKY     = 5,
-    BUTTON_INDEX     = 4,
-    BUTTON_JOY       = 1,
-    BUTTON_LEFT      = 2,
-    BUTTON_RIGHT     = 3,
-    BUTTON_CONFIRM   = 7,
-    BUTTON_TOP_LEFT  = 6,
-    BUTTON_TOP_RIGHT = 0,
-    BUTTON_NONE      = 8
-  };
-#endif
-
-  bool initMCP();
-#else
-  enum ButtonIndex {
+  enum Button {
     BUTTON_PINKY     = 0,
     BUTTON_INDEX     = 1,
     BUTTON_JOY       = 2,
@@ -53,6 +23,45 @@ public:
     BUTTON_TOP_RIGHT = 7,
     BUTTON_NONE      = 8
   };
+
+  // Weird order given by ESP32 layout
+#if defined(ARDUINO_ARCH_ESP32)
+#if defined(LEFT_REMOTE)
+  enum ButtonPin {
+    BUTTON_PIN_PINKY     = 2,
+    BUTTON_PIN_INDEX     = 4,
+    BUTTON_PIN_JOY       = 5,
+    BUTTON_PIN_LEFT      = 7,
+    BUTTON_PIN_RIGHT     = 6,
+    BUTTON_PIN_CONFIRM   = 3,
+    BUTTON_PIN_TOP_LEFT  = 1,
+    BUTTON_PIN_TOP_RIGHT = 0
+  };
+#else
+  enum ButtonPin {
+    BUTTON_PIN_PINKY     = 5,
+    BUTTON_PIN_INDEX     = 4,
+    BUTTON_PIN_JOY       = 1,
+    BUTTON_PIN_LEFT      = 2,
+    BUTTON_PIN_RIGHT     = 3,
+    BUTTON_PIN_CONFIRM   = 7,
+    BUTTON_PIN_TOP_LEFT  = 6,
+    BUTTON_PIN_TOP_RIGHT = 0
+  };
+#endif
+
+  bool initMCP();
+#else
+  enum ButtonPin {
+    BUTTON_PIN_PINKY     = 0,
+    BUTTON_PIN_INDEX     = 1,
+    BUTTON_PIN_JOY       = 2,
+    BUTTON_PIN_LEFT      = 3,
+    BUTTON_PIN_RIGHT     = 4,
+    BUTTON_PIN_CONFIRM   = 5,
+    BUTTON_PIN_TOP_LEFT  = 6,
+    BUTTON_PIN_TOP_RIGHT = 7
+  };
 #endif
   struct AxisCalib {
   public:
@@ -60,8 +69,8 @@ public:
     uint16_t min, max, center;
   };
 
-  static int htonBtn(ButtonIndex index);
-  static ButtonIndex ntohBtn(int index);
+  static Button pinToButton(ButtonPin index);
+  static ButtonPin buttonToPin(Button index);
 
   bool begin();
   void update();
@@ -71,9 +80,9 @@ public:
   bb::IMU& imu() { return imu_; }
 
   void setCalibration(const AxisCalib& hc, const AxisCalib& vc) { hCalib = hc; vCalib = vc; }
-  void setIncrementalPos(ButtonIndex btn);
+  void setIncrementalPos(Button btn);
   void resetIncrementalPos();
-  void setIncrementalRot(ButtonIndex btn);
+  void setIncrementalRot(Button btn);
 
   bool anyButtonPressed();
 
@@ -86,7 +95,7 @@ public:
   uint16_t minJoyRawH, maxJoyRawH, minJoyRawV, maxJoyRawV;
   AxisCalib hCalib, vCalib;
 
-  std::array<bool,8> buttons, buttonsChanged;
+  std::map<Button,bool> buttons, buttonsChanged;
 
   bool btnTopLChanged, btnTopRChanged, btnConfirmChanged;
   
@@ -123,7 +132,7 @@ protected:
   unsigned long tlms_, trms_, cms_;
   std::function<void(void)> tlShortPressCB_, tlLongPressCB_, trShortPressCB_, trLongPressCB_, cShortPressCB_, cLongPressCB_;
   unsigned long longPressThresh_;
-  ButtonIndex incrementalPos_, incrementalRot_; 
+  Button incrementalPos_, incrementalRot_; 
   float incRotR_, incRotP_, incRotH_;
   
   unsigned long lastIncPosMicros_;

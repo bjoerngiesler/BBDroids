@@ -59,7 +59,7 @@ public:
   void selectRightRemote(uint64_t address);
 
   // Other callbacks
-  void setIncrRotButtonCB(RInput::ButtonIndex button, bool left);
+  void setIncrRotButtonCB(RInput::Button button, bool left);
   void factoryResetCB(bool left);
   void startCalibrationCB(bool left);
   void finishCalibrationCB(bool left);
@@ -99,7 +99,7 @@ protected:
 
   RWidget* mainWidget_;
 
-  bool needsDraw_;
+  bool needsMenuRebuild_;
   std::vector<XBee::Node> discoveredNodes_;
 
   RWidget titleWidget;

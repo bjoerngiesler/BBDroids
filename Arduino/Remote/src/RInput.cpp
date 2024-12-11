@@ -49,34 +49,30 @@ void bTopRISR(void) {
 }
 #endif // ARDUINO_ARCH_ESP32
 
-int RInput::htonBtn(ButtonIndex index) {
-  switch(index) {
-    case BUTTON_PINKY:     return 0; break;
-    case BUTTON_INDEX:     return 1; break;
-    case BUTTON_JOY:       return 2; break;
-    case BUTTON_LEFT:      return 3; break;
-    case BUTTON_RIGHT:     return 4; break;
-    case BUTTON_CONFIRM:   return 5; break;
-    case BUTTON_TOP_LEFT:  return 6; break;
-    case BUTTON_TOP_RIGHT: return 7; break;
-    default: break;
+RInput::Button RInput::pinToButton(RInput::ButtonPin pin) {
+  switch(pin) {
+    case BUTTON_PIN_PINKY:     return BUTTON_PINKY; break;
+    case BUTTON_PIN_INDEX:     return BUTTON_INDEX; break;
+    case BUTTON_PIN_JOY:       return BUTTON_JOY; break;
+    case BUTTON_PIN_LEFT:      return BUTTON_LEFT; break;
+    case BUTTON_PIN_RIGHT:     return BUTTON_RIGHT; break;
+    case BUTTON_PIN_CONFIRM:   return BUTTON_CONFIRM; break;
+    case BUTTON_PIN_TOP_LEFT:  return BUTTON_TOP_LEFT; break;
+    case BUTTON_PIN_TOP_RIGHT: default: return BUTTON_TOP_RIGHT; break;
   }
-  return 8;
 }
 
-RInput::ButtonIndex RInput::ntohBtn(int index) {
-  switch(index) {
-    case 0: return BUTTON_PINKY; break;
-    case 1: return BUTTON_INDEX; break;
-    case 2: return BUTTON_JOY; break;
-    case 3: return BUTTON_LEFT; break;
-    case 4: return BUTTON_RIGHT; break;
-    case 5: return BUTTON_CONFIRM; break;
-    case 6: return BUTTON_TOP_LEFT; break;
-    case 7: return BUTTON_TOP_RIGHT; break;
-    default: break;
+RInput::ButtonPin RInput::buttonToPin(RInput::Button button) {
+  switch(button) {
+    case BUTTON_PINKY: return BUTTON_PIN_PINKY; break;
+    case BUTTON_INDEX: return BUTTON_PIN_INDEX; break;
+    case BUTTON_JOY: return BUTTON_PIN_JOY; break;
+    case BUTTON_LEFT: return BUTTON_PIN_LEFT; break;
+    case BUTTON_RIGHT: return BUTTON_PIN_RIGHT; break;
+    case BUTTON_CONFIRM: return BUTTON_PIN_CONFIRM; break;
+    case BUTTON_TOP_LEFT: return BUTTON_PIN_TOP_LEFT; break;
+    case BUTTON_TOP_RIGHT: default: return BUTTON_PIN_TOP_RIGHT; break;
   }
-  return BUTTON_NONE;
 }
 
 
@@ -99,7 +95,7 @@ bool RInput::initMCP() {
 }
 
 RInput::RInput(): imu_(IMU_ADDR) {
-  for(bool& b: buttons) b = false;
+  for(auto& b: buttons) b.second = false;
   tlms_ = trms_ = cms_ = 0;
   longPressThresh_ = 500;
   minJoyRawH = 2048;
@@ -116,7 +112,7 @@ bool RInput::begin() {
   return true;
 }
 
-void RInput::setIncrementalPos(ButtonIndex btn) {
+void RInput::setIncrementalPos(Button btn) {
   incrementalPos_ = btn;
 }
 
@@ -127,7 +123,7 @@ void RInput::resetIncrementalPos() {
   lastIncPosMicros_ = 0;
 }
   
-void RInput::setIncrementalRot(ButtonIndex btn) {
+void RInput::setIncrementalRot(Button btn) {
   incrementalRot_ = btn;
 }
 
@@ -230,14 +226,15 @@ void RInput::update() {
 #if defined(ARDUINO_ARCH_ESP32) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
   if(mcpOK_) {
     for(uint8_t i = 0; i < buttons.size(); i++) {
+      Button b = pinToButton(ButtonPin(i));
       if (mcp_.digitalRead(i) == LOW) {
-        if(buttons[i] == false) buttonsChanged[i] = true;
-        else buttonsChanged[i] = false;
-        buttons[i] = true;
+        if(buttons[b] == false) buttonsChanged[b] = true;
+        else buttonsChanged[b] = false;
+        buttons[b] = true;
       } else {
-        if(buttons[i] == true) buttonsChanged[i] = true;
-        else buttonsChanged[i] = false;
-        buttons[i] = false;
+        if(buttons[b] == true) buttonsChanged[b] = true;
+        else buttonsChanged[b] = false;
+        buttons[b] = false;
       }
     }
   } else {
@@ -280,7 +277,7 @@ void RInput::update() {
 }
 
 bool RInput::anyButtonPressed() {
-  for(bool& b: buttons) if(b == true) return true;
+  for(auto& b: buttons) if(b.second == true) return true;
   return false;
 }
 

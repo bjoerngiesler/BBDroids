@@ -64,6 +64,11 @@ Result RRemote::initialize() {
     Console::console.printfBroadcast("Other Remote Address: 0x%llx\n", params_.otherRemoteAddress);
     Console::console.printfBroadcast("Droid address: 0x%x\n", params_.droidAddress);
     RInput::input.setCalibration(params_.hCalib, params_.vCalib);
+#if defined(LEFT_REMOTE)
+    RInput::input.setIncrementalRot(RInput::Button(params_.config.lIncrRotBtn));
+#else
+    RInput::input.setIncrementalRot(RInput::Button(params_.config.rIncrRotBtn));
+#endif
   } else {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
     ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
@@ -83,8 +88,6 @@ void RRemote::setMainWidget(RWidget* widget) {
   widget->setNeedsContentsRedraw();
   setTopTitle(widget->name());
   mainWidget_ = widget;
-
-  needsDraw_ = true;
 }
 
 void RRemote::showMain() {
@@ -116,7 +119,7 @@ void RRemote::showPairDroidMenu() {
   for(auto& n: discoveredNodes_) {
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_DROID) continue;
     Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
-    pairDroidMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.address); showMenu(&mainMenu_); });
+    pairDroidMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.address); showMain(); });
   }
   pairDroidMenu_.addEntry("<--", [=]() { RRemote::remote.showMenu(&pairMenu_); });
 
@@ -139,7 +142,7 @@ void RRemote::showPairRemoteMenu() {
   pairRemoteMenu_.setName(String(discoveredNodes_.size()) + " Remotes");
   for(auto& n: discoveredNodes_) {
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_REMOTE) continue;
-    pairRemoteMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.address); showMenu(&mainMenu_); });
+    pairRemoteMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.address); showMain(); });
   }
   pairRemoteMenu_.addEntry("<--", [=]() { RRemote::remote.showMenu(&pairMenu_); });
 
@@ -170,37 +173,39 @@ void RRemote::populateMenus() {
 
   lRIncrRotMenu_.clear();
   lRIncrRotMenu_.setName("Incr Rotation");
-  lRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButtonCB(RInput::BUTTON_NONE, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_NONE);
-  lRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButtonCB(RInput::BUTTON_LEFT, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_LEFT);
-  lRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButtonCB(RInput::BUTTON_RIGHT, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_RIGHT);
-  lRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButtonCB(RInput::BUTTON_PINKY, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_PINKY);
-  lRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButtonCB(RInput::BUTTON_INDEX, true);showMenu(&leftRemoteMenu_);}, RInput::BUTTON_INDEX);
+  lRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButtonCB(RInput::BUTTON_NONE, true);showMain();}, RInput::BUTTON_NONE);
+  lRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButtonCB(RInput::BUTTON_LEFT, true);showMain();}, RInput::BUTTON_LEFT);
+  lRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButtonCB(RInput::BUTTON_RIGHT, true);showMain();}, RInput::BUTTON_RIGHT);
+  lRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButtonCB(RInput::BUTTON_PINKY, true);showMain();}, RInput::BUTTON_PINKY);
+  lRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButtonCB(RInput::BUTTON_INDEX, true);showMain();}, RInput::BUTTON_INDEX);
   lRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
   lRIncrRotMenu_.highlightWidgetsWithTag(params_.config.lIncrRotBtn);
 
   rRIncrRotMenu_.clear();
   rRIncrRotMenu_.setName("Incr Rotation");
-  rRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButtonCB(RInput::BUTTON_NONE, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_NONE);
-  rRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButtonCB(RInput::BUTTON_LEFT, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_LEFT);
-  rRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButtonCB(RInput::BUTTON_RIGHT, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_RIGHT);
-  rRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButtonCB(RInput::BUTTON_PINKY, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_PINKY);
-  rRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButtonCB(RInput::BUTTON_INDEX, false);showMenu(&rightRemoteMenu_);}, RInput::BUTTON_INDEX);
+  rRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButtonCB(RInput::BUTTON_NONE, false);showMain();}, RInput::BUTTON_NONE);
+  rRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButtonCB(RInput::BUTTON_LEFT, false);showMain();}, RInput::BUTTON_LEFT);
+  rRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButtonCB(RInput::BUTTON_RIGHT, false);showMain();}, RInput::BUTTON_RIGHT);
+  rRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButtonCB(RInput::BUTTON_PINKY, false);showMain();}, RInput::BUTTON_PINKY);
+  rRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButtonCB(RInput::BUTTON_INDEX, false);showMain();}, RInput::BUTTON_INDEX);
   rRIncrRotMenu_.addEntry("<--", [=]{showMenu(&rightRemoteMenu_);});
   rRIncrRotMenu_.highlightWidgetsWithTag(params_.config.rIncrRotBtn);
 
   leftRemoteMenu_.clear();
   leftRemoteMenu_.addEntry("Incr Rot...", [=]{showMenu(&lRIncrRotMenu_);});
   leftRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibrationCB(true);});
-  leftRemoteMenu_.addEntry("Set Primary", [=]{setLeftIsPrimaryCB(true);});
+  leftRemoteMenu_.addEntry("Set Primary", [=]{setLeftIsPrimaryCB(true);showMain();}, params_.config.leftIsPrimary?1:0);
   leftRemoteMenu_.addEntry("Factory Reset", [=]{factoryResetCB(true);});
   leftRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
+  leftRemoteMenu_.highlightWidgetsWithTag(1);
 
   rightRemoteMenu_.clear();
   rightRemoteMenu_.addEntry("Incr Rot...", [=]{showMenu(&rRIncrRotMenu_);});
   rightRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibrationCB(false);});
-  rightRemoteMenu_.addEntry("Set Primary", [=]{setLeftIsPrimaryCB(false);});
+  rightRemoteMenu_.addEntry("Set Primary", [=]{setLeftIsPrimaryCB(false);showMain();}, params_.config.leftIsPrimary?0:1);
   rightRemoteMenu_.addEntry("Factory Reset", [=]() {factoryResetCB(false);});
   rightRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
+  rightRemoteMenu_.highlightWidgetsWithTag(1);
 }
 
 void RRemote::setTopTitle(const String& title) {
@@ -235,8 +240,8 @@ void RRemote::selectDroid(uint64_t droid) {
   } 
         
   showMessage("Success", MSGDELAY);
-  populateMenus();
   storeParams();
+  needsMenuRebuild_ = true;
 #endif
 }
 
@@ -280,7 +285,7 @@ void RRemote::selectRightRemote(uint64_t address) {
 
   showMessage("Success", MSGDELAY);
   storeParams();
-  populateMenus();
+  needsMenuRebuild_ = true;
 #endif
 }
 
@@ -325,6 +330,10 @@ Result RRemote::step() {
     topLabel_.draw();
     bottomLabel_.draw();
     if(mainWidget_ != NULL) mainWidget_->draw();
+    if(needsMenuRebuild_) {
+      populateMenus();
+      needsMenuRebuild_ = false;
+    }
   } else {
     RDisplay::display.setLED(RDisplay::LED_COMM, 0, 0, 0);
   }
@@ -344,20 +353,25 @@ Result RRemote::stepCalib() {
   return RES_OK;
 }
 
-void RRemote::setIncrRotButtonCB(RInput::ButtonIndex button, bool left) {
+void RRemote::setIncrRotButtonCB(RInput::Button button, bool left) {
+  RInput::Button tempBtn;
 #if defined(LEFT_REMOTE)
   if(left) {
     if(params_.config.lIncrRotBtn == button) return;
     RInput::input.setIncrementalRot(button);
     params_.config.lIncrRotBtn = button;
     lRIncrRotMenu_.highlightWidgetsWithTag(button);
+    storeParams();
   } else {
     if(params_.config.rIncrRotBtn == button) return;
+    tempBtn = RInput::Button(params_.config.rIncrRotBtn);
     params_.config.rIncrRotBtn = button;
     rRIncrRotMenu_.highlightWidgetsWithTag(button);
+    if(sendConfigToRightRemote() != RES_OK) {
+      params_.config.rIncrRotBtn = tempBtn;
+    } else storeParams();
   }
-  storeParams();
-  sendConfigToRightRemote();
+  needsMenuRebuild_ = true;
 #else
   Console::console.printfBroadcast("setIncrRotButtonCB() is left remote only!\n");
 #endif
@@ -377,7 +391,7 @@ void RRemote::factoryResetCB(bool left) {
 
     params_.otherRemoteAddress = 0;
     storeParams();
-    populateMenus();
+    needsMenuRebuild_ = true;
   }
 #else
   Console::console.printfBroadcast("setIncrRotButtonCB() is left remote only!\n");
@@ -428,13 +442,22 @@ void RRemote::finishCalibrationCB(bool left) {
 }
 
 void RRemote::setLeftIsPrimaryCB(bool yesno) {
+  bool oldLIP = params_.config.leftIsPrimary;
+  if(oldLIP == yesno) return;
+
   params_.config.leftIsPrimary = yesno;
 
 #if defined(LEFT_REMOTE)
-  sendConfigToRightRemote();
+  Result res = sendConfigToRightRemote();
+  if(res != RES_OK) {
+    params_.config.leftIsPrimary = oldLIP;
+
+    return;
+  }
 #endif
   
   storeParams();
+  needsMenuRebuild_ = true;
 }
 
 void RRemote::factoryReset() {
@@ -527,7 +550,6 @@ Result RRemote::sendConfigToRightRemote() {
   }
 
   showMessage("Success", MSGDELAY);
-  populateMenus();
   storeParams();
   return RES_OK;
 }
@@ -695,7 +717,7 @@ Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint
                                        packet.cfgPayload.remoteConfig.lIncrRotBtn, packet.cfgPayload.remoteConfig.rIncrRotBtn, 
                                        packet.cfgPayload.remoteConfig.lIncrTransBtn, packet.cfgPayload.remoteConfig.rIncrTransBtn);
       params_.config = packet.cfgPayload.remoteConfig;
-      RInput::input.setIncrementalRot(RInput::ButtonIndex(params_.config.rIncrRotBtn));
+      RInput::input.setIncrementalRot(RInput::Button(params_.config.rIncrRotBtn));
       storeParams();
       return RES_OK; 
 
