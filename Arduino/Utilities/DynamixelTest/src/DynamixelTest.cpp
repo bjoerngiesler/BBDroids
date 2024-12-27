@@ -7,14 +7,14 @@
 // For caution and testing, the define SIMULATION_ONLY disables actual changes
 // to be written. Comment it out to go to live mode.
 
-#include <DynamixelShield.h>
+#include <Dynamixel2Arduino.h>
 #include <vector>
 
 #define DXL_BAUDRATE 57600
 #define DXL_PROTOCOL_VERSION 2.0
 
 #define MAXID 253
-DynamixelShield dxl;
+Dynamixel2Arduino dxl;
 bool dxlIDsFound[MAXID+1];
 
 std::vector<String> split(const String& str);
