@@ -124,9 +124,6 @@ void RRemoteVisWidget::moveWidgetsAround() {
 }
 
 Result RRemoteVisWidget::draw(ConsoleStream* stream) {
-    int bodyWidth_ = 56;
-    int bodyHeight_ = 120;
-
     if(needsFullRedraw_) {
         RDisplay::display.rect(0, y_, w, h+y_, RDisplay::BLACK, true);
         if(left_) {
@@ -189,9 +186,9 @@ Result RRemoteVisWidget::visualizeFromPacket(const bb::ControlPacket& packet) {
     pot1_.setAngle(packet.getAxis(8, bb::ControlPacket::UNIT_DEGREES));
     pot2_.setAngle(packet.getAxis(9, bb::ControlPacket::UNIT_DEGREES));
 
-    int batt = (packet.battery / 16) % 5;
-    for(int i=1; i<=batt; i++) batteryState_[i-1].setBackgroundColor(RDisplay::LIGHTGREEN1);
-    for(int i=batt+1; i<=4; i++) batteryState_[i-1].setBackgroundColor(RDisplay::LIGHTRED1);
+    float batt = 6*(float(packet.battery)/float(BATTERY_MAX));
+    for(int i=1; i<=batt&&i<=4; i++) batteryState_[i-1].setBackgroundColor(RDisplay::LIGHTGREEN1);
+    for(int i=batt; i<=4; i++) batteryState_[i-1].setBackgroundColor(RDisplay::LIGHTRED1);
 
     return RES_OK;
 }
