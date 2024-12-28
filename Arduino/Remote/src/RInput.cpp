@@ -151,9 +151,9 @@ void RInput::testMatrix() {
 void RInput::update() {
 #if defined(LEFT_REMOTE)
   joyRawH = analogRead(P_A_JOY_HOR);
-  joyRawV = 4096 - analogRead(P_A_JOY_VER);
+  joyRawV = 4095 - analogRead(P_A_JOY_VER);
 #else
-  joyRawH = 4096 - analogRead(P_A_JOY_HOR);
+  joyRawH = 4095 - analogRead(P_A_JOY_HOR);
   joyRawV = analogRead(P_A_JOY_VER);
 #endif
 
@@ -177,12 +177,14 @@ void RInput::update() {
   joyV = constrain(joyV, -1.0f, 1.0f);
   
   battRaw = analogRead(P_A_BATT_CHECK);
+  float battCooked = (battRaw/4095.0)*3.1;
+  Console::console.printfBroadcast("Batt Raw: %d Batt: %f\n", battRaw, battCooked);
   battRaw = constrain(battRaw, MIN_ANALOG_IN_VDIV, MAX_ANALOG_IN_VDIV);
   battery = float(battRaw-MIN_ANALOG_IN_VDIV)/float(MAX_ANALOG_IN_VDIV-MIN_ANALOG_IN_VDIV);
-
-  pot1 = (float)((4096-analogRead(P_A_POT1)) / 4096.0f); // careful - wraps around on the left remote
+  
+  pot1 = (float)((4095-analogRead(P_A_POT1)) / 4096.0f); // careful - wraps around on the left remote
 #if !defined(LEFT_REMOTE)
-  pot2 = (float)((4096-analogRead(P_A_POT2)) / 4096.0f);
+  pot2 = (float)((4095-analogRead(P_A_POT2)) / 4096.0f);
 #else
   pot2 = 0;
 #endif
@@ -360,7 +362,7 @@ Result RInput::fillControlPacket(ControlPacket& packet) {
   packet.setAxis(9, pot2, bb::ControlPacket::UNIT_UNITY);
 #endif
 
-  packet.battery = RInput::input.battery * 63;
+  packet.battery = RInput::input.battery * BATTERY_MAX;
   
   return RES_OK;
 }
