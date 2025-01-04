@@ -15,7 +15,9 @@ RRemote::RRemote():
 "\trunning_status on|off  Continuously prints status\r\n"\
 "\ttestsuite              Run test suite\r\n"\
 "\tcalibrate_imu          Run IMU calibration\r\n"\
-"\treset                  Factory reset";
+"\treset                  Factory reset\n"\
+"\tset_droid ADDR         Set droid address to ADDR (64bit hex - max 16 digits, omit the 0x)\n"\
+"\tset_other_remote ADDR  Set other remote address to ADDR (64bit hex - max 16 digits, omit the 0x)\n";
 
   started_ = false;
   onInitScreen_ = true;
@@ -62,7 +64,7 @@ Result RRemote::initialize() {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is valid.\n", paramsHandle_);
     ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
     Console::console.printfBroadcast("Other Remote Address: 0x%llx\n", params_.otherRemoteAddress);
-    Console::console.printfBroadcast("Droid address: 0x%x\n", params_.droidAddress);
+    Console::console.printfBroadcast("Droid address: 0x%llx\n", params_.droidAddress);
     RInput::input.setCalibration(params_.hCalib, params_.vCalib);
 #if defined(LEFT_REMOTE)
     RInput::input.setIncrementalRot(RInput::Button(params_.config.lIncrRotBtn));
@@ -231,11 +233,9 @@ void RRemote::selectDroid(uint64_t droid) {
     Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
     if(res != RES_OK) {
       showMessage(String("Error ") + res, MSGDELAY);
-      return;
     } 
     if(reply != ConfigPacket::CONFIG_REPLY_OK) {
       showMessage(String("Failed ") + int(reply), MSGDELAY);
-      return;
     }
   } 
         
@@ -311,9 +311,9 @@ Result RRemote::stop(ConsoleStream *stream) {
 void RRemote::updateStatusLED() {
   if(mode_ == MODE_CALIBRATION) {
     RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 0, 255);
-  } else if(Console::console.isStarted() && XBee::xbee.isStarted() && isStarted() && RInput::input.isOK()) {
+  } else if(Console::console.isStarted() && XBee::xbee.isStarted() && isStarted() && RInput::input.imuOK() && RInput::input.buttonsOK()) {
     RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 255, 0);
-  } else if(!XBee::xbee.isStarted() || !RInput::input.isOK()) {
+  } else if(!XBee::xbee.isStarted() || !RInput::input.imuOK() || !RInput::input.buttonsOK() ) {
     RDisplay::display.setLED(RDisplay::LED_STATUS, 255, 0, 0);
   } else {
     RDisplay::display.setLED(RDisplay::LED_STATUS, 255, 255, 0);
@@ -340,7 +340,7 @@ Result RRemote::step() {
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
     if(runningStatus_) {
-      printStatus();
+      printExtendedStatusLine();
     }
 
     fillAndSend();
@@ -598,6 +598,7 @@ bb::Result RRemote::fillAndSend() {
 
   // both remotes send to droid
   if(params_.droidAddress != 0 && mode_ == MODE_REGULAR) {
+    //Console::console.printfBroadcast("Sending %d times to 0x%llx\n", params_.config.sendRepeats+1, params_.droidAddress);
     for(int i=0; i<params_.config.sendRepeats+1; i++) {
       res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
     }
@@ -613,14 +614,7 @@ bb::Result RRemote::fillAndSend() {
 
 Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
   if(words.size() == 0) return RES_CMD_UNKNOWN_COMMAND;
-  if(words[0] == "status") {
-    if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
-    printStatus(stream);
-    stream->printf("\n");
-    return RES_OK;
-  } 
-  
-  else if(words[0] == "running_status") {
+  if(words[0] == "running_status") {
     if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
     if(words[1] == "on" || words[1] == "true") {
       runningStatus_ = true;
@@ -645,6 +639,46 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
 
   else if(words[0] == "reset") {
     factoryReset();
+    return RES_OK;
+  }
+
+  else if(words[0] == "set_droid") {
+    if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    if(words[1].length() > 16) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    uint64_t addr = 0;
+    String addrstr = words[1];
+    for(int i=0; i<addrstr.length(); i++) {
+      if(i!=0) addr <<= 4;
+      if(addrstr[i] >= '0' && addrstr[i] <= '9') addr = addr + (addrstr[i]-'0');
+      else if(addrstr[i] >= 'a' && addrstr[i] <= 'f') addr = addr + (addrstr[i]-'a') + 0xa;
+      else if(addrstr[i] >= 'A' && addrstr[i] <= 'F') addr = addr + (addrstr[i]-'a') + 0xa;
+      else {
+        stream->printf("Invalid character '%c' at position %d - must be 0-9a-fA-F.\n");
+        return RES_CMD_INVALID_ARGUMENT;
+      }
+    }
+    stream->printf("Setting droid address to 0x%llx.\n", addr);
+    params_.droidAddress = addr;
+    return RES_OK;
+  }
+
+  else if(words[0] == "set_other_remote") {
+    if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    if(words[1].length() > 16) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    uint64_t addr = 0;
+    String addrstr = words[1];
+    for(int i=0; i<addrstr.length(); i++) {
+      if(i!=0) addr <<= 4;
+      if(addrstr[i] >= '0' && addrstr[i] <= '9') addr = addr + (addrstr[i]-'0');
+      else if(addrstr[i] >= 'a' && addrstr[i] <= 'f') addr = addr + (addrstr[i]-'a');
+      else if(addrstr[i] >= 'A' && addrstr[i] <= 'F') addr = addr + (addrstr[i]-'a');
+      else {
+        stream->printf("Invalid character '%c' at position %d - must be 0-9a-fA-F.\n");
+        return RES_CMD_INVALID_ARGUMENT;
+      }
+    }
+    stream->printf("Setting other remote address to 0x%llx.\n", addr);
+    params_.otherRemoteAddress = addr;
     return RES_OK;
   }
 
@@ -749,19 +783,62 @@ Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint
 #endif
 }
 
-void RRemote::printStatus(ConsoleStream *stream) {
+String RRemote::statusLine() {
+  String str = bb::Subsystem::statusLine() + ", ";
+  if(RInput::input.imuOK()) str += "IMU OK, ";
+  else str += "IMU error, ";
+  if(RInput::input.buttonsOK()) str += "Buttons OK.";
+  else str += "Buttons error.";
+
+  return str;
+}
+
+void RRemote::printExtendedStatus(ConsoleStream* stream) {
+  Runloop::runloop.excuseOverrun();
+
+  float pitch, roll, heading, rax, ray, raz, ax, ay, az;
+  RInput::input.imu().getFilteredPRH(pitch, roll, heading);
+  RInput::input.imu().getAccelMeasurement(rax, ray, raz);
+  RInput::input.imu().getGravCorrectedAccel(ax, ay, az);
+
+  stream->printf("Sequence number: %ld\n", seqnum_);
+  stream->printf("Addressing:\n");
+  stream->printf("\tOther remote: 0x%llx\n", params_.otherRemoteAddress);
+  stream->printf("\tDroid:        0x%llx\n", params_.droidAddress);
+  stream->printf("Joystick:\n");
+  stream->printf("\tHor: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", RInput::input.joyRawH, RInput::input.joyH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max);
+  stream->printf("\tVer: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", RInput::input.joyRawV, RInput::input.joyV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max);
+  stream->printf("IMU:\n");
+  stream->printf("\tRotation             Pitch: %.2f Roll: %.2f Heading: %.2f\n", pitch, roll, heading);
+  stream->printf("\tRaw Acceleration     X:%f Y:%f Z:%f\n", rax, ray, raz);
+  stream->printf("\tGrav-corrected accel X:%f Y:%f Z:%f\n", ax, ay, az);
+  stream->printf("Buttons: Pinky(%d):%c Index(%d):%c Joy(%d):%c Left(%d):%c Right(%d):%c Confirm(%d):%c TopLeft(%d):%c TopRight(%d):%c\n",
+                 RInput::BUTTON_PINKY, RInput::input.buttons[RInput::BUTTON_PINKY] ? 'X' : '_',
+                 RInput::BUTTON_INDEX, RInput::input.buttons[RInput::BUTTON_INDEX] ? 'X' : '_',
+                 RInput::BUTTON_JOY, RInput::input.buttons[RInput::BUTTON_JOY] ? 'X' : '_',
+                 RInput::BUTTON_LEFT, RInput::input.buttons[RInput::BUTTON_LEFT] ? 'X' : '_',
+                 RInput::BUTTON_RIGHT, RInput::input.buttons[RInput::BUTTON_RIGHT] ? 'X' : '_',
+                 RInput::BUTTON_CONFIRM, RInput::input.buttons[RInput::BUTTON_CONFIRM] ? 'X' : '_',
+                 RInput::BUTTON_TOP_LEFT, RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? 'X' : '_',
+                 RInput::BUTTON_TOP_RIGHT, RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? 'X' : '_');
+  stream->printf("Potentiometer 1: %.1f Potentiometer 2: %.1f\n", RInput::input.pot1, RInput::input.pot2);
+  stream->printf("Battery: %.1f\n", RInput::input.battery);
+}
+
+void RRemote::printExtendedStatusLine(ConsoleStream *stream) {
   const unsigned int bufsize = 255;
   char buf[bufsize];
+  memset(buf, 0, bufsize);
 
-  float pitch, roll, heading, ax, ay, az;
+  float pitch, roll, heading, rax, ray, raz, ax, ay, az;
   RInput::input.imu().getFilteredPRH(pitch, roll, heading);
-  //RInput::input.imu().getAccelMeasurement(ax, ay, az);
+  RInput::input.imu().getAccelMeasurement(rax, ray, raz);
   RInput::input.imu().getGravCorrectedAccel(ax, ay, az);
 
 #if 0
   snprintf(buf, bufsize, "S%ld AX%f AY%f AZ%f\n", seqnum_, ax, ay, az);
 #else
-  snprintf(buf, bufsize, "S%ld H%d [%d..%d..%d] %.2f V%d [%d..%d..%d] %.2f P%.1f R%.1f H%.1f AX%f AY%f AZ%f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c\n",
+  snprintf(buf, bufsize, "S%ld H%d [%d..%d..%d] %.2f V%d [%d..%d..%d] %.2f P%.1f R%.1f H%.1f AX%.2f AY%.2f AZ%.2f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c",
     seqnum_,
     RInput::input.joyRawH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max, RInput::input.joyH,
     RInput::input.joyRawV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max, RInput::input.joyV,
@@ -778,9 +855,10 @@ void RRemote::printStatus(ConsoleStream *stream) {
     RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? '0' : '1',
     RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? '0' : '1');
 #endif
-
-  if(stream != NULL) stream->printf(buf);
-  else Console::console.printfBroadcast(buf);
+  if(stream)
+    stream->printf("%s\n", buf);
+  else 
+    Console::console.printfBroadcast("%s\n", buf);
 }
 
 void RRemote::runTestsuite() {

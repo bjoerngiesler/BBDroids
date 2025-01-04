@@ -260,7 +260,7 @@ void bb::Console::printHelpAllSubsystems(ConsoleStream* stream) {
 void bb::Console::printStatusAllSubsystems(ConsoleStream* stream) {
 	stream->printf("System status:\n");
 	const std::vector<Subsystem*> subsystems = SubsystemManager::manager.subsystems();
-	for(auto& s: subsystems) s->printStatus(stream);
+	for(auto& s: subsystems) s->printStatusLine(stream);
 }
 
 std::vector<String> bb::Console::split(const String& str) {

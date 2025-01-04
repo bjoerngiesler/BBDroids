@@ -12,11 +12,9 @@
 
 using namespace bb;
 
-Uart *dynamixelSerial, *dfplayerSerial, *serialTXSerial;
+Uart *dfplayerSerial, *serialTXSerial;
 
 bool setupBoardComm() {
-  dynamixelSerial = &Serial1;
-
   serialTXSerial = new Uart(&sercom3, P_SERIALTX_RX, P_SERIALTX_TX, SERCOM_RX_PAD_1, UART_TX_PAD_0);
   pinPeripheral(P_SERIALTX_RX, PIO_SERCOM);
   pinPeripheral(P_SERIALTX_TX, PIO_SERCOM);
@@ -24,7 +22,6 @@ bool setupBoardComm() {
   dfplayerSerial = new Uart(&sercom1, P_DFPLAYER_RX, P_DFPLAYER_TX, SERCOM_RX_PAD_1, UART_TX_PAD_0);
   pinPeripheral(P_DFPLAYER_RX, PIO_SERCOM);
   pinPeripheral(P_DFPLAYER_TX, PIO_SERCOM);
-
   return true;
 }
 
@@ -74,11 +71,9 @@ void setup() {
 
   setupBoardComm();
 
-#if 0
   DOSound::sound.begin(dfplayerSerial);
   DOSound::sound.setVolume(25);
   DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING);
-#endif
 
   initializeSubsystems();
   startSubsystems();

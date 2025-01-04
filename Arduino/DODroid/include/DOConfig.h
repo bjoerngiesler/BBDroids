@@ -16,7 +16,7 @@ static const float         WHEEL_DISTANCE = 95.0;                      // Distan
 // Parameters - all of these can be set from the commandline and stored in flash.
 struct DOParams {
     float neckRange         = 30.0; // Careful with this, easy to nosedive if the drive controller and neck aren't working together well.
-    float neckOffset        = 0.0;  
+    float neckOffset        = -2.0;  
     float headRollRange     = 45.0;
     float headRollOffset    = 0.0;
     float headPitchRange    = 45.0; 
@@ -26,7 +26,7 @@ struct DOParams {
 
     float gyroPitchDeadband = 1.0;
 
-    float wheelSpeedKp      = 0.11;
+    float wheelSpeedKp      = 0.10;
     float wheelSpeedKi      = 0.8;
     float wheelSpeedKd      = 0.0;
     float wheelSpeedImax    = 255;
@@ -49,10 +49,10 @@ struct DOParams {
     // Free animation parameters. 
     // Be aware of the units!!! E.g. target unit for servo free animation is always degrees, but input may be something else.
     // Example - faNeckSpeed has input unit of mm/s, going up to maxSpeed, so is probably much below 1.
-    float faNeckIMUAccel     = -30;   // Move neck by acceleration from the IMU
-    float faNeckSPAccel      = 0;    // Move neck by acceleration from speed setpoint
-    float faNeckSpeed        = 0.01;     // Move neck by absolute speed over ground
-    float faNeckSpeedSP      = -0.06; // Move neck by speed *setpoint* over ground. Good idea to interpolate this with faNeckSpeed!
+    float faNeckIMUAccel     = 0;   // Move neck by acceleration from the IMU
+    float faNeckSPAccel      = -0.01;    // Move neck by acceleration from speed setpoint
+    float faNeckSpeed        = -0.02;     // Move neck by absolute speed over ground
+    float faNeckSpeedSP      = -0.04; // Move neck by speed *setpoint* over ground. 
     float faHeadPitchSpeedSP = 0.03;  // Pitch up head at higher speeds to counteract the neck speed setpoint
     float faHeadRollTurn     = .10;   // Move head roll by IMU turn speed
     float faHeadHeadingTurn  = .14;   // Move head heading by IMU turn speed

@@ -12,6 +12,7 @@ public:
   DODriveControlOutput(bb::ControlOutput& left, bb::ControlOutput& right);
 
   virtual void setGoalVelocity(float goalVel);
+  virtual float goalVelocity() { return goalVel_; }
   virtual void setAcceleration(float accel);
   virtual void setGoalRotation(float goalRot);
   void setDeadband(float deadband);

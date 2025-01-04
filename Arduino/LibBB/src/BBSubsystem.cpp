@@ -38,7 +38,7 @@ bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words,
 
 	else if(words[0] == "status") {
 		if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
-		printStatus(stream);
+		printExtendedStatus(stream);
 		return RES_OK;
 	} 
 
@@ -83,22 +83,33 @@ bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words,
 	return RES_CMD_UNKNOWN_COMMAND;
 }
 
-void bb::Subsystem::printStatus(ConsoleStream* stream) {
-	stream->printf("%s (%s): ", name(), description());
-
+String bb::Subsystem::statusLine() {
+	String line = String(name()) + " (" + description() + "): ";
 	if(isStarted()) {
-		stream->printf("started, ");
+		line += "started, ";
 		switch(operationStatus()) {
 		case RES_OK:
-			stream->printf("operational\n");
+			line += "operational";
 			break;
 		default:
-			stream->printf("not operational: ");
-			stream->printf(errorMessage(operationStatus()));
-			stream->printf("\n");
+			line += "not operational: ";
+			line += errorMessage(operationStatus());
 			break;
 		}
-	} else stream->printf("stopped\n");
+	} else line += "stopped";
+	
+	return line;
+}
+
+void bb::Subsystem::printStatusLine(ConsoleStream* stream) {
+	if(stream) 
+		stream->printf("%s\n", statusLine().c_str());
+	else
+		Console::console.printfBroadcast("%s\n", statusLine().c_str());
+}
+
+void bb::Subsystem::printExtendedStatus(ConsoleStream* stream) {
+	printStatusLine(stream);
 }
 
 void bb::Subsystem::printHelp(ConsoleStream* stream) {

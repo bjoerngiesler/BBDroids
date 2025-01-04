@@ -105,7 +105,9 @@ static const uint8_t IMU_ADDR           = 0x6b;
 static const uint8_t MCP_ADDR1           = 0x26;
 static const uint8_t MCP_ADDR2           = 0x27;
 
-static const uint16_t MAX_ANALOG_IN_VDIV = 2303; // Max battery voltage is 4.2V, with our voltage divider we'll see 2.1V or 2606 out of 4096 possible values.
-static const uint16_t MIN_ANALOG_IN_VDIV = 1936; // Min battery voltage is 3.7V, with our voltage divider we'll see 1.85V or 2296 out of 4096 possible values.
+static float MAX_VOLTAGE = 4.2;
+static float MIN_VOLTAGE = 3.7;
+static const uint16_t MAX_ANALOG_IN_VDIV = 2520; // Max battery voltage is 4.2V, with our voltage divider we'll see 2.1V or 2606 out of 4096 possible values.
+static const uint16_t MIN_ANALOG_IN_VDIV = 1940; // Min battery voltage is 3.7V, with our voltage divider we'll see 1.85V or 2296 out of 4096 possible values.
 
 #endif // CONFIG_H

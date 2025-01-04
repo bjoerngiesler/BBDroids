@@ -77,17 +77,12 @@ RInput::ButtonPin RInput::buttonToPin(RInput::Button button) {
 
 
 bool RInput::initMCP() {
-  Console::console.printfBroadcast("Initializing MCP\n");
-
-  Console::console.printfBroadcast("Trying address 1\n");
   if(mcp_.begin_I2C(MCP_ADDR1) == 0) {
-    Console::console.printfBroadcast("Trying address 2\n");
     if(mcp_.begin_I2C(MCP_ADDR2) == 0) { // HAAAAAACK!!! to fix my stupid right remote with a bad solder joint
       Console::console.printfBroadcast("Couldn't initialize MCP!\n");
       return false;
     }
   }
-  Console::console.printfBroadcast("Successfully initialized MCP!\n");
   for (uint8_t i = 0; i < 8; i++) {
     mcp_.pinMode(i, INPUT_PULLUP);
   }
@@ -178,7 +173,7 @@ void RInput::update() {
   
   battRaw = analogRead(P_A_BATT_CHECK);
   float battCooked = (battRaw/4095.0)*3.1;
-  Console::console.printfBroadcast("Batt Raw: %d Batt: %f\n", battRaw, battCooked);
+  //Console::console.printfBroadcast("Batt Raw: %d Batt: %f\n", battRaw, battCooked);
   battRaw = constrain(battRaw, MIN_ANALOG_IN_VDIV, MAX_ANALOG_IN_VDIV);
   battery = float(battRaw-MIN_ANALOG_IN_VDIV)/float(MAX_ANALOG_IN_VDIV-MIN_ANALOG_IN_VDIV);
   
@@ -294,11 +289,6 @@ void RInput::btnTopLeftReleased() {
   } else if(tlLongPressCB_ != nullptr) {
     tlLongPressCB_();
   }
-}
-
-bool RInput::isOK() {
-  if(mcpOK_ && imu_.available()) return true;
-  return false;
 }
 
 Result RInput::fillControlPacket(ControlPacket& packet) {

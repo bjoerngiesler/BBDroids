@@ -34,7 +34,8 @@ public:
   Result stepDrive();
   Result stepHead();
 
-  virtual void printStatus(ConsoleStream *stream);
+  virtual String statusLine();
+  virtual void printExtendedStatus(ConsoleStream *stream = NULL);
   virtual Result fillAndSendStatePacket();
 
   void setControlParameters();
@@ -64,6 +65,8 @@ protected:
   bb::PIDController balanceController_;
   
   MotorStatus leftMotorStatus_, rightMotorStatus_;
+
+  int numLeftCtrlPackets_, numRightCtrlPackets_;
   
   bool driveOn_;
   bool servosOK_, antennasOK_;

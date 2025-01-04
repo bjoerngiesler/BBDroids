@@ -86,7 +86,7 @@ Result DODroid::initialize() {
 
   balanceController_.setAutoUpdate(false);
   balanceController_.setReverse(true); // FIXME Not quite sure anymore why we're reversing here, we should be forwarding. Check!
-  balanceController_.setDebug(false);
+  balanceController_.setDebug(true);
  
   imu_.setRotationAroundZ(bb::IMU::ROTATE_90);
 
@@ -105,7 +105,6 @@ Result DODroid::start(ConsoleStream* stream) {
   DOBattStatus::batt.begin();
 
   operationStatus_ = selfTest();
-  
 
   if(operationStatus_ == RES_DROID_VOLTAGE_TOO_LOW) {
     if(DOBattStatus::batt.voltage() < 1.0) {
@@ -161,14 +160,15 @@ void DODroid::setControlParameters() {
 Result DODroid::step() {
   if(!imu_.available() || !DOBattStatus::batt.available()) {
     fillAndSendStatePacket();
+    Console::console.printfBroadcast("IMU or battery missing - critical error\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
+
+  Runloop::runloop.excuseOverrun(); // FIXME find out what's taking so long
 
   if((Runloop::runloop.getSequenceNumber() % 1000) == 0) {
     stepPowerProtect();
   }
-
-  Runloop::runloop.excuseOverrun();
 
   // Encoder and IMU updates are needed for everything, so we do them here.
   leftEncoder_.update();  
@@ -204,22 +204,23 @@ bb::Result DODroid::stepPowerProtect() {
 }
 
 bb::Result DODroid::stepHead() {
-  float p, r, h, dr, dp, dh, ax, ay, az;
+  float p, r, h, dr, dp, dh, ax, ay, az, rax, ray, raz;
   imu_.getFilteredPRH(p, r, h);
-  imu_.getAccelMeasurement(ax, ay, az);
+  imu_.getGravCorrectedAccel(ax, ay, az);
+  imu_.getAccelMeasurement(rax, ray, raz);
   imu_.getGyroMeasurement(dp, dr, dh);
 
-  //Console::console.printfBroadcast("R:%f P:%f H:%f AX:%f AY:%f AZ:%f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, dr, dp, dh);
+  //Console::console.printfBroadcast("R:%f P:%f H:%f AX:%f AY:%f AZ:%f RAX:%f RAY: %f RAZ: %f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, rax, ray, raz, dr, dp, dh);
 
   float speed = (leftEncoder_.presentSpeed() + rightEncoder_.presentSpeed())/2;
-  float speedSP = (lSpeedController_.goal() + rSpeedController_.goal())/2;
+  float speedSP = driveOutput_.goalVelocity();
   float accelSP = (speedSP-speed);
   if(speedSP == 0) accelSP = 0;
 
   if(servosOK_) {
     float nod = params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
     if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
-    else nod += params_.faNeckSpeedSP*speedSP/2;
+    else nod += params_.faNeckSpeedSP*speedSP;
     nod += params_.neckOffset;
     bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
 
@@ -288,54 +289,68 @@ void DODroid::switchDrive(bool onoff) {
   balanceController_.setGoal(0);
 
   driveOn_ = onoff;
+  if(driveOn_) Console::console.printfBroadcast("Drive system is now on.\n");
+  else Console::console.printfBroadcast("Drive system is now off.\n");
 }
 
-void DODroid::printStatus(ConsoleStream *stream) {
-  if(!stream) return;
-  stream->printf("%s: %s", name_, started_ ? "started" : "not started");
-  if(!started_) {
-    stream->printf("\n");
-    return;
-  }
-
-  stream->printf(", status: %s", errorMessage(operationStatus_));
-  
-  stream->printf(", batt: ");
+String DODroid::statusLine() {
+  String str = bb::Subsystem::statusLine();
+  str += ", batt: ";
   if(DOBattStatus::batt.available()) {
-    stream->printf("%fV %fmA", DOBattStatus::batt.voltage(), DOBattStatus::batt.current());
+    str = str + DOBattStatus::batt.voltage() + "V " + DOBattStatus::batt.current() + "mA";
   } else {
-    stream->printf("not available");
+    str += "not available";
   }
 
-  stream->printf(", servos: %s", bb::Servos::servos.isStarted() ? "OK" : "not started");
+  if(Servos::servos.isStarted()) str += ", servos OK";
+  else str += ", servos not started";
 
-  stream->printf(", motors: ");
+  str += ", motors: ";
 
   leftEncoder_.update();
-  if(leftMotorStatus_ == MOTOR_OK) stream->printf("L OK");
-  else stream->printf("L Err %d", leftMotorStatus_);
-  stream->printf(", enc %.1f", leftEncoder_.presentPosition());
+  if(leftMotorStatus_ == MOTOR_OK) str += "L OK";
+  else str = str + "L Err " + leftMotorStatus_;
 
   rightEncoder_.update();
-  if(rightMotorStatus_ == MOTOR_OK) stream->printf(", R OK");
-  else stream->printf("R Err %d", rightMotorStatus_);
-  stream->printf(", enc %.1f", rightEncoder_.presentPosition());
+  if(rightMotorStatus_ == MOTOR_OK) str += ", R OK";
+  else str = str + ", R Err " + rightMotorStatus_;
+
+  if(imu_.available()) str = str + ", IMU OK";
+  else str = str + ", IMU Error";  
+
+  return str;
+}
+
+void DODroid::printExtendedStatus(ConsoleStream *stream) {
+  stream->printf("Started: %s, Operation status: %s\n", started_?"yes":"no", errorMessage(operationStatus_));
+
+  stream->printf("Control packets received:\n");
+  stream->printf("\tFrom left remote: %d\n", numLeftCtrlPackets_);
+  stream->printf("\tFrom right remote: %d\n", numRightCtrlPackets_);
+
+  stream->printf("Motors:\n");
+  leftEncoder_.update();
+  if(leftMotorStatus_ == MOTOR_OK) stream->printf("\tLeft OK, encoder %f\n", leftEncoder_.presentPosition());
+  else stream->printf("\tLeft Err %d\n", leftMotorStatus_);
+  rightEncoder_.update();
+  if(rightMotorStatus_ == MOTOR_OK) stream->printf("\tRight OK, encoder %f\n", rightEncoder_.presentPosition());
+  else stream->printf("\tRight Err %d\n", rightMotorStatus_);
 
   float p, r, h;
   imu_.getFilteredPRH(p, r, h);
-  stream->printf(", IMU: P%f R%f H%f", p, r, h);
-
-  stream->printf("\n");
+  stream->printf("IMU: P%.2f R%.2f H%.2f\n", p, r, h);
 }
 
+
 Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
-  if(source == PACKET_SOURCE_LEFT_REMOTE) {
-    Console::console.printfBroadcast("Control packet from left remote (but not primary)\n");
-  } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {    
-    Console::console.printfBroadcast("Control packet from right remote (but not primary)\n");
-  } 
+  if(source == PACKET_SOURCE_LEFT_REMOTE) numLeftCtrlPackets_++;
+  else if(source == PACKET_SOURCE_RIGHT_REMOTE) numRightCtrlPackets_++;
+  else {
+    Console::console.printfBroadcast("Control packet from unknown source %d\n", source);
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
   if(packet.primary == true) {
-    //Console::console.printfBroadcast("Control packet from primary remote\n");
     static int numZero = 0;
     if(EPSILON(packet.getAxis(0)) && EPSILON(packet.getAxis(1))) {
       numZero++;
@@ -360,6 +375,7 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
       annealH_ = fabs(remoteH_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
     }
 
+#if 0
     if(driveOn_ == false) { // doesn't work while driving
       if(packet.button0 && !lastBtn0_) {
         DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING, false);
@@ -367,7 +383,7 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
       else if(packet.button1 && !lastBtn1_) DOSound::sound.playFolderRandom(DOSound::FOLDER_POSITIVE, false);
       else if(packet.button2 && !lastBtn2_) DOSound::sound.playFolderRandom(DOSound::FOLDER_NEGATIVE, false);
     }
-
+#endif
     lastBtn0_ = packet.button0;
     lastBtn1_ = packet.button1;
     lastBtn2_ = packet.button2;
@@ -390,8 +406,10 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
       driveOutput_.setGoalRotation(rot);
     }
 
-    DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
-  } // Primary Remote
+    //DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
+  } else {
+    Console::console.printfBroadcast("Control packet from secondary remote\n");
+  }
 
   return RES_OK;
 }

@@ -65,7 +65,7 @@ public:
 #endif
   struct AxisCalib {
   public:
-    AxisCalib(): min(0), max(4096), center(2048) {}
+    AxisCalib(): min(0), max(4095), center(2048) {}
     uint16_t min, max, center;
   };
 
@@ -75,7 +75,9 @@ public:
   bool begin();
   void update();
   void printOnSerial();
-  bool isOK();
+  bool imuOK() { return imu_.available(); }
+  bool buttonsOK() { return mcpOK_; }
+
   Result fillControlPacket(ControlPacket& packet);
   bb::IMU& imu() { return imu_; }
 

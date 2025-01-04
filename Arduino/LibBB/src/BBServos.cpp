@@ -83,7 +83,10 @@ Result bb::Servos::start(ConsoleStream* stream) {
   if(stream) stream->printf("Detecting Dynamixels... ");
   for (unsigned int i = 0; i < numBps; i++) {
     dxl_.begin(bpsList[i]);
-    if (dxl_.scan() == false) continue;
+    if (dxl_.scan() == false) {
+      if(stream) stream->printf("scan failed at %dbps...", bpsList[i]);
+      continue;
+    }
 
     bps = bpsList[i];
 

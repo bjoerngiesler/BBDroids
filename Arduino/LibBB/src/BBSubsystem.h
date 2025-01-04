@@ -42,7 +42,9 @@ public:
 
 	virtual Result registerWithManager() { return SubsystemManager::manager.registerSubsystem(this); }
 
-	virtual void printStatus(ConsoleStream *stream);
+	virtual String statusLine();
+	virtual void printStatusLine(ConsoleStream *stream = NULL);
+	virtual void printExtendedStatus(ConsoleStream *stream = NULL);
 	virtual void printHelp(ConsoleStream *stream);
 	virtual void printParameters(ConsoleStream *stream);
 

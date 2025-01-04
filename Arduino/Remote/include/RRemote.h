@@ -39,7 +39,10 @@ public:
   Result fillAndSend();
   
   void updateStatusLED();
-  void printStatus(ConsoleStream *stream = NULL);
+  virtual String statusLine();
+  virtual void printExtendedStatus(ConsoleStream *stream = NULL);
+  void printExtendedStatusLine(ConsoleStream *stream = NULL); 
+
 
   void setMainWidget(RWidget* widget);
 
