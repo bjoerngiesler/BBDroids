@@ -16,7 +16,7 @@ static const float         WHEEL_DISTANCE = 95.0;                      // Distan
 // Parameters - all of these can be set from the commandline and stored in flash.
 struct DOParams {
     float neckRange         = 30.0; // Careful with this, easy to nosedive if the drive controller and neck aren't working together well.
-    float neckOffset        = -2.0;  
+    float neckOffset        = -4.0;  
     float headRollRange     = 45.0;
     float headRollOffset    = 0.0;
     float headPitchRange    = 45.0; 
@@ -45,6 +45,8 @@ struct DOParams {
     float speedAxisDeadband = 0.05;
     float rotAxisGain       = 0.4;
     float rotAxisDeadband   = 0.05;
+
+    float leanHeadToBody    = 0.8;
 
     // Free animation parameters. 
     // Be aware of the units!!! E.g. target unit for servo free animation is always degrees, but input may be something else.

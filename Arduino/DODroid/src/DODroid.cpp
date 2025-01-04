@@ -68,6 +68,8 @@ Result DODroid::initialize() {
   addParameter("rot_axis_gain", "Gain for controller rot axis", params_.speedAxisGain, -INT_MAX, INT_MAX);
   addParameter("rot_axis_deadband", "Deadband for controller rot axis", params_.speedAxisGain, -INT_MAX, INT_MAX);
 
+  addParameter("lean_head_to_body", "Lean multiplier to counter head motion with body motion", params_.leanHeadToBody, -INT_MAX, INT_MAX);
+
   addParameter("antenna_offset", "Offset for antennas", params_.antennaOffset, -INT_MAX, INT_MAX);
   addParameter("gyro_pitch_deadband", "Deadband for gyro pitch", params_.gyroPitchDeadband, -INT_MAX, INT_MAX);
 
@@ -222,9 +224,11 @@ bb::Result DODroid::stepHead() {
     if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
     else nod += params_.faNeckSpeedSP*speedSP;
     nod += params_.neckOffset;
+    nod += lean_;
+    nod = constrain(nod, -params_.neckRange, params_.neckRange);
     bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
 
-    float headPitch = -nod + remoteP_ - params_.neckOffset - params_.headPitchOffset;
+    float headPitch = -nod - params_.leanHeadToBody*lean_ + remoteP_ - params_.neckOffset - params_.headPitchOffset;
     headPitch += params_.faHeadPitchSpeedSP*speedSP;
     bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 + headPitch);
     bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh - remoteH_ + params_.headHeadingOffset);
@@ -407,8 +411,11 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
     }
 
     //DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
-  } else {
-    Console::console.printfBroadcast("Control packet from secondary remote\n");
+  } else { // secondary remote
+    if(driveOn_ == true) {
+      lean_ = -1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange;
+      balanceController_.setGoal(params_.leanHeadToBody*lean_);
+    }
   }
 
   return RES_OK;
