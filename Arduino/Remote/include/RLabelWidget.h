@@ -33,15 +33,23 @@ public:
     void setJustification(HorizontalJustification hor, VerticalJustification ver);
     void setAutoscroll(bool autoscroll = true);
     void setAutoscrollTiming(float leftwait, float pixelwait, float rightwait);
+    void setLinebreak(bool lb=true) { linebreak_ = lb; }
+    void setAutosize(bool as=true) { autosize_ = as; }
 
     virtual void setDrawsFrame(bool yesno = true) { setFrameType(FRAME_ALL); }
     virtual void setFrameType(FrameType type) { frameType_ = type; setNeedsFullRedraw(); }
+
+    //! Split str into lines, with a maximum line width of maxwidth (in characters)
+    static std::vector<String> splitLines(const String& str, unsigned int maxwidth);
 
 protected:
     HorizontalJustification hor_;
     VerticalJustification ver_;
     String title_;
+    std::vector<String> lines_;
     bool autoscroll_;
+    bool linebreak_;
+    bool autosize_;
     float leftwait_, pixelwait_, rightwait_;
     int8_t xdelta_;
     FrameType frameType_;

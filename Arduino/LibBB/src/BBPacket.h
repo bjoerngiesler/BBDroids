@@ -175,7 +175,7 @@ struct __attribute__((packed)) RemoteConfigPacket {
 
 struct __attribute__ ((packed)) ConfigPacket {
 	static const uint64_t MAGIC = 0xbadeaffebabeface;
-#define CONFIG_TYPE_BITS 6
+#define CONFIG_TYPE_BITS 6 // allows for 63 config types
 
 	enum ConfigType {
 		CONFIG_SET_LEFT_REMOTE_ID       = 0,  // L->R - parameter: address
@@ -190,10 +190,10 @@ struct __attribute__ ((packed)) ConfigPacket {
 	};
 
 	enum ConfigReplyType {
-		CONFIG_TRANSMIT_NOREPLY       = 0, // transmission
-		CONFIG_TRANSMIT_REPLY         = 1, // OK reply
-		CONFIG_REPLY_OK               = 2, // something went wrong
-		CONFIG_REPLY_ERROR            = 3
+		CONFIG_TRANSMIT_NOREPLY       = 0, // No reply requested
+		CONFIG_TRANSMIT_REPLY         = 1, // Reply requested
+		CONFIG_REPLY_OK               = 2, // Reply OK
+		CONFIG_REPLY_ERROR            = 3  // Something went wrong
 	};
 
 	ConfigType      type  : CONFIG_TYPE_BITS;

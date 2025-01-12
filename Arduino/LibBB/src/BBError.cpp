@@ -8,8 +8,8 @@ static const char* messages[] = {
 	"Invalid parameter value", // 3
 	"Read-only parameter", // 4
 	
-	"Hardware dependency missing (eg specify serial port in code)", // 5
-	"Hardware dependency locked (shutdown subsys first)", // 6
+	"HW dependency missing", // 5
+	"HW dependency locked", // 6
 	"Subsys already registered", // 7
 	"No such subsys", // 8
 	"Resource not available", // 9

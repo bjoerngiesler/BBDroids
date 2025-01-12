@@ -4,7 +4,7 @@ RWidget::RWidget(): name_("Widget") {
     needsFullRedraw_ = needsContentsRedraw_ = true; 
     x_ = y_ = 1;
     width_ = height_ = 10;
-    borderCol_ = RDisplay::WHITE;
+    frameCol_ = RDisplay::WHITE;
     bgCol_ = RDisplay::BLACK;
     fgCol_ = RDisplay::WHITE;
     hlCol_ = RDisplay::LIGHTBLUE2;
@@ -27,14 +27,27 @@ Result RWidget::draw(ConsoleStream* stream) {
 }
 
 void RWidget::setPosition(int x, int y) { 
+    if(x == x_ && y == y_) return;
     x_ = x; 
     y_ = y; 
+    setNeedsFullRedraw();
 }
 
 void RWidget::setSize(uint8_t w, uint8_t h) { 
+    if(w == width_ && h == height_) return;
     width_ = w; 
     height_ = h; 
     setNeedsFullRedraw(); 
+}
+
+void RWidget::centerOnDisplay() {
+    setPosition(RDisplay::MAIN_X + (RDisplay::DISPLAY_WIDTH-width())/2, 
+                RDisplay::MAIN_Y + (RDisplay::DISPLAY_HEIGHT-height())/2);
+}
+
+void RWidget::centerOnMain() {
+    setPosition(RDisplay::MAIN_X + (RDisplay::MAIN_WIDTH-width())/2, 
+                RDisplay::MAIN_Y + (RDisplay::MAIN_HEIGHT-height())/2);
 }
 
 void RWidget::setNeedsFullRedraw(bool needs) { 
@@ -70,9 +83,9 @@ void RWidget::setMarkingColor(uint8_t marking) {
     needsFullRedraw_ = true;
 }
 
-void RWidget::setBorderColor(uint8_t border) {
-    if(borderCol_ == border) return;
-    borderCol_ = border;
+void RWidget::setFrameColor(uint8_t frame) {
+    if(frameCol_ == frame) return;
+    frameCol_ = frame;
     needsFullRedraw_ = true;
 }
 

@@ -35,7 +35,6 @@ void setup() {
   Wire.setClock(400000UL);
 
   ConfigStorage::storage.initialize();
-
   Runloop::runloop.initialize();
 
 #if defined(LEFT_REMOTE)
@@ -44,6 +43,10 @@ void setup() {
 #endif
 #endif
   RDisplay::display.initialize();
+  RDisplay::display.start();
+  RDisplay::display.setLEDBrightness(16);
+
+  RRemote::remote.initialize();
 
 #if defined(LEFT_REMOTE)
   //uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_L, BUILDER_ID, REMOTE_ID);
@@ -59,10 +62,7 @@ void setup() {
 #else
   WifiServer::server.initialize("RRemote-$MAC", "RRemoteKey", true, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
 #endif
-  RRemote::remote.initialize();
 
-  RDisplay::display.start();
-  RDisplay::display.setLEDBrightness(16);
 #if defined(LEFT_REMOTE)
   XBee::xbee.setName("LeftRemote");
 #else

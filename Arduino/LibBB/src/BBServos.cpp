@@ -668,7 +668,7 @@ bool bb::Servos::setCompliantMode(uint8_t id, uint8_t maxCurrentPercent) {
     dxl_.torqueOff(id);
   }
   
-  maxCurrentPercent = constrain(maxCurrentPercent, 0, 100);
+  if(maxCurrentPercent>100) maxCurrentPercent = 100;
   
   if(maxCurrentPercent == 0) {
     res = dxl_.writeControlTableItem(ControlTableItem::OPERATING_MODE, id, OP_POSITION);

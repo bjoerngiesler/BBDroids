@@ -25,7 +25,7 @@ Result RCrosshairWidget::draw(ConsoleStream* stream) {
         if(fillsBg_)
             RDisplay::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
         if(drawsFrame_)
-            RDisplay::display.rect(x_, y_, x_+width_, y_+height_, borderCol_, false);
+            RDisplay::display.rect(x_, y_, x_+width_, y_+height_, frameCol_, false);
         needsFullRedraw_ = false;
     }
 

@@ -63,7 +63,7 @@ protected:
 		virtual String toString() const = 0;
 		virtual String description() const = 0;
 		virtual const String& name() const { return name_; }
-		virtual const void print(ConsoleStream* stream);
+		virtual void print(ConsoleStream* stream);
 	protected:
 		String name_;
 	};

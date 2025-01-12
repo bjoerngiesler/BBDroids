@@ -12,6 +12,8 @@ public:
 
     virtual void setPosition(int x, int y);
     virtual void setSize(uint8_t w, uint8_t h);
+    virtual void centerOnDisplay();
+    virtual void centerOnMain();
 
     virtual uint8_t width() { return width_; }
     virtual uint8_t height() { return height_; }
@@ -29,7 +31,7 @@ public:
     virtual void setForegroundColor(uint8_t foreground);
     virtual void setCursorColor(uint8_t cursor);
     virtual void setMarkingColor(uint8_t marking);
-    virtual void setBorderColor(uint8_t border);
+    virtual void setFrameColor(uint8_t frame);
     virtual void setHighlightColor(uint8_t highlight);
 
     virtual void takeInputFocus();
@@ -60,7 +62,7 @@ protected:
     bool needsFullRedraw_, needsContentsRedraw_;
     int x_, y_;
     uint8_t width_, height_;
-    uint8_t bgCol_, fgCol_, borderCol_, cursorCol_, markingCol_, hlCol_;
+    uint8_t bgCol_, fgCol_, frameCol_, cursorCol_, markingCol_, hlCol_;
     bool fillsBg_, drawsFrame_;
     String name_;
     std::function<void(void)> action_;

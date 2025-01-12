@@ -151,31 +151,31 @@ Result RRemoteVisWidget::visualizeFromPacket(const bb::ControlPacket& packet) {
 
     if(packet.button0) {
         mainBtns_[0].setBackgroundColor(RDisplay::LIGHTRED1);
-        mainBtns_[0].setBorderColor(RDisplay::RED);
+        mainBtns_[0].setFrameColor(RDisplay::RED);
     } else {
         mainBtns_[0].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[0].setBorderColor(RDisplay::DIMBLUE);
+        mainBtns_[0].setFrameColor(RDisplay::DIMBLUE);
     }
     if(packet.button1) {
         mainBtns_[1].setBackgroundColor(RDisplay::LIGHTRED1);
-        mainBtns_[1].setBorderColor(RDisplay::RED);
+        mainBtns_[1].setFrameColor(RDisplay::RED);
     } else {
         mainBtns_[1].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[1].setBorderColor(RDisplay::DIMBLUE);
+        mainBtns_[1].setFrameColor(RDisplay::DIMBLUE);
     }
     if(packet.button2) {
         mainBtns_[2].setBackgroundColor(RDisplay::LIGHTRED1);
-        mainBtns_[2].setBorderColor(RDisplay::RED);
+        mainBtns_[2].setFrameColor(RDisplay::RED);
     } else {
         mainBtns_[2].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[2].setBorderColor(RDisplay::DIMBLUE);
+        mainBtns_[2].setFrameColor(RDisplay::DIMBLUE);
     }
     if(packet.button3) {
         mainBtns_[3].setBackgroundColor(RDisplay::LIGHTRED1);
-        mainBtns_[3].setBorderColor(RDisplay::RED);
+        mainBtns_[3].setFrameColor(RDisplay::RED);
     } else {
         mainBtns_[3].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[3].setBorderColor(RDisplay::DIMBLUE);
+        mainBtns_[3].setFrameColor(RDisplay::DIMBLUE);
     }
     if(packet.button4) {
         crosshair_.setBackgroundColor(RDisplay::RED);

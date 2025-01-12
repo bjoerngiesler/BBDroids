@@ -20,7 +20,6 @@ RRemote::RRemote():
 "\tset_other_remote ADDR  Set other remote address to ADDR (64bit hex - max 16 digits, omit the 0x)\n";
 
   started_ = false;
-  onInitScreen_ = true;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
   deltaR_ = 0; deltaP_ = 0; deltaH_ = 0;
   memset((void*)&lastPacketSent_, 0, sizeof(Packet));
@@ -76,10 +75,57 @@ Result RRemote::initialize() {
     ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
   }
 
+  return Subsystem::initialize();
+}
+
+Result RRemote::start(ConsoleStream *stream) {
+  (void)stream;
+  runningStatus_ = false;
+  operationStatus_ = RES_OK;
+
+#if defined(LEFT_REMOTE)
   populateMenus();
   showMain();
+  drawGUI();
+  showMessage("Welcome!\n\nMonaco\nCtrl System\nSW " VERSION_STRING, 3000, RDisplay::LIGHTBLUE2);
+  mainWidget_->setNeedsFullRedraw();
+#endif
 
-  return Subsystem::initialize();
+  started_ = true;
+
+  return RES_OK;
+}
+
+Result RRemote::stop(ConsoleStream *stream) {
+  (void)stream;
+  RDisplay::display.setLED(RDisplay::LED_BOTH, 255, 255, 0);
+  operationStatus_ = RES_OK;
+  started_ = false;
+  
+  return RES_OK;
+}
+
+Result RRemote::step() {
+  if(!started_) return RES_SUBSYS_NOT_STARTED;
+
+  RInput::input.update();
+
+  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
+    updateStatusLED();
+    drawGUI();
+  } else {
+    RDisplay::display.setLED(RDisplay::LED_COMM, 0, 0, 0);
+  }
+
+  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
+    if(runningStatus_) {
+      printExtendedStatusLine();
+    }
+
+    fillAndSend();
+  }
+
+  return RES_OK;
 }
 
 void RRemote::setMainWidget(RWidget* widget) {
@@ -210,6 +256,16 @@ void RRemote::populateMenus() {
   rightRemoteMenu_.highlightWidgetsWithTag(1);
 }
 
+void RRemote::drawGUI() {
+  topLabel_.draw();
+  bottomLabel_.draw();
+  if(mainWidget_ != NULL) mainWidget_->draw();
+  if(needsMenuRebuild_) {
+    populateMenus();
+    needsMenuRebuild_ = false;
+  }
+}
+
 void RRemote::setTopTitle(const String& title) {
   topLabel_.setTitle(title);
 }
@@ -232,14 +288,14 @@ void RRemote::selectDroid(uint64_t droid) {
     packet.cfgPayload.address = params_.droidAddress;
     Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
     if(res != RES_OK) {
-      showMessage(String("Error ") + res, MSGDELAY);
+      showMessage(String("D ID -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
     } 
     if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-      showMessage(String("Failed ") + int(reply), MSGDELAY);
+      showMessage(String("D ID -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
     }
   } 
         
-  showMessage("Success", MSGDELAY);
+  showMessage("Success", MSGDELAY, RDisplay::LIGHTGREEN2);
   storeParams();
   needsMenuRebuild_ = true;
 #endif
@@ -260,11 +316,11 @@ void RRemote::selectRightRemote(uint64_t address) {
   packet.cfgPayload.address = XBee::xbee.hwAddress();
   Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
   if(res != RES_OK) {
-    showMessage(String("Error ") + res, MSGDELAY);
+    showMessage(String("L ID -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
     return;
   }
   if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-    showMessage(String("Failed ") + int(reply), MSGDELAY);
+    showMessage(String("L ID -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
     return;
   }
 
@@ -274,38 +330,19 @@ void RRemote::selectRightRemote(uint64_t address) {
     packet.cfgPayload.address = params_.droidAddress;
     Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
     if(res != RES_OK) {
-      showMessage(String("Error ") + res, MSGDELAY);
+      showMessage(String("D ID -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
       return;
     }
     if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-      showMessage(String("Failed ") + int(reply), MSGDELAY);
+      showMessage(String("D ID -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
       return;
     }
   }
 
-  showMessage("Success", MSGDELAY);
+  showMessage("Success", MSGDELAY, RDisplay::LIGHTGREEN2);
   storeParams();
   needsMenuRebuild_ = true;
 #endif
-}
-
-Result RRemote::start(ConsoleStream *stream) {
-  (void)stream;
-  runningStatus_ = false;
-  operationStatus_ = RES_OK;
-
-  started_ = true;
-
-  return RES_OK;
-}
-
-Result RRemote::stop(ConsoleStream *stream) {
-  (void)stream;
-  RDisplay::display.setLED(RDisplay::LED_BOTH, 255, 255, 0);
-  operationStatus_ = RES_OK;
-  started_ = false;
-  
-  return RES_OK;
 }
 
 void RRemote::updateStatusLED() {
@@ -318,39 +355,6 @@ void RRemote::updateStatusLED() {
   } else {
     RDisplay::display.setLED(RDisplay::LED_STATUS, 255, 255, 0);
   }
-}
-
-Result RRemote::step() {
-  if(!started_) return RES_SUBSYS_NOT_STARTED;
-
-  RInput::input.update();
-
-  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
-    updateStatusLED();
-    topLabel_.draw();
-    bottomLabel_.draw();
-    if(mainWidget_ != NULL) mainWidget_->draw();
-    if(needsMenuRebuild_) {
-      populateMenus();
-      needsMenuRebuild_ = false;
-    }
-  } else {
-    RDisplay::display.setLED(RDisplay::LED_COMM, 0, 0, 0);
-  }
-
-  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
-    if(runningStatus_) {
-      printExtendedStatusLine();
-    }
-
-    fillAndSend();
-  }
-
-  return RES_OK;
-}
-
-Result RRemote::stepCalib() {
-  return RES_OK;
 }
 
 void RRemote::setIncrRotButtonCB(RInput::Button button, bool left) {
@@ -403,10 +407,22 @@ void RRemote::startCalibrationCB(bool left) {
   if(left) {
     startCalibration();
   } else {
-    bb::Packet packet(bb::PACKET_TYPE_CONFIG, bb::PACKET_SOURCE_LEFT_REMOTE, sequenceNumber());
-    packet.payload.config.type = bb::ConfigPacket::CONFIG_CALIBRATE;
-    packet.payload.config.cfgPayload.magic = bb::ConfigPacket::MAGIC;
-    XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
+    ConfigPacket packet;
+    ConfigPacket::ConfigReplyType reply;
+    packet.type = bb::ConfigPacket::CONFIG_CALIBRATE;
+    packet.cfgPayload.magic = bb::ConfigPacket::MAGIC;
+
+    Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
+    if(res != RES_OK) {
+      showMessage(String("Calib -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
+      showMain();
+      return;
+    } 
+    if(reply != ConfigPacket::CONFIG_REPLY_OK) {
+      showMessage(String("Calib -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
+      showMain();
+      return;
+    }
 
     mainVis_.showIndex(1);
     remoteVisR_.crosshair().setMinMax(1024, 4096-1024, 1024, 4096-1024);
@@ -525,9 +541,10 @@ void RRemote::storeParams() {
   bb::ConfigStorage::storage.store();
 }
 
-void RRemote::showMessage(const String& msg, unsigned int delayms) {
+void RRemote::showMessage(const String& msg, unsigned int delayms, uint8_t color) {
   message_.setTitle(msg);
-  message_.setNeedsFullRedraw();
+  message_.setForegroundColor(color);
+  message_.setFrameColor(color);
   message_.draw();
   if(delayms != 0) delay(delayms);
 }
@@ -541,15 +558,15 @@ Result RRemote::sendConfigToRightRemote() {
 
   Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
   if(res != RES_OK) {
-    showMessage(String("Error ") + res, MSGDELAY);
+    showMessage(String("Config -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
     return res;
   } 
   if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-    showMessage(String("Failed ") + int(reply), MSGDELAY);
+    showMessage(String("Config -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
     return RES_SUBSYS_COMM_ERROR;
   }
 
-  showMessage("Success", MSGDELAY);
+  showMessage("Success", MSGDELAY, RDisplay::LIGHTGREEN2);
   storeParams();
   return RES_OK;
 }

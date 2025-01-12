@@ -31,7 +31,6 @@ public:
   Result start(ConsoleStream *stream = NULL);
   Result stop(ConsoleStream *stream = NULL);
   Result step();
-  Result stepCalib();
   Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   Result incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet);
   Result incomingStatePacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const StatePacket& packet);
@@ -53,6 +52,7 @@ public:
   void showMain();
 
   void populateMenus();
+  void drawGUI();
 
   void setTopTitle(const String& title);
   void setBottomTitle(const String& title);
@@ -74,7 +74,7 @@ public:
 
   void storeParams();
 
-  void showMessage(const String& str, unsigned int delayms=0);
+  void showMessage(const String& str, unsigned int delayms=0, uint8_t color=RDisplay::WHITE);
 
 #if defined(LEFT_REMOTE)
   Result sendConfigToRightRemote();
@@ -90,7 +90,6 @@ protected:
   Mode mode_;
   
   bool runningStatus_;
-  bool onInitScreen_;
   Packet lastPacketSent_;
 
   RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_, leftRemoteMenu_, rightRemoteMenu_, droidMenu_;

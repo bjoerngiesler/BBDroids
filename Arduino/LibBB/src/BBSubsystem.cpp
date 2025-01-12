@@ -167,7 +167,7 @@ bb::Result bb::Subsystem::setParameterValue(const String& name, const String& st
 	return retval;
 }
 
-const void bb::Subsystem::Parameter::print(ConsoleStream* stream) {
+void bb::Subsystem::Parameter::print(ConsoleStream* stream) {
 	if(stream) stream->printf("%s: %s\n", name_.c_str(), description().c_str());
 }
 
