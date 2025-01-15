@@ -22,13 +22,17 @@ DODroid::DODroid():
 
   driveOutput_(lSpeedController_, rSpeedController_),
 
-  balanceController_(balanceInput_, driveOutput_)
+  balanceController_(balanceInput_, driveOutput_),
+
+  statusPixels_(3, P_STATUS_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 {
   // Pull down the ENABLE pins for the motor controllers. FIXME I *think* this isn't needed for D-Ov2Evo, test!
   pinMode(PULL_DOWN_15, OUTPUT);
   digitalWrite(PULL_DOWN_15, LOW);
   pinMode(PULL_DOWN_20, OUTPUT);
   digitalWrite(PULL_DOWN_20, LOW);
+
+  statusPixels_.begin();
 
   name_ = "d-o";
 
@@ -38,7 +42,14 @@ DODroid::DODroid():
 "\tselftest\tRun self test\r\n"\
 "\tplay_sound [<folder>] <num>\tPlay sound\r\n";
   started_ = false;
+
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
+  setLED(LED_STATUS, WHITE);
+  setLED(LED_COMM, OFF);
+  setLED(LED_DRIVE, OFF);
+
+  commLEDOn_ = false;
+  msLastLeftCtrlPacket_ = msLastRightCtrlPacket_ = 0;
 }
 
 Result DODroid::initialize() {
@@ -113,9 +124,11 @@ Result DODroid::start(ConsoleStream* stream) {
       Console::console.printfBroadcast("No power (%.fV), USB only!\n", DOBattStatus::batt.voltage());
       started_ = true;
       operationStatus_ = RES_OK;
+      setLED(LED_STATUS, BLUE);
       return RES_OK;
     }
   } else if(operationStatus_ != RES_OK) {
+    setLED(LED_STATUS, RED);
     return operationStatus_;
   }
 
@@ -125,6 +138,7 @@ Result DODroid::start(ConsoleStream* stream) {
 
   started_ = true;
   operationStatus_ = RES_OK;
+  setLED(LED_STATUS, GREEN);
   return operationStatus_;
 }
 
@@ -132,6 +146,7 @@ Result DODroid::stop(ConsoleStream* stream) {
   (void) stream;
   started_ = false;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
+  setLED(LED_STATUS, WHITE); 
 
   return RES_OK;
 }
@@ -196,9 +211,13 @@ bb::Result DODroid::stepPowerProtect() {
     bb::Servos::servos.switchTorque(SERVO_HEAD_PITCH, false);
     bb::Servos::servos.switchTorque(SERVO_HEAD_HEADING, false);
     bb::Servos::servos.switchTorque(SERVO_HEAD_ROLL, false);
+
     while(true) {
-      DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
-      delay(5000);
+      int i=0;
+      if(i%2 == 0) setLED(LED_STATUS, RED);
+      else setLED(LED_STATUS, OFF);
+      if(i%5 == 0) DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
+      delay(1000);
     }
   }
   
@@ -347,9 +366,27 @@ void DODroid::printExtendedStatus(ConsoleStream *stream) {
 
 
 Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
-  if(source == PACKET_SOURCE_LEFT_REMOTE) numLeftCtrlPackets_++;
-  else if(source == PACKET_SOURCE_RIGHT_REMOTE) numRightCtrlPackets_++;
-  else {
+  if(commLEDOn_ == false) {
+    unsigned long ms = millis();
+    if(ms - msLastLeftCtrlPacket_ < 100) {
+      if(ms - msLastRightCtrlPacket_ < 100) {
+        setLED(LED_COMM, WHITE);
+      } else {
+        setLED(LED_COMM, BLUE);
+      }
+    } else setLED(LED_COMM, GREEN);
+  
+    commLEDOn_ = true;
+    Runloop::runloop.scheduleTimedCallback(100, [=]{ setLED(LED_COMM, OFF); commLEDOn_ = false; });
+  }
+
+  if(source == PACKET_SOURCE_LEFT_REMOTE) {
+    numLeftCtrlPackets_++;
+    msLastLeftCtrlPacket_ = millis();
+  } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
+    numRightCtrlPackets_++;
+    msLastRightCtrlPacket_ = millis();
+  } else {
     Console::console.printfBroadcast("Control packet from unknown source %d\n", source);
     return RES_SUBSYS_COMM_ERROR;
   }
@@ -399,6 +436,11 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
       float rot = packet.getAxis(0);
       if(fabs(vel)<params_.speedAxisDeadband) vel = 0;
       if(fabs(rot)<params_.rotAxisDeadband) rot = 0;
+      if(fabs(vel)<params_.speedAxisDeadband && fabs(rot)<params_.rotAxisDeadband) {
+        setLED(LED_DRIVE, BLUE);
+      } else {
+        setLED(LED_DRIVE, GREEN);
+      }
 
       if(numZero > 5) {
         balanceController_.reset();
@@ -408,6 +450,8 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
       rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
       driveOutput_.setGoalVelocity(vel);
       driveOutput_.setGoalRotation(rot);
+    } else {
+      setLED(LED_DRIVE, OFF);
     }
 
     //DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
@@ -558,4 +602,26 @@ bool DODroid::getAntennas(uint8_t& a1, uint8_t& a2, uint8_t& a3) {
   a3 = Wire.read();
 
   return true;
+}
+
+Result DODroid::setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b) {
+  statusPixels_.setPixelColor(int(which), r, g, b);
+  statusPixels_.show();
+  return RES_OK;
+}
+
+Result DODroid::setLED(WhichLED which, WhatColor color) {
+  switch(color) {
+    case RED: return setLED(which, 255, 0, 0); break;
+    case GREEN: return setLED(which, 0, 255, 0); break;
+    case BLUE: return setLED(which, 0, 0, 255); break;
+    case WHITE: return setLED(which, 255, 255, 255); break;
+    case OFF: default: return setLED(which, 0, 0, 0); break;
+  }
+  return RES_COMMON_NOT_IN_LIST;
+}
+
+void DODroid::setLEDBrightness(uint8_t brightness) {
+  statusPixels_.setBrightness(brightness);
+  statusPixels_.show();
 }

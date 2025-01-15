@@ -2,6 +2,8 @@
 #define DODROID_H
 
 #include <LibBB.h>
+#include <Adafruit_NeoPixel.h>
+
 #include "DODriveController.h"
 #include "DOConfig.h"
 
@@ -11,7 +13,6 @@ class DODroid: public Subsystem, public PacketReceiver {
 public:
   static DODroid droid;
   static DOParams params_;
-
 
   enum MotorStatus { // FIXME this probably needs to go somewhere else, closer to DCMotor or EncoderMotor?
     MOTOR_UNTESTED         = 0,
@@ -54,6 +55,23 @@ public:
   bool setAntennas(uint8_t a1, uint8_t a2, uint8_t a3);
   bool getAntennas(uint8_t& a1, uint8_t& a2, uint8_t& a3);
 
+  enum WhichLED {
+    LED_STATUS = 0,
+    LED_COMM   = 1,
+    LED_DRIVE  = 2
+  };
+  enum WhatColor {
+    OFF   = 0,
+    RED   = 1,
+    GREEN = 2,
+    BLUE  = 3,
+    WHITE = 4 
+  };
+
+  Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b);
+  Result setLED(WhichLED which, WhatColor color);
+  void setLEDBrightness(uint8_t brightness);
+
 protected:
   bb::IMU imu_;
   bb::DCMotor leftMotor_, rightMotor_;
@@ -67,13 +85,17 @@ protected:
   MotorStatus leftMotorStatus_, rightMotorStatus_;
 
   int numLeftCtrlPackets_, numRightCtrlPackets_;
-  
+  unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_;
+
   bool driveOn_;
   bool servosOK_, antennasOK_;
   bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
   float remoteP_, remoteH_, remoteR_;
   float annealP_, annealH_, annealR_, annealTime_;
   float lean_;
+
+  Adafruit_NeoPixel statusPixels_;
+  bool commLEDOn_;
 };
 
 #endif
