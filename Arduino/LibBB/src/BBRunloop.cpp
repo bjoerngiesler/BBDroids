@@ -33,8 +33,12 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		for(std::vector<TimedCallback>::iterator iter = timedCallbacks_.begin(); iter != timedCallbacks_.end(); iter++) {
 			if(iter->triggerMS < m) { // FIXME there is highly likely an integer wrap in here...?
 				iter->cb();
-				if(true == iter->oneshot) iter = timedCallbacks_.erase(iter);
-				else iter->triggerMS = m + iter->deltaMS;
+				if(true == iter->oneshot) {
+					iter = timedCallbacks_.erase(iter);
+					if(iter == timedCallbacks_.end()) break;
+				} else {
+					iter->triggerMS = m + iter->deltaMS;
+				}
 			}
 		}
 
@@ -129,10 +133,11 @@ void* bb::Runloop::scheduleTimedCallback(uint64_t ms, std::function<void(void)> 
 bb::Result bb::Runloop::cancelTimedCallback(void* handle) {
 	for(std::vector<TimedCallback>::iterator iter = timedCallbacks_.begin(); iter != timedCallbacks_.end(); iter++) {
 		if(handle == (void*)&(*iter)) {
-			timedCallbacks_.erase(iter);
+			iter = timedCallbacks_.erase(iter);
 			return RES_OK;
 		}
 	}
+	Console::console.printfBroadcast("Callback not found!\n");
 	return RES_COMMON_NOT_IN_LIST;
 }
 

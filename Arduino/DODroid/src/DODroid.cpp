@@ -33,6 +33,8 @@ DODroid::DODroid():
   digitalWrite(PULL_DOWN_20, LOW);
 
   statusPixels_.begin();
+  statusPixels_.setBrightness(10);
+  statusPixels_.show();
 
   name_ = "d-o";
 
@@ -181,21 +183,28 @@ Result DODroid::step() {
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
-  Runloop::runloop.excuseOverrun(); // FIXME find out what's taking so long
-
   if((Runloop::runloop.getSequenceNumber() % 1000) == 0) {
     stepPowerProtect();
   }
-
+  unsigned long ms = micros();
   // Encoder and IMU updates are needed for everything, so we do them here.
   leftEncoder_.update();  
   rightEncoder_.update();  
+  unsigned int ms0 = micros();
   imu_.update();
+  unsigned int ms1 = micros();
 
   stepHead();
+  unsigned int ms2 = micros();
   stepDrive();
+  unsigned int ms3 = micros();
 
   fillAndSendStatePacket();
+
+  if(XBee::xbee.isStarted() && Servos::servos.isStarted()) setLED(LED_STATUS, GREEN);
+  else setLED(LED_STATUS, YELLOW);
+  unsigned int ms4 = micros();
+  // Console::console.printfBroadcast("0: %d 1: %d 2: %d 3: %d 4: %d\n", ms0-ms, ms1-ms0, ms2-ms1, ms3-ms2, ms4-ms3);
 
   return RES_OK;
 }
@@ -228,7 +237,7 @@ bb::Result DODroid::stepHead() {
   float p, r, h, dr, dp, dh, ax, ay, az, rax, ray, raz;
   imu_.getFilteredPRH(p, r, h);
   imu_.getGravCorrectedAccel(ax, ay, az);
-  imu_.getAccelMeasurement(rax, ray, raz);
+  //imu_.getAccelMeasurement(rax, ray, raz);
   imu_.getGyroMeasurement(dp, dr, dh);
 
   //Console::console.printfBroadcast("R:%f P:%f H:%f AX:%f AY:%f AZ:%f RAX:%f RAY: %f RAZ: %f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, rax, ray, raz, dr, dp, dh);
@@ -497,12 +506,13 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
 }
 
 Result DODroid::fillAndSendStatePacket() {
+  return RES_OK;
+
+
   LargeStatePacket p;
   memset(&p, 0, sizeof(LargeStatePacket));
 
   if((Runloop::runloop.getSequenceNumber() % 5) != 0) return RES_OK;
-
-  Runloop::runloop.excuseOverrun(); // not nice but sending the UDP packet takes about 3ms
 
   p.timestamp = Runloop::runloop.millisSinceStart() / 1000.0;
   p.droidType = DroidType::DROID_DO;
@@ -615,6 +625,7 @@ Result DODroid::setLED(WhichLED which, WhatColor color) {
     case RED: return setLED(which, 255, 0, 0); break;
     case GREEN: return setLED(which, 0, 255, 0); break;
     case BLUE: return setLED(which, 0, 0, 255); break;
+    case YELLOW: return setLED(which, 255, 255, 0); break;
     case WHITE: return setLED(which, 255, 255, 255); break;
     case OFF: default: return setLED(which, 0, 0, 0); break;
   }

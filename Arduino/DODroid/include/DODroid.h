@@ -61,11 +61,12 @@ public:
     LED_DRIVE  = 2
   };
   enum WhatColor {
-    OFF   = 0,
-    RED   = 1,
-    GREEN = 2,
-    BLUE  = 3,
-    WHITE = 4 
+    OFF    = 0,
+    RED    = 1,
+    GREEN  = 2,
+    BLUE   = 3,
+    YELLOW = 4,
+    WHITE  = 5 
   };
 
   Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b);

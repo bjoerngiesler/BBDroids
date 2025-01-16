@@ -134,8 +134,10 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 	}
 
 	Result res = firstResponder_->handleConsoleCommand(words, stream);
-	stream->printf(errorMessage(res));
-	stream->printf(".\n> ");
+	if(res != RES_OK) {
+		stream->printf(errorMessage(res));
+		stream->printf(".\n> ");
+	}
 }
 
 bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {

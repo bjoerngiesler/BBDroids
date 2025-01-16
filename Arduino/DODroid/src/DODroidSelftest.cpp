@@ -4,6 +4,8 @@
 #include "../resources/systemsounds.h"
 
 Result DODroid::selfTest(ConsoleStream *stream) {
+  Result res;
+
   Runloop::runloop.excuseOverrun();
 
   DOSound::sound.playSystemSound(SystemSounds::SELFTEST_STARTING_PLEASE_STAND_CLEAR);
@@ -33,8 +35,10 @@ Result DODroid::selfTest(ConsoleStream *stream) {
 
   // Check Servos
   DOSound::sound.playSystemSound(SystemSounds::SERVOS);
-  if(servoTest(stream) != RES_OK) {
+  res = servoTest(stream);
+  if(res != RES_OK) {
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    return res;
   } else {
     DOSound::sound.playSystemSound(SystemSounds::OK);
   }

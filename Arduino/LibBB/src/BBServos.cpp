@@ -7,7 +7,7 @@ static const uint8_t MAX_SERVO_ID = 4;
 using namespace bb;
 
 bb::Servos bb::Servos::servos;
-static const unsigned int bpsList[] = { 57600, 115200, 1000000 };
+static const unsigned int bpsList[] = { 1000000, 57600, 115200 };
 static const unsigned int numBps = 3;
 static const unsigned int goalBps = 1000000;
 
@@ -139,8 +139,9 @@ Result bb::Servos::start(ConsoleStream* stream) {
             return RES_SUBSYS_HW_DEPENDENCY_MISSING;
           }
         }
-      }
+      } 
     } 
+    break;
 
     if (stream) stream->printf("\n");
   }
