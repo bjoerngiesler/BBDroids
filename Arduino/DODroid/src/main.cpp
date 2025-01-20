@@ -36,7 +36,6 @@ void SERCOM3_Handler() {
 void initializeSubsystems() {
   ConfigStorage::storage.initialize();
   Runloop::runloop.initialize();
-  Console::console.initialize();
   WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
   WifiServer::server.setOTANameAndPassword("D-O", "OTA");
   uint16_t station = XBee::makeStationID(XBee::DROID_DIFF_UNSTABLE, BUILDER_ID, DROID_ID);
@@ -50,7 +49,6 @@ void initializeSubsystems() {
 }
 
 void startSubsystems() {
-  Console::console.start();
   WifiServer::server.start();
   XBee::xbee.addPacketReceiver(&DODroid::droid);
   XBee::xbee.start(Console::console.serialStream());
@@ -65,15 +63,17 @@ void startSubsystems() {
 
 void setup() {
   Serial.begin(2000000);
+  while(!Serial);
   Serial.println("Starting up...");
 
   Wire.begin();
 
   setupBoardComm();
 
+  Console::console.initialize();
+  Console::console.start();
+
   DOSound::sound.begin(dfplayerSerial);
-  DOSound::sound.setVolume(25);
-  DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING);
 
   initializeSubsystems();
   startSubsystems();

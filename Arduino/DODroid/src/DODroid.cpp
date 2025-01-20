@@ -177,6 +177,11 @@ void DODroid::setControlParameters() {
 }
 
 Result DODroid::step() {
+  if((Runloop::runloop.getSequenceNumber() % 100) == 0 && driveOn_ == false) {
+    Runloop::runloop.excuseOverrun();
+    DOSound::sound.checkSDCard();
+  }
+
   if(!imu_.available() || !DOBattStatus::batt.available()) {
     fillAndSendStatePacket();
     Console::console.printfBroadcast("IMU or battery missing - critical error\n");
