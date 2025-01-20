@@ -1,5 +1,5 @@
 namespace SystemSounds {
-  static const uint8_t I_AM_DODO = 1;
+  static const uint8_t SOUND_SYSTEM_READY = 1;
   static const uint8_t YES = 2;
   static const uint8_t NO = 3;
   static const uint8_t FAILURE = 4;

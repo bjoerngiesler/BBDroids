@@ -1,4 +1,4 @@
-001 I am Dodo
+001 Sound system ready
 002 Yes
 003 No
 004 Failure
