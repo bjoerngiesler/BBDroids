@@ -32,14 +32,18 @@ bool DOSound::begin(Uart *ser) {
 
 bool DOSound::playSound(int fileNumber) {
   if(!available_ || !sdCardInserted()) return false;
+  unsigned long us = micros();
   dfp_.play(fileNumber);
+  Console::console.printfBroadcast("playFolder() took %dus\n", micros()-us);
   return true;
 }
 
 bool DOSound::playFolder(Folder folder, int filenumber) {
   if(!available_ || !sdCardInserted()) return false;
 
+  unsigned long us = micros();
   dfp_.playFolder(int(folder), filenumber);
+  Console::console.printfBroadcast("playFolder() took %dus\n", micros()-us);
   return true;
 }
 

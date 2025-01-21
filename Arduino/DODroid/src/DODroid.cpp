@@ -430,15 +430,10 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
       annealH_ = fabs(remoteH_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
     }
 
-#if 0
-    if(driveOn_ == false) { // doesn't work while driving
-      if(packet.button0 && !lastBtn0_) {
-        DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING, false);
-      } 
-      else if(packet.button1 && !lastBtn1_) DOSound::sound.playFolderRandom(DOSound::FOLDER_POSITIVE, false);
-      else if(packet.button2 && !lastBtn2_) DOSound::sound.playFolderRandom(DOSound::FOLDER_NEGATIVE, false);
-    }
-#endif
+    if(packet.button0 && !lastBtn0_) DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING);
+    else if(packet.button1 && !lastBtn1_) DOSound::sound.playFolderRandom(DOSound::FOLDER_POSITIVE);
+    else if(packet.button2 && !lastBtn2_) DOSound::sound.playFolderRandom(DOSound::FOLDER_NEGATIVE);
+
     lastBtn0_ = packet.button0;
     lastBtn1_ = packet.button1;
     lastBtn2_ = packet.button2;
