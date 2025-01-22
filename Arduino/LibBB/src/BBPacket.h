@@ -6,6 +6,11 @@
 #include <BBConsole.h>
 
 namespace bb {
+	struct HWAddress {
+		uint32_t addrHi, addrLo;
+		bool isZero() { return addrLo == 0 || addrHi == 0; }
+		bool operator==(const HWAddress& other) { return other.addrHi == addrHi && other.addrLo == addrLo; }
+	};
 
 //
 // REALTIME PROTOCOL
@@ -171,6 +176,8 @@ struct __attribute__((packed)) RemoteConfigPacket {
 	bool leftIsPrimary       : 1;
 	uint8_t ledBrightness    : 3;
 	uint8_t sendRepeats      : 3;
+	uint8_t reserved         : 1;
+	uint8_t deadbandPercent  : 4;
 };
 
 struct __attribute__ ((packed)) ConfigPacket {
@@ -199,7 +206,7 @@ struct __attribute__ ((packed)) ConfigPacket {
 	ConfigType      type  : CONFIG_TYPE_BITS;
 	ConfigReplyType reply : 8-CONFIG_TYPE_BITS;
 	union {
-		uint64_t address;
+		HWAddress address;
 		uint64_t magic;
 		RemoteConfigPacket remoteConfig;
 	} cfgPayload;
@@ -255,11 +262,11 @@ struct PacketFrame {
 
 class PacketReceiver { 
 public:
-	virtual Result incomingPacket(uint64_t srcAddr, uint8_t rssi, const Packet& packet);
-	virtual Result incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet);
-	virtual Result incomingStatePacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const StatePacket& packet);
-	virtual Result incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ConfigPacket& packet);
-	virtual Result incomingPairingPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const PairingPacket& packet);
+	virtual Result incomingPacket(const HWAddress& src, uint8_t rssi, const Packet& packet);
+	virtual Result incomingControlPacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet);
+	virtual Result incomingStatePacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, const StatePacket& packet);
+	virtual Result incomingConfigPacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet);
+	virtual Result incomingPairingPacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, const PairingPacket& packet);
 };
 
 /*

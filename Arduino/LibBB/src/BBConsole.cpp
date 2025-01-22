@@ -137,7 +137,7 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 	if(res != RES_OK) {
 		stream->printf(errorMessage(res));
 		stream->printf(".\n> ");
-	}
+	} else stream->printf("\n> ");
 }
 
 bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {
@@ -198,7 +198,9 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 	}
 
 	else if(words[0] == "store") {
-		return ConfigStorage::storage.store();
+		ConfigStorage::storage.writeAll();
+		ConfigStorage::storage.commit();
+		return RES_OK;
 	} 
 
 	else if(words[0] == "scan_i2c") {

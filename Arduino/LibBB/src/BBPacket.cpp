@@ -48,23 +48,24 @@ uint8_t bb::Packet::calculateCRC() {
 	return calcCRC7((const uint8_t*)this, sizeof(Packet));
 }
 
-bb::Result bb::PacketReceiver::incomingPacket(uint64_t station, uint8_t rssi, const Packet& packet) {
+bb::Result bb::PacketReceiver::incomingPacket(const HWAddress& station, uint8_t rssi, const Packet& packet) {
 	Result res;
 	ConfigPacket::ConfigReplyType reply = packet.payload.config.reply;
 	Packet packet2 = packet;
 	switch(packet.type) {
 	case bb::PACKET_TYPE_CONTROL:
-		return incomingControlPacket(station, packet.source, rssi, packet.payload.control);
+		return incomingControlPacket(station, packet.source, rssi, packet.seqnum, packet.payload.control);
 		break;
 	case bb::PACKET_TYPE_STATE:
-		return incomingStatePacket(station, packet.source, rssi, packet.payload.state);
+		return incomingStatePacket(station, packet.source, rssi, packet.seqnum, packet.payload.state);
 		break;
 	case bb::PACKET_TYPE_CONFIG:
+		Console::console.printfBroadcast("Config packet from 0x%lx:%lx\n", station.addrHi, station.addrLo);
 		if(reply == ConfigPacket::CONFIG_REPLY_ERROR || reply == ConfigPacket::CONFIG_REPLY_OK) {
 			Console::console.printfBroadcast("This is a Reply packet! Discarding.\n");
 			return RES_SUBSYS_COMM_ERROR;
 		}
-		res = incomingConfigPacket(station, packet.source, rssi, packet.payload.config);
+		res = incomingConfigPacket(station, packet.source, rssi, packet.seqnum, packet.payload.config);
 		if(reply == ConfigPacket::CONFIG_TRANSMIT_NOREPLY) {
 			Console::console.printfBroadcast("Config packet but wants no reply\n"); 
 			return res;
@@ -78,42 +79,46 @@ bb::Result bb::PacketReceiver::incomingPacket(uint64_t station, uint8_t rssi, co
 			packet2.payload.config.reply = ConfigPacket::CONFIG_REPLY_ERROR;
 		}
 
-		return XBee::xbee.sendTo(packet.source, packet2, false);
+		return XBee::xbee.sendTo(station, packet2, false);
 		break;
 	case bb::PACKET_TYPE_PAIRING:
 	default:
-		return incomingPairingPacket(station, packet.source, rssi, packet.payload.pairing);
+		return incomingPairingPacket(station, packet.source, rssi, packet.seqnum, packet.payload.pairing);
 	}
 }
 
-bb::Result bb::PacketReceiver::incomingControlPacket(uint64_t station, bb::PacketSource source, uint8_t rssi, const bb::ControlPacket& packet) {
+bb::Result bb::PacketReceiver::incomingControlPacket(const HWAddress& station, bb::PacketSource source, uint8_t rssi, uint8_t seqnum, const bb::ControlPacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;
 	(void)packet;
+	Console::console.printfBroadcast("Incoming control packet default impl\n");
 	return RES_OK;
 }
 
-bb::Result bb::PacketReceiver::incomingStatePacket(uint64_t station, bb::PacketSource source, uint8_t rssi, const bb::StatePacket& packet) {
+bb::Result bb::PacketReceiver::incomingStatePacket(const HWAddress& station, bb::PacketSource source, uint8_t rssi, uint8_t seqnum, const bb::StatePacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;
 	(void)packet;
+	Console::console.printfBroadcast("Incoming state packet default impl\n");
 	return RES_OK;
 }
 
-bb::Result bb::PacketReceiver::incomingConfigPacket(uint64_t station, bb::PacketSource source, uint8_t rssi, const bb::ConfigPacket& packet) {
+bb::Result bb::PacketReceiver::incomingConfigPacket(const HWAddress& station, bb::PacketSource source, uint8_t rssi, uint8_t seqnum, const bb::ConfigPacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;
 	(void)packet;
+	Console::console.printfBroadcast("Incoming config packet default impl\n");
 	return RES_OK;
 }
 
-bb::Result bb::PacketReceiver::incomingPairingPacket(uint64_t station, bb::PacketSource source, uint8_t rssi, const bb::PairingPacket& packet) {
+bb::Result bb::PacketReceiver::incomingPairingPacket(const HWAddress& station, bb::PacketSource source, uint8_t rssi, uint8_t seqnum, const bb::PairingPacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;
 	(void)packet;
+	Console::console.printfBroadcast("Incoming pairing packet default impl\n");
 	return RES_OK;
 }

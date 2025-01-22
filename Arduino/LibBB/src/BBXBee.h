@@ -69,7 +69,7 @@ public:
 		return id&0x7;
 	}
 
-	uint64_t hwAddress() { return hwAddress_; }
+	HWAddress hwAddress() { return hwAddress_; }
 
 	virtual Result start(ConsoleStream *stream = NULL);
 	virtual Result stop(ConsoleStream *stream = NULL);
@@ -101,7 +101,7 @@ public:
 
 	struct Node {
 		uint16_t stationId;
-		uint64_t address;
+		HWAddress address;
 		uint8_t rssi;
 		char name[20];
 	};
@@ -110,13 +110,15 @@ public:
 	Result send(const String& str);
 	Result send(const uint8_t *bytes, size_t size);
 	Result send(const Packet& packet);
-	Result sendTo(uint64_t dest, const Packet& packet, bool ack);
-	Result sendConfigPacket(uint64_t dest, bb::PacketSource src, const ConfigPacket& packet, ConfigPacket::ConfigReplyType& replyType,
+	Result sendTo(const HWAddress& dest, const Packet& packet, bool ack) { return sendToXBee(dest, packet, ack); }
+	Result sendToXBee3(const HWAddress& dest, const Packet& packet, bool ack);
+	Result sendToXBee(const HWAddress& dest, const Packet& packet, bool ack);
+	Result sendConfigPacket(const HWAddress& dest, bb::PacketSource src, const ConfigPacket& packet, ConfigPacket::ConfigReplyType& replyType,
 	                        uint8_t seqnum, bool waitForReply = true);
 	
 	bool available();
 	String receive();
-	Result receiveAPIMode(uint64_t& srcAddr, uint8_t& rssi, Packet& packet);
+	Result receiveAPIMode(HWAddress& src, uint8_t& rssi, Packet& packet);
 
 	typedef enum {
 		DEBUG_SILENT = 0,
@@ -145,7 +147,7 @@ protected:
 		char name[20];
 	} XBeeParams;
 	XBeeParams params_;
-	uint64_t hwAddress_;
+	HWAddress hwAddress_;
 	ConfigStorage::HANDLE paramsHandle_;
 	std::vector<PacketReceiver*> receivers_;
 
@@ -167,7 +169,6 @@ protected:
 		virtual uint8_t checksum() const { return checksum_; }
 
 		void calcChecksum();
-
 
 		static APIFrame atRequest(uint8_t frameID, uint16_t command);
 		bool isATRequest();
@@ -200,7 +201,7 @@ protected:
 		static const uint8_t ATResponseNDMinLength = 11;
 		struct __attribute__ ((packed)) ATResponseND {
 			EndianInt16 my;
-			EndianInt64 address;
+			EndianInt32 addrHi, addrLo;
 			uint8_t rssi;
 			char name[20];
 		};

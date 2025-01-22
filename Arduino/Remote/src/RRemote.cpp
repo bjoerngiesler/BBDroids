@@ -24,15 +24,16 @@ RRemote::RRemote():
   deltaR_ = 0; deltaP_ = 0; deltaH_ = 0;
   memset((void*)&lastPacketSent_, 0, sizeof(Packet));
 
-  params_.droidAddress = 0x0;
-  params_.otherRemoteAddress = 0x0;
+  params_.droidAddress = {0,0};
+  params_.otherRemoteAddress = {0,0};
   params_.config.leftIsPrimary = true;
   params_.config.ledBrightness = 7;
   params_.config.sendRepeats = 2;
-  params_.config.lIncrRotBtn = RInput::BUTTON_NONE;
-  params_.config.rIncrRotBtn = RInput::BUTTON_NONE;
+  params_.config.lIncrRotBtn = RInput::BUTTON_LEFT;
+  params_.config.rIncrRotBtn = RInput::BUTTON_RIGHT;
   params_.config.lIncrTransBtn = RInput::BUTTON_NONE;
   params_.config.rIncrTransBtn = RInput::BUTTON_NONE;
+  params_.config.deadbandPercent = 8;
 
   message_.setTitle("?");
 
@@ -50,31 +51,45 @@ RRemote::RRemote():
 
   bottomLabel_.setSize(RDisplay::DISPLAY_WIDTH, RDisplay::CHAR_HEIGHT+4);
   bottomLabel_.setPosition(0, RDisplay::DISPLAY_HEIGHT-RDisplay::CHAR_HEIGHT-3);
-  bottomLabel_.setJustification(RLabelWidget::HOR_CENTERED, RLabelWidget::BOTTOM_JUSTIFIED);
+  bottomLabel_.setJustification(RLabelWidget::LEFT_JUSTIFIED, RLabelWidget::BOTTOM_JUSTIFIED);
   bottomLabel_.setFrameType(RLabelWidget::FRAME_TOP);
-  bottomLabel_.setTitle(VERSION_STRING);
+  bottomLabel_.setTitle("L   R   D");
+
+  leftSeqnum_.setSize(16, 10);
+  leftSeqnum_.setPosition(RDisplay::CHAR_WIDTH+1, RDisplay::DISPLAY_HEIGHT-RDisplay::CHAR_HEIGHT);
+  rightSeqnum_.setSize(16, 10);
+  rightSeqnum_.setPosition(5*RDisplay::CHAR_WIDTH+1, leftSeqnum_.y());
+  droidSeqnum_.setSize(16, 10);
+  droidSeqnum_.setPosition(9*RDisplay::CHAR_WIDTH+1, leftSeqnum_.y());
 }
 
 Result RRemote::initialize() { 
+  addParameter("led_brightness", "LED Brightness", ledBrightness_, 8);
+  addParameter("deadband", "Joystick deadband in percent", deadbandPercent_, 15);
+
   RInput::input.begin();
 
-  paramsHandle_ = ConfigStorage::storage.reserveBlock("remote", sizeof(params_));
+  paramsHandle_ = ConfigStorage::storage.reserveBlock("remote", sizeof(params_), (uint8_t*)&params_);
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is valid.\n", paramsHandle_);
-    ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
-    Console::console.printfBroadcast("Other Remote Address: 0x%llx\n", params_.otherRemoteAddress);
-    Console::console.printfBroadcast("Droid address: 0x%llx\n", params_.droidAddress);
-    RInput::input.setCalibration(params_.hCalib, params_.vCalib);
-#if defined(LEFT_REMOTE)
-    RInput::input.setIncrementalRot(RInput::Button(params_.config.lIncrRotBtn));
-#else
-    RInput::input.setIncrementalRot(RInput::Button(params_.config.rIncrRotBtn));
-#endif
+    ConfigStorage::storage.readBlock(paramsHandle_);
+    Console::console.printfBroadcast("Other Remote Address: 0x%lx:%lx\n", params_.otherRemoteAddress.addrHi, params_.otherRemoteAddress.addrLo);
+    Console::console.printfBroadcast("Droid address: 0x%lx:%lx\n", params_.droidAddress.addrHi, params_.droidAddress.addrLo);
   } else {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
-    ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+    ConfigStorage::storage.writeBlock(paramsHandle_);
   }
 
+  RInput::input.setCalibration(params_.hCalib, params_.vCalib);
+#if defined(LEFT_REMOTE)
+  RInput::input.setIncrementalRot(RInput::Button(params_.config.lIncrRotBtn));
+#else
+  RInput::input.setIncrementalRot(RInput::Button(params_.config.rIncrRotBtn));
+#endif
+  deadbandPercent_ = params_.config.deadbandPercent;
+  ledBrightness_ = params_.config.ledBrightness;
+  RInput::input.setDeadbandPercent(params_.config.deadbandPercent);
+  RDisplay::display.setLEDBrightness(ledBrightness_<<2);
   return Subsystem::initialize();
 }
 
@@ -108,6 +123,8 @@ Result RRemote::stop(ConsoleStream *stream) {
 Result RRemote::step() {
   if(!started_) return RES_SUBSYS_NOT_STARTED;
 
+  Runloop::runloop.excuseOverrun(); // FIXME not good
+
   RInput::input.update();
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
@@ -126,6 +143,18 @@ Result RRemote::step() {
   }
 
   return RES_OK;
+}
+
+void RRemote::parameterChangedCallback(const String& name) {
+  if(name == "deadband") {
+    params_.config.deadbandPercent = deadbandPercent_;
+    RInput::input.setDeadbandPercent(deadbandPercent_);
+    Console::console.printfBroadcast("Set deadband percent to %d\n", deadbandPercent_);
+  } else if (name == "led_brightness") {
+    params_.config.ledBrightness = ledBrightness_;
+    RDisplay::display.setLEDBrightness(ledBrightness_<<2);
+    Console::console.printfBroadcast("Set LED Brightness to %d\n", ledBrightness_);
+  }
 }
 
 void RRemote::setMainWidget(RWidget* widget) {
@@ -163,12 +192,14 @@ void RRemote::showPairDroidMenu() {
   Console::console.printfBroadcast("%d nodes discovered.\n", discoveredNodes_.size());
 
   pairDroidMenu_.clear();
-  pairDroidMenu_.setName(String(discoveredNodes_.size()) + " Droids");
+  int num = 0;
   for(auto& n: discoveredNodes_) {
     if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_DROID) continue;
     Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
     pairDroidMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.address); showMain(); });
+    num++;
   }
+  pairDroidMenu_.setName(String(num) + " Droids");
   pairDroidMenu_.addEntry("<--", [=]() { RRemote::remote.showMenu(&pairMenu_); });
 
   Console::console.printfBroadcast("Showing droidsMenu\n");
@@ -205,9 +236,9 @@ void RRemote::populateMenus() {
   droidMenu_.setName("Droid");
   
   mainMenu_.clear();
-  if(params_.droidAddress != 0) mainMenu_.addEntry("Droid...", [=]() { showMenu(&droidMenu_); });
+  if(params_.droidAddress.addrHi != 0 || params_.droidAddress.addrLo != 0) mainMenu_.addEntry("Droid...", [=]() { showMenu(&droidMenu_); });
   mainMenu_.addEntry("Left Remote...", [=]() { showMenu(&leftRemoteMenu_); });
-  if(params_.otherRemoteAddress != 0) mainMenu_.addEntry("Right Remote...", [=]() { showMenu(&rightRemoteMenu_); });
+  if(params_.otherRemoteAddress.addrHi != 0 || params_.droidAddress.addrLo != 0) mainMenu_.addEntry("Right Remote...", [=]() { showMenu(&rightRemoteMenu_); });
   mainMenu_.addEntry("Pair...", [=]() { RRemote::remote.showMenu(&pairMenu_); });
   mainMenu_.addEntry("<--", []() { RRemote::remote.showMain(); });
   
@@ -259,6 +290,9 @@ void RRemote::populateMenus() {
 void RRemote::drawGUI() {
   topLabel_.draw();
   bottomLabel_.draw();
+  leftSeqnum_.draw();
+  rightSeqnum_.draw();
+  droidSeqnum_.draw();
   if(mainWidget_ != NULL) mainWidget_->draw();
   if(needsMenuRebuild_) {
     populateMenus();
@@ -274,36 +308,45 @@ void RRemote::setBottomTitle(const String& title) {
   bottomLabel_.setTitle(title);
 }
 
-void RRemote::selectDroid(uint64_t droid) {
+void RRemote::selectDroid(const HWAddress& droid) {
 #if defined(LEFT_REMOTE)
-  Console::console.printfBroadcast("Selecting droid 0x%x\n", droid);
+  Console::console.printfBroadcast("Selecting droid 0x%lx:%lx\n", droid.addrHi, droid.addrLo);
   Runloop::runloop.excuseOverrun();
   
   params_.droidAddress = droid;
+  
+  ConfigPacket packet;
+  ConfigPacket::ConfigReplyType reply;
 
-  if(params_.otherRemoteAddress != 0) {
-    ConfigPacket packet;
-    ConfigPacket::ConfigReplyType reply;
+  packet.type = bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID;
+  packet.cfgPayload.address = XBee::xbee.hwAddress();
+  Result res = XBee::xbee.sendConfigPacket(params_.droidAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
+  if(res != RES_OK) {
+    showMessage(String("L ID -> D:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
+  } else if(reply != ConfigPacket::CONFIG_REPLY_OK) {
+    showMessage(String("L ID -> D:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
+  }
+
+  if(params_.otherRemoteAddress.addrHi != 0 || params_.otherRemoteAddress.addrLo != 0) {
     packet.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
     packet.cfgPayload.address = params_.droidAddress;
     Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
     if(res != RES_OK) {
       showMessage(String("D ID -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
-    } 
-    if(reply != ConfigPacket::CONFIG_REPLY_OK) {
+    } else if(reply != ConfigPacket::CONFIG_REPLY_OK) {
       showMessage(String("D ID -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
     }
   } 
         
   showMessage("Success", MSGDELAY, RDisplay::LIGHTGREEN2);
-  storeParams();
+  ConfigStorage::storage.writeAll();
   needsMenuRebuild_ = true;
 #endif
 }
 
-void RRemote::selectRightRemote(uint64_t address) {
+void RRemote::selectRightRemote(const HWAddress& address) {
 #if defined(LEFT_REMOTE)
-  Console::console.printfBroadcast("Selecting right remote 0x%llx\n", address);
+  Console::console.printfBroadcast("Selecting right remote 0x%lx:%lx\n", address.addrHi, address.addrLo);
   Runloop::runloop.excuseOverrun();
 
   params_.otherRemoteAddress = address;
@@ -325,7 +368,7 @@ void RRemote::selectRightRemote(uint64_t address) {
   }
 
   // Set droid address to right remote
-  if(params_.droidAddress != 0) {
+  if(!params_.droidAddress.isZero()) {
     packet.type = bb::ConfigPacket::CONFIG_SET_DROID_ID;
     packet.cfgPayload.address = params_.droidAddress;
     Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
@@ -340,7 +383,7 @@ void RRemote::selectRightRemote(uint64_t address) {
   }
 
   showMessage("Success", MSGDELAY, RDisplay::LIGHTGREEN2);
-  storeParams();
+  ConfigStorage::storage.writeAll();
   needsMenuRebuild_ = true;
 #endif
 }
@@ -365,7 +408,7 @@ void RRemote::setIncrRotButtonCB(RInput::Button button, bool left) {
     RInput::input.setIncrementalRot(button);
     params_.config.lIncrRotBtn = button;
     lRIncrRotMenu_.highlightWidgetsWithTag(button);
-    storeParams();
+    ConfigStorage::storage.writeAll();
   } else {
     if(params_.config.rIncrRotBtn == button) return;
     tempBtn = RInput::Button(params_.config.rIncrRotBtn);
@@ -373,7 +416,7 @@ void RRemote::setIncrRotButtonCB(RInput::Button button, bool left) {
     rRIncrRotMenu_.highlightWidgetsWithTag(button);
     if(sendConfigToRightRemote() != RES_OK) {
       params_.config.rIncrRotBtn = tempBtn;
-    } else storeParams();
+    } else ConfigStorage::storage.writeAll();
   }
   needsMenuRebuild_ = true;
 #else
@@ -393,8 +436,8 @@ void RRemote::factoryResetCB(bool left) {
     packet.payload.config.cfgPayload.magic = bb::ConfigPacket::MAGIC;
     XBee::xbee.sendTo(params_.otherRemoteAddress, packet, true);
 
-    params_.otherRemoteAddress = 0;
-    storeParams();
+    params_.otherRemoteAddress = {0, 0};
+    ConfigStorage::storage.writeAll();
     needsMenuRebuild_ = true;
   }
 #else
@@ -472,7 +515,7 @@ void RRemote::setLeftIsPrimaryCB(bool yesno) {
   }
 #endif
   
-  storeParams();
+  ConfigStorage::storage.writeAll();
   needsMenuRebuild_ = true;
 }
 
@@ -526,7 +569,8 @@ void RRemote::finishCalibration() {
       params_.vCalib.max = vMax;
       params_.vCalib.center = vCur;
       RInput::input.setCalibration(params_.hCalib, params_.vCalib);
-      storeParams();
+      
+      ConfigStorage::storage.writeAll();
 
       RDisplay::display.flashLED(RDisplay::LED_BOTH, 2, 250, 250, 0, 150, 0);
     } else {
@@ -534,11 +578,6 @@ void RRemote::finishCalibration() {
       RDisplay::display.flashLED(RDisplay::LED_BOTH, 2, 250, 250, 150, 0, 0);
     }
     mode_ = MODE_REGULAR;
-}
-
-void RRemote::storeParams() {
-  bb::ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
-  bb::ConfigStorage::storage.store();
 }
 
 void RRemote::showMessage(const String& msg, unsigned int delayms, uint8_t color) {
@@ -567,7 +606,7 @@ Result RRemote::sendConfigToRightRemote() {
   }
 
   showMessage("Success", MSGDELAY, RDisplay::LIGHTGREEN2);
-  storeParams();
+  ConfigStorage::storage.writeAll();
   return RES_OK;
 }
 #endif
@@ -594,27 +633,30 @@ bb::Result RRemote::fillAndSend() {
 
   RInput::input.fillControlPacket(packet.payload.control);
   remoteVisL_.visualizeFromPacket(packet.payload.control);
+  leftSeqnum_.setSquareColor(packet.seqnum%8, RDisplay::GREEN);
+  leftSeqnum_.setSquareColor((packet.seqnum+1)%8, leftSeqnum_.backgroundColor());
 
   Result res = RES_OK;
   int r=0, g=0, b=0;
 
-  if(params_.droidAddress != 0 && params_.otherRemoteAddress != 0) {        // both set -- white
+  if((params_.droidAddress.addrLo != 0 || params_.droidAddress.addrHi != 0) && 
+      (params_.otherRemoteAddress.addrHi != 0 || params_.otherRemoteAddress.addrLo != 0)) {        // both set -- white
     r = 255; g = 255; b = 255;
-  } else if(params_.droidAddress != 0) {                                    // only droid set -- blue
+  } else if(params_.droidAddress.addrHi != 0 || params_.droidAddress.addrLo != 0) {                                    // only droid set -- blue
     r = 0; g = 0; b = 255;
-  } else if(params_.otherRemoteAddress != 0) {
+  } else if(params_.otherRemoteAddress.addrHi != 0 || params_.otherRemoteAddress.addrLo != 0) {
     r = 255; g = 0; b = 255;
   }
 
 #if !defined(LEFT_REMOTE) // right remote sends to left remote
-  if(params_.otherRemoteAddress != 0) {
+  if(!params_.otherRemoteAddress.isZero()) {
     res = bb::XBee::xbee.sendTo(params_.otherRemoteAddress, packet, false);
     if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
   }
 #endif
 
   // both remotes send to droid
-  if(params_.droidAddress != 0 && mode_ == MODE_REGULAR) {
+  if(!params_.droidAddress.isZero() && mode_ == MODE_REGULAR) {
     //Console::console.printfBroadcast("Sending %d times to 0x%llx\n", params_.config.sendRepeats+1, params_.droidAddress);
     for(int i=0; i<params_.config.sendRepeats+1; i++) {
       res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
@@ -674,8 +716,8 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
         return RES_CMD_INVALID_ARGUMENT;
       }
     }
-    stream->printf("Setting droid address to 0x%llx.\n", addr);
-    params_.droidAddress = addr;
+    params_.droidAddress = {uint32_t(addr>>32), uint32_t(addr&0xffffffff)};
+    stream->printf("Setting droid address to 0x%lx:%lx.\n", params_.droidAddress.addrHi, params_.droidAddress.addrLo);
     return RES_OK;
   }
 
@@ -694,8 +736,8 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
         return RES_CMD_INVALID_ARGUMENT;
       }
     }
-    stream->printf("Setting other remote address to 0x%llx.\n", addr);
-    params_.otherRemoteAddress = addr;
+    params_.otherRemoteAddress = {uint32_t(addr>>32), uint32_t(addr&0xffffffff)};
+    stream->printf("Setting other remote address to 0x%lx:%lx.\n", params_.otherRemoteAddress.addrHi, params_.otherRemoteAddress.addrLo);
     return RES_OK;
   }
 
@@ -707,58 +749,88 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
   return Subsystem::handleConsoleCommand(words, stream);
 } 
 
-Result RRemote::incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
+Result RRemote::incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet) {
 #if defined(LEFT_REMOTE)
-  //if(srcAddr == params_.otherRemoteAddress && params_.otherRemoteAddress != 0) {
-  if(source == PACKET_SOURCE_RIGHT_REMOTE) {
+  if(source == PACKET_SOURCE_RIGHT_REMOTE) { // FIXME Must check for address too but we're getting 16bit addressed packets here?!
       remoteVisR_.visualizeFromPacket(packet);
       if(packet.button5 == true ||
          packet.button6 == true ||
          packet.button7 == true) {
           remoteVisR_.crosshair().showMinMaxRect(false);
       }
+      
+      uint8_t expected = (lastRightSeqnum_+1)%8;
+      rightSeqnum_.setSquareColor(seqnum%8, RDisplay::GREEN);
+      rightSeqnum_.setSquareColor((seqnum+1)%8, rightSeqnum_.backgroundColor());
+
+      if(seqnum != expected) {
+        int missed;
+        if(expected < seqnum) missed = seqnum - expected;
+        else missed = 8 + (seqnum - expected);
+        Console::console.printfBroadcast("Seqnum expected: %d, received: %d, missed %d\n", expected, seqnum, missed);
+        for(int i=1; i<missed; i++) rightSeqnum_.setSquareColor(lastRightSeqnum_+i, RDisplay::RED);
+      }
+      
+      lastRightSeqnum_ = seqnum;
       return RES_OK;    
+  } else {
+    Console::console.printfBroadcast("Unknown address 0x%lx:%lx sent Control packet to left remote\n", srcAddr.addrHi, srcAddr.addrLo);
+    return RES_SUBSYS_COMM_ERROR;
   }
-  Console::console.printfBroadcast("Unknown address 0x%llx sent Control packet to left remote\n", srcAddr);
-  return RES_SUBSYS_COMM_ERROR;
 #else
-  Console::console.printfBroadcast("Address 0x%llx sent Control packet to right remote - should never happen\n", srcAddr);
+  Console::console.printfBroadcast("Address 0x%lx:%lx sent Control packet to right remote - should never happen\n", srcAddr.addrHi, srcAddr.addrLo);
   return RES_SUBSYS_COMM_ERROR;
 #endif
 }
 
-Result RRemote::incomingStatePacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const StatePacket& packet) {
+Result RRemote::incomingStatePacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const StatePacket& packet) {
 #if defined(LEFT_REMOTE)
-  return RES_OK; // Ignore for now
+  Console::console.printfBroadcast("Got state packet from 0x%lx:%lx\n", srcAddr.addrHi, srcAddr.addrLo);
+  if(source == PACKET_SOURCE_DROID) {
+    //droidVis_.visualizeFromPacket(packet);
+    droidSeqnum_.setSquareColor(seqnum%8, RDisplay::GREEN);
+    droidSeqnum_.setSquareColor((seqnum+1)%8, droidSeqnum_.backgroundColor());
+    if(seqnum%8 != (lastDroidSeqnum_+1)%8) {
+      int missed = lastDroidSeqnum_ < seqnum ? seqnum - lastDroidSeqnum_ : seqnum - (8-lastDroidSeqnum_);
+      Console::console.printfBroadcast("Got seqnum %d, expected %d, missed %d", seqnum, lastDroidSeqnum_, missed);
+      for(int i=1; i<missed; i++) droidSeqnum_.setSquareColor(lastRightSeqnum_+i, RDisplay::RED);
+    }
+    lastDroidSeqnum_ = seqnum;
+    return RES_OK;    
+  }
+
+  Console::console.printfBroadcast("Unknown address 0x%lx:%lx sent State packet to left remote\n", srcAddr.addrHi, srcAddr.addrLo);
+  return RES_SUBSYS_COMM_ERROR;
 #else
-  Console::console.printfBroadcast("Address 0x%llx sent State packet to right remote - should never happen\n", srcAddr);
+  Console::console.printfBroadcast("Address 0x%lx:%lx sent State packet to right remote - should never happen\n", srcAddr.addrHi, srcAddr.addrLo);
   return RES_SUBSYS_COMM_ERROR;
 #endif
 }
 
-Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ConfigPacket& packet) {
+Result RRemote::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet) {
 #if defined(LEFT_REMOTE)
-  Console::console.printfBroadcast("Address 0x%llx sent Config packet to left remote - should never happen\n", srcAddr);
+  Console::console.printfBroadcast("Address 0x%lx:%lx sent Config packet to left remote - should never happen\n", srcAddr.addrHi, srcAddr.addrLo);
   return RES_SUBSYS_COMM_ERROR;
 #else
   Console::console.printfBroadcast("Got config packet from 0x%llx, type %d\n", srcAddr, packet.type);
-  if(srcAddr == params_.otherRemoteAddress || params_.otherRemoteAddress == 0) { // if we're not bound, we accept config packets from anyone
+  if(srcAddr == params_.otherRemoteAddress || params_.otherRemoteAddress.isZero()) { // if we're not bound, we accept config packets from anyone
     switch(packet.type) {
     case bb::ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID:
       if(packet.cfgPayload.address != srcAddr) {
-        Console::console.printfBroadcast("Error: Pairing packet source 0x%llx and payload 0x%llx don't match\n", srcAddr, packet.cfgPayload.address);
+        Console::console.printfBroadcast("Error: Pairing packet source 0x%lx:%lx and payload 0x%lx:%lx don't match\n", 
+          srcAddr.addrHi, srcAddr.addrLo, packet.cfgPayload.address.addrHi, packet.cfgPayload.address.addrLo);
         return RES_SUBSYS_COMM_ERROR;
       }
 
-      Console::console.printfBroadcast("Setting Left Remote ID to 0x%llx.\n", packet.cfgPayload.address);
+      Console::console.printfBroadcast("Setting Left Remote ID to 0x%lx:%lx.\n", packet.cfgPayload.address.addrHi, packet.cfgPayload.address.addrLo);
       params_.otherRemoteAddress = packet.cfgPayload.address;
-      storeParams();
+      ConfigStorage::storage.writeAll();
       return RES_OK; 
 
     case bb::ConfigPacket::CONFIG_SET_DROID_ID:
-      Console::console.printfBroadcast("Setting Droid ID to 0x%llx.\n", packet.cfgPayload.address);
+      Console::console.printfBroadcast("Setting Droid ID to 0x%lx:%lx.\n", packet.cfgPayload.address.addrHi, packet.cfgPayload.address.addrLo);
       params_.droidAddress = packet.cfgPayload.address;
-      storeParams();
+      ConfigStorage::storage.writeAll();
       return RES_OK; 
 
     case bb::ConfigPacket::CONFIG_SET_REMOTE_PARAMS:
@@ -769,7 +841,7 @@ Result RRemote::incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint
                                        packet.cfgPayload.remoteConfig.lIncrTransBtn, packet.cfgPayload.remoteConfig.rIncrTransBtn);
       params_.config = packet.cfgPayload.remoteConfig;
       RInput::input.setIncrementalRot(RInput::Button(params_.config.rIncrRotBtn));
-      storeParams();
+      ConfigStorage::storage.writeAll();
       return RES_OK; 
 
     case bb::ConfigPacket::CONFIG_FACTORY_RESET:
@@ -820,8 +892,9 @@ void RRemote::printExtendedStatus(ConsoleStream* stream) {
 
   stream->printf("Sequence number: %ld\n", seqnum_);
   stream->printf("Addressing:\n");
-  stream->printf("\tOther remote: 0x%llx\n", params_.otherRemoteAddress);
-  stream->printf("\tDroid:        0x%llx\n", params_.droidAddress);
+  stream->printf("\tThis remote:  0x%lx:%lx\n", XBee::xbee.hwAddress().addrHi, XBee::xbee.hwAddress().addrLo);
+  stream->printf("\tOther remote: 0x%lx:%lx\n", params_.otherRemoteAddress.addrHi, params_.otherRemoteAddress.addrLo);
+  stream->printf("\tDroid:        0x%lx:%lx\n", params_.droidAddress.addrHi, params_.droidAddress.addrLo);
   stream->printf("Joystick:\n");
   stream->printf("\tHor: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", RInput::input.joyRawH, RInput::input.joyH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max);
   stream->printf("\tVer: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", RInput::input.joyRawV, RInput::input.joyV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max);
@@ -855,7 +928,7 @@ void RRemote::printExtendedStatusLine(ConsoleStream *stream) {
 #if 0
   snprintf(buf, bufsize, "S%ld AX%f AY%f AZ%f\n", seqnum_, ax, ay, az);
 #else
-  snprintf(buf, bufsize, "S%ld H%d [%d..%d..%d] %.2f V%d [%d..%d..%d] %.2f P%.1f R%.1f H%.1f AX%.2f AY%.2f AZ%.2f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c",
+  snprintf(buf, bufsize, "S%ld H%d [%d..%d..%d] %f V%d [%d..%d..%d] %f P%.1f R%.1f H%.1f AX%.2f AY%.2f AZ%.2f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c",
     seqnum_,
     RInput::input.joyRawH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max, RInput::input.joyH,
     RInput::input.joyRawV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max, RInput::input.joyV,

@@ -14,12 +14,13 @@ public:
 	static ConfigStorage storage;
 
 	bool initialize();
-	HANDLE reserveBlock(const char* name, size_t size);
-	Result writeBlock(HANDLE, uint8_t* block);
-	Result readBlock(HANDLE, uint8_t* block);
+	HANDLE reserveBlock(const char* name, size_t size, uint8_t* mem);
+	Result writeBlock(HANDLE);
+	Result readBlock(HANDLE);
 	bool blockIsValid(HANDLE);
 	Result factoryReset();
-	Result store();
+	Result writeAll();
+	Result commit();
 
 protected:
 	ConfigStorage();
@@ -27,6 +28,7 @@ protected:
 	struct Block {
 		HANDLE handle;
 		size_t size;
+		uint8_t *mem;
 	};
 	std::vector<Block> blocks_;
 	bool initialized_;

@@ -64,9 +64,9 @@ bb::WifiServer::WifiServer(): tcp_(DEFAULT_TCP_PORT) {
 bb::Result bb::WifiServer::initialize(const String& ssid, const String& wpakey, bool apmode, uint16_t udpPort, uint16_t tcpPort) {
 	if(operationStatus_ != RES_SUBSYS_NOT_INITIALIZED) return RES_SUBSYS_ALREADY_INITIALIZED;
 
-	paramsHandle_ = ConfigStorage::storage.reserveBlock("wifi", sizeof(params_));
+	paramsHandle_ = ConfigStorage::storage.reserveBlock("wifi", sizeof(params_), (uint8_t*)&params_);
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
-		ConfigStorage::storage.readBlock(paramsHandle_, (uint8_t*)&params_);
+		ConfigStorage::storage.readBlock(paramsHandle_);
 	} else {
 		memset(&params_, 0, sizeof(params_));
 		strncpy(params_.ssid, ssid.c_str(), MAX_STRLEN);
@@ -257,7 +257,7 @@ bb::Result bb::WifiServer::setParameterValue(const String& name, const String& v
 		res = RES_OK;
 	} 
 
-	if(res == RES_OK) ConfigStorage::storage.writeBlock(paramsHandle_, (uint8_t*)&params_);
+	if(res == RES_OK) ConfigStorage::storage.writeBlock(paramsHandle_);
 
 	return res;
 }

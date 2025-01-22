@@ -48,6 +48,7 @@ public:
 	virtual void printHelp(ConsoleStream *stream);
 	virtual void printParameters(ConsoleStream *stream);
 
+	virtual Result addParameter(const String& name, const String& help, unsigned int& param, int max = INT_MAX);
 	virtual Result addParameter(const String& name, const String& help, int& param, int min = INT_MIN, int max = INT_MAX);
 	virtual Result addParameter(const String& name, const String& help, float& param, float min = INT_MIN, float max = INT_MAX);
 	virtual Result addParameter(const String& name, const String& help, String& param, int maxlen = 0);
@@ -94,6 +95,30 @@ protected:
 		int& val_;
 		String help_;
 		int min_, max_;
+	};
+
+	class UIntParameter: public Parameter {
+	public:
+		UIntParameter(const String& name, unsigned int& val, String help, int max=INT_MAX): 
+			val_(val), help_(help), max_(max) { name_ = name; }
+		virtual Result fromString(const String& str) {
+			int v = str.toInt();
+			if(v<0 || v>int(max_)) return RES_COMMON_OUT_OF_RANGE;
+			val_ = v;
+			return RES_OK;
+		}
+		virtual String toString() const { return String(val_); }
+		virtual String description() const { 
+			String str = toString() + " [0..";
+			if(max_==INT_MAX) str+="inf"; else str+=max_;
+			str += "]";
+			if(help_.length() != 0) str = str + ": " + help_; 
+			return str;
+		}
+	protected:
+		unsigned int& val_;
+		String help_;
+		unsigned int max_;
 	};
 
 	class FloatParameter: public Parameter {

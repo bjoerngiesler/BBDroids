@@ -95,8 +95,6 @@ static const uint8_t P_D_BTN_R       = D2;
 
 #endif // ARDUINO_ARCH_ESP32
 
-#define JoystickEpsilon             0.01f
-
 static const uint8_t BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 2 - Micke, 3 - Brad
 static const uint8_t REMOTE_ID = 0;
 

@@ -6,6 +6,7 @@
 
 DODroid DODroid::droid;
 DOParams DODroid::params_;
+bb::ConfigStorage::HANDLE DODroid::paramsHandle_;
 
 DODroid::DODroid():
   imu_(IMU_ADDR),
@@ -23,6 +24,8 @@ DODroid::DODroid():
   driveOutput_(lSpeedController_, rSpeedController_),
 
   balanceController_(balanceInput_, driveOutput_),
+
+  positionController_(balanceInput_, driveOutput_), // FIXME
 
   statusPixels_(3, P_STATUS_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 {
@@ -96,6 +99,16 @@ Result DODroid::initialize() {
   addParameter("fa_antenna_speed", "Free Anim: Antenna position on wheel speed setpoint", params_.faAntennaSpeedSP, -INT_MAX, INT_MAX);
   addParameter("fa_head_anneal_time", "Free Anim: Head anneal time", params_.faHeadAnnealTime, -INT_MAX, INT_MAX);
 
+  paramsHandle_ = ConfigStorage::storage.reserveBlock("d-o", sizeof(params_), (uint8_t*)&params_);
+  if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
+    Console::console.printfBroadcast("D-O: Storage block 0x%x is valid.\n", paramsHandle_);
+    ConfigStorage::storage.readBlock(paramsHandle_);
+    Console::console.printfBroadcast("Left Address: 0x%lx:%lx\n", params_.leftRemoteAddress.addrHi, params_.leftRemoteAddress.addrLo);
+  } else {
+    Console::console.printfBroadcast("Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
+    ConfigStorage::storage.writeBlock(paramsHandle_);
+  }
+
   lSpeedController_.setAutoUpdate(false);
   rSpeedController_.setAutoUpdate(false);
 
@@ -114,12 +127,12 @@ Result DODroid::start(ConsoleStream* stream) {
   rightMotorStatus_ = MOTOR_UNTESTED;
   servosOK_ = false;
   antennasOK_ = false;
-  driveOn_ = false;
+  driveMode_ = DRIVE_OFF;
 
   imu_.begin();
   DOBattStatus::batt.begin();
 
-  operationStatus_ = selfTest();
+  operationStatus_ = RES_OK; // selfTest();
 
   if(operationStatus_ == RES_DROID_VOLTAGE_TOO_LOW) {
     if(DOBattStatus::batt.voltage() < 1.0) {
@@ -177,13 +190,15 @@ void DODroid::setControlParameters() {
 }
 
 Result DODroid::step() {
-  if((Runloop::runloop.getSequenceNumber() % 100) == 0 && driveOn_ == false) {
+  if((Runloop::runloop.getSequenceNumber() % 100) == 0 && driveMode_ == DRIVE_OFF) {
     Runloop::runloop.excuseOverrun();
     DOSound::sound.checkSDCard();
   }
 
   if(!imu_.available() || !DOBattStatus::batt.available()) {
-    fillAndSendStatePacket();
+    if((Runloop::runloop.getSequenceNumber() % 4) == 0) {
+      fillAndSendStatePacket();
+    }
     Console::console.printfBroadcast("IMU or battery missing - critical error\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
@@ -204,7 +219,8 @@ Result DODroid::step() {
   stepDrive();
   unsigned int ms3 = micros();
 
-  fillAndSendStatePacket();
+  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) 
+    fillAndSendStatePacket();
 
   if(XBee::xbee.isStarted() && Servos::servos.isStarted()) setLED(LED_STATUS, GREEN);
   else setLED(LED_STATUS, YELLOW);
@@ -306,10 +322,11 @@ bb::Result DODroid::stepHead() {
 }
 
 bb::Result DODroid::stepDrive() {
-  if(driveOn_ == true && leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
+  if(driveMode_ != DRIVE_OFF && leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
     balanceController_.update();
     lSpeedController_.update();
     rSpeedController_.update();
+    if(driveMode_ == DRIVE_POSITION) positionController_.update();
   } else {
     leftMotor_.set(0);
     rightMotor_.set(0);
@@ -317,17 +334,23 @@ bb::Result DODroid::stepDrive() {
   return RES_OK;
 }
 
-void DODroid::switchDrive(bool onoff) {
+void DODroid::switchDrive(DriveMode mode) {
   lSpeedController_.reset();
   lSpeedController_.setGoal(0);
   rSpeedController_.reset();
   rSpeedController_.setGoal(0);
   balanceController_.reset();
   balanceController_.setGoal(0);
+  positionController_.reset();
+  positionController_.setGoal(0);
 
-  driveOn_ = onoff;
-  if(driveOn_) Console::console.printfBroadcast("Drive system is now on.\n");
-  else Console::console.printfBroadcast("Drive system is now off.\n");
+  driveMode_ = mode;
+  Console::console.printfBroadcast("Drive mode: ");
+  switch(driveMode_) {
+    case DRIVE_OFF: Console::console.printfBroadcast("off\n"); break;
+    case DRIVE_VELOCITY: Console::console.printfBroadcast("velocity\n"); break;
+    case DRIVE_POSITION: default: Console::console.printfBroadcast("off\n"); break;
+  }
 }
 
 String DODroid::statusLine() {
@@ -378,8 +401,19 @@ void DODroid::printExtendedStatus(ConsoleStream *stream) {
   stream->printf("IMU: P%.2f R%.2f H%.2f\n", p, r, h);
 }
 
+Result DODroid::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet) {
+  if(source == PACKET_SOURCE_LEFT_REMOTE && packet.type == ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID) {
+    Console::console.printfBroadcast("setting left remote id to 0x%lx:%lx.\n", packet.cfgPayload.address.addrHi, packet.cfgPayload.address.addrLo);
+    params_.leftRemoteAddress = packet.cfgPayload.address;
+    ConfigStorage::storage.writeBlock(paramsHandle_);
+    ConfigStorage::storage.commit();
+    return RES_OK;
+  }
+  Console::console.printfBroadcast("Error - packet of type %d from source %d\n", packet.type, source);
+  return RES_SUBSYS_COMM_ERROR;
+}
 
-Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet) {
+Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet) {
   if(commLEDOn_ == false) {
     unsigned long ms = millis();
     if(ms - msLastLeftCtrlPacket_ < 100) {
@@ -406,18 +440,11 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
   }
 
   if(packet.primary == true) {
-    static int numZero = 0;
-    if(EPSILON(packet.getAxis(0)) && EPSILON(packet.getAxis(1))) {
-      numZero++;
-    } else {
-      numZero = 0;
-    }
-
     if(packet.button4 && !lastBtn4_) {
-      if(driveOn_ == false) {
-        switchDrive(true);
+      if(driveMode_ == DRIVE_OFF) {
+        switchDrive(DRIVE_VELOCITY);
       } else {
-        switchDrive(false);
+        switchDrive(DRIVE_OFF);
       }
     }
 
@@ -440,7 +467,7 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
     lastBtn3_ = packet.button3;
     lastBtn4_ = packet.button4;
 
-    if(driveOn_ == true) {
+    if(driveMode_ != DRIVE_OFF) {
       float vel = packet.getAxis(1);
       float rot = packet.getAxis(0);
       if(fabs(vel)<params_.speedAxisDeadband) vel = 0;
@@ -451,10 +478,6 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
         setLED(LED_DRIVE, GREEN);
       }
 
-      if(numZero > 5) {
-        balanceController_.reset();
-      }
-      
       vel = constrain(vel * params_.maxSpeed * params_.speedAxisGain, -params_.maxSpeed, params_.maxSpeed);
       rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
       driveOutput_.setGoalVelocity(vel);
@@ -465,7 +488,7 @@ Result DODroid::incomingControlPacket(uint64_t srcAddr, PacketSource source, uin
 
     //DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
   } else { // secondary remote
-    if(driveOn_ == true) {
+    if(driveMode_ == DRIVE_VELOCITY) {
       lean_ = -1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange;
       balanceController_.setGoal(params_.leanHeadToBody*lean_);
     }
@@ -506,8 +529,18 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
 }
 
 Result DODroid::fillAndSendStatePacket() {
-  return RES_OK;
+  Packet packet(PACKET_TYPE_STATE, PACKET_SOURCE_DROID, sequenceNumber());
+  packet.payload.state.battery = DOBattStatus::batt.available() ? StatePacket::STATUS_OK : StatePacket::STATUS_ERROR;
 
+  if(!params_.leftRemoteAddress.isZero()) {
+    XBee::xbee.sendTo(params_.leftRemoteAddress, packet, false);
+  } else {
+    HWAddress broadcast = {0, 0xffff};
+    HWAddress bjoernsleft = {0x13a200, 0x4216c9d6};
+    XBee::xbee.sendTo(broadcast, packet, false);
+  }
+
+  return RES_OK;
 
   LargeStatePacket p;
   memset(&p, 0, sizeof(LargeStatePacket));
@@ -523,7 +556,7 @@ Result DODroid::fillAndSendStatePacket() {
 
   if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
     p.drive[0].errorState = ERROR_OK;   
-    p.drive[0].controlMode = driveOn_ ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
+    p.drive[0].controlMode = (driveMode_ != DRIVE_OFF) ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
 
     p.drive[0].presentPWM = balanceController_.present();
     p.drive[0].presentPos = leftEncoder_.presentPosition();
@@ -539,7 +572,7 @@ Result DODroid::fillAndSendStatePacket() {
 
   if(leftMotorStatus_ == MOTOR_OK) {
     p.drive[1].errorState = ERROR_OK;
-    p.drive[1].controlMode = driveOn_ ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
+    p.drive[1].controlMode = (driveMode_ != DRIVE_OFF) ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
     p.drive[1].presentPWM = leftMotor_.present();
     p.drive[1].presentPos = leftEncoder_.presentPosition();
     p.drive[1].presentSpeed = leftEncoder_.presentSpeed();
@@ -555,7 +588,7 @@ Result DODroid::fillAndSendStatePacket() {
 
   if(rightMotorStatus_ == MOTOR_OK) {
     p.drive[2].errorState = ERROR_OK;
-    p.drive[2].controlMode = driveOn_ ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
+    p.drive[2].controlMode = (driveMode_ != DRIVE_OFF) ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
     p.drive[2].presentPWM = rightMotor_.present();
     p.drive[2].presentPos = rightEncoder_.presentPosition();
     p.drive[2].presentSpeed = rightEncoder_.presentSpeed();

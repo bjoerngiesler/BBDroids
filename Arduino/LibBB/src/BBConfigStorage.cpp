@@ -17,7 +17,7 @@ static const size_t MAXSIZE=1024;
 
 bb::ConfigStorage bb::ConfigStorage::storage;
 
-bb::ConfigStorage::HANDLE bb::ConfigStorage::reserveBlock(const char* name, size_t size) {
+bb::ConfigStorage::HANDLE bb::ConfigStorage::reserveBlock(const char* name, size_t size, uint8_t *mem) {
 	if(!initialized_) {
 		Serial.println("Not initialized, returning 0.");
 		return 0;
@@ -35,16 +35,16 @@ bb::ConfigStorage::HANDLE bb::ConfigStorage::reserveBlock(const char* name, size
 		Serial.println(String("nvs_open() returned ") + err);
 		return RES_CONFIG_INVALID_HANDLE;
 	}
-	Block block = {handle, size};
+	Block block = {handle, size, mem};
 #else
-	Block block = {nextHandle_+1, size};
+	Block block = {nextHandle_+1, size, mem};
 	nextHandle_ = nextHandle_ + size + 1;
 #endif
 	blocks_.push_back(block);
 	return block.handle;
 }
 
-bb::Result bb::ConfigStorage::writeBlock(HANDLE handle, uint8_t* data) {
+bb::Result bb::ConfigStorage::writeBlock(HANDLE handle) {
 	if(!initialized_) return RES_CONFIG_INVALID_HANDLE;
 
 	for(auto block: blocks_) {
@@ -53,7 +53,7 @@ bb::Result bb::ConfigStorage::writeBlock(HANDLE handle, uint8_t* data) {
   			Serial.print("Storing "); Serial.print(size); Serial.print(" bytes of data at address "); Serial.println(handle, HEX);
 #if defined(ARDUINO_ARCH_ESP32)
 			esp_err_t err;
-			err = nvs_set_blob(handle, "blob", data, size);
+			err = nvs_set_blob(handle, "blob", block.mem, size);
 			if(err != ESP_OK) {
 				Serial.println(String("nvs_set_blob() returned ") + err);
 				return RES_CONFIG_INVALID_HANDLE;
@@ -74,26 +74,25 @@ bb::Result bb::ConfigStorage::writeBlock(HANDLE handle, uint8_t* data) {
   			Serial.println("Commited blob.");
 #else
   			for(size_t i=0; i<size; i++) {
-  				Serial.print(handle+i);
-  				Serial.print(".");
-  				EEPROM.write(handle+i, data[i]);	
+  				EEPROM.write(handle+i, block.mem[i]);	
   			} 
   			Serial.println("Marking as valid");
   			EEPROM.write(handle-1, 0xba);
 #endif
-  			Serial.println("Done.");
+
+			Serial.println("Done.");
   			return RES_OK;
   		}
   	}
   	return RES_CONFIG_INVALID_HANDLE;
 }
 
-bb::Result bb::ConfigStorage::readBlock(HANDLE handle, uint8_t* data) {
+bb::Result bb::ConfigStorage::readBlock(HANDLE handle) {
 	if(!initialized_) return RES_CONFIG_INVALID_HANDLE;
 	for(auto block: blocks_) {
   		if(block.handle == handle) {
 #if defined(ARDUINO_ARCH_ESP32)
-			esp_err_t err = nvs_get_blob(handle, "blob", data, &block.size);
+			esp_err_t err = nvs_get_blob(handle, "blob", block.mem, &block.size);
 			if(err != ESP_OK) {
 				Serial.println(String("nvs_get_blob() returned ") + err);
 				return RES_CONFIG_INVALID_HANDLE;
@@ -101,7 +100,7 @@ bb::Result bb::ConfigStorage::readBlock(HANDLE handle, uint8_t* data) {
 #else
   			size_t size = block.size;
   			for(size_t i=0; i<size; i++) {
-  				data[i] = EEPROM.read(handle+i);
+  				block.mem[i] = EEPROM.read(handle+i);
   			} 
 #endif
   			return RES_OK;
@@ -148,8 +147,15 @@ bool bb::ConfigStorage::initialize() {
 	return true;
 }
 
-bb::Result bb::ConfigStorage::store() {
+bb::Result bb::ConfigStorage::writeAll() {
 	if(!initialized_) return RES_SUBSYS_NOT_INITIALIZED;
+	for(auto& block: blocks_) {
+		writeBlock(block.handle);
+	}
+	return RES_OK;
+}
+
+bb::Result bb::ConfigStorage::commit() {
 #if !defined(ARDUINO_ARCH_ESP32)
 	EEPROM.commit();
 #endif

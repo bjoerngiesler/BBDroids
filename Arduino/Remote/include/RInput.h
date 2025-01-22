@@ -82,6 +82,7 @@ public:
   bb::IMU& imu() { return imu_; }
 
   void setCalibration(const AxisCalib& hc, const AxisCalib& vc) { hCalib = hc; vCalib = vc; }
+  void setDeadbandPercent(unsigned long db) { deadbandPercent_ = db; }
   void setIncrementalPos(Button btn);
   void resetIncrementalPos();
   void setIncrementalRot(Button btn);
@@ -136,6 +137,7 @@ protected:
   unsigned long longPressThresh_;
   Button incrementalPos_, incrementalRot_; 
   float incRotR_, incRotP_, incRotH_;
+  unsigned long deadbandPercent_;
   
   unsigned long lastIncPosMicros_;
   double incAccX_, incVelX_, incPosX_;

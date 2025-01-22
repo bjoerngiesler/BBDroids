@@ -157,23 +157,37 @@ void RInput::update() {
   minJoyRawV = min(minJoyRawV, joyRawV);
   maxJoyRawV = max(maxJoyRawV, joyRawV);
 
-  if(joyRawH < hCalib.center)
-    joyH = float(map(joyRawH, hCalib.min, hCalib.center, 0, 2047)-2047) / 2048.0f;
-  else
-    joyH = float(map(joyRawH, hCalib.center, hCalib.max, 2047, 4095)-2047) / 2048.0f;
-  if(abs(joyH) < JoystickEpsilon) joyH = 0.0f;
+  unsigned int deadbandAbs = rint(4096*(deadbandPercent_/100.0f)/2.0f);
+  if(joyRawH < hCalib.center) {
+    if(joyRawH < hCalib.center - deadbandAbs)
+      joyH = float(map(joyRawH, hCalib.min, hCalib.center-deadbandAbs, 0, 2047)-2047) / 2048.0f;
+    else
+      joyH = 0;
+  } else {
+    if(joyRawH > hCalib.center + deadbandAbs)
+      joyH = float(map(joyRawH, hCalib.center+deadbandAbs, hCalib.max, 2047, 4095)-2047) / 2048.0f;
+    else
+      joyH = 0;
+  }
   joyH = constrain(joyH, -1.0f, 1.0f);
 
-  if(joyRawV < vCalib.center)
-    joyV = float(2047-map(joyRawV, vCalib.min, vCalib.center, 0, 2047)) / 2048.0f;
-  else
-    joyV = float(2047-map(joyRawV, vCalib.center, vCalib.max, 2047, 4095)) / 2048.0f;
-  if(abs(joyV) < JoystickEpsilon) joyV = 0.0f;
+  if(joyRawV < vCalib.center) {
+    if(joyRawV < hCalib.center - deadbandAbs)
+      joyV = float(2047-map(joyRawV, vCalib.min, vCalib.center-deadbandAbs, 0, 2047)) / 2048.0f;
+    else {
+      joyV = 0;
+    }
+  } else {
+    if(joyRawV > hCalib.center + deadbandAbs)
+      joyV = float(2047-map(joyRawV, vCalib.center+deadbandAbs, vCalib.max, 2047, 4095)) / 2048.0f;
+    else
+      joyV = 0;
+  }
+  if(abs(joyV) < deadbandPercent_/100.0f) joyV = 0.0f;
   joyV = constrain(joyV, -1.0f, 1.0f);
   
   battRaw = analogRead(P_A_BATT_CHECK);
   float battCooked = (battRaw/4095.0)*3.1;
-  //Console::console.printfBroadcast("Batt Raw: %d Batt: %f\n", battRaw, battCooked);
   battRaw = constrain(battRaw, MIN_ANALOG_IN_VDIV, MAX_ANALOG_IN_VDIV);
   battery = float(battRaw-MIN_ANALOG_IN_VDIV)/float(MAX_ANALOG_IN_VDIV-MIN_ANALOG_IN_VDIV);
   
@@ -268,7 +282,6 @@ void RInput::update() {
           Console::console.printfBroadcast("IMU not available!\n");
         }
       }
-      Console::console.printfBroadcast("Inc Rot P:%f R:%f H:%f\n", incRotP_, incRotR_, incRotH_);
     }
   }
 }

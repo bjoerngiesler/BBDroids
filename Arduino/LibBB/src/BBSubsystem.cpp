@@ -141,6 +141,12 @@ bb::Result bb::Subsystem::addParameter(const String& name, const String& help, i
 	return RES_OK;
 }
 
+bb::Result bb::Subsystem::addParameter(const String& name, const String& help, unsigned int& val, int max) {
+	if(findParameter(name) != NULL) return RES_COMMON_DUPLICATE_IN_LIST;
+	parameters_.push_back(new UIntParameter(name, val, help, max));
+	return RES_OK;
+}
+
 bb::Result bb::Subsystem::addParameter(const String& name, const String& help, float& val, float min, float max) {
 	if(findParameter(name) != NULL) return RES_COMMON_DUPLICATE_IN_LIST;
 	parameters_.push_back(new FloatParameter(name, val, help, min, max));
@@ -164,6 +170,9 @@ bb::Result bb::Subsystem::setParameterValue(const String& name, const String& st
 	Parameter* p = findParameter(name);
 	if(p == NULL) return RES_PARAM_NO_SUCH_PARAMETER;
 	bb::Result retval = p->fromString(stringval);
+	if(retval == RES_OK) {
+		parameterChangedCallback(name);
+	}
 	return retval;
 }
 

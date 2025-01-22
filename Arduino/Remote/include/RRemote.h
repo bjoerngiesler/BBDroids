@@ -14,6 +14,7 @@
 #include "RIMUWidget.h"
 #include "RRemoteVisWidget.h"
 #include "RRotaWidget.h"
+#include "RSeqnumWidget.h"
 
 using namespace bb;
 
@@ -32,9 +33,11 @@ public:
   Result stop(ConsoleStream *stream = NULL);
   Result step();
   Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
-  Result incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet);
-  Result incomingStatePacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const StatePacket& packet);
-  Result incomingConfigPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ConfigPacket& packet);
+	virtual void parameterChangedCallback(const String& name);
+
+  Result incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet);
+  Result incomingStatePacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const StatePacket& packet);
+  Result incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet);
   Result fillAndSend();
   
   void updateStatusLED();
@@ -58,8 +61,8 @@ public:
   void setBottomTitle(const String& title);
 
   // Pairing callbacks
-  void selectDroid(uint64_t address);
-  void selectRightRemote(uint64_t address);
+  void selectDroid(const HWAddress& address);
+  void selectRightRemote(const HWAddress& address);
 
   // Other callbacks
   void setIncrRotButtonCB(RInput::Button button, bool left);
@@ -96,6 +99,7 @@ protected:
   RMenuWidget lRIncrRotMenu_, rRIncrRotMenu_;
   RMessageWidget message_;
   RLabelWidget topLabel_, bottomLabel_;
+  RSeqnumWidget leftSeqnum_, rightSeqnum_, droidSeqnum_;
   RRotaWidget mainVis_;
   RRemoteVisWidget remoteVisL_, remoteVisR_;
 
@@ -120,8 +124,8 @@ protected:
   int16_t calibRounds;
 
   struct RemoteParams {
-    uint64_t otherRemoteAddress = 0x0;
-    uint64_t droidAddress = 0x0;
+    HWAddress otherRemoteAddress = {0, 0};
+    HWAddress droidAddress = {0, 0};
     RInput::AxisCalib hCalib = RInput::AxisCalib();
     RInput::AxisCalib vCalib = RInput::AxisCalib();
     bb::RemoteConfigPacket config;
@@ -129,6 +133,9 @@ protected:
 
   static RemoteParams params_;
   static bb::ConfigStorage::HANDLE paramsHandle_;
+  unsigned int ledBrightness_, deadbandPercent_;
+  
+  uint8_t lastRightSeqnum_, lastDroidSeqnum_;
 };
 
 #endif // RREMOTE_H

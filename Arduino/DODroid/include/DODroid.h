@@ -13,6 +13,8 @@ class DODroid: public Subsystem, public PacketReceiver {
 public:
   static DODroid droid;
   static DOParams params_;
+  static bb::ConfigStorage::HANDLE paramsHandle_;
+
 
   enum MotorStatus { // FIXME this probably needs to go somewhere else, closer to DCMotor or EncoderMotor?
     MOTOR_UNTESTED         = 0,
@@ -40,9 +42,17 @@ public:
   virtual Result fillAndSendStatePacket();
 
   void setControlParameters();
-  void switchDrive(bool onoff);
 
-  virtual Result incomingControlPacket(uint64_t srcAddr, PacketSource source, uint8_t rssi, const ControlPacket& packet);
+  enum DriveMode {
+    DRIVE_OFF = 0,
+    DRIVE_VELOCITY = 1,
+    DRIVE_POSITION = 2
+  };
+
+  void switchDrive(DriveMode mode);
+
+  virtual Result incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet);
+  virtual Result incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet);
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   virtual Result setParameterValue(const String& name, const String& stringVal);
 
@@ -82,13 +92,15 @@ protected:
   bb::IMUControlInput balanceInput_;
   DODriveControlOutput driveOutput_;
   bb::PIDController balanceController_;
+  bb::PIDController positionController_;
   
   MotorStatus leftMotorStatus_, rightMotorStatus_;
 
   int numLeftCtrlPackets_, numRightCtrlPackets_;
   unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_;
 
-  bool driveOn_;
+  DriveMode driveMode_;
+  
   bool servosOK_, antennasOK_;
   bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
   float remoteP_, remoteH_, remoteR_;

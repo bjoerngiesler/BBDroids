@@ -58,17 +58,10 @@ void setup() {
   XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200, &Serial1);
 
 #if defined(LEFT_REMOTE)
-  WifiServer::server.initialize("LRemote-$MAC", "LRemoteKey", true, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
-#else
-  WifiServer::server.initialize("RRemote-$MAC", "RRemoteKey", true, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
-#endif
-
-#if defined(LEFT_REMOTE)
   XBee::xbee.setName("LeftRemote");
 #else
   XBee::xbee.setName("RightRemote");
 #endif
-  WifiServer::server.start();
   XBee::xbee.start();
   XBee::xbee.setAPIMode(true);
 

@@ -28,11 +28,17 @@ public:
     virtual void setNeedsContentsRedraw(bool needs = true);
 
     virtual void setBackgroundColor(uint8_t background);
+    uint8_t backgroundColor() { return bgCol_; }
     virtual void setForegroundColor(uint8_t foreground);
+    uint8_t foregroundColor() { return fgCol_; }
     virtual void setCursorColor(uint8_t cursor);
+    uint8_t cursorColor() { return cursorCol_; }
     virtual void setMarkingColor(uint8_t marking);
+    uint8_t markingColor() { return markingCol_; }
     virtual void setFrameColor(uint8_t frame);
+    uint8_t frameColor() { return frameCol_; }
     virtual void setHighlightColor(uint8_t highlight);
+    uint8_t highlightColor() { return hlCol_; }
 
     virtual void takeInputFocus();
 

@@ -61,6 +61,8 @@ struct DOParams {
     float faAntennaSpeedSP   = .05;    // Move antennas by speed over ground
     float faHeadAnnealTime   = .5;    // Time it takes for all head axes ot return to 0 after control has been relinquished.
     float faHeadAnnealDelay  = .3;    // Delay before we anneal
+
+    bb::HWAddress leftRemoteAddress = {0,0};
 };
 
 // Battery constants
