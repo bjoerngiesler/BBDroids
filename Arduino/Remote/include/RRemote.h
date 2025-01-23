@@ -58,7 +58,6 @@ public:
   void drawGUI();
 
   void setTopTitle(const String& title);
-  void setBottomTitle(const String& title);
 
   // Pairing callbacks
   void selectDroid(const HWAddress& address);
@@ -136,6 +135,7 @@ protected:
   unsigned int ledBrightness_, deadbandPercent_;
   
   uint8_t lastRightSeqnum_, lastDroidSeqnum_;
+  unsigned long lastRightMs_, lastDroidMs_;
 };
 
 #endif // RREMOTE_H

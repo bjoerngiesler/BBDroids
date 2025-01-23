@@ -9,7 +9,8 @@ namespace bb {
 	struct HWAddress {
 		uint32_t addrHi, addrLo;
 		bool isZero() { return addrLo == 0 || addrHi == 0; }
-		bool operator==(const HWAddress& other) { return other.addrHi == addrHi && other.addrLo == addrLo; }
+		bool operator==(const HWAddress& other) const { return other.addrHi == addrHi && other.addrLo == addrLo; }
+		bool operator!=(const HWAddress& other) const { return other.addrHi != addrHi || other.addrLo != addrLo; }
 	};
 
 //

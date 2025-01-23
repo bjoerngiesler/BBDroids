@@ -206,10 +206,10 @@ bb::Result bb::XBee::step() {
 			Packet packet;
 			Result retval = receiveAPIMode(srcAddr, rssi, packet);
 			if(retval != RES_OK) {
-				Console::console.printfBroadcast("receiveAPIMode(): %s\n", errorMessage(retval));
+				//Console::console.printfBroadcast("receiveAPIMode(): %s\n", errorMessage(retval));
 				return retval;
 			}
-			Console::console.printfBroadcast("Received packet from %lx:%lx type %d\n", srcAddr.addrHi, srcAddr.addrLo, packet.type);
+			//Console::console.printfBroadcast("Received packet from %lx:%lx type %d\n", srcAddr.addrHi, srcAddr.addrLo, packet.type);
 			for(auto& r: receivers_) {
 				r->incomingPacket(srcAddr, rssi, packet);
 			}
@@ -489,7 +489,7 @@ bb::Result bb::XBee::setConnectionInfo(uint8_t chan, uint16_t pan, uint16_t stat
 		if(!stayInAT) leaveATMode();
 		return RES_COMM_TIMEOUT;
 	}
-	
+
 	if(!stayInAT) leaveATMode();
 
 	return RES_OK;
@@ -590,7 +590,6 @@ bb::Result bb::XBee::send(const String& str) {
 	if(operationStatus_ != RES_OK) return RES_SUBSYS_NOT_OPERATIONAL;
 	if(isInATMode()) leaveATMode();
 	uart_->write(str.c_str(), str.length());
-	uart_->flush();
 	return RES_OK;
 }
 
@@ -598,7 +597,6 @@ bb::Result bb::XBee::send(const uint8_t *bytes, size_t size) {
 	if(operationStatus_ != RES_OK) return RES_SUBSYS_NOT_OPERATIONAL;
 	if(isInATMode()) leaveATMode();
 	uart_->write(bytes, size);
-	uart_->flush();
 	return RES_OK;
 }
 
@@ -621,7 +619,6 @@ bb::Result bb::XBee::send(const bb::Packet& packet) {
 	frame.crc = frame.packet.calculateCRC();
 
 	uart_->write((uint8_t*)&frame, sizeof(frame));
-	uart_->flush();
 
 	return RES_OK;
 }
@@ -703,7 +700,7 @@ bb::Result bb::XBee::sendConfigPacket(const HWAddress& dest,
 
 	if(waitForReply == false) return res;
 
-	int timeout = 50;
+	int timeout = 500;
 	while(true) {
 		while(uart_->available() == false) {
 			timeout--;
@@ -771,7 +768,7 @@ bb::Result bb::XBee::receiveAPIMode(HWAddress& srcAddr, uint8_t& rssi, Packet& p
 	retval = receive(frame);
 	if(retval != RES_OK) return retval;
 
-	Console::console.printfBroadcast("Received frame of length %d, first char 0x%x\n", frame.length(), frame.data()[0]);
+	//Console::console.printfBroadcast("Received frame of length %d, first char 0x%x\n", frame.length(), frame.data()[0]);
 
 	if(frame.data()[0] == 0x81) { // 16bit address frame
 		if(frame.length() != sizeof(bb::Packet) + 5) {
@@ -813,7 +810,6 @@ String bb::XBee::sendStringAndWaitForResponse(const String& str, int predelay, b
   	if(cr) {
   		uart_->print("\r");
   	}
-    uart_->flush();
 
 
     if(predelay > 0) delay(predelay);
@@ -1109,7 +1105,6 @@ bb::Result bb::XBee::send(const APIFrame& frame) {
 		writeEscapedByte(uart_, data[i]);
 	}
 	writeEscapedByte(uart_, frame.checksum());
-	uart_->flush();
 
 	return RES_OK;
 }

@@ -132,7 +132,7 @@ Result DODroid::start(ConsoleStream* stream) {
   imu_.begin();
   DOBattStatus::batt.begin();
 
-  operationStatus_ = RES_OK; // selfTest();
+  operationStatus_ = selfTest();
 
   if(operationStatus_ == RES_DROID_VOLTAGE_TOO_LOW) {
     if(DOBattStatus::batt.voltage() < 1.0) {
@@ -534,10 +534,6 @@ Result DODroid::fillAndSendStatePacket() {
 
   if(!params_.leftRemoteAddress.isZero()) {
     XBee::xbee.sendTo(params_.leftRemoteAddress, packet, false);
-  } else {
-    HWAddress broadcast = {0, 0xffff};
-    HWAddress bjoernsleft = {0x13a200, 0x4216c9d6};
-    XBee::xbee.sendTo(broadcast, packet, false);
   }
 
   return RES_OK;
