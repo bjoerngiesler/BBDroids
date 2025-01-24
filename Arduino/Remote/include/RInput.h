@@ -89,6 +89,8 @@ public:
 
   bool anyButtonPressed();
 
+  float secondsSinceLastMotion();
+
   void testMatrix();
 
   float pot1, pot2; // range: 0 .. 1.0
@@ -145,6 +147,7 @@ protected:
   double incAccZ_, incVelZ_, incPosZ_;
   bb::HighPassFilter accXFilter_, accYFilter_, accZFilter_;
   bb::IMU imu_;
+  unsigned long lastMotionMS_;
 };
 
 #endif // REMOTEINPUT_H

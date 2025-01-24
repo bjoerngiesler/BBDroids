@@ -203,6 +203,11 @@ void RInput::update() {
 
     float ax, ay, az;
     imu_.getGravCorrectedAccel(ax, ay, az);
+    float absAccel = sqrt(sq(ax)+sq(ay)+sq(az));
+    if(absAccel>.045) {
+      lastMotionMS_ = millis();
+    }
+
     incAccX_ = accXFilter_.filter(ax); if(fabs(incAccX_)<.1) incAccX_=0; 
     incAccY_ = accYFilter_.filter(ay); if(fabs(incAccY_)<.1) incAccY_=0; 
     incAccZ_ = accZFilter_.filter(az); if(fabs(incAccZ_)<.1) incAccZ_=0; 
@@ -285,6 +290,11 @@ void RInput::update() {
     }
   }
 }
+
+float RInput::secondsSinceLastMotion() {
+  return WRAPPEDDIFF(millis(), lastMotionMS_, ULONG_MAX) / 1e3;
+}
+
 
 bool RInput::anyButtonPressed() {
   for(auto& b: buttons) if(b.second == true) return true;

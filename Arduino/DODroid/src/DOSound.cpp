@@ -32,15 +32,12 @@ bool DOSound::begin(Uart *ser) {
 
 bool DOSound::playSound(int fileNumber) {
   if(!available_ || !sdCardInserted()) return false;
-  unsigned long us = micros();
   dfp_.play(fileNumber);
   return true;
 }
 
 bool DOSound::playFolder(Folder folder, int filenumber) {
   if(!available_ || !sdCardInserted()) return false;
-
-  unsigned long us = micros();
   dfp_.playFolder(int(folder), filenumber);
   return true;
 }
@@ -73,7 +70,6 @@ bool DOSound::setVolume(uint8_t vol) {
 
 bool DOSound::checkSDCard() {
   int fc = dfp_.numSdTracks();
-  int fd = dfp_.numFolders();
 
   if(fileCount_ == -1) {
     if(fc == -1) {

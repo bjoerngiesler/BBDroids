@@ -4,9 +4,6 @@
 // LibBB - Bavarian Builders Droid Base Library for Arduino
 // Written 2022-2023 by Björn Giesler <bjoern@giesler.de>
 
-#define EPS_ 0.001
-#define EPSILON(x) ((x>-EPS_)&&(x<EPS_))
-
 #include "BBSubsystem.h"
 #include "BBXBee.h"
 #include "BBWifiServer.h"
@@ -22,5 +19,10 @@
 #include "BBEncoder.h"
 #endif
 #include "BBLinAlg.h"
+
+// A couple of convenience macros
+#define WRAPPEDDIFF(a, b, max) ((a>=b) ? a-b : (max-b)+a)
+#define EPS_ 0.001
+#define EPSILON(x) ((x>-EPS_)&&(x<EPS_))
 
 #endif // LIBBB8_H

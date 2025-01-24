@@ -155,6 +155,11 @@ Result RRemote::step() {
     RDisplay::display.setLED(RDisplay::LED_COMM, 0, 0, 0);
   }
 
+  if((bb::Runloop::runloop.getSequenceNumber() % 10) == 0) {
+    if(RInput::input.secondsSinceLastMotion() > 10) RDisplay::display.setLEDBrightness(1);
+    else RDisplay::display.setLEDBrightness(params_.config.ledBrightness << 2);
+  }
+
   return RES_OK;
 }
 
@@ -783,19 +788,15 @@ Result RRemote::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
           remoteVisR_.crosshair().showMinMaxRect(false);
       }
       
-      uint8_t expected = (lastRightSeqnum_+1)%8;
       rightSeqnum_.setSquareColor(seqnum%8, RDisplay::GREEN);
       rightSeqnum_.setSquareColor((seqnum+1)%8, rightSeqnum_.backgroundColor());
       rightSeqnum_.setNoComm(false);
-
-      if(seqnum != expected) {
-        int missed;
-        if(expected < seqnum) missed = seqnum - expected;
-        else missed = 8 + (seqnum - expected);
-        Console::console.printfBroadcast("Seqnum expected: %d, received: %d, missed %d\n", expected, seqnum, missed);
-        for(int i=1; i<missed; i++) rightSeqnum_.setSquareColor(lastRightSeqnum_+i, RDisplay::RED);
-      }
       
+      uint8_t diff = WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8);
+      if(diff>1) {
+        Console::console.printfBroadcast("Seqnum expected: %d, received: %d, missed %d\n", lastRightSeqnum_+1, seqnum, diff-1);
+        for(int i=1; i<diff; i++) rightSeqnum_.setSquareColor(lastRightSeqnum_+i, RDisplay::RED);
+      }
       lastRightSeqnum_ = seqnum;
       lastRightMs_ = millis();
     
@@ -947,7 +948,7 @@ void RRemote::printExtendedStatus(ConsoleStream* stream) {
                  RInput::BUTTON_CONFIRM, RInput::input.buttons[RInput::BUTTON_CONFIRM] ? 'X' : '_',
                  RInput::BUTTON_TOP_LEFT, RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? 'X' : '_',
                  RInput::BUTTON_TOP_RIGHT, RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? 'X' : '_');
-  stream->printf("Potentiometer 1: %.1f Potentiometer 2: %.1f\n", RInput::input.pot1, RInput::input.pot2);
+  stream->printf("Potentiometer 1: %.1f\nPotentiometer 2: %.1f\n", RInput::input.pot1, RInput::input.pot2);
   stream->printf("Battery: %.1f\n", RInput::input.battery);
 }
 

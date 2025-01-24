@@ -8,11 +8,6 @@ DODroid DODroid::droid;
 DOParams DODroid::params_;
 bb::ConfigStorage::HANDLE DODroid::paramsHandle_;
 
-unsigned long wrappedDiff(unsigned long a, unsigned long b, unsigned long max) {
-  if(a>=b) return a-b;
-  return (max-b)+a;
-}
-
 DODroid::DODroid():
   imu_(IMU_ADDR),
 
@@ -322,7 +317,7 @@ bb::Result DODroid::stepHead() {
 }
 
 bb::Result DODroid::stepDrive() {
-  unsigned long timeSinceLastPrimary = wrappedDiff(millis(), msLastPrimaryCtrlPacket_, ULONG_MAX);
+  unsigned long timeSinceLastPrimary = WRAPPEDDIFF(millis(), msLastPrimaryCtrlPacket_, ULONG_MAX);
   if(timeSinceLastPrimary > 500 && driveMode_ != DRIVE_OFF) {
     Console::console.printfBroadcast("No control packet from primary in %dms. Switching drive off.\n", timeSinceLastPrimary);
     switchDrive(DRIVE_OFF);
@@ -437,18 +432,18 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
 
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
     if(seqnum == lastLeftSeqnum_) return RES_OK; // duplicate
-    if(wrappedDiff(seqnum, lastLeftSeqnum_, 8) != 1) {
+    if(WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8) != 1) {
       Console::console.printfBroadcast("Left control packet: seqnum %d, last %d, lost %d packets!\n", 
-                                       seqnum, lastLeftSeqnum_, wrappedDiff(seqnum, lastLeftSeqnum_, 8)-1);
+                                       seqnum, lastLeftSeqnum_, WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8)-1);
     }
     lastLeftSeqnum_ = seqnum;
     numLeftCtrlPackets_++;
     msLastLeftCtrlPacket_ = millis();
   } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
     if(seqnum == lastRightSeqnum_) return RES_OK; // duplicate
-    if(wrappedDiff(seqnum, lastRightSeqnum_, 8) != 1) {
+    if(WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8) != 1) {
       Console::console.printfBroadcast("Right control packet: seqnum %d, last %d, lost %d packets!\n", 
-                                       seqnum, lastRightSeqnum_, wrappedDiff(seqnum, lastRightSeqnum_, 8)-1);
+                                       seqnum, lastRightSeqnum_, WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8)-1);
     }
     lastRightSeqnum_ = seqnum;
     numRightCtrlPackets_++;
