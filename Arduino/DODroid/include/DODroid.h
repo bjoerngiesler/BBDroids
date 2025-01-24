@@ -97,7 +97,8 @@ protected:
   MotorStatus leftMotorStatus_, rightMotorStatus_;
 
   int numLeftCtrlPackets_, numRightCtrlPackets_;
-  unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_;
+  uint8_t lastLeftSeqnum_, lastRightSeqnum_;
+  unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_, msLastPrimaryCtrlPacket_;
 
   DriveMode driveMode_;
   

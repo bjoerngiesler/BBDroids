@@ -72,7 +72,7 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		if(looptime <= cycleTime_) {
 			delayMicroseconds(cycleTime_-looptime);
 		} else if(excuseOverrun_ == false) {
-			Console::console.printfBroadcast("%dus spent in loop: ", looptime);
+			Console::console.printfBroadcast("%d/%dus spent in loop: ", looptime, cycleTime_);
 			for(auto& t: timingInfo) {
 				Console::console.printfBroadcast(t.c_str());
 				Console::console.printfBroadcast(" ");

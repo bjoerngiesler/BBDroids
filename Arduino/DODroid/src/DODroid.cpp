@@ -8,6 +8,11 @@ DODroid DODroid::droid;
 DOParams DODroid::params_;
 bb::ConfigStorage::HANDLE DODroid::paramsHandle_;
 
+unsigned long wrappedDiff(unsigned long a, unsigned long b, unsigned long max) {
+  if(a>=b) return a-b;
+  return (max-b)+a;
+}
+
 DODroid::DODroid():
   imu_(IMU_ADDR),
 
@@ -54,7 +59,7 @@ DODroid::DODroid():
   setLED(LED_DRIVE, OFF);
 
   commLEDOn_ = false;
-  msLastLeftCtrlPacket_ = msLastRightCtrlPacket_ = 0;
+  msLastLeftCtrlPacket_ = msLastRightCtrlPacket_ = msLastPrimaryCtrlPacket_ = 0;
 }
 
 Result DODroid::initialize() {
@@ -114,7 +119,7 @@ Result DODroid::initialize() {
 
   balanceController_.setAutoUpdate(false);
   balanceController_.setReverse(true); // FIXME Not quite sure anymore why we're reversing here, we should be forwarding. Check!
-  balanceController_.setDebug(true);
+  //balanceController_.setDebug(true);
  
   imu_.setRotationAroundZ(bb::IMU::ROTATE_90);
 
@@ -132,6 +137,7 @@ Result DODroid::start(ConsoleStream* stream) {
   imu_.begin();
   DOBattStatus::batt.begin();
 
+  //operationStatus_ = RES_OK;
   operationStatus_ = selfTest();
 
   if(operationStatus_ == RES_DROID_VOLTAGE_TOO_LOW) {
@@ -206,26 +212,21 @@ Result DODroid::step() {
   if((Runloop::runloop.getSequenceNumber() % 1000) == 0) {
     stepPowerProtect();
   }
-  unsigned long ms = micros();
+
   // Encoder and IMU updates are needed for everything, so we do them here.
   leftEncoder_.update();  
   rightEncoder_.update();  
-  unsigned int ms0 = micros();
+
   imu_.update();
-  unsigned int ms1 = micros();
 
   stepHead();
-  unsigned int ms2 = micros();
   stepDrive();
-  unsigned int ms3 = micros();
 
-  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) 
+  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
     fillAndSendStatePacket();
-
-  if(XBee::xbee.isStarted() && Servos::servos.isStarted()) setLED(LED_STATUS, GREEN);
-  else setLED(LED_STATUS, YELLOW);
-  unsigned int ms4 = micros();
-  // Console::console.printfBroadcast("0: %d 1: %d 2: %d 3: %d 4: %d\n", ms0-ms, ms1-ms0, ms2-ms1, ms3-ms2, ms4-ms3);
+    if(XBee::xbee.isStarted() && Servos::servos.isStarted()) setLED(LED_STATUS, GREEN);
+    else setLED(LED_STATUS, YELLOW);
+  }
 
   return RES_OK;
 }
@@ -255,10 +256,9 @@ bb::Result DODroid::stepPowerProtect() {
 }
 
 bb::Result DODroid::stepHead() {
-  float p, r, h, dr, dp, dh, ax, ay, az, rax, ray, raz;
+  float p, r, h, dr, dp, dh, ax, ay, az;
   imu_.getFilteredPRH(p, r, h);
-  imu_.getGravCorrectedAccel(ax, ay, az);
-  //imu_.getAccelMeasurement(rax, ray, raz);
+  imu_.getAccelMeasurement(ax, ay, az);
   imu_.getGyroMeasurement(dp, dr, dh);
 
   //Console::console.printfBroadcast("R:%f P:%f H:%f AX:%f AY:%f AZ:%f RAX:%f RAY: %f RAZ: %f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, rax, ray, raz, dr, dp, dh);
@@ -322,6 +322,13 @@ bb::Result DODroid::stepHead() {
 }
 
 bb::Result DODroid::stepDrive() {
+  unsigned long timeSinceLastPrimary = wrappedDiff(millis(), msLastPrimaryCtrlPacket_, ULONG_MAX);
+  if(timeSinceLastPrimary > 500 && driveMode_ != DRIVE_OFF) {
+    Console::console.printfBroadcast("No control packet from primary in %dms. Switching drive off.\n", timeSinceLastPrimary);
+    switchDrive(DRIVE_OFF);
+    DOSound::sound.playSystemSound(SystemSounds::DISCONNECTED);
+  }
+
   if(driveMode_ != DRIVE_OFF && leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
     balanceController_.update();
     lSpeedController_.update();
@@ -429,9 +436,21 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
   }
 
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
+    if(seqnum == lastLeftSeqnum_) return RES_OK; // duplicate
+    if(wrappedDiff(seqnum, lastLeftSeqnum_, 8) != 1) {
+      Console::console.printfBroadcast("Left control packet: seqnum %d, last %d, lost %d packets!\n", 
+                                       seqnum, lastLeftSeqnum_, wrappedDiff(seqnum, lastLeftSeqnum_, 8)-1);
+    }
+    lastLeftSeqnum_ = seqnum;
     numLeftCtrlPackets_++;
     msLastLeftCtrlPacket_ = millis();
   } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
+    if(seqnum == lastRightSeqnum_) return RES_OK; // duplicate
+    if(wrappedDiff(seqnum, lastRightSeqnum_, 8) != 1) {
+      Console::console.printfBroadcast("Right control packet: seqnum %d, last %d, lost %d packets!\n", 
+                                       seqnum, lastRightSeqnum_, wrappedDiff(seqnum, lastRightSeqnum_, 8)-1);
+    }
+    lastRightSeqnum_ = seqnum;
     numRightCtrlPackets_++;
     msLastRightCtrlPacket_ = millis();
   } else {
@@ -440,6 +459,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
   }
 
   if(packet.primary == true) {
+    msLastPrimaryCtrlPacket_ = millis();
     if(packet.button4 && !lastBtn4_) {
       if(driveMode_ == DRIVE_OFF) {
         switchDrive(DRIVE_VELOCITY);
@@ -488,10 +508,10 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
 
     //DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
   } else { // secondary remote
-    if(driveMode_ == DRIVE_VELOCITY) {
+    //if(driveMode_ == DRIVE_POSITION) {
       lean_ = -1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange;
       balanceController_.setGoal(params_.leanHeadToBody*lean_);
-    }
+    //}
   }
 
   return RES_OK;

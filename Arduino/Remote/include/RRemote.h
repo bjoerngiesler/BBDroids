@@ -132,7 +132,7 @@ protected:
 
   static RemoteParams params_;
   static bb::ConfigStorage::HANDLE paramsHandle_;
-  unsigned int ledBrightness_, deadbandPercent_;
+  unsigned int ledBrightness_, deadbandPercent_, sendRepeats_;
   
   uint8_t lastRightSeqnum_, lastDroidSeqnum_;
   unsigned long lastRightMs_, lastDroidMs_;

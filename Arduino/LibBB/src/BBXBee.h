@@ -97,7 +97,7 @@ public:
 	Result getConnectionInfo(uint8_t& chan, uint16_t& pan, uint16_t& station, bool stayInAT=false);
 
 	Result setAPIMode(bool onoff);
-	Result sendAPIModeATCommand(uint8_t frameID, const char* cmd, uint8_t argument);
+	Result sendAPIModeATCommand(uint8_t frameID, const char* cmd, uint32_t& argument, bool request=false);
 
 	struct Node {
 		uint16_t stationId;
@@ -115,6 +115,7 @@ public:
 	Result sendToXBee(const HWAddress& dest, const Packet& packet, bool ack);
 	Result sendConfigPacket(const HWAddress& dest, bb::PacketSource src, const ConfigPacket& packet, ConfigPacket::ConfigReplyType& replyType,
 	                        uint8_t seqnum, bool waitForReply = true);
+	int numFailedACKs();
 	
 	bool available();
 	String receive();
@@ -172,6 +173,21 @@ protected:
 
 		static APIFrame atRequest(uint8_t frameID, uint16_t command);
 		bool isATRequest();
+		bool isATResponse();
+		bool is16BitRXPacket();
+		bool is64BitRXPacket();
+		bool isRXPacket() { return is16BitRXPacket() || is64BitRXPacket(); }
+
+		enum Type {
+			TRANSMITLEGACY  = 0x00,
+			ATREQUEST 		= 0x08,
+			TRANSMITREQUEST = 0x10,
+			RECEIVE64BIT    = 0x80,
+			RECEIVE16BIT	= 0x81,
+			ATRESPONSE		= 0x88
+		};
+
+
 
 		Result unpackATResponse(uint8_t &frameID, uint16_t &command, uint8_t &status, uint8_t** data, uint16_t &length);
 
@@ -207,13 +223,6 @@ protected:
 		};
 
 	protected:
-		enum Type {
-			ATREQUEST 		= 0x08,
-			TRANSMITREQUEST = 0x10,
-			RECEIVE16BIT	= 0x81,
-			ATRESPONSE		= 0x88
-		};
-
 		uint8_t *data_;
 		uint16_t length_;
 		uint8_t checksum_;

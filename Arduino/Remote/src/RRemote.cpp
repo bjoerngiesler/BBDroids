@@ -28,7 +28,7 @@ RRemote::RRemote():
   params_.otherRemoteAddress = {0,0};
   params_.config.leftIsPrimary = true;
   params_.config.ledBrightness = 7;
-  params_.config.sendRepeats = 2;
+  params_.config.sendRepeats = 3;
   params_.config.lIncrRotBtn = RInput::BUTTON_LEFT;
   params_.config.rIncrRotBtn = RInput::BUTTON_RIGHT;
   params_.config.lIncrTransBtn = RInput::BUTTON_NONE;
@@ -70,6 +70,7 @@ RRemote::RRemote():
 Result RRemote::initialize() { 
   addParameter("led_brightness", "LED Brightness", ledBrightness_, 8);
   addParameter("deadband", "Joystick deadband in percent", deadbandPercent_, 15);
+  addParameter("send_repeats", "Send repeats for control packets (0 = send only once)", sendRepeats_, 15);
 
   RInput::input.begin();
 
@@ -92,6 +93,7 @@ Result RRemote::initialize() {
 #endif
   deadbandPercent_ = params_.config.deadbandPercent;
   ledBrightness_ = params_.config.ledBrightness;
+  sendRepeats_ = params_.config.sendRepeats;
   RInput::input.setDeadbandPercent(params_.config.deadbandPercent);
   RDisplay::display.setLEDBrightness(ledBrightness_<<2);
 
@@ -165,6 +167,9 @@ void RRemote::parameterChangedCallback(const String& name) {
     params_.config.ledBrightness = ledBrightness_;
     RDisplay::display.setLEDBrightness(ledBrightness_<<2);
     Console::console.printfBroadcast("Set LED Brightness to %d\n", ledBrightness_);
+  } else if(name == "send_repeats") {
+    params_.config.sendRepeats = sendRepeats_;
+    Console::console.printfBroadcast("Set send repeats to %d\n", sendRepeats_);
   }
 }
 

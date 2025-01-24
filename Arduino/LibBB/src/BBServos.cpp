@@ -800,15 +800,15 @@ Result bb::Servos::syncReadInfo(ConsoleStream *stream) {
   
   recv_cnt = dxl_.syncRead(&srPresentInfos);
   if(recv_cnt != servos_.size()) {
-    if(stream) stream->printf("Receiving position failed!\n");
-    else Console::console.printfBroadcast("Receiving position failed!\n");
+    if(stream) stream->printf("servo: Receiving position failed!\n");
+    else Console::console.printfBroadcast("servo: Receiving position failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
   recv_cnt = dxl_.syncRead(&srLoadInfos);
   if(recv_cnt != servos_.size()) {
-    if(stream) stream->printf("Receiving initial load failed!\n");
-    else Console::console.printfBroadcast("Receiving initial load failed!\n");
+    if(stream) stream->printf("servo: Receiving initial load failed!\n");
+    else Console::console.printfBroadcast("servo: Receiving initial load failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
@@ -817,14 +817,14 @@ Result bb::Servos::syncReadInfo(ConsoleStream *stream) {
 
 Result bb::Servos::syncWriteInfo(ConsoleStream* stream) {
   if(dxl_.syncWrite(&swVelInfos) == false) {
-    if(stream) stream->printf("Sending servo profile velocity failed!\n");
-    else Console::console.printfBroadcast("Sending servo profile velocity failed!\n");
+    if(stream) stream->printf("servo: Sending servo profile velocity failed!\n");
+    else Console::console.printfBroadcast("servo: Sending servo profile velocity failed!\n");
     return RES_SUBSYS_COMM_ERROR;
   }
 
   if(dxl_.syncWrite(&swGoalInfos) == false) {
-    if(stream) stream->printf("Sending servo position goal failed!\n");
-    else Console::console.printfBroadcast("Sending servo position goal failed!\n");
+    if(stream) stream->printf("servo: Sending servo position goal failed!\n");
+    else Console::console.printfBroadcast("servo: Sending servo position goal failed!\n");
     return RES_SUBSYS_COMM_ERROR;
   }
 
