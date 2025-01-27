@@ -90,17 +90,21 @@ protected:
   bb::PIDController lSpeedController_, rSpeedController_;
 
   bb::IMUControlInput balanceInput_;
-  DODriveControlOutput driveOutput_;
+  DOVelControlOutput velOutput_;
   bb::PIDController balanceController_;
-  bb::PIDController positionController_;
+  DOPosControlInput posInput_;
+  DOPosControlOutput posOutput_;
+  bb::PIDController posController_;
   
   MotorStatus leftMotorStatus_, rightMotorStatus_;
 
   int numLeftCtrlPackets_, numRightCtrlPackets_;
   uint8_t lastLeftSeqnum_, lastRightSeqnum_;
   unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_, msLastPrimaryCtrlPacket_;
+  float msSinceDriveInput_;
 
   DriveMode driveMode_;
+  bool driveSafety_;
   
   bool servosOK_, antennasOK_;
   bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;

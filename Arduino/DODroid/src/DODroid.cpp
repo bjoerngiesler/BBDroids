@@ -21,11 +21,13 @@ DODroid::DODroid():
 
   balanceInput_(imu_, bb::IMUControlInput::IMU_PITCH),
 
-  driveOutput_(lSpeedController_, rSpeedController_),
+  velOutput_(lSpeedController_, rSpeedController_),
 
-  balanceController_(balanceInput_, driveOutput_),
+  balanceController_(balanceInput_, velOutput_),
 
-  positionController_(balanceInput_, driveOutput_), // FIXME
+  posInput_(leftEncoder_, rightEncoder_),
+  posOutput_(velOutput_),
+  posController_(posInput_, posOutput_),
 
   statusPixels_(3, P_STATUS_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 {
@@ -42,10 +44,12 @@ DODroid::DODroid():
   name_ = "d-o";
 
   description_ = "D-O Main System";
-  help_ = "Available commands:\r\n"\
-"\tstatus\t\tPrint Status\r\n"\
-"\tselftest\tRun self test\r\n"\
-"\tplay_sound [<folder>] <num>\tPlay sound\r\n";
+  help_ = "Available commands:\n"\
+"\tstatus\t\tPrint Status\n"\
+"\tselftest\tRun self test\n"\
+"\tsafety {on|off}\tSwitch safety functions on/off\n"\
+"\tdrive {off|pos|vel}\tSwitch drive system to off, position control, or velocity control\n"\
+"\tplay_sound [<folder>] <num>\tPlay sound\n";
   started_ = false;
 
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
@@ -76,6 +80,10 @@ Result DODroid::initialize() {
   addParameter("bal_ki", "Integrative constant for balance PID controller", params_.balKi, -INT_MAX, INT_MAX);
   addParameter("bal_kd", "Derivative constant for balance PID controller", params_.balKd, -INT_MAX, INT_MAX);
   addParameter("bal_neck_mix", "Mix neck SP into balance SP to avoid inducing motion", params_.balNeckMix, -INT_MAX, INT_MAX);
+
+  addParameter("pos_kp", "Proportional constant for position PID controller", params_.posKp, -INT_MAX, INT_MAX);
+  addParameter("pos_ki", "Integrative constant for position PID controller", params_.posKi, -INT_MAX, INT_MAX);
+  addParameter("pos_kd", "Derivative constant for position PID controller", params_.posKd, -INT_MAX, INT_MAX);
 
   addParameter("accel", "Acceleration in mm/s^2", params_.accel, -INT_MAX, INT_MAX);
   addParameter("max_speed", "Maximum speed (only honored in speed control mode)", params_.maxSpeed, 0, INT_MAX);
@@ -128,6 +136,7 @@ Result DODroid::start(ConsoleStream* stream) {
   servosOK_ = false;
   antennasOK_ = false;
   driveMode_ = DRIVE_OFF;
+  driveSafety_ = true;
 
   imu_.begin();
   DOBattStatus::batt.begin();
@@ -186,8 +195,10 @@ void DODroid::setControlParameters() {
   balanceController_.setRamp(0);
   balanceController_.setErrorDeadband(-1.0, 1.0);
   balanceController_.reset();
-  driveOutput_.setAcceleration(params_.accel);
-  driveOutput_.setMaxSpeed(params_.maxSpeed);
+  velOutput_.setAcceleration(params_.accel);
+  velOutput_.setMaxSpeed(params_.maxSpeed);
+
+  posController_.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
 }
 
 Result DODroid::step() {
@@ -259,7 +270,7 @@ bb::Result DODroid::stepHead() {
   //Console::console.printfBroadcast("R:%f P:%f H:%f AX:%f AY:%f AZ:%f RAX:%f RAY: %f RAZ: %f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, rax, ray, raz, dr, dp, dh);
 
   float speed = (leftEncoder_.presentSpeed() + rightEncoder_.presentSpeed())/2;
-  float speedSP = driveOutput_.goalVelocity();
+  float speedSP = velOutput_.goalVelocity();
   float accelSP = (speedSP-speed);
   if(speedSP == 0) accelSP = 0;
 
@@ -318,7 +329,7 @@ bb::Result DODroid::stepHead() {
 
 bb::Result DODroid::stepDrive() {
   unsigned long timeSinceLastPrimary = WRAPPEDDIFF(millis(), msLastPrimaryCtrlPacket_, ULONG_MAX);
-  if(timeSinceLastPrimary > 500 && driveMode_ != DRIVE_OFF) {
+  if(timeSinceLastPrimary > 500 && driveMode_ != DRIVE_OFF && driveSafety_ == true) {
     Console::console.printfBroadcast("No control packet from primary in %dms. Switching drive off.\n", timeSinceLastPrimary);
     switchDrive(DRIVE_OFF);
     DOSound::sound.playSystemSound(SystemSounds::DISCONNECTED);
@@ -328,7 +339,7 @@ bb::Result DODroid::stepDrive() {
     balanceController_.update();
     lSpeedController_.update();
     rSpeedController_.update();
-    if(driveMode_ == DRIVE_POSITION) positionController_.update();
+    if(driveMode_ == DRIVE_POSITION) posController_.update();
   } else {
     leftMotor_.set(0);
     rightMotor_.set(0);
@@ -343,15 +354,26 @@ void DODroid::switchDrive(DriveMode mode) {
   rSpeedController_.setGoal(0);
   balanceController_.reset();
   balanceController_.setGoal(0);
-  positionController_.reset();
-  positionController_.setGoal(0);
+  posController_.reset();
+  posController_.setPresentAsGoal();
 
   driveMode_ = mode;
   Console::console.printfBroadcast("Drive mode: ");
   switch(driveMode_) {
-    case DRIVE_OFF: Console::console.printfBroadcast("off\n"); break;
-    case DRIVE_VELOCITY: Console::console.printfBroadcast("velocity\n"); break;
-    case DRIVE_POSITION: default: Console::console.printfBroadcast("off\n"); break;
+    case DRIVE_OFF: 
+      setLED(LED_DRIVE, OFF);
+      Console::console.printfBroadcast("off\n"); 
+      break;
+    
+    case DRIVE_VELOCITY: 
+      setLED(LED_DRIVE, GREEN);
+      Console::console.printfBroadcast("velocity\n"); 
+      break;
+
+    case DRIVE_POSITION: default: 
+      setLED(LED_DRIVE, BLUE);
+      Console::console.printfBroadcast("position\n"); 
+      break;
   }
 }
 
@@ -393,10 +415,10 @@ void DODroid::printExtendedStatus(ConsoleStream *stream) {
   stream->printf("Motors:\n");
   leftEncoder_.update();
   if(leftMotorStatus_ == MOTOR_OK) stream->printf("\tLeft OK, encoder %f\n", leftEncoder_.presentPosition());
-  else stream->printf("\tLeft Err %d\n", leftMotorStatus_);
+  else stream->printf("\tLeft Err %d, encoder %f\n", leftMotorStatus_, leftEncoder_.presentPosition());
   rightEncoder_.update();
   if(rightMotorStatus_ == MOTOR_OK) stream->printf("\tRight OK, encoder %f\n", rightEncoder_.presentPosition());
-  else stream->printf("\tRight Err %d\n", rightMotorStatus_);
+  else stream->printf("\tRight Err %d, encoder %f\n", rightMotorStatus_, rightEncoder_.presentPosition());
 
   float p, r, h;
   imu_.getFilteredPRH(p, r, h);
@@ -457,7 +479,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     msLastPrimaryCtrlPacket_ = millis();
     if(packet.button4 && !lastBtn4_) {
       if(driveMode_ == DRIVE_OFF) {
-        switchDrive(DRIVE_VELOCITY);
+        switchDrive(DRIVE_POSITION);
       } else {
         switchDrive(DRIVE_OFF);
       }
@@ -485,18 +507,22 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     if(driveMode_ != DRIVE_OFF) {
       float vel = packet.getAxis(1);
       float rot = packet.getAxis(0);
-      if(fabs(vel)<params_.speedAxisDeadband) vel = 0;
-      if(fabs(rot)<params_.rotAxisDeadband) rot = 0;
-      if(fabs(vel)<params_.speedAxisDeadband && fabs(rot)<params_.rotAxisDeadband) {
-        setLED(LED_DRIVE, BLUE);
+
+      if(EPSILON(vel) && EPSILON(rot)) {
+        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && driveMode_ == DRIVE_VELOCITY) {
+          switchDrive(DRIVE_POSITION);
+        }
       } else {
-        setLED(LED_DRIVE, GREEN);
+        msSinceDriveInput_ = millis();
+        if(driveMode_ == DRIVE_POSITION) {
+          switchDrive(DRIVE_VELOCITY);
+          vel = constrain(vel * params_.maxSpeed * params_.speedAxisGain, -params_.maxSpeed, params_.maxSpeed);
+          rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
+          velOutput_.setGoalVelocity(vel);
+          velOutput_.setGoalRotation(rot);
+        }
       }
 
-      vel = constrain(vel * params_.maxSpeed * params_.speedAxisGain, -params_.maxSpeed, params_.maxSpeed);
-      rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
-      driveOutput_.setGoalVelocity(vel);
-      driveOutput_.setGoalRotation(rot);
     } else {
       setLED(LED_DRIVE, OFF);
     }
@@ -519,7 +545,9 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
     if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
     Runloop::runloop.excuseOverrun();
     return selfTest(stream);
-  } else if(words[0] == "play_sound") {
+  } 
+  
+  else if(words[0] == "play_sound") {
     if(words.size() == 1 || words.size() > 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
     if(words.size() == 2) {
       bool retval = DOSound::sound.playSound(words[1].toInt());
@@ -529,6 +557,31 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
       if(retval == false) stream->printf("Error\n");
     }
     return RES_OK;
+  }
+
+  else if(words[0] == "safety") {
+    if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    if(words[1] == "off") {
+      driveSafety_ = false;
+      return RES_OK;
+    } else if(words[1] == "on") {
+      driveSafety_ = true;
+      return RES_OK;
+    } else return RES_CMD_INVALID_ARGUMENT;
+  }
+
+  else if(words[0] == "drive") {
+    if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    if(words[1] == "off") {
+      switchDrive(DRIVE_OFF);
+      return RES_OK;
+    } else if(words[1] == "pos") {
+      switchDrive(DRIVE_POSITION);
+      return RES_OK;
+    } else if(words[1] == "vel") {
+      switchDrive(DRIVE_VELOCITY);
+      return RES_OK;
+    } else return RES_CMD_INVALID_ARGUMENT;
   }
   
   return bb::Subsystem::handleConsoleCommand(words, stream);

@@ -9,14 +9,14 @@ namespace bb {
 
 class ControlInput {
 public:
-  virtual Result update() = 0;
   virtual float present() = 0;
+  virtual Result update() = 0;
   virtual float controlGain() { return 1.0f; }
 };
 
 class ControlOutput {
 public:
-  virtual float present() = 0;
+  virtual float present()         = 0;
   virtual Result set(float value) = 0;
 };
 
@@ -37,7 +37,7 @@ public:
   void setDebug(bool yesno) { debug_ = yesno; }
 
   void setGoal(const float& sp);
-  void setCurrentAsGoal();
+  void setPresentAsGoal();
   float goal() { return goal_; }
   float error() { return lastErr_; }
   virtual Result set(float value) { setGoal(value); return RES_OK; }

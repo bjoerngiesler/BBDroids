@@ -100,6 +100,11 @@ void bb::PIDController::setGoal(const float& sp) {
   if(EPSILON(ramp_)) curSetpoint_ = goal_;
 }
 
+void bb::PIDController::setPresentAsGoal() {
+  goal_ = present();
+  if(EPSILON(ramp_)) curSetpoint_ = goal_;
+}
+
 float bb::PIDController::present() {
   return input_.present();
 }

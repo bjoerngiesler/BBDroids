@@ -290,7 +290,7 @@ public:
 
     if(isStarted() && words.size() == 1) {
       bool isNumber = true;
-      for(int i=0; i<words[0].length(); i++) {
+      for(unsigned int i=0; i<words[0].length(); i++) {
         if(!isDigit(words[0].charAt(i)) && words[0].charAt(i) != '.' && words[0].charAt(i) != '-') {
           isNumber = false;
           break;

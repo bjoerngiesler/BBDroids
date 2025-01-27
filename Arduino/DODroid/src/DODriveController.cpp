@@ -1,6 +1,6 @@
 #include "DODriveController.h"
 
-DODriveControlOutput::DODriveControlOutput(bb::ControlOutput& left, bb::ControlOutput& right):
+DOVelControlOutput::DOVelControlOutput(bb::ControlOutput& left, bb::ControlOutput& right):
   left_(left),
   right_(right) {
     goalVel_ = 0;
@@ -8,12 +8,11 @@ DODriveControlOutput::DODriveControlOutput(bb::ControlOutput& left, bb::ControlO
     curVel_ = 0;
     curRot_ = 0;
     accel_ = 0;
-    useControlInput_ = true;
     maxSpeed_ = 0;
     lastCycleUS_ = micros();
 }
 
-bb::Result DODriveControlOutput::set(float value) {
+bb::Result DOVelControlOutput::set(float value) {
   bb::Result resLeft, resRight;
   unsigned long us = micros();
   float dt;
@@ -56,40 +55,62 @@ bb::Result DODriveControlOutput::set(float value) {
   return RES_OK;
 }
 
-float DODriveControlOutput::present() {
+float DOVelControlOutput::present() {
   return (left_.present() + right_.present()) / 2.0f;
 }
 
-void DODriveControlOutput::setGoalVelocity(float goalVel) {
+void DOVelControlOutput::setGoalVelocity(float goalVel) {
   goalVel_ = goalVel;
   if(EPSILON(accel_)) {
     curVel_ = goalVel_;
   }
 }
   
-void DODriveControlOutput::setAcceleration(float accel) {
+void DOVelControlOutput::setAcceleration(float accel) {
   accel_ = accel;
 }
   
-void DODriveControlOutput::setGoalRotation(float goalRot) {
+void DOVelControlOutput::setGoalRotation(float goalRot) {
   goalRot_ = goalRot;
   if(EPSILON(accel_)) {
     curRot_ = goalRot_;
   }
 }
 
-void DODriveControlOutput::setDeadband(float deadband) {
+void DOVelControlOutput::setDeadband(float deadband) {
   deadband_ = deadband;  
 }
 
-DODriveControlInput::DODriveControlInput(bb::ControlInput& left, bb::ControlInput& right):
+DOVelControlInput::DOVelControlInput(bb::ControlInput& left, bb::ControlInput& right):
   left_(left), right_(right) {  
 }
 
-Result DODriveControlInput::update() {
+float DOVelControlInput::present() {
+  return (left_.present() + right_.present())/2.0f;
+}
+
+// ==
+
+DOPosControlInput::DOPosControlInput(bb::Encoder& left, bb::Encoder& right):
+  left_(left), right_(right) {
+}
+
+float DOPosControlInput::present() {
+  return (left_.presentPosition() + right_.presentPosition())/2.0f;
+}
+
+// ==
+
+DOPosControlOutput::DOPosControlOutput(DOVelControlOutput& velOut):
+  velOut_(velOut) {
+}
+
+Result DOPosControlOutput::set(float goal) {
+  velOut_.setGoalVelocity(goal);
+  velOut_.setGoalRotation(0);
   return RES_OK;
 }
 
-float DODriveControlInput::present() {
-  return (left_.present() + right_.present())/2.0f;
+float DOPosControlOutput::present() {
+  return velOut_.goalVelocity();
 }

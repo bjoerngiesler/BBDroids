@@ -5,11 +5,9 @@
 
 using namespace bb;
 
-
-
-class DODriveControlOutput: public bb::ControlOutput {
+class DOVelControlOutput: public bb::ControlOutput {
 public:
-  DODriveControlOutput(bb::ControlOutput& left, bb::ControlOutput& right);
+  DOVelControlOutput(bb::ControlOutput& left, bb::ControlOutput& right);
 
   virtual void setGoalVelocity(float goalVel);
   virtual float goalVelocity() { return goalVel_; }
@@ -17,12 +15,9 @@ public:
   virtual void setGoalRotation(float goalRot);
   void setDeadband(float deadband);
 
-  bool useControlInput() { return useControlInput_; }
-  void setUseControlInput(bool yesno) { useControlInput_ = yesno; }
-
   // These are used by the controller framework, do not call directly.
   virtual float present();
-  virtual Result set(float value); 
+  virtual Result set(float value); // set velocity difference
   virtual float maxSpeed() { return maxSpeed_; }
   virtual void setMaxSpeed(float m) { maxSpeed_ = m; }
 
@@ -32,19 +27,42 @@ protected:
   float deadband_;
   bb::ControlOutput &left_, &right_;
   unsigned long lastCycleUS_;
-  bool useControlInput_;
   float maxSpeed_;
 };
 
-class DODriveControlInput: public bb::ControlInput {
+class DOVelControlInput: public bb::ControlInput {
 public:
-  DODriveControlInput(bb::ControlInput& left, bb::ControlInput& right);
+  DOVelControlInput(bb::ControlInput& left, bb::ControlInput& right);
 
-  virtual Result update();
-  virtual float present();
+  virtual float present(); // outputs velocity
+  virtual Result update() { return RES_OK; } // we call update() one by one in DODroid::step()
 protected:
-  bb::ControlInput &left_, &right_;
+  bb::ControlInput& left_;
+  bb::ControlInput& right_;
   unsigned long lastCycleUS_;
+};
+
+class DOPosControlOutput: public bb::ControlOutput {
+public:
+  DOPosControlOutput(DOVelControlOutput& velOut);
+
+  virtual float present();
+  virtual Result set(float value);
+
+protected:
+  DOVelControlOutput& velOut_;
+};
+
+class DOPosControlInput: public bb::ControlInput {
+public:
+  DOPosControlInput(bb::Encoder& left, bb::Encoder& right);
+
+  virtual float present(); // outputs position
+  virtual Result update() { return RES_OK; }
+
+protected:
+  bb::Encoder& left_;
+  bb::Encoder& right_;
 };
 
 #endif // DODRIVECONTROLLER_H

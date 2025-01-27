@@ -35,6 +35,10 @@ struct DOParams {
     float balKi             = 0;
     float balKd             = 0;
 
+    float posKp             = 0;
+    float posKi             = 0;
+    float posKd             = 0;
+
     float balNeckMix        = 0;
     float maxSpeed          = 800;
     float accel             = 2500;
@@ -42,9 +46,7 @@ struct DOParams {
     float antennaOffset     = 0;  
 
     float speedAxisGain     = 1.0;
-    float speedAxisDeadband = 0.05;
     float rotAxisGain       = 0.4;
-    float rotAxisDeadband   = 0.05;
 
     float leanHeadToBody    = 0.8;
 

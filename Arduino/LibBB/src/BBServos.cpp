@@ -403,7 +403,7 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
   // how many ms should it take to reach the goal?
   float timeToReachGoalMS = maxoffs / ((vel * 4096.0) / 60000);
 
-  Console::console.printfBroadcast("Time to reach the goal: %f\n", timeToReachGoalMS);
+  //Console::console.printfBroadcast("Time to reach the goal: %f\n", timeToReachGoalMS);
 
   int timeRemaining = (int)(2*timeToReachGoalMS);
   bool allReachedGoal = false;
@@ -413,7 +413,7 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
     if(id == ID_ALL) {
       for(auto& s: servos_) {
         int diff = abs((int)s.present - (int)s.goal);
-        Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s.id, s.present, s.goal, diff, s.load, rawVel);
+        //Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s.id, s.present, s.goal, diff, s.load, rawVel);
         if(diff > 10) allReachedGoal = false;
         if(abs(s.load) > maxLoad) {
           Console::console.printfBroadcast("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.\n",
@@ -424,7 +424,7 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
       }
     } else {
       int diff = abs((int)s->present - (int)s->goal);
-      Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s->id, s->present, s->goal, diff, s->load, rawVel);
+      //Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s->id, s->present, s->goal, diff, s->load, rawVel);
       if(diff > 10) allReachedGoal = false;
       if(ABS(s->load) > maxLoad) {
         Console::console.printfBroadcast("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.", maxLoad, s->id, s->load);
