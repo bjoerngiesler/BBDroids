@@ -158,32 +158,25 @@ void RInput::update() {
   maxJoyRawV = max(maxJoyRawV, joyRawV);
 
   unsigned int deadbandAbs = rint(4096*(deadbandPercent_/100.0f)/2.0f);
-  if(joyRawH < hCalib.center) {
-    if(joyRawH < hCalib.center - deadbandAbs)
-      joyH = float(map(joyRawH, hCalib.min, hCalib.center-deadbandAbs, 0, 2047)-2047) / 2048.0f;
-    else
-      joyH = 0;
+  //Console::console.printfBroadcast("Deadband percent: %d Absolute: %d\n", deadbandPercent_, deadbandAbs);
+  if(joyRawH < hCalib.center - deadbandAbs) {
+    joyH = float(map(joyRawH, hCalib.min, hCalib.center-deadbandAbs, 0, 2047)-2047) / 2048.0f;
+  } else if(joyRawH > hCalib.center + deadbandAbs) {
+    joyH = float(map(joyRawH, hCalib.center+deadbandAbs, hCalib.max, 2047, 4095)-2047) / 2048.0f;
   } else {
-    if(joyRawH > hCalib.center + deadbandAbs)
-      joyH = float(map(joyRawH, hCalib.center+deadbandAbs, hCalib.max, 2047, 4095)-2047) / 2048.0f;
-    else
-      joyH = 0;
+    joyH = 0;
   }
   joyH = constrain(joyH, -1.0f, 1.0f);
 
-  if(joyRawV < vCalib.center) {
-    if(joyRawV < hCalib.center - deadbandAbs)
-      joyV = float(2047-map(joyRawV, vCalib.min, vCalib.center-deadbandAbs, 0, 2047)) / 2048.0f;
-    else {
-      joyV = 0;
-    }
+  if(joyRawV < vCalib.center-deadbandAbs) {
+    joyV = float(2047-map(joyRawV, vCalib.min, vCalib.center-deadbandAbs, 0, 2047)) / 2048.0f;
+    Console::console.printfBroadcast("Mapping %d from %d to %d-%d = %f\n", joyRawV, vCalib.min, vCalib.center, deadbandAbs, joyV);
+  } else if(joyRawV > vCalib.center+deadbandAbs) {
+    joyV = float(2047-map(joyRawV, vCalib.center+deadbandAbs, vCalib.max, 2047, 4095)) / 2048.0f;
+    Console::console.printfBroadcast("Mapping %d from %d+%d to %d = %f\n", joyRawV, vCalib.center, deadbandAbs, vCalib.max, joyV);
   } else {
-    if(joyRawV > hCalib.center + deadbandAbs)
-      joyV = float(2047-map(joyRawV, vCalib.center+deadbandAbs, vCalib.max, 2047, 4095)) / 2048.0f;
-    else
-      joyV = 0;
+    joyV = 0;
   }
-  if(abs(joyV) < deadbandPercent_/100.0f) joyV = 0.0f;
   joyV = constrain(joyV, -1.0f, 1.0f);
   
   battRaw = analogRead(P_A_BATT_CHECK);
