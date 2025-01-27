@@ -1,6 +1,6 @@
 <mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/24.7.8 Chrome/128.0.6613.36 Electron/32.0.1 Safari/537.36" version="24.7.8">
   <diagram name="Seite-1" id="kHR3K2X6mLvnaRXTm4rC">
-    <mxGraphModel dx="2017" dy="1968" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="2017" dy="799" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -266,9 +266,6 @@
             </Array>
             <mxPoint as="offset" />
           </mxGeometry>
-        </mxCell>
-        <mxCell id="d_OcTvCgIvUWKZTnsHg6-36" value="Basic control concept description:&lt;div&gt;&lt;ul&gt;&lt;li&gt;Lowest level:&amp;nbsp; is based on individual per-wheel speed PID controllers&lt;/li&gt;&lt;li&gt;- Overlaid is a balance controller that gets its&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;" style="rounded=0;whiteSpace=wrap;html=1;align=left;verticalAlign=top;" vertex="1" parent="1">
-          <mxGeometry x="320" y="-260" width="460" height="190" as="geometry" />
         </mxCell>
         <mxCell id="d_OcTvCgIvUWKZTnsHg6-41" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;entryX=0.52;entryY=0.346;entryDx=0;entryDy=0;entryPerimeter=0;" edge="1" parent="1" source="4gz29d7Vr_LdfD3-UEPO-31" target="d_OcTvCgIvUWKZTnsHg6-22">
           <mxGeometry x="-0.5469" relative="1" as="geometry">
