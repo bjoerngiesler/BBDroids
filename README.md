@@ -27,7 +27,7 @@ How to do this is described on the [PlatformIO installation page for Virtual Stu
 
 ### Download the Software
 
-<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Download-the-Software.png" width="200" />
+<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Download-the-Software.png" width="500" />
 
 ## If you want to build the D-Ov2Evo droid...
 
