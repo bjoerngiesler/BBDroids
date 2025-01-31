@@ -25,7 +25,7 @@ Although like any new tool, this may look like a daunting task, it is really qui
 2. Install the PlatformIO extension for Visual Studio Code.
 How to do this is described on the [PlatformIO installation page for Virtual Studio Code](https://platformio.org/install/ide?install=vscode) - please follow that guide!
 
-### Download the Software
+### Download the Remote and Droid Software
 
 You are already on the right page! Please click on the green "Code" button above, then use the "Download ZIP" option on the bottom of the menu that pops up. (If you're familiar with Git you can of course also do a proper checkout, but if you aren't, a plain download is fine.
 
@@ -49,6 +49,14 @@ PlatformIO will now present you with a couple of windows in the bottom right cor
 
 <center>
 	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Build-In-VSCode.png" width="300" />
+</center>
+
+This will build the software for the *left* remote. So get your left remote ready (the one with the display), connect it to your computer using a USB cable, and select "Upload" from the same menu you just selected "Build" from.
+
+To build the software for the *right* remote, we need to go into the PlatformIO target list (because the left and right remote build from exactly the same source, but are built slightly differently). You can find it on the left hand side of the window, at the very bottom, the little alien head.
+
+<center>
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Upload-Right-Remote.png" width="300" />
 </center>
 
 ## If you want to build the D-Ov2Evo droid...
