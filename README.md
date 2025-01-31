@@ -78,9 +78,9 @@ Visual Studio Code's menu bar has the option "Open Folder" in the File menu. Use
 
 Open the `Arduino/Utilities/AntennaI2CServer` folder in the File menu. Once it's done initializing everything, connect the QtPy microcontroller to the computer via USB cable, and use the "Upload" option in the drop-down menu on the top right to build and upload the software to the microcontroller.
 
-## If you want to build the D-Ov2Evo droid...
+## Build the hardware for the D-Ov2Evo droid
 
-...please refer to the documentation collection on the Wiki page: https://github.com/bjoerngiesler/BBDroids/wiki/91-Individual-Droid:-D%E2%80%90Ov2Evo
+Please refer to the documentation collection on the Wiki page: https://github.com/bjoerngiesler/BBDroids/wiki/91-Individual-Droid:-D%E2%80%90Ov2Evo
 
 ## About
 
