@@ -35,7 +35,7 @@ You are already on the right page! Please click on the green "Code" button above
 
 Unzip the ZIP file somewhere on your hard drive where you are going to build and keep the software.
 
-### Build the Remote software
+### Build and Upload the Remote software
 
 Open Visual Studio Code. It presents you with a window that contains a start menu. 
 
@@ -51,13 +51,24 @@ PlatformIO will now present you with a couple of windows in the bottom right cor
 	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Build-In-VSCode.png" width="300" />
 </center>
 
-This will build the software for the *left* remote. So get your left remote ready (the one with the display), connect it to your computer using a USB cable, and select "Upload" from the same menu you just selected "Build" from.
+This will build the software for the *left* remote. So get your left remote ready (the one with the display) and connect it to your computer using USB.
+
+Before you upload the software, you need to get the ESP32 microcontroller on the remote into bootloader mode. You do this by
+1. pushing and hold down the tiny button to the *right* of the USB connector on the ESP32 microcontroller (this is the *Bootloader* button),
+2. pushing and releasing the tiny button to the *left* of the USB connector (this is the *Reset* button),
+3. releasing the Bootloader button to the right of the USB connector.
+
+Now the microcontroller is in bootloader mode, select "Upload" from the same menu you just selected "Build" from. This should upload the software to the right remote. If you're getting an error message saying "no reply on serial port" or somesuch, your microcontroller is not in bootloader mode, so do the dance with the buttons once more. They're tiny but clicky, you can feel when you're pressing them down correctly.
 
 To build the software for the *right* remote, we need to go into the PlatformIO target list (because the left and right remote build from exactly the same source, but are built slightly differently). You can find it on the left hand side of the window, at the very bottom, the little alien head.
 
 <center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Upload-Right-Remote.png" width="300" />
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Upload-Right-Remote.png" width="400" />
 </center>
+
+This will give you a list of targets, including `left_remote` and `right_remote`, in the window pane one over to the right. Confusingly, if you click on the arrow next to `right_remote`, PlatformIO will first go and think for a while, and likely close the `right_remote` menu again. Fear not, this is normal, just go ahead and click on that arrow again. At some point there will be a "Build" and "Upload" option there. Disconnect the left remote from your computer, connect the right one, get it into bootloader mode, and click on "Upload". 
+
+Congratulations, you've built and flashed the software for the remotes!
 
 ## If you want to build the D-Ov2Evo droid...
 
