@@ -14,7 +14,44 @@ Hardware concept, layout and realization by Felix Beyer, software concept and re
 
 *Watch this space for official releases!*
 
-## If you want to build D-Ov2Evo...
+## Download and Build the Software
+
+### Installing PlatformIO and VS Code
+
+Although the BBDroids software package is using the Arduino framework, it is not built using the Arduino build environment but instead is using PlatformIO and Visual Studio Code. The reason for this is that PlatformIO will automatically install all required code and libraries on a per-project basis into a sandbox environment, without interfering with other projects which might use other libraries. This is really the only manageable way of distributing larger Arduino packages.
+
+Although like any new tool, this may look like a daunting task, it is really quite simple. To install, there are really only two easy steps:
+1. Install Visual Studio Code itself
+2. Install the PlatformIO extension for Visual Studio Code.
+How to do this is described on the [PlatformIO installation page for Virtual Studio Code](https://platformio.org/install/ide?install=vscode) - please follow that guide!
+
+### Download the Software
+
+You are already on the right page! Please click on the green "Code" button above, then use the "Download ZIP" option on the bottom of the menu that pops up. (If you're familiar with Git you can of course also do a proper checkout, but if you aren't, a plain download is fine.
+
+<center>
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Download-the-Software.png" width="500" />
+</center>
+
+Unzip the ZIP file somewhere on your hard drive where you are going to build and keep the software.
+
+### Build the Remote software
+
+Open Visual Studio Code. It presents you with a window that contains a start menu. 
+
+<center>
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Open-In-VS-Code.png" width="500" />
+</center>
+
+Use that menu's "Open" command to navigate to the `Arduino/Remote` folder in the Zip contents you just unpacked. Yes, you will open a folder here, not a file.
+
+PlatformIO will now present you with a couple of windows in the bottom right corner doing its thing initializing the environment and getting everything ready. Give it a bit. Once it is done, click on the drop-down arrow on the build menu in the upper right corner and choose the "Build" option.
+
+<center>
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Build-In-VS-Code.png" width="500" />
+</center>
+
+## If you want to build the D-Ov2Evo droid...
 
 ...please refer to the documentation collection on the Wiki page: https://github.com/bjoerngiesler/BBDroids/wiki/91-Individual-Droid:-D%E2%80%90Ov2Evo
 
