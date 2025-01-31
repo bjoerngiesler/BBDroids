@@ -70,6 +70,14 @@ This will give you a list of targets, including `left_remote` and `right_remote`
 
 Congratulations, you've built and flashed the software for the remotes!
 
+### Build and Upload the D-O software (or any droid software)
+
+Visual Studio Code's menu bar has the option "Open Folder" in the File menu. Use that option to open the `Arduino/DODroid` folder. Once it's done initializing everything, connect the droid's MKR Wifi 1010 controller to the computer via USB cable, and use the "Upload" option in the drop-down menu on the top right to build and upload the software to the microcontroller.
+
+### Build and Upload the Aerial software 
+
+Open the `Arduino/Utilities/AntennaI2CServer` folder in the File menu. Once it's done initializing everything, connect the QtPy microcontroller to the computer via USB cable, and use the "Upload" option in the drop-down menu on the top right to build and upload the software to the microcontroller.
+
 ## If you want to build the D-Ov2Evo droid...
 
 ...please refer to the documentation collection on the Wiki page: https://github.com/bjoerngiesler/BBDroids/wiki/91-Individual-Droid:-D%E2%80%90Ov2Evo
