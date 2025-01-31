@@ -27,7 +27,29 @@ How to do this is described on the [PlatformIO installation page for Virtual Stu
 
 ### Download the Software
 
-<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Download-the-Software.png" width="500" />
+You are already on the right page! Please click on the green "Code" button above, then use the "Download ZIP" option on the bottom of the menu that pops up. (If you're familiar with Git you can of course also do a proper checkout, but if you aren't, a plain download is fine.
+
+<center>
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Download-the-Software.png" width="500" />
+</center>
+
+Unzip the ZIP file somewhere on your hard drive where you are going to build and keep the software.
+
+### Build the Remote software
+
+Open Visual Studio Code. It presents you with a window that contains a start menu. 
+
+<center>
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Open-In-VS-Code.png" width="500" />
+</center>
+
+Use that menu's "Open" command to navigate to the `Arduino/Remote` folder in the Zip contents you just unpacked. Yes, you will open a folder here, not a file.
+
+PlatformIO will now present you with a couple of windows in the bottom right corner doing its thing initializing the environment and getting everything ready. Give it a bit. Once it is done, click on the drop-down arrow on the build menu in the upper right corner and choose the "Build" option.
+
+<center>
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Build-In-VS-Code.png" width="500" />
+</center>
 
 ## If you want to build the D-Ov2Evo droid...
 
