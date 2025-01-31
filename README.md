@@ -48,7 +48,7 @@ Use that menu's "Open" command to navigate to the `Arduino/Remote` folder in the
 PlatformIO will now present you with a couple of windows in the bottom right corner doing its thing initializing the environment and getting everything ready. Give it a bit. Once it is done, click on the drop-down arrow on the build menu in the upper right corner and choose the "Build" option.
 
 <center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Build-In-VS-Code.png" width="300" />
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Build-In-VSCode.png" width="300" />
 </center>
 
 ## If you want to build the D-Ov2Evo droid...
