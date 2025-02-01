@@ -16,7 +16,7 @@ Hardware concept, layout and realization by Felix Beyer, software concept and re
 
 ## Download and Build the Software
 
-### Installing PlatformIO and VS Code
+### Installing Git, PlatformIO and VS Code
 
 Although the BBDroids software package is using the Arduino framework, it is not built using the Arduino build environment but instead is using PlatformIO and Visual Studio Code. The reason for this is that PlatformIO will automatically install all required code and libraries on a per-project basis into a sandbox environment, without interfering with other projects which might use other libraries. This is really the only manageable way of distributing larger Arduino packages.
 
@@ -24,6 +24,8 @@ Although like any new tool, this may look like a daunting task, it is really qui
 1. Install Visual Studio Code itself
 2. Install the PlatformIO extension for Visual Studio Code.
 How to do this is described on the [PlatformIO installation page for Virtual Studio Code](https://platformio.org/install/ide?install=vscode) - please follow that guide!
+
+You also want to install a Git client. Git is a very popular source code management system. We use it to manage our code, and PlatformIO uses it to pull the various libraries it needs from Github. [Please download a Git client for your operating system here.](https://git-scm.com/downloads)
 
 ### Download the Remote and Droid Software
 
