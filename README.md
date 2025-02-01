@@ -48,7 +48,7 @@ At the end of the pull, VS Code will ask you if you want to open the downloaded 
 Instead, use the start menu's "Open" command to navigate to the `Arduino/Remote` folder in the Zip contents you just unpacked. **Yes, you will open a folder here, not a file, which is confusing; just select the folder and click "Open".**
 
 <center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Open.png" width="300" />
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Open.png" width="500" />
 </center>
 
 
