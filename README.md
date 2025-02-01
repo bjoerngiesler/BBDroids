@@ -72,7 +72,7 @@ Now the microcontroller is in bootloader mode, select "Upload" from the same men
 To build the software for the *right* remote, we need to go into the PlatformIO target list (because the left and right remote build from exactly the same source, but are built slightly differently). You can find it on the left hand side of the window, at the very bottom, the little alien head.
 
 <center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Upload-Right-Remote.png" width="400" />
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Upload-Right-Remote.png" width="400" />
 </center>
 
 This will give you a list of targets, including `left_remote` and `right_remote`, in the window pane one over to the right. Confusingly, if you click on the arrow next to `right_remote`, PlatformIO will first go and think for a while, and likely close the `right_remote` menu again. Fear not, this is normal, just go ahead and click on that arrow again. At some point there will be a "Build" and "Upload" option there. Disconnect the left remote from your computer, connect the right one, get it into bootloader mode, and click on "Upload". 
