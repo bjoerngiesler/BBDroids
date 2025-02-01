@@ -29,28 +29,35 @@ You also want to install a **Git client**. Git is a very popular source code man
 
 ### Download the Remote and Droid Software
 
-You are already on the right page! Please click on the green "Code" button above, then use the "Download ZIP" option on the bottom of the menu that pops up. (If you're familiar with Git you can of course also do a proper checkout, but if you aren't, a plain download is fine.
+You are already on the right page! Please click on the green "Code" button above, then use the "Clone HTTPS" option at the top of the menu that pops up. Copy the URL you find there.
 
 <center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Download-the-Software.png" width="500" />
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Github-Download-Software.png" width="500" />
 </center>
 
-Unzip the ZIP file somewhere on your hard drive where you are going to build and keep the software.
+Now open Visual Studio Code. It presents you with a window that contains a start menu. Choose the "Clone Git Repository" option and paste the URL you just copied from Github.
+
+<center>
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Clone-Git-Repo.png" width="300" />
+</center>
+
+Visual Studio Code prompts you for a directory to clone the repository into. Create a new empty directory somewhere you want the BBDroids code to live. VS Code will now pull the contents from Github into that directory.
+
+At the end of the pull, VS Code will ask you if you want to open the downloaded repository. **Answer "No" or "Cancel"**, because our repository contains different projects that we need to open one by one.
+
+Instead, use the start menu's "Open" command to navigate to the `Arduino/Remote` folder in the Zip contents you just unpacked. **Yes, you will open a folder here, not a file, which is confusing; just select the folder and click "Open".**
+
+<center>
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Open.png" width="300" />
+</center>
+
 
 ### Build and Upload the Remote software
-
-Open Visual Studio Code. It presents you with a window that contains a start menu. 
-
-<center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Open-In-VS-Code.png" width="300" />
-</center>
-
-Use that menu's "Open" command to navigate to the `Arduino/Remote` folder in the Zip contents you just unpacked. Yes, you will open a folder here, not a file.
 
 PlatformIO will now present you with a couple of windows in the bottom right corner doing its thing initializing the environment and getting everything ready. Give it a bit. Once it is done, click on the drop-down arrow on the build menu in the upper right corner and choose the "Build" option.
 
 <center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Build-In-VSCode.png" width="300" />
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Build.png" width="300" />
 </center>
 
 This will build the software for the *left* remote. So get your left remote ready (the one with the display) and connect it to your computer using USB.
