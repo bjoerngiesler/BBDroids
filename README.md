@@ -92,7 +92,7 @@ Open the `Arduino/Utilities/AntennaI2CServer` folder in the File menu. Once it's
 The VS Code window integrates with Git as the source code control system. Any time the software has changed (we publish updates and release notes on Facebook), click on the version control logo (couple of circles connected with angled lines) on the left, then on the three dots in the Source Code Management line, then on "Pull". Please see the (German-language, sorry) screenshot below.
 
 <center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Git-Pull.png" width="400" />
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Git-Pull.png" width="400" />
 </center>
 
 ## Build the hardware for the D-Ov2Evo droid
