@@ -38,7 +38,7 @@ You are already on the right page! Please click on the green "Code" button above
 Now open Visual Studio Code. It presents you with a window that contains a start menu. Choose the "Clone Git Repository" option and paste the URL you just copied from Github.
 
 <center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Clone-Git-Repo.png" width="300" />
+	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Clone-Git-Repo.png" width="500" />
 </center>
 
 Visual Studio Code prompts you for a directory to clone the repository into. Create a new empty directory somewhere you want the BBDroids code to live. VS Code will now pull the contents from Github into that directory.
