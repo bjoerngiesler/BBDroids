@@ -14,90 +14,16 @@ Hardware concept, layout and realization by Felix Beyer, software concept and re
 
 *Watch this space for official releases!*
 
-## Download and Build the Software
+## D-Ov2Evo Electronics Kit Info Collection
 
-### Installing PlatformIO, VS Code and Git
+If you have just received your D-Ov2Evo electonics kit, these pages will help you get started.
 
-Although the BBDroids software package is using the Arduino framework, it is not built using the Arduino build environment but instead is using PlatformIO and Visual Studio Code. The reason for this is that PlatformIO will automatically install all required code and libraries on a per-project basis into a sandbox environment, without interfering with other projects which might use other libraries. This is really the only manageable way of distributing larger Arduino packages.
+* [Software: Install tools, build, upload](https://github.com/bjoerngiesler/BBDroids/wiki/01-Build:-Software)
+* [Remotes: Build howto](https://github.com/bjoerngiesler/BBDroids/wiki/02-Build:-Remotes)
+* [D-Ov2Evo droid: Electronics build howto](https://github.com/bjoerngiesler/BBDroids/wiki/03-Build:-D%E2%80%90Ov2Evo-Power-and-Main-PCBs)
+* [D-Ov2Evo droid: Hardware build howto](https://github.com/bjoerngiesler/BBDroids/wiki/04-Build:-D%E2%80%90Ov2Evo-Hardware-Step%E2%80%90By%E2%80%90Step-Instructions)
 
-Although like any new tool, this may look like a daunting task, it is really quite simple. To install, there are really only two easy steps:
-1. Install Visual Studio Code itself
-2. Install the PlatformIO extension for Visual Studio Code.
-How to do this is described on the [PlatformIO installation page for Virtual Studio Code](https://platformio.org/install/ide?install=vscode) - please follow that guide!
-
-You also want to install a **Git client**. Git is a very popular source code management system. We use it to manage our code, and PlatformIO uses it to pull the various libraries it needs from Github. [Please download a Git client for your operating system here.](https://git-scm.com/downloads)
-
-### Download the Remote and Droid Software
-
-You are already on the right page! Please click on the green "Code" button above, then use the "Clone HTTPS" option at the top of the menu that pops up. Copy the URL you find there.
-
-<center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/Github-Download-Software.png" width="500" />
-</center>
-
-Now open Visual Studio Code. It presents you with a window that contains a start menu. Choose the "Clone Git Repository" option and paste the URL you just copied from Github.
-
-<center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Clone-Git-Repo.png" width="500" />
-</center>
-
-Visual Studio Code prompts you for a directory to clone the repository into. Create a new empty directory somewhere you want the BBDroids code to live. VS Code will now pull the contents from Github into that directory.
-
-At the end of the pull, VS Code will ask you if you want to open the downloaded repository. **Answer "No" or "Cancel"**, because our repository contains different projects that we need to open one by one.
-
-Instead, use the start menu's "Open" command to navigate to the `Arduino/Remote` folder in the Zip contents you just unpacked. **Yes, you will open a folder here, not a file, which is confusing; just select the folder and click "Open".**
-
-<center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Open.png" width="500" />
-</center>
-
-
-### Build and Upload the Remote software
-
-PlatformIO will now present you with a couple of windows in the bottom right corner doing its thing initializing the environment and getting everything ready. Give it a bit. Once it is done, click on the drop-down arrow on the build menu in the upper right corner and choose the "Build" option.
-
-<center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Build.png" width="300" />
-</center>
-
-This will build the software for the *left* remote. So get your left remote ready (the one with the display) and connect it to your computer using USB.
-
-Before you upload the software, you need to get the ESP32 microcontroller on the remote into bootloader mode. You do this by
-1. pushing and hold down the tiny button to the *right* of the USB connector on the ESP32 microcontroller (this is the *Bootloader* button),
-2. pushing and releasing the tiny button to the *left* of the USB connector (this is the *Reset* button),
-3. releasing the Bootloader button to the right of the USB connector.
-
-Now the microcontroller is in bootloader mode, select "Upload" from the same menu you just selected "Build" from. This should upload the software to the right remote. If you're getting an error message saying "no reply on serial port" or somesuch, your microcontroller is not in bootloader mode, so do the dance with the buttons once more. They're tiny but clicky, you can feel when you're pressing them down correctly.
-
-To build the software for the *right* remote, we need to go into the PlatformIO target list (because the left and right remote build from exactly the same source, but are built slightly differently). You can find it on the left hand side of the window, at the very bottom, the little alien head.
-
-<center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Upload-Right-Remote.png" width="400" />
-</center>
-
-This will give you a list of targets, including `left_remote` and `right_remote`, in the window pane one over to the right. Confusingly, if you click on the arrow next to `right_remote`, PlatformIO will first go and think for a while, and likely close the `right_remote` menu again. Fear not, this is normal, just go ahead and click on that arrow again. At some point there will be a "Build" and "Upload" option there. Disconnect the left remote from your computer, connect the right one, get it into bootloader mode, and click on "Upload". 
-
-Congratulations, you've built and flashed the software for the remotes!
-
-### Build and Upload the D-O software (or any droid software)
-
-Visual Studio Code's menu bar has the option "Open Folder" in the File menu. Use that option to open the `Arduino/DODroid` folder. Once it's done initializing everything, connect the droid's MKR Wifi 1010 controller to the computer via USB cable, and use the "Upload" option in the drop-down menu on the top right to build and upload the software to the microcontroller.
-
-### Build and Upload the Aerial software 
-
-Open the `Arduino/Utilities/AntennaI2CServer` folder in the File menu. Once it's done initializing everything, connect the QtPy microcontroller to the computer via USB cable, and use the "Upload" option in the drop-down menu on the top right to build and upload the software to the microcontroller.
-
-### When the Software has Changed...
-
-The VS Code window integrates with Git as the source code control system. Any time the software has changed (we publish updates and release notes on Facebook), click on the version control logo (couple of circles connected with angled lines) on the left, then on the three dots in the Source Code Management line, then on "Pull". Please see the (German-language, sorry) screenshot below.
-
-<center>
-	<img src="https://github.com/bjoerngiesler/BBDroids/blob/main/Documentation/Common/VSCode-Git-Pull.png" width="400" />
-</center>
-
-## Build the hardware for the D-Ov2Evo droid
-
-Please refer to the documentation collection on the Wiki page: https://github.com/bjoerngiesler/BBDroids/wiki/91-Individual-Droid:-D%E2%80%90Ov2Evo
+Please also refer to the documentation collection on the Wiki page: https://github.com/bjoerngiesler/BBDroids/wiki/91-Individual-Droid:-D%E2%80%90Ov2Evo
 
 ## About
 
