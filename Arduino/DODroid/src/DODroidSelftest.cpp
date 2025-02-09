@@ -269,7 +269,6 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
 
     enc.update();
     distance = enc.presentPosition()-startPosition;
-    Console::console.printfBroadcast("%d\n", enc.presentPosition(true));
 
     if(fabs(mA) > ST_ABORT_MILLIAMPS) { 
       blockedcount++;

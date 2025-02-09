@@ -32,8 +32,8 @@ struct DOParams {
     float balKi             = 0;
     float balKd             = 0;
 
-    float posKp             = 3;
-    float posKi             = 0.1;
+    float posKp             = 6;
+    float posKi             = 0.2;
     float posKd             = 0;
 
     float maxSpeed          = 800;

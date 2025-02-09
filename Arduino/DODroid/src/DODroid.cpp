@@ -518,16 +518,22 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       float vel = packet.getAxis(1);
       float rot = packet.getAxis(0);
 
-      if(EPSILON(vel) && EPSILON(rot)) {
-        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && driveMode_ == DRIVE_VELOCITY) {
+      if(EPSILON(vel) && EPSILON(rot)) { // no drive input - joystick at zero
+        float lSpeed = leftEncoder_.presentSpeed(), rSpeed = rightEncoder_.presentSpeed();
+        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && 
+           driveMode_ == DRIVE_VELOCITY && 
+           fabs(lSpeed) < 1.0 && fabs(rSpeed) < 1.0) {
+          LOG(LOG_INFO, "Switching to position control mode, present speed left: %f, right: %f\n", lSpeed, rSpeed);
           switchDrive(DRIVE_POSITION);
         }
-      } else {
-        msSinceDriveInput_ = millis();
+      } else { // have drive input
         if(driveMode_ == DRIVE_POSITION) {
           switchDrive(DRIVE_VELOCITY);
         }
+        msSinceDriveInput_ = millis();
+      }
 
+      if(driveMode_ == DRIVE_VELOCITY) {
         vel = constrain(vel * params_.maxSpeed * params_.speedAxisGain, -params_.maxSpeed, params_.maxSpeed);
         rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
         velOutput_.setGoalVelocity(vel);
