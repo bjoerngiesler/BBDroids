@@ -44,7 +44,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   }
 
   // Check Aerials
-  Wire.beginTransmission(0x17);
+  Wire.beginTransmission(AERIAL_ADDR);
   uint8_t antErr = Wire.endTransmission();
   if(antErr != 0) {
     Console::console.printfBroadcast("Aerial error: 0x%x\n", antErr);

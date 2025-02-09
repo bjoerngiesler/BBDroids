@@ -71,6 +71,8 @@ Result DODroid::initialize() {
   addParameter("head_heading_range", "Head heading servo movement range", params_.headHeadingRange, -INT_MAX, INT_MAX);
   addParameter("head_heading_offset", "Head heading servo servo offset", params_.headHeadingOffset, -INT_MAX, INT_MAX);
 
+  addParameter("mot_deadband", "Deadband for drive motors", params_.motorDeadband, 0, 255);
+
   addParameter("wheel_kp", "Proportional constant for wheel speed PID controller", params_.wheelKp, -INT_MAX, INT_MAX);
   addParameter("wheel_ki", "Integrative constant for wheel speed PID controller", params_.wheelKi, -INT_MAX, INT_MAX);
   addParameter("wheel_kd", "Derivative constant for wheel speed PID controller", params_.wheelKd, -INT_MAX, INT_MAX);
@@ -184,6 +186,9 @@ Result DODroid::stop(ConsoleStream* stream) {
 }
 
 void DODroid::setControlParameters() {
+  leftMotor_.setDeadband(params_.motorDeadband);
+  rightMotor_.setDeadband(params_.motorDeadband);
+
   leftEncoder_.setMillimetersPerTick(WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN);
   leftEncoder_.setMode(bb::Encoder::INPUT_SPEED);
   leftEncoder_.setUnit(bb::Encoder::UNIT_MILLIMETERS);
@@ -301,6 +306,7 @@ bb::Result DODroid::stepHead() {
     float aer = 90 + params_.aerialOffset + speedSP*params_.faAerialSpeedSP;
 
     aer = constrain(aer, 0, 180);
+    LOG(LOG_INFO, "Setting aerials to %f %f %f\n", aer+remoteAerial1_, aer+remoteAerial2_, aer+remoteAerial3_);
     setAerials(constrain(aer + remoteAerial1_, 0, 180), 
                constrain(aer + remoteAerial2_, 0, 180),
                constrain(aer + remoteAerial3_, 0, 180));
@@ -552,7 +558,10 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       balanceController_.setGoal(params_.leanHeadToBody*lean_-pitchAtRest_);
     }
 
-    if(packet.button5) remoteAerial1_ = params_.aerialAnim;
+    if(packet.button5) {
+      LOG(LOG_INFO, "Setting aerial 1 to %d\n", params_.aerialAnim);
+      remoteAerial1_ = params_.aerialAnim;
+    } 
     else remoteAerial1_ = 0;
     if(packet.button6) remoteAerial2_ = params_.aerialAnim;
     else remoteAerial2_ = 0;
@@ -707,12 +716,14 @@ Result DODroid::fillAndSendStatePacket() {
 
 bool DODroid::setAerials(uint8_t a1, uint8_t a2, uint8_t a3) {
   if(aerialsOK_ == false) return false;
+
+  int retval;
   uint8_t aerials[3] = {a1, a2, a3};
-  Wire.beginTransmission(0x17);
+  Wire.beginTransmission(AERIAL_ADDR);
   Wire.write(aerials, sizeof(aerials));
-  if(Wire.endTransmission() == 0) return true;
-  Console::console.printfBroadcast("Error moving aerials\n");
-  aerialsOK_ = false;
+  retval = Wire.endTransmission();
+  if(retval == 0) return true;
+  LOG(LOG_ERROR, "Error %d moving aerials\n", retval);
   return false;
 }
 

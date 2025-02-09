@@ -24,6 +24,8 @@ struct DOParams {
     float headHeadingRange  = 90.0;
     float headHeadingOffset = 0.0;
 
+    float motorDeadband     = 10.0;
+
     float wheelKp           = 0.10;
     float wheelKi           = 0.8;
     float wheelKd           = 0.0;
