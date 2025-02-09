@@ -10,28 +10,42 @@
 namespace bb {
 
 class Subsystem;	
+class ConsoleStream;
 
+//! Variadic printf() that uses the given ConsoleStream, or BroadcastStream if stream is NULL.
+int printf(ConsoleStream* stream, const char* format, ...);
+
+//! Variadic printf() that uses BroadcastStream.
+int printf(const char* format, ...);
+
+/*!
+	\brief Base class for console streams.
+
+*/
 class ConsoleStream {
 public:
 	virtual bool available() = 0;
 	virtual bool readStringUntil(unsigned char c, String& str) = 0;
 
-	void printf(const char* format, ...) {
+	int printf(const char* format, ...) {
+		int retval;
 		va_list args;
 		va_start(args, format);
-		vprintf(format, args);
+		retval = vprintf(format, args);
 		va_end(args);
+		return retval;
 	}
 
-	void vprintf(const char* format, va_list args) {
+	int vprintf(const char* format, va_list args) {
 		int len = vsnprintf(NULL, 0, format, args) + 1;
 		char *buf = new char[len];
 		vsnprintf(buf, len, format, args);
 		printfFinal(buf);
 		free(buf);
+		return len;
 	}
 
-	virtual void printfFinal(const char* str) = 0;
+	virtual int printfFinal(const char* str) = 0;
 
 	void printGreeting() {
 		printfFinal("Console ready. Type \"help\" for instructions.\n> ");
@@ -44,6 +58,11 @@ public:
 #define HWSERIAL_CLASS HardwareSerial
 #endif
 
+/*!
+	\brief Console stream interacting with a serial port. 
+	
+	One of these is created by default on the Serial line.
+*/
 class SerialConsoleStream: public ConsoleStream {
 public:
 	SerialConsoleStream(HWSERIAL_CLASS& ser);
@@ -55,7 +74,7 @@ public:
 	virtual bool available();
 	virtual bool readStringUntil(unsigned char c, String& str);
 
-	virtual void printfFinal(const char* str);
+	virtual int printfFinal(const char* str);
 protected:
 	HWSERIAL_CLASS& ser_;
 	bool opened_;
@@ -63,15 +82,34 @@ protected:
 	unsigned long checkInterval_, lastCheck_;
 };
 
+/*!
+	\brief Virtual stream that will broadcast to all opened console streams. 
+	
+	This stream cannot be read from.
+*/
 class BroadcastStream: public ConsoleStream {
 public:
 	static BroadcastStream bc;
 
 	virtual bool available() { return false; }
 	virtual bool readStringUntil(unsigned char c, String& str) { return false; }
-	virtual void printfFinal(const char* str);
+	virtual int printfFinal(const char* str);
 };
 
+/*!
+	\brief Console subsystem.
+
+	This subsystem handles console I/O. It can manage several consoles; one is created with the Arduino's
+	Serial port by default but more can be added, e.g. by the Wifi subsystem.
+
+	Commands that are entered into a console are handled by the first responder; this is customarily
+	bb::Console::console itself, but another subsystem can be defined as the first responder.
+
+	The console subsystem handles some toplevel commands, like "help", "status" etc., by itself. Other commands
+	need to be prefixed with a subsystem name, and will then be forwarded to that subsystem's handleConsoleCommand()
+	method. The stream the command was entered on is passed to the command handler to be able to output
+
+*/
 class Console: public Subsystem {
 public:
 	static Console console;

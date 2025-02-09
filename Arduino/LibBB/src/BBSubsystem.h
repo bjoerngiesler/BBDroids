@@ -27,18 +27,30 @@ protected:
 
 class Subsystem {
 public:
+	static const unsigned int LOG_ALL   = 0;
+	static const unsigned int LOG_DEBUG = 1;
+	static const unsigned int LOG_INFO  = 2;
+	static const unsigned int LOG_WARN  = 3;
+	static const unsigned int LOG_ERROR = 4;
+	static const unsigned int LOG_FATAL = 5;
+
+#define LOGS(stream, level, args...) if(level>=loglevel_) { bb::printf(stream, "%s(%d): "); bb::printf(stream, args); }
+#define LOG(level, args...) if(level>=loglevel_) { bb::printf("%s(%d): "); bb::printf(args); }
+
 	virtual const char* name() { return name_; }
 	virtual const char* description() { return description_; }
 	virtual const char* help() { return help_; }
 	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
-	virtual Result initialize() { operationStatus_ = RES_SUBSYS_NOT_STARTED; return registerWithManager(); };
+	virtual Result initialize();
 	virtual Result start(ConsoleStream *stream) = 0;
 	virtual Result stop(ConsoleStream *stream) = 0;
 	virtual Result step() = 0;
 	virtual bool isStarted() { return started_; }
 	virtual Result operationStatus() { return operationStatus_; }
 	virtual unsigned long sequenceNumber(bool autoincrement = true) { unsigned long s = seqnum_; if(autoincrement) seqnum_++; return s; }
+
+	void setLogLevel(unsigned int lvl) { loglevel_ = lvl; }
 
 	virtual Result registerWithManager() { return SubsystemManager::manager.registerSubsystem(this); }
 
@@ -199,8 +211,9 @@ protected:
 	Result operationStatus_;
 	const char *name_, *description_, *help_;
 	unsigned long seqnum_;
+	unsigned int loglevel_;
 
-	Subsystem(): started_(false), operationStatus_(RES_SUBSYS_NOT_INITIALIZED), name_(""), description_(""), help_(""), seqnum_(0) {}
+	Subsystem(): started_(false), operationStatus_(RES_SUBSYS_NOT_INITIALIZED), name_(""), description_(""), help_(""), seqnum_(0), loglevel_(LOG_INFO) {}
 	virtual ~Subsystem() { }
 };
 

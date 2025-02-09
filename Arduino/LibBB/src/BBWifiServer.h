@@ -26,7 +26,7 @@ public:
 	void setClient(const WiFiClient& client);
 	virtual bool available();
 	virtual bool readStringUntil(unsigned char c, String& str);
-	virtual void printfFinal(const char* str);
+	virtual int printfFinal(const char* str);
 protected:
 	WiFiClient client_;
 };

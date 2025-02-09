@@ -6,6 +6,28 @@
 
 bb::Console bb::Console::console;
 
+int bb::printf(bb::ConsoleStream* stream, const char* format, ...) {
+	int retval;
+	va_list args;
+	va_start(args, format);
+	if(stream != NULL) {
+		retval = stream->vprintf(format, args);
+	} else {
+		retval = BroadcastStream::bc.vprintf(format, args);
+	}
+	va_end(args);
+	return retval;
+}
+
+int bb::printf(const char* format, ...) {
+	int retval;
+	va_list args;
+	va_start(args, format);
+	retval = BroadcastStream::bc.vprintf(format, args);
+	va_end(args);
+	return retval;
+}
+
 bb::SerialConsoleStream::SerialConsoleStream(HWSERIAL_CLASS& ser): ser_(ser), opened_(false), curStr_("") {
 	lastCheck_ = micros();
 	checkInterval_ = 1000000;
@@ -60,15 +82,16 @@ bool bb::SerialConsoleStream::readStringUntil(unsigned char c, String& str) {
 	return false;
 }
 
-void bb::SerialConsoleStream::printfFinal(const char* buf) {
-	ser_.print(buf);
+int bb::SerialConsoleStream::printfFinal(const char* buf) {
+	return ser_.print(buf);
 }
 
 bb::BroadcastStream bb::BroadcastStream::bc;
 
-void bb::BroadcastStream::printfFinal(const char* str) {
+int bb::BroadcastStream::printfFinal(const char* str) {
 	const std::vector<ConsoleStream*>& streams = Console::console.streams();
 	for(auto* s: streams) s->printfFinal(str);
+	return strlen(str);
 }
 
 

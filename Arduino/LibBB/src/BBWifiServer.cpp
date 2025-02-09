@@ -45,8 +45,9 @@ bool bb::WifiConsoleStream::readStringUntil(unsigned char c, String& str) {
 	}
 }
 
-void bb::WifiConsoleStream::printfFinal(const char* str) {
+int bb::WifiConsoleStream::printfFinal(const char* str) {
 	client_.print(str);
+	return strlen(str);
 }
 
 bb::WifiServer::WifiServer(): tcp_(DEFAULT_TCP_PORT) {

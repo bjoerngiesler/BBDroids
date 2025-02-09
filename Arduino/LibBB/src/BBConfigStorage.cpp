@@ -170,7 +170,7 @@ bb::Result bb::ConfigStorage::factoryReset() {
 		return RES_CONFIG_INVALID_HANDLE;
 	}
 #else
-#warning Factory reset not implemented for current architecture!
+	Serial.println("Factory reset not implemented for current architecture!");
 #endif
 	return RES_OK;
 }

@@ -31,6 +31,10 @@ void bb::rotToEuler(const BLA::Matrix<3, 3>& A, float &p, float &r, float &h) {
     float r2 = atan2(A(2,1)/cos(p2), A(2,2)/cos(p2));
     float h1 = atan2(A(1,0)/cos(p1), A(0,0)/cos(p1));
     float h2 = atan2(A(1,0)/cos(p2), A(0,0)/cos(p2));
+    
+    // make compiler happy
+    (void) r2;
+    (void) h2;
 
     r = RAD_TO_DEG*r1; p = RAD_TO_DEG*p1; h = RAD_TO_DEG*h1;
   } else {

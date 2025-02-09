@@ -948,7 +948,7 @@ bb::Result bb::XBee::sendAPIModeATCommand(uint8_t frameID, const char* cmd, uint
 
 	if(request) {
 		argument = 0;
-		for(int i=5; i<5+sizeof(argument)&&i<length; i++) {
+		for(unsigned int i=5; i<5+sizeof(argument)&&i<length; i++) {
 			argument <<= 8;
 			argument |= data[i];
 		}
