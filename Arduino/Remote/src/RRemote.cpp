@@ -72,8 +72,6 @@ Result RRemote::initialize() {
   addParameter("deadband", "Joystick deadband in percent", deadbandPercent_, 15);
   addParameter("send_repeats", "Send repeats for control packets (0 = send only once)", sendRepeats_, 15);
 
-  RInput::input.begin();
-
   paramsHandle_ = ConfigStorage::storage.reserveBlock("remote", sizeof(params_), (uint8_t*)&params_);
 	if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
     Console::console.printfBroadcast("Remote: Storage block 0x%x is valid.\n", paramsHandle_);
@@ -110,6 +108,10 @@ Result RRemote::start(ConsoleStream *stream) {
   runningStatus_ = false;
   operationStatus_ = RES_OK;
 
+  if(RInput::input.begin() == false) {
+    LOG(LOG_FATAL, "Error initializing RInput\n");
+  }
+
 #if defined(LEFT_REMOTE)
   populateMenus();
   showMain();
@@ -129,7 +131,7 @@ Result RRemote::start(ConsoleStream *stream) {
 
 Result RRemote::stop(ConsoleStream *stream) {
   (void)stream;
-  RDisplay::display.setLED(RDisplay::LED_BOTH, 255, 255, 0);
+  RDisplay::display.setLED(RDisplay::LED_BOTH, RDisplay::LED_YELLOW);
   operationStatus_ = RES_OK;
   started_ = false;
   
@@ -152,7 +154,7 @@ Result RRemote::step() {
     updateStatusLED();
     drawGUI();
   } else {
-    RDisplay::display.setLED(RDisplay::LED_COMM, 0, 0, 0);
+    RDisplay::display.setLED(RDisplay::LED_COMM, RDisplay::LED_OFF);
   }
 
   if((bb::Runloop::runloop.getSequenceNumber() % 10) == 0) {
@@ -417,13 +419,16 @@ void RRemote::selectRightRemote(const HWAddress& address) {
 
 void RRemote::updateStatusLED() {
   if(mode_ == MODE_CALIBRATION) {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 0, 255);
-  } else if(Console::console.isStarted() && XBee::xbee.isStarted() && isStarted() && RInput::input.imuOK() && RInput::input.buttonsOK()) {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, 0, 255, 0);
-  } else if(!XBee::xbee.isStarted() || !RInput::input.imuOK() || !RInput::input.buttonsOK() ) {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, 255, 0, 0);
+    RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_BLUE);
+  } else if(Console::console.isStarted() && XBee::xbee.isStarted() && isStarted() && RInput::input.imuOK() && RInput::input.mcpOK()) {
+    if(RInput::input.joyAtZero())
+      RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_WHITE);
+    else
+      RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_GREEN);
+  } else if(!XBee::xbee.isStarted() || !RInput::input.imuOK() || !RInput::input.mcpOK() ) {
+    RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_RED);
   } else {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, 255, 255, 0);
+    RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_YELLOW);
   }
 }
 
@@ -913,7 +918,7 @@ String RRemote::statusLine() {
   String str = bb::Subsystem::statusLine() + ", ";
   if(RInput::input.imuOK()) str += "IMU OK, ";
   else str += "IMU error, ";
-  if(RInput::input.buttonsOK()) str += "Buttons OK.";
+  if(RInput::input.mcpOK()) str += "Buttons OK.";
   else str += "Buttons error.";
 
   return str;
@@ -921,11 +926,6 @@ String RRemote::statusLine() {
 
 void RRemote::printExtendedStatus(ConsoleStream* stream) {
   Runloop::runloop.excuseOverrun();
-
-  float pitch, roll, heading, rax, ray, raz, ax, ay, az;
-  RInput::input.imu().getFilteredPRH(pitch, roll, heading);
-  RInput::input.imu().getAccelMeasurement(rax, ray, raz);
-  RInput::input.imu().getGravCorrectedAccel(ax, ay, az);
 
   stream->printf("Sequence number: %ld\n", seqnum_);
   stream->printf("Addressing:\n");
@@ -935,19 +935,34 @@ void RRemote::printExtendedStatus(ConsoleStream* stream) {
   stream->printf("Joystick:\n");
   stream->printf("\tHor: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", RInput::input.joyRawH, RInput::input.joyH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max);
   stream->printf("\tVer: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", RInput::input.joyRawV, RInput::input.joyV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max);
-  stream->printf("IMU:\n");
-  stream->printf("\tRotation             Pitch: %.2f Roll: %.2f Heading: %.2f\n", pitch, roll, heading);
-  stream->printf("\tRaw Acceleration     X:%f Y:%f Z:%f\n", rax, ray, raz);
-  stream->printf("\tGrav-corrected accel X:%f Y:%f Z:%f\n", ax, ay, az);
-  stream->printf("Buttons: Pinky(%d):%c Index(%d):%c Joy(%d):%c Left(%d):%c Right(%d):%c Confirm(%d):%c TopLeft(%d):%c TopRight(%d):%c\n",
-                 RInput::BUTTON_PINKY, RInput::input.buttons[RInput::BUTTON_PINKY] ? 'X' : '_',
-                 RInput::BUTTON_INDEX, RInput::input.buttons[RInput::BUTTON_INDEX] ? 'X' : '_',
-                 RInput::BUTTON_JOY, RInput::input.buttons[RInput::BUTTON_JOY] ? 'X' : '_',
-                 RInput::BUTTON_LEFT, RInput::input.buttons[RInput::BUTTON_LEFT] ? 'X' : '_',
-                 RInput::BUTTON_RIGHT, RInput::input.buttons[RInput::BUTTON_RIGHT] ? 'X' : '_',
-                 RInput::BUTTON_CONFIRM, RInput::input.buttons[RInput::BUTTON_CONFIRM] ? 'X' : '_',
-                 RInput::BUTTON_TOP_LEFT, RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? 'X' : '_',
-                 RInput::BUTTON_TOP_RIGHT, RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? 'X' : '_');
+
+  if(RInput::input.imuOK()) {
+    float pitch, roll, heading, rax, ray, raz, ax, ay, az;
+    RInput::input.imu().getFilteredPRH(pitch, roll, heading);
+    RInput::input.imu().getAccelMeasurement(rax, ray, raz);
+    RInput::input.imu().getGravCorrectedAccel(ax, ay, az);
+    stream->printf("IMU: OK\n");
+    stream->printf("\tRotation             Pitch: %.2f Roll: %.2f Heading: %.2f\n", pitch, roll, heading);
+    stream->printf("\tRaw Acceleration     X:%f Y:%f Z:%f\n", rax, ray, raz);
+    stream->printf("\tGrav-corrected accel X:%f Y:%f Z:%f\n", ax, ay, az);
+  } else {
+    stream->printf("IMU: Error\n");
+  }
+
+  if(RInput::input.mcpOK()) {      
+    stream->printf("Buttons: Pinky(%d):%c Index(%d):%c Joy(%d):%c Left(%d):%c Right(%d):%c Confirm(%d):%c TopLeft(%d):%c TopRight(%d):%c\n",
+                  RInput::BUTTON_PINKY, RInput::input.buttons[RInput::BUTTON_PINKY] ? 'X' : '_',
+                  RInput::BUTTON_INDEX, RInput::input.buttons[RInput::BUTTON_INDEX] ? 'X' : '_',
+                  RInput::BUTTON_JOY, RInput::input.buttons[RInput::BUTTON_JOY] ? 'X' : '_',
+                  RInput::BUTTON_LEFT, RInput::input.buttons[RInput::BUTTON_LEFT] ? 'X' : '_',
+                  RInput::BUTTON_RIGHT, RInput::input.buttons[RInput::BUTTON_RIGHT] ? 'X' : '_',
+                  RInput::BUTTON_CONFIRM, RInput::input.buttons[RInput::BUTTON_CONFIRM] ? 'X' : '_',
+                  RInput::BUTTON_TOP_LEFT, RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? 'X' : '_',
+                  RInput::BUTTON_TOP_RIGHT, RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? 'X' : '_');
+  } else {
+    stream->printf("Buttons: Error\n");
+  }
+
   stream->printf("Potentiometer 1: %.1f\nPotentiometer 2: %.1f\n", RInput::input.pot1, RInput::input.pot2);
   stream->printf("Battery: %.1f\n", RInput::input.battery);
 }

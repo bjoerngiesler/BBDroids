@@ -300,6 +300,18 @@ Result RDisplay::setLED(RDisplay::WhichLED which, uint8_t r, uint8_t g, uint8_t 
   return RES_OK;
 }
 
+Result RDisplay::setLED(WhichLED which, WhatColor color) {
+  switch(color) {
+    case LED_RED: return setLED(which, 255, 0, 0); break;
+    case LED_GREEN: return setLED(which, 0, 255, 0); break;
+    case LED_BLUE: return setLED(which, 0, 0, 255); break;
+    case LED_YELLOW: return setLED(which, 255, 255, 0); break;
+    case LED_WHITE: return setLED(which, 255, 255, 255); break;
+    case LED_OFF: default: return setLED(which, 0, 0, 0); break;
+  }
+  return RES_COMMON_NOT_IN_LIST;
+}
+
 Result RDisplay::flashLED(WhichLED which, uint8_t iterations, uint8_t millisOn, uint8_t millisOff, uint8_t r, uint8_t g, uint8_t b) {
   for(int i=0; i<iterations; i++) {
     setLED(which, r, g, b);

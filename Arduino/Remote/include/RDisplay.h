@@ -58,12 +58,6 @@ public:
   static const uint8_t MAIN_WIDTH = DISPLAY_WIDTH;
   static const uint8_t MAIN_HEIGHT = DISPLAY_HEIGHT-28;
 
-  enum WhichLED {
-    LED_STATUS,
-    LED_COMM,
-    LED_BOTH
-  };
-
   static RDisplay display;
 
   virtual Result initialize();
@@ -80,7 +74,23 @@ public:
   Result circle(uint8_t x, uint8_t y, uint8_t radius, uint8_t color, bool filled = false);
   Result plot(uint8_t x, uint8_t y, uint8_t color);
 
+  enum WhichLED {
+    LED_STATUS,
+    LED_COMM,
+    LED_BOTH
+  };
+  
+  enum WhatColor {
+    LED_OFF    = 0,
+    LED_RED    = 1,
+    LED_GREEN  = 2,
+    LED_BLUE   = 3,
+    LED_YELLOW = 4,
+    LED_WHITE  = 5
+  };
+
   Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b);
+  Result setLED(WhichLED which, WhatColor color);
   Result flashLED(WhichLED which, uint8_t iterations, uint8_t millisOn, uint8_t millisOff, uint8_t r, uint8_t g, uint8_t b);
   void setLEDBrightness(uint8_t brightness);
 

@@ -75,6 +75,17 @@ RInput::ButtonPin RInput::buttonToPin(RInput::Button button) {
   }
 }
 
+bool RInput::initIMU() {
+  if(imu_.begin() == true) {
+    float dr = imu_.dataRate();
+    Console::console.printfBroadcast("Successfully initialized IMU; data rate: %f\n", dr);
+    Runloop::runloop.setCycleTimeMicros(1e6/dr);
+    return true;
+  }
+
+  Console::console.printfBroadcast("IMU not available\n");
+  return false;
+}
 
 bool RInput::initMCP() {
   if(mcp_.begin_I2C(MCP_ADDR1) == 0) {
@@ -86,10 +97,11 @@ bool RInput::initMCP() {
   for (uint8_t i = 0; i < 8; i++) {
     mcp_.pinMode(i, INPUT_PULLUP);
   }
+  mcpOK_ = true;
   return true;
 }
 
-RInput::RInput(): imu_(IMU_ADDR) {
+RInput::RInput(): joyHFilter_(100, 0.01), joyVFilter_(100, 0.01), imu_(IMU_ADDR) {
   for(auto& b: buttons) b.second = false;
   tlms_ = trms_ = cms_ = 0;
   longPressThresh_ = 500;
@@ -100,11 +112,20 @@ RInput::RInput(): imu_(IMU_ADDR) {
   incrementalPos_ = BUTTON_NONE;
   incrementalRot_ = BUTTON_NONE;
   incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
+  joyAtZero_ = false;
   imu_.setRotationAroundZ(bb::IMU::ROTATE_180);
 }
 
 bool RInput::begin() {
-  return true;
+  for(int i=0; i<10; i++) {
+    if(initIMU() == true) break;
+    delay(100);
+  }
+  for(int i=0; i<10; i++) {
+    if(initMCP() == true) break;
+    delay(100);
+  }
+  return imuOK() && mcpOK();
 }
 
 void RInput::setIncrementalPos(Button btn) {
@@ -157,23 +178,32 @@ void RInput::update() {
   minJoyRawV = min(minJoyRawV, joyRawV);
   maxJoyRawV = max(maxJoyRawV, joyRawV);
 
+  float joyFilteredH = joyHFilter_.filter(joyRawH);
+  float joyFilteredV = joyVFilter_.filter(joyRawV);
   unsigned int deadbandAbs = rint(4096*(deadbandPercent_/100.0f)/2.0f);
+
   //Console::console.printfBroadcast("Deadband percent: %d Absolute: %d\n", deadbandPercent_, deadbandAbs);
-  if(joyRawH < hCalib.center - deadbandAbs) {
-    joyH = float(map(joyRawH, hCalib.min, hCalib.center-deadbandAbs, 0, 2047)-2047) / 2048.0f;
-  } else if(joyRawH > hCalib.center + deadbandAbs) {
-    joyH = float(map(joyRawH, hCalib.center+deadbandAbs, hCalib.max, 2047, 4095)-2047) / 2048.0f;
+  joyAtZero_ = true;
+
+  if(joyFilteredH < hCalib.center - deadbandAbs) {
+    joyH = float(map(joyFilteredH, hCalib.min, hCalib.center-deadbandAbs, 0, 2047)-2047) / 2048.0f;
+    joyAtZero_ = false;
+  } else if(joyFilteredH > hCalib.center + deadbandAbs) {
+    joyAtZero_ = false;
+    joyH = float(map(joyFilteredH, hCalib.center+deadbandAbs, hCalib.max, 2047, 4095)-2047) / 2048.0f;
   } else {
     joyH = 0;
   }
   joyH = constrain(joyH, -1.0f, 1.0f);
 
-  if(joyRawV < vCalib.center-deadbandAbs) {
-    joyV = float(2047-map(joyRawV, vCalib.min, vCalib.center-deadbandAbs, 0, 2047)) / 2048.0f;
-    Console::console.printfBroadcast("Mapping %d from %d to %d-%d = %f\n", joyRawV, vCalib.min, vCalib.center, deadbandAbs, joyV);
-  } else if(joyRawV > vCalib.center+deadbandAbs) {
-    joyV = float(2047-map(joyRawV, vCalib.center+deadbandAbs, vCalib.max, 2047, 4095)) / 2048.0f;
-    Console::console.printfBroadcast("Mapping %d from %d+%d to %d = %f\n", joyRawV, vCalib.center, deadbandAbs, vCalib.max, joyV);
+  if(joyFilteredV < vCalib.center-deadbandAbs) {
+    joyAtZero_ = false;
+    joyV = float(2047-map(joyFilteredV, vCalib.min, vCalib.center-deadbandAbs, 0, 2047)) / 2048.0f;
+    //Console::console.printfBroadcast("Mapping %f from %d to %d-%d = %f\n", joyFilteredV, vCalib.min, vCalib.center, deadbandAbs, joyV);
+  } else if(joyFilteredV > vCalib.center+deadbandAbs) {
+    joyAtZero_ = false;
+    joyV = float(2047-map(joyFilteredV, vCalib.center+deadbandAbs, vCalib.max, 2047, 4095)) / 2048.0f;
+    //Console::console.printfBroadcast("Mapping %f from %d+%d to %d = %f\n", joyFilteredV, vCalib.center, deadbandAbs, vCalib.max, joyV);
   } else {
     joyV = 0;
   }
@@ -222,13 +252,6 @@ void RInput::update() {
     }
     lastIncPosMicros_ = micros();
   } else {
-    if(imu_.begin() == true) {
-      float dr = imu_.dataRate();
-      Console::console.printfBroadcast("Successfully initialized IMU; data rate: %f\n", dr);
-      Runloop::runloop.setCycleTimeMicros(1e6/dr);
-    } else {
-      Console::console.printfBroadcast("IMU not available\n");
-    }
   }
 
 
@@ -246,9 +269,8 @@ void RInput::update() {
         buttons[b] = false;
       }
     }
-  } else {
-    mcpOK_ = initMCP();
-  }
+  } 
+
 #endif // ARDUINO_ARCH_ESP32
   if(buttonsChanged[BUTTON_TOP_LEFT]) {
     if(buttons[BUTTON_TOP_LEFT]) btnTopLeftPressed();

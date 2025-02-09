@@ -50,7 +50,6 @@ public:
   };
 #endif
 
-  bool initMCP();
 #else
   enum ButtonPin {
     BUTTON_PIN_PINKY     = 0,
@@ -75,8 +74,10 @@ public:
   bool begin();
   void update();
   void printOnSerial();
+  bool initIMU();
   bool imuOK() { return imu_.available(); }
-  bool buttonsOK() { return mcpOK_; }
+  bool initMCP();
+  bool mcpOK() { return mcpOK_; }
 
   Result fillControlPacket(ControlPacket& packet);
   bb::IMU& imu() { return imu_; }
@@ -88,6 +89,8 @@ public:
   void setIncrementalRot(Button btn);
 
   bool anyButtonPressed();
+
+  bool joyAtZero() { return joyAtZero_; }
 
   float secondsSinceLastMotion();
 
@@ -146,8 +149,10 @@ protected:
   double incAccY_, incVelY_, incPosY_;
   double incAccZ_, incVelZ_, incPosZ_;
   bb::HighPassFilter accXFilter_, accYFilter_, accZFilter_;
+  bb::LowPassFilter joyHFilter_, joyVFilter_;
   bb::IMU imu_;
   unsigned long lastMotionMS_;
+  bool joyAtZero_;
 };
 
 #endif // REMOTEINPUT_H

@@ -16,6 +16,7 @@ int getAnalogReadResolution() { return 12; } // whatever
 #include <WiFiAP.h>
 
 void setup() {
+  Serial.begin(2000000);
 #if !defined(ARDUINO_ARCH_ESP32)
   rp2040.enableDoubleResetBootloader();
 #endif
