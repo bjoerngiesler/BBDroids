@@ -62,6 +62,7 @@ void bb::DCMotor::setEnabled(bool en) {
 }
 
 bb::Result bb::DCMotor::set(float speed) {
+  if(fabs(speed) < deadband_) speed = 0;
   speed_ = constrain(speed, -255.0, 255.0);
   if(reverse_) speed_ = -speed_;
 
