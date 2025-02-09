@@ -43,27 +43,27 @@ Result DODroid::selfTest(ConsoleStream *stream) {
     DOSound::sound.playSystemSound(SystemSounds::OK);
   }
 
-  // Check Antennas
+  // Check Aerials
   Wire.beginTransmission(0x17);
   uint8_t antErr = Wire.endTransmission();
   if(antErr != 0) {
-    Console::console.printfBroadcast("Antenna error: 0x%x\n", antErr);
+    Console::console.printfBroadcast("Aerial error: 0x%x\n", antErr);
   } else {
     uint8_t step=4, d=25;
-    antennasOK_ = true;
+    aerialsOK_ = true;
     for(uint8_t val = 0; val < 180; val+=step) {
-      setAntennas(val, val, val);
+      setAerials(val, val, val);
       delay(d);
     }
     for(uint8_t val = 180; val > 0; val-=step) {
-      setAntennas(val, val, val);
+      setAerials(val, val, val);
       delay(d);
     }
     for(uint8_t val = 0; val < 90; val+=step) {
-      setAntennas(val, val, val);
+      setAerials(val, val, val);
       delay(d);
     }
-    setAntennas(90, 90, 90);
+    setAerials(90, 90, 90);
   }
 
   // Check IMU
@@ -90,8 +90,9 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   }
   float p, r, h;
   imu_.getFilteredPRH(p, r, h);
-  balanceController_.setGoal(-p);
-  Console::console.printfBroadcast("IMU calibrated. Pitch angle at rest: %f\n", p);
+  pitchAtRest_ = p;
+  balanceController_.setGoal(-pitchAtRest_);
+  Console::console.printfBroadcast("IMU calibrated. Pitch angle at rest: %f\n", pitchAtRest_);
   DOSound::sound.playSystemSound(SystemSounds::OK);
 
 
@@ -175,6 +176,7 @@ Result DODroid::servoTest(ConsoleStream *stream) {
     Console::console.printfBroadcast("Critical error: Servo subsystem not started!\n");
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
+
   if(bb::Servos::servos.hasServoWithID(SERVO_NECK) == false) {
     Console::console.printfBroadcast("Critical error: Neck servo missing!\n");
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
@@ -194,6 +196,7 @@ Result DODroid::servoTest(ConsoleStream *stream) {
   } else {
     bb::Servos::servos.setRange(SERVO_HEAD_PITCH, 180-params_.headPitchRange, 180+params_.headPitchRange);
     bb::Servos::servos.setOffset(SERVO_HEAD_PITCH, params_.headPitchOffset);
+    headIsOn_ = true;
   }
 
   if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_HEADING) == false) {
@@ -204,6 +207,7 @@ Result DODroid::servoTest(ConsoleStream *stream) {
   } else {
     bb::Servos::servos.setRange(SERVO_HEAD_HEADING, 180-params_.headHeadingRange, 180+params_.headHeadingRange);
     bb::Servos::servos.setOffset(SERVO_HEAD_HEADING, params_.headHeadingOffset);
+    headIsOn_ = true;
   }
 
   if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_ROLL) == false) {

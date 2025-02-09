@@ -71,15 +71,13 @@ Result DODroid::initialize() {
   addParameter("head_heading_range", "Head heading servo movement range", params_.headHeadingRange, -INT_MAX, INT_MAX);
   addParameter("head_heading_offset", "Head heading servo servo offset", params_.headHeadingOffset, -INT_MAX, INT_MAX);
 
-  addParameter("wheel_kp", "Proportional constant for wheel speed PID controller", params_.wheelSpeedKp, -INT_MAX, INT_MAX);
-  addParameter("wheel_ki", "Integrative constant for wheel speed PID controller", params_.wheelSpeedKi, -INT_MAX, INT_MAX);
-  addParameter("wheel_kd", "Derivative constant for wheel speed PID controller", params_.wheelSpeedKd, -INT_MAX, INT_MAX);
-  addParameter("wheel_imax", "Max I aggregate for wheel speed PID controller", params_.wheelSpeedImax, -INT_MAX, INT_MAX);
+  addParameter("wheel_kp", "Proportional constant for wheel speed PID controller", params_.wheelKp, -INT_MAX, INT_MAX);
+  addParameter("wheel_ki", "Integrative constant for wheel speed PID controller", params_.wheelKi, -INT_MAX, INT_MAX);
+  addParameter("wheel_kd", "Derivative constant for wheel speed PID controller", params_.wheelKd, -INT_MAX, INT_MAX);
 
   addParameter("bal_kp", "Proportional constant for balance PID controller", params_.balKp, -INT_MAX, INT_MAX);
   addParameter("bal_ki", "Integrative constant for balance PID controller", params_.balKi, -INT_MAX, INT_MAX);
   addParameter("bal_kd", "Derivative constant for balance PID controller", params_.balKd, -INT_MAX, INT_MAX);
-  addParameter("bal_neck_mix", "Mix neck SP into balance SP to avoid inducing motion", params_.balNeckMix, -INT_MAX, INT_MAX);
 
   addParameter("pos_kp", "Proportional constant for position PID controller", params_.posKp, -INT_MAX, INT_MAX);
   addParameter("pos_ki", "Integrative constant for position PID controller", params_.posKi, -INT_MAX, INT_MAX);
@@ -88,14 +86,12 @@ Result DODroid::initialize() {
   addParameter("accel", "Acceleration in mm/s^2", params_.accel, -INT_MAX, INT_MAX);
   addParameter("max_speed", "Maximum speed (only honored in speed control mode)", params_.maxSpeed, 0, INT_MAX);
   addParameter("speed_axis_gain", "Gain for controller speed axis", params_.speedAxisGain, -INT_MAX, INT_MAX);
-  addParameter("speed_axis_deadband", "Deadband for controller speed axis", params_.speedAxisGain, -INT_MAX, INT_MAX);
-  addParameter("rot_axis_gain", "Gain for controller rot axis", params_.speedAxisGain, -INT_MAX, INT_MAX);
-  addParameter("rot_axis_deadband", "Deadband for controller rot axis", params_.speedAxisGain, -INT_MAX, INT_MAX);
+  addParameter("rot_axis_gain", "Gain for controller rot axis", params_.rotAxisGain, -INT_MAX, INT_MAX);
 
   addParameter("lean_head_to_body", "Lean multiplier to counter head motion with body motion", params_.leanHeadToBody, -INT_MAX, INT_MAX);
 
-  addParameter("antenna_offset", "Offset for antennas", params_.antennaOffset, -INT_MAX, INT_MAX);
-  addParameter("gyro_pitch_deadband", "Deadband for gyro pitch", params_.gyroPitchDeadband, -INT_MAX, INT_MAX);
+  addParameter("aerial_offset", "Offset for aerials", params_.aerialOffset, -INT_MAX, INT_MAX);
+  addParameter("aerial_anim", "Animation angle for aerials", params_.aerialAnim, -INT_MAX, INT_MAX);
 
   addParameter("fa_neck_imu_accel", "Free Anim - neck on IMU accel", params_.faNeckIMUAccel, -INT_MAX, INT_MAX);
   addParameter("fa_neck_sp_accel", "Free Anim - neck on accel setpoint", params_.faNeckSPAccel, -INT_MAX, INT_MAX);
@@ -104,16 +100,16 @@ Result DODroid::initialize() {
   addParameter("fa_head_pitch_speed_sp", "Free Anim - head pitch on wheel speed setpoint", params_.faHeadPitchSpeedSP, -INT_MAX, INT_MAX);
   addParameter("fa_head_roll_turn", "Free Anim: Head roll on turn speed", params_.faHeadRollTurn, -INT_MAX, INT_MAX);
   addParameter("fa_head_heading_turn", "Free Anim: Head heading on turn speed", params_.faHeadHeadingTurn, -INT_MAX, INT_MAX);
-  addParameter("fa_antenna_speed", "Free Anim: Antenna position on wheel speed setpoint", params_.faAntennaSpeedSP, -INT_MAX, INT_MAX);
+  addParameter("fa_aerial_speed", "Free Anim: Aerial position on wheel speed setpoint", params_.faAerialSpeedSP, -INT_MAX, INT_MAX);
   addParameter("fa_head_anneal_time", "Free Anim: Head anneal time", params_.faHeadAnnealTime, -INT_MAX, INT_MAX);
 
   paramsHandle_ = ConfigStorage::storage.reserveBlock("d-o", sizeof(params_), (uint8_t*)&params_);
   if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
-    Console::console.printfBroadcast("D-O: Storage block 0x%x is valid.\n", paramsHandle_);
+    LOG(LOG_INFO, "Storage block 0x%x is valid.\n", paramsHandle_);
     ConfigStorage::storage.readBlock(paramsHandle_);
-    Console::console.printfBroadcast("Left Address: 0x%lx:%lx\n", params_.leftRemoteAddress.addrHi, params_.leftRemoteAddress.addrLo);
+    LOG(LOG_INFO, "Left Address: 0x%lx:%lx\n", params_.leftRemoteAddress.addrHi, params_.leftRemoteAddress.addrLo);
   } else {
-    Console::console.printfBroadcast("Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
+    LOG(LOG_INFO, "Remote: Storage block 0x%x is invalid, using initialized parameters.\n", paramsHandle_);
     ConfigStorage::storage.writeBlock(paramsHandle_);
   }
 
@@ -134,19 +130,30 @@ Result DODroid::start(ConsoleStream* stream) {
   leftMotorStatus_ = MOTOR_UNTESTED;
   rightMotorStatus_ = MOTOR_UNTESTED;
   servosOK_ = false;
-  antennasOK_ = false;
+  aerialsOK_ = false;
   driveMode_ = DRIVE_OFF;
   driveSafety_ = true;
+  headIsOn_ = false;
+  pitchAtRest_ = 0;
 
   imu_.begin();
   DOBattStatus::batt.begin();
 
   //operationStatus_ = RES_OK;
   operationStatus_ = selfTest();
+  if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_HEADING) || 
+     bb::Servos::servos.hasServoWithID(SERVO_HEAD_PITCH) || 
+     bb::Servos::servos.hasServoWithID(SERVO_HEAD_ROLL)) {
+    LOG(LOG_INFO, "Head is on\n");
+    headIsOn_ = true;
+  } else {
+    LOG(LOG_INFO, "Head is not on\n");
+    headIsOn_ = false;
+  }
 
   if(operationStatus_ == RES_DROID_VOLTAGE_TOO_LOW) {
     if(DOBattStatus::batt.voltage() < 1.0) {
-      Console::console.printfBroadcast("No power (%.fV), USB only!\n", DOBattStatus::batt.voltage());
+      LOG(LOG_ERROR, "No power (%.fV), USB only!\n", DOBattStatus::batt.voltage());
       started_ = true;
       operationStatus_ = RES_OK;
       setLED(LED_STATUS, BLUE);
@@ -184,10 +191,10 @@ void DODroid::setControlParameters() {
   rightEncoder_.setMode(bb::Encoder::INPUT_SPEED);
   rightEncoder_.setUnit(bb::Encoder::UNIT_MILLIMETERS);
 
-  lSpeedController_.setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
-  rSpeedController_.setControlParameters(params_.wheelSpeedKp, params_.wheelSpeedKi, params_.wheelSpeedKd);
-  lSpeedController_.setIBounds(-params_.wheelSpeedImax, params_.wheelSpeedImax);
-  rSpeedController_.setIBounds(-params_.wheelSpeedImax, params_.wheelSpeedImax);
+  lSpeedController_.setControlParameters(params_.wheelKp, params_.wheelKi, params_.wheelKd);
+  rSpeedController_.setControlParameters(params_.wheelKp, params_.wheelKi, params_.wheelKd);
+  lSpeedController_.setIBounds(-255, 255);
+  rSpeedController_.setIBounds(-255, 255);
   lSpeedController_.reset();
   rSpeedController_.reset();
 
@@ -211,7 +218,7 @@ Result DODroid::step() {
     if((Runloop::runloop.getSequenceNumber() % 4) == 0) {
       fillAndSendStatePacket();
     }
-    Console::console.printfBroadcast("IMU or battery missing - critical error\n");
+    LOG(LOG_FATAL, "IMU or battery missing - critical error\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
@@ -290,10 +297,13 @@ bb::Result DODroid::stepHead() {
     bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh - remoteR_ + params_.headRollOffset);
   }
 
-  if(antennasOK_) {
-    float ant = 90 + params_.antennaOffset + speedSP*params_.faAntennaSpeedSP;
-    ant = constrain(ant, 0, 180);
-    setAntennas(ant, ant, ant);
+  if(aerialsOK_) {
+    float aer = 90 + params_.aerialOffset + speedSP*params_.faAerialSpeedSP;
+
+    aer = constrain(aer, 0, 180);
+    setAerials(constrain(aer + remoteAerial1_, 0, 180), 
+               constrain(aer + remoteAerial2_, 0, 180),
+               constrain(aer + remoteAerial3_, 0, 180));
   }
 
   if(lastBtn3_ == false && (float(millis())/1000.0f > annealTime_ + params_.faHeadAnnealDelay)) {
@@ -353,7 +363,7 @@ void DODroid::switchDrive(DriveMode mode) {
   rSpeedController_.reset();
   rSpeedController_.setGoal(0);
   balanceController_.reset();
-  balanceController_.setGoal(0);
+  balanceController_.setGoal(-pitchAtRest_);
   posController_.reset();
   posController_.setPresentAsGoal();
 
@@ -516,11 +526,12 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
         msSinceDriveInput_ = millis();
         if(driveMode_ == DRIVE_POSITION) {
           switchDrive(DRIVE_VELOCITY);
-          vel = constrain(vel * params_.maxSpeed * params_.speedAxisGain, -params_.maxSpeed, params_.maxSpeed);
-          rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
-          velOutput_.setGoalVelocity(vel);
-          velOutput_.setGoalRotation(rot);
         }
+
+        vel = constrain(vel * params_.maxSpeed * params_.speedAxisGain, -params_.maxSpeed, params_.maxSpeed);
+        rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
+        velOutput_.setGoalVelocity(vel);
+        velOutput_.setGoalRotation(rot);
       }
 
     } else {
@@ -529,10 +540,18 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
 
     //DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
   } else { // secondary remote
-    //if(driveMode_ == DRIVE_POSITION) {
-      lean_ = -1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange;
-      balanceController_.setGoal(params_.leanHeadToBody*lean_);
-    //}
+    lean_ = -1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange;
+
+    if(headIsOn_) {
+      balanceController_.setGoal(params_.leanHeadToBody*lean_-pitchAtRest_);
+    }
+
+    if(packet.button5) remoteAerial1_ = params_.aerialAnim;
+    else remoteAerial1_ = 0;
+    if(packet.button6) remoteAerial2_ = params_.aerialAnim;
+    else remoteAerial2_ = 0;
+    if(packet.button7) remoteAerial3_ = params_.aerialAnim;
+    else remoteAerial3_ = 0;
   }
 
   return RES_OK;
@@ -680,19 +699,19 @@ Result DODroid::fillAndSendStatePacket() {
 }
 
 
-bool DODroid::setAntennas(uint8_t a1, uint8_t a2, uint8_t a3) {
-  if(antennasOK_ == false) return false;
-  uint8_t antennas[3] = {a1, a2, a3};
+bool DODroid::setAerials(uint8_t a1, uint8_t a2, uint8_t a3) {
+  if(aerialsOK_ == false) return false;
+  uint8_t aerials[3] = {a1, a2, a3};
   Wire.beginTransmission(0x17);
-  Wire.write(antennas, sizeof(antennas));
+  Wire.write(aerials, sizeof(aerials));
   if(Wire.endTransmission() == 0) return true;
-  Console::console.printfBroadcast("Error moving antennas\n");
-  antennasOK_ = false;
+  Console::console.printfBroadcast("Error moving aerials\n");
+  aerialsOK_ = false;
   return false;
 }
 
-bool DODroid::getAntennas(uint8_t& a1, uint8_t& a2, uint8_t& a3) {
-  if(antennasOK_ == false) return false;
+bool DODroid::getAerials(uint8_t& a1, uint8_t& a2, uint8_t& a3) {
+  if(aerialsOK_ == false) return false;
   int timeout;
   Wire.requestFrom(0x17, 3);
 

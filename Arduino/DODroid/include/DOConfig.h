@@ -24,26 +24,23 @@ struct DOParams {
     float headHeadingRange  = 90.0;
     float headHeadingOffset = 0.0;
 
-    float gyroPitchDeadband = 1.0;
-
-    float wheelSpeedKp      = 0.10;
-    float wheelSpeedKi      = 0.8;
-    float wheelSpeedKd      = 0.0;
-    float wheelSpeedImax    = 255;
+    float wheelKp           = 0.10;
+    float wheelKi           = 0.8;
+    float wheelKd           = 0.0;
 
     float balKp             = 20;
     float balKi             = 0;
     float balKd             = 0;
 
-    float posKp             = 0;
-    float posKi             = 0;
+    float posKp             = 3;
+    float posKi             = 0.1;
     float posKd             = 0;
 
-    float balNeckMix        = 0;
     float maxSpeed          = 800;
     float accel             = 2500;
 
-    float antennaOffset     = 0;  
+    float aerialOffset     = 0;
+    float aerialAnim       = -45;
 
     float speedAxisGain     = 1.0;
     float rotAxisGain       = 0.4;
@@ -53,23 +50,24 @@ struct DOParams {
     // Free animation parameters. 
     // Be aware of the units!!! E.g. target unit for servo free animation is always degrees, but input may be something else.
     // Example - faNeckSpeed has input unit of mm/s, going up to maxSpeed, so is probably much below 1.
-    float faNeckIMUAccel     = 0;   // Move neck by acceleration from the IMU
-    float faNeckSPAccel      = -0.01;    // Move neck by acceleration from speed setpoint
-    float faNeckSpeed        = -0.02;     // Move neck by absolute speed over ground
+    float faNeckIMUAccel     = 0;     // Move neck by acceleration from the IMU
+    float faNeckSPAccel      = -0.01; // Move neck by acceleration from speed setpoint
+    float faNeckSpeed        = -0.02; // Move neck by absolute speed over ground
     float faNeckSpeedSP      = -0.04; // Move neck by speed *setpoint* over ground. 
     float faHeadPitchSpeedSP = 0.03;  // Pitch up head at higher speeds to counteract the neck speed setpoint
     float faHeadRollTurn     = .10;   // Move head roll by IMU turn speed
     float faHeadHeadingTurn  = .14;   // Move head heading by IMU turn speed
-    float faAntennaSpeedSP   = .05;    // Move antennas by speed over ground
+    float faAerialSpeedSP   = .05;    // Move aerials by speed over ground
     float faHeadAnnealTime   = .5;    // Time it takes for all head axes ot return to 0 after control has been relinquished.
-    float faHeadAnnealDelay  = .3;    // Delay before we anneal
+    float faHeadAnnealDelay  = .3;    // Delay before we anneal the head position if button is released
 
     bb::HWAddress leftRemoteAddress = {0,0};
+    bb::HWAddress rightRemoteAddress = {0,0};
 };
 
 // Battery constants
 static const float POWER_BATT_NONE = 5.0;  // Everything under this means we're connected to USB.
-static const float POWER_BATT_MIN  = 12.5; // Minimum voltage - below this, everything switches off to save the LiPos.
+static const float POWER_BATT_MIN  = 13.0; // Minimum voltage - below this, everything switches off to save the LiPos.
 static const float POWER_BATT_MAX  = 16.0; // Maximum voltage - above this, we're overvolting and will probably breal stuff.
 
 // Selftest Constants
@@ -115,13 +113,8 @@ static const uint8_t P_DYNAMIXEL_RX    = 13; // Must be usable as Serial RX
 static const uint8_t P_DYNAMIXEL_TX    = 14; // Must be usable as Serial TX
 
 // I2C Peripherals
-static const uint8_t BATT_STATUS_ADDR   = 0x40;
-static const uint8_t IMU_ADDR           = 0x6a;
-static const uint8_t ANTENNA_ADDR       = 0x17;
-
-// Network config
-static const uint16_t COMMAND_UDP_PORT = 2000; // BB8 listens on this port for commands (see BB8Packet.h for command structure)
-static const uint16_t STATE_UDP_PORT   = 2001; // BB8 sends running state on this port
-static const uint16_t REPLY_UDP_PORT   = 2002; // This port is used to reply to special commands
+static const uint8_t BATT_STATUS_ADDR  = 0x40;
+static const uint8_t IMU_ADDR          = 0x6a;
+static const uint8_t AERIAL_ADDR       = 0x17;
 
 #endif // DOCONFIG_H

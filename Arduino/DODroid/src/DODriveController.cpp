@@ -46,7 +46,6 @@ bb::Result DOVelControlOutput::set(float value) {
     rightGoal = constrain(rightGoal, -maxSpeed_, maxSpeed_);
   }
 
-  //Console::console.printfBroadcast("Set goal L%f R%f\n", leftGoal, rightGoal);
   resLeft = left_.set(leftGoal);
   resRight = right_.set(rightGoal);
 

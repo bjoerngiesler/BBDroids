@@ -61,9 +61,9 @@ public:
   Result motorTest(ConsoleStream *stream = NULL);
   MotorStatus singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc, bool reverse, ConsoleStream *stream = NULL);
 
-  bool antennasOK() { return antennasOK_; }
-  bool setAntennas(uint8_t a1, uint8_t a2, uint8_t a3);
-  bool getAntennas(uint8_t& a1, uint8_t& a2, uint8_t& a3);
+  bool aerialsOK() { return aerialsOK_; }
+  bool setAerials(uint8_t a1, uint8_t a2, uint8_t a3);
+  bool getAerials(uint8_t& a1, uint8_t& a2, uint8_t& a3);
 
   enum WhichLED {
     LED_STATUS = 0,
@@ -106,11 +106,14 @@ protected:
   DriveMode driveMode_;
   bool driveSafety_;
   
-  bool servosOK_, antennasOK_;
+  bool servosOK_, aerialsOK_;
   bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
   float remoteP_, remoteH_, remoteR_;
+  float pitchAtRest_;
+  float remoteAerial1_, remoteAerial2_, remoteAerial3_;
   float annealP_, annealH_, annealR_, annealTime_;
   float lean_;
+  bool headIsOn_;
 
   Adafruit_NeoPixel statusPixels_;
   bool commLEDOn_;
