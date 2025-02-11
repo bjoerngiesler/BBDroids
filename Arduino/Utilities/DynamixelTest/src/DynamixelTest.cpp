@@ -332,11 +332,13 @@ std::vector<String> split(const String& str) {
         end++;
         if(end == str.length()) {
           String substr = str.substring(start, end);
+          substr.trim();
           if(substr.length()) words.push_back(substr);
         }
       } else if(end >= start) {
         quotes = false;
         String substr = str.substring(start, end);
+        substr.trim();
         if(substr.length()) words.push_back(substr);
         start = end+1;
         end = end+1;
@@ -353,10 +355,12 @@ std::vector<String> split(const String& str) {
         end++;
         if(end == str.length()) {
           String substr = str.substring(start, end);
+          substr.trim();
           if(substr.length()) words.push_back(substr);
         }
       } else if(end >= start) {
         String substr = str.substring(start, end);
+        substr.trim();
         if(substr.length()) words.push_back(substr);
         start = end+1;
         end = end+1;
