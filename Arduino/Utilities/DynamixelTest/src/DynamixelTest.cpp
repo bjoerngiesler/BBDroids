@@ -9,6 +9,7 @@
 
 #include <Dynamixel2Arduino.h>
 #include <vector>
+#include <BBConsole.h>
 
 #define DXL_BAUDRATE 57600
 #define DXL_PROTOCOL_VERSION 2.0
@@ -16,8 +17,6 @@
 #define MAXID 253
 Dynamixel2Arduino dxl;
 bool dxlIDsFound[MAXID+1];
-
-std::vector<String> split(const String& str);
 
 bool print_help();
 
@@ -73,6 +72,8 @@ bool setID(uint8_t fromId, uint8_t toId) {
     Serial.println("ERROR!");
   }
 #endif
+
+  return true;
 }
 
 bool init(unsigned int baud) {
@@ -230,6 +231,7 @@ bool print_help() {
   Serial.println("    set_id ID NEWID       Change servo ID to NEWID.");
   Serial.println("    set_baud ID BAUDRATE  Set ID's baud rate. Supported baud rates: 57600, 115200, 1000000. Do an init afterwards.");
   Serial.print("> ");
+  return true;
 }
 
 void loop() {
@@ -240,7 +242,7 @@ void loop() {
 
   Serial.print(command);
 
-  std::vector<String> words = split(command);
+  std::vector<String> words = bb::Console::split(command);
 
   if(words.size() == 0) return;
 
@@ -319,54 +321,4 @@ void loop() {
   }
 
   Serial.println("Unknown command.");
-}
-
-std::vector<String> split(const String& str) {
-  std::vector<String> words;
-  unsigned int start = 0, end = 0;
-  bool quotes = false;
-
-  while(end < str.length()) {
-    if(quotes == true) {
-      if(str[end] != '"') {
-        end++;
-        if(end == str.length()) {
-          String substr = str.substring(start, end);
-          substr.trim();
-          if(substr.length()) words.push_back(substr);
-        }
-      } else if(end >= start) {
-        quotes = false;
-        String substr = str.substring(start, end);
-        substr.trim();
-        if(substr.length()) words.push_back(substr);
-        start = end+1;
-        end = end+1;
-      }
-    } else {
-      if(str[end] == '"') {
-        quotes = true;
-        start++;
-        end++;
-        continue;
-      }
-  
-      if(str[end] != ' ') {
-        end++;
-        if(end == str.length()) {
-          String substr = str.substring(start, end);
-          substr.trim();
-          if(substr.length()) words.push_back(substr);
-        }
-      } else if(end >= start) {
-        String substr = str.substring(start, end);
-        substr.trim();
-        if(substr.length()) words.push_back(substr);
-        start = end+1;
-        end = end+1;
-      } 
-    }
-  }
-
-  return words;
 }
