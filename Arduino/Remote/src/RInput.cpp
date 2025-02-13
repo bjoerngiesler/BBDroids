@@ -3,6 +3,8 @@
 #include "RInput.h"
 #include "Config.h"
 
+#include <deque>
+
 using namespace bb;
 
 RInput RInput::input;
@@ -13,24 +15,24 @@ static void prepareInterruptPin(int pin, void (*isr)(void)) {
   attachInterrupt(digitalPinToInterrupt(pin), isr, CHANGE);
 }
 
-void bPinkyISR(void) { 
-  RInput::input.buttons[RInput::BUTTON_PINKY] = !digitalRead(P_D_BTN_PINKY); 
+void b1ISR(void) { 
+  RInput::input.buttons[RInput::BUTTON_1] = !digitalRead(P_D_BTN_1); 
 }
 
-void bIndexISR(void) { 
-  RInput::input.buttons[RInput::BUTTON_INDEX] = !digitalRead(P_D_BTN_INDEX); 
+void b2ISR(void) { 
+  RInput::input.buttons[RInput::BUTTON_2] = !digitalRead(P_D_BTN_2); 
+}
+
+void b3ISR(void) { 
+  RInput::input.buttons[RInput::BUTTON_3] = !digitalRead(P_D_BTN_3); 
+}
+
+void b4ISR(void) { 
+  RInput::input.buttons[RInput::BUTTON_4] = !digitalRead(P_D_BTN_4); 
 }
 
 void bJoyISR(void) { 
   RInput::input.buttons[RInput::BUTTON_JOY] = !digitalRead(P_D_BTN_JOY); 
-}
-
-void bLISR(void) { 
-  RInput::input.buttons[RInput::BUTTON_LEFT] = !digitalRead(P_D_BTN_L); 
-}
-
-void bRISR(void) { 
-  RInput::input.buttons[RInput::BUTTON_RIGHT] = !digitalRead(P_D_BTN_R); 
 }
 
 void bConfirmISR(void) { 
@@ -38,40 +40,40 @@ void bConfirmISR(void) {
   RInput::input.btnConfirmChanged = true;
 }
 
-void bTopLISR(void) { 
-  RInput::input.buttons[RInput::BUTTON_TOP_LEFT] = !digitalRead(P_D_BTN_TOP_L); 
-  RInput::input.btnTopLChanged = true;
+void bLISR(void) { 
+  RInput::input.buttons[RInput::BUTTON_LEFT] = !digitalRead(P_D_BTN_L); 
+  RInput::input.btnLChanged = true;
 }
 
-void bTopRISR(void) { 
-  RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] = !digitalRead(P_D_BTN_TOP_R); 
-  RInput::input.btnTopRChanged = true;
+void bRISR(void) { 
+  RInput::input.buttons[RInput::BUTTON_RIGHT] = !digitalRead(P_D_BTN_R); 
+  RInput::input.btnRChanged = true;
 }
 #endif // ARDUINO_ARCH_ESP32
 
 RInput::Button RInput::pinToButton(RInput::ButtonPin pin) {
   switch(pin) {
-    case BUTTON_PIN_PINKY:     return BUTTON_PINKY; break;
-    case BUTTON_PIN_INDEX:     return BUTTON_INDEX; break;
-    case BUTTON_PIN_JOY:       return BUTTON_JOY; break;
-    case BUTTON_PIN_LEFT:      return BUTTON_LEFT; break;
-    case BUTTON_PIN_RIGHT:     return BUTTON_RIGHT; break;
-    case BUTTON_PIN_CONFIRM:   return BUTTON_CONFIRM; break;
-    case BUTTON_PIN_TOP_LEFT:  return BUTTON_TOP_LEFT; break;
-    case BUTTON_PIN_TOP_RIGHT: default: return BUTTON_TOP_RIGHT; break;
+    case BUTTON_PIN_1:       return BUTTON_1; break;
+    case BUTTON_PIN_2:       return BUTTON_2; break;
+    case BUTTON_PIN_3:       return BUTTON_3; break;
+    case BUTTON_PIN_4:       return BUTTON_4; break;
+    case BUTTON_PIN_JOY:     return BUTTON_JOY; break;
+    case BUTTON_PIN_CONFIRM: return BUTTON_CONFIRM; break;
+    case BUTTON_PIN_LEFT:    return BUTTON_LEFT; break;
+    case BUTTON_PIN_RIGHT:   default: return BUTTON_RIGHT; break;
   }
 }
 
 RInput::ButtonPin RInput::buttonToPin(RInput::Button button) {
   switch(button) {
-    case BUTTON_PINKY: return BUTTON_PIN_PINKY; break;
-    case BUTTON_INDEX: return BUTTON_PIN_INDEX; break;
-    case BUTTON_JOY: return BUTTON_PIN_JOY; break;
-    case BUTTON_LEFT: return BUTTON_PIN_LEFT; break;
-    case BUTTON_RIGHT: return BUTTON_PIN_RIGHT; break;
+    case BUTTON_1:       return BUTTON_PIN_1; break;
+    case BUTTON_2:       return BUTTON_PIN_2; break;
+    case BUTTON_3:       return BUTTON_PIN_3; break;
+    case BUTTON_4:       return BUTTON_PIN_4; break;
+    case BUTTON_JOY:     return BUTTON_PIN_JOY; break;
     case BUTTON_CONFIRM: return BUTTON_PIN_CONFIRM; break;
-    case BUTTON_TOP_LEFT: return BUTTON_PIN_TOP_LEFT; break;
-    case BUTTON_TOP_RIGHT: default: return BUTTON_PIN_TOP_RIGHT; break;
+    case BUTTON_LEFT:    return BUTTON_PIN_LEFT; break;
+    case BUTTON_RIGHT:   default: return BUTTON_PIN_RIGHT; break;
   }
 }
 
@@ -103,7 +105,7 @@ bool RInput::initMCP() {
 
 RInput::RInput(): joyHFilter_(100, 0.01), joyVFilter_(100, 0.01), imu_(IMU_ADDR) {
   for(auto& b: buttons) b.second = false;
-  tlms_ = trms_ = cms_ = 0;
+  lms_ = rms_ = cms_ = 0;
   longPressThresh_ = 500;
   minJoyRawH = 2048;
   maxJoyRawH = 2048;
@@ -114,6 +116,10 @@ RInput::RInput(): joyHFilter_(100, 0.01), joyVFilter_(100, 0.01), imu_(IMU_ADDR)
   incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
   joyAtZero_ = false;
   imu_.setRotationAroundZ(bb::IMU::ROTATE_180);
+
+#if defined(LEFT_REMOTE)
+  pinMode(P_A_POT1, INPUT_PULLDOWN);
+#endif
 }
 
 bool RInput::begin() {
@@ -211,14 +217,15 @@ void RInput::update() {
   
   battRaw = analogRead(P_A_BATT_CHECK);
   float battCooked = (battRaw/4095.0)*3.1;
+  (void)battCooked;
   battRaw = constrain(battRaw, MIN_ANALOG_IN_VDIV, MAX_ANALOG_IN_VDIV);
   battery = float(battRaw-MIN_ANALOG_IN_VDIV)/float(MAX_ANALOG_IN_VDIV-MIN_ANALOG_IN_VDIV);
   
-  pot1 = (float)((4095-analogRead(P_A_POT1)) / 4096.0f); // careful - wraps around on the left remote
-#if !defined(LEFT_REMOTE)
-  pot2 = (float)((4095-analogRead(P_A_POT2)) / 4096.0f);
+#if defined(LEFT_REMOTE)
+  processEncoder();
 #else
-  pot2 = 0;
+  pot1 = (float)((4095-analogRead(P_A_POT1)) / 4096.0f); 
+  pot2 = (float)((4095-analogRead(P_A_POT2)) / 4096.0f);
 #endif
 
   if(imu_.available()) {
@@ -270,15 +277,15 @@ void RInput::update() {
       }
     }
   } 
-
 #endif // ARDUINO_ARCH_ESP32
-  if(buttonsChanged[BUTTON_TOP_LEFT]) {
-    if(buttons[BUTTON_TOP_LEFT]) btnTopLeftPressed();
-    else btnTopLeftReleased();
+
+  if(buttonsChanged[BUTTON_LEFT]) {
+    if(buttons[BUTTON_LEFT]) btnLeftPressed();
+    else btnLeftReleased();
   }
-  if(buttonsChanged[BUTTON_TOP_RIGHT]) {
-    if(buttons[BUTTON_TOP_RIGHT]) btnTopRightPressed();
-    else btnTopRightReleased();
+  if(buttonsChanged[BUTTON_RIGHT]) {
+    if(buttons[BUTTON_RIGHT]) btnRightPressed();
+    else btnRightReleased();
   }
   if(buttonsChanged[BUTTON_CONFIRM]) {
     if(buttons[BUTTON_CONFIRM]) btnConfirmPressed();
@@ -316,34 +323,107 @@ bool RInput::anyButtonPressed() {
   return false;
 }
 
-void RInput::btnTopLeftPressed() {
-  tlms_ = millis();
+void RInput::btnLeftPressed() {
+  lms_ = millis();
+  if(lPressCB_ != nullptr) lPressCB_();
 }
-void RInput::btnTopLeftReleased() {
-  if(millis() - tlms_ < longPressThresh_ || tlLongPressCB_ == nullptr) {
-    if(tlShortPressCB_ != nullptr) {
-      tlShortPressCB_();
+
+void RInput::btnLeftReleased() {
+  if(lReleaseCB_ != nullptr) lReleaseCB_();
+  
+  if(millis() - lms_ < longPressThresh_ || lLongPressCB_ == nullptr) {
+    if(lShortPressCB_ != nullptr) {
+      lShortPressCB_();
     }
-  } else if(tlLongPressCB_ != nullptr) {
-    tlLongPressCB_();
+  } else if(lLongPressCB_ != nullptr) {
+    lLongPressCB_();
   }
+}
+
+void RInput::btnRightPressed() {
+  rms_ = millis();
+  if(rPressCB_ != nullptr) rPressCB_();
+}
+
+void RInput::btnRightReleased() {
+  if(rReleaseCB_ != nullptr) rReleaseCB_();
+
+  if(millis() - rms_ < longPressThresh_ || rLongPressCB_ == nullptr) {
+    if(rShortPressCB_ != nullptr) {
+      rShortPressCB_();
+    }
+  } else if(rLongPressCB_ != nullptr) {
+    rLongPressCB_();
+  }
+}
+
+void RInput::btnConfirmPressed() {
+  cms_ = millis();
+  if(cPressCB_ != nullptr) cPressCB_();
+}
+
+void RInput::btnConfirmReleased() {
+  if(cReleaseCB_ != nullptr) cReleaseCB_();
+
+  if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
+    if(cShortPressCB_ != nullptr) {
+      cShortPressCB_();
+    } else {
+    }
+  } else if(cLongPressCB_ != nullptr){
+    cLongPressCB_();
+  }
+}
+
+void RInput::processEncoder() {
+  uint16_t enc = analogRead(P_A_POT1);
+
+  // Remove spurious stuff arount zero
+  static uint16_t deadband = 70;
+  if(enc < deadband) return;
+  
+  // median filter to reduce noise
+  static std::deque<uint16_t> meas;
+  meas.push_back(enc);
+  while(meas.size() > 3) meas.pop_front();
+  std::deque<uint16_t> measTmp = meas;
+  std::sort(measTmp.begin(), measTmp.end());
+  enc = measTmp[measTmp.size()/2];
+
+  float encDeg = rint((enc/4096.0)*360.0);
+  float encDiff = lastEncDeg_ - encDeg;
+
+  if(lastEncDeg_ > 270 && encDeg < 90) {
+    encDiff -= 360;
+  } else if(lastEncDeg_ < 90 && encDeg > 270) {
+    encDiff += 360;
+  }
+
+  if(fabs(encDiff) > 5) {
+    if(encTurnCB_ != nullptr) encTurnCB_(encDiff);
+    lastEncDeg_ = encDeg;
+  }
+}
+
+void RInput::clearCallbacks() {
+  setAllCallbacks(nullptr);
 }
 
 Result RInput::fillControlPacket(ControlPacket& packet) {
 #if defined(LEFT_REMOTE)
-  packet.button0 = buttons[BUTTON_PINKY];
-  packet.button1 = buttons[BUTTON_INDEX];
-  packet.button2 = buttons[BUTTON_RIGHT];
-  packet.button3 = buttons[BUTTON_LEFT];
+  packet.button0 = buttons[BUTTON_1];
+  packet.button1 = buttons[BUTTON_2];
+  packet.button2 = buttons[BUTTON_3];
+  packet.button3 = buttons[BUTTON_4];
   packet.button4 = buttons[BUTTON_JOY];
   packet.button5 = false;
   packet.button6 = false;
   packet.button7 = false;
 #else
-  packet.button0 = RInput::input.buttons[BUTTON_PINKY];
-  packet.button1 = RInput::input.buttons[BUTTON_INDEX];
-  packet.button2 = RInput::input.buttons[BUTTON_LEFT];
-  packet.button3 = RInput::input.buttons[BUTTON_RIGHT];
+  packet.button0 = RInput::input.buttons[BUTTON_1];
+  packet.button1 = RInput::input.buttons[BUTTON_2];
+  packet.button2 = RInput::input.buttons[BUTTON_3];
+  packet.button3 = RInput::input.buttons[BUTTON_4];
   packet.button4 = RInput::input.buttons[BUTTON_JOY];
   packet.button5 = RInput::input.buttons[BUTTON_TOP_LEFT];
   packet.button6 = RInput::input.buttons[BUTTON_TOP_RIGHT];
@@ -382,83 +462,10 @@ Result RInput::fillControlPacket(ControlPacket& packet) {
   }
 
   packet.setAxis(8, RInput::input.pot1, bb::ControlPacket::UNIT_UNITY);
-
-#if defined(LEFT_REMOTE)
-  packet.setAxis(9, 0);
-#else
-  // FIXME replace by values set in menu system
-  packet.setAxis(9, pot2, bb::ControlPacket::UNIT_UNITY);
-#endif
+  packet.setAxis(9, RInput::input.pot2, bb::ControlPacket::UNIT_UNITY);
 
   packet.battery = RInput::input.battery * BATTERY_MAX;
   
   return RES_OK;
 }
 
-void RInput::btnTopRightPressed() {
-  trms_ = millis();
-}
-void RInput::btnTopRightReleased() {
-  if(millis() - trms_ < longPressThresh_ || trLongPressCB_ == nullptr) {
-    if(trShortPressCB_ != nullptr) {
-      trShortPressCB_();
-    }
-  } else if(trLongPressCB_ != nullptr) {
-    trLongPressCB_();
-  }
-}
-
-void RInput::btnConfirmPressed() {
-  cms_ = millis();
-}
-
-void RInput::btnConfirmReleased() {
-  if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
-    if(cShortPressCB_ != nullptr) {
-      cShortPressCB_();
-    } else {
-    }
-  } else if(cLongPressCB_ != nullptr){
-    cLongPressCB_();
-  }
-}
-
-void RInput::clearCallbacks() {
-  tlShortPressCB_ = nullptr;
-  tlLongPressCB_ = nullptr;
-  trShortPressCB_ = nullptr;
-  trLongPressCB_ = nullptr;
-  cLongPressCB_ = nullptr;
-  cShortPressCB_ = nullptr;
-}
-
-void RInput::printOnSerial() {
-  Serial.print("L:");
-  Serial.print(buttons[BUTTON_LEFT]);
-  Serial.print(" R:");
-  Serial.print(buttons[BUTTON_RIGHT]);
-  Serial.print(" P:");
-  Serial.print(buttons[BUTTON_PINKY]);
-  Serial.print(" I:");
-  Serial.print(buttons[BUTTON_INDEX]);
-  Serial.print(" TL:");
-  Serial.print(buttons[BUTTON_TOP_LEFT]);
-  Serial.print(" TR:");
-  Serial.print(buttons[BUTTON_TOP_RIGHT]);
-  Serial.print(" Joy:");
-  Serial.print(buttons[BUTTON_JOY]);
-  Serial.print(" Cf:");
-  Serial.print(buttons[BUTTON_CONFIRM]);
-
-  Serial.print(" H:");
-  Serial.print(joyH, 3);
-  Serial.print(" V:");
-  Serial.print(joyV, 3);
-
-  Serial.print(" Batt:");
-  Serial.print(battery, 3);
-  Serial.print(" Pot1:");
-  Serial.print(pot1, 5);
-  Serial.print(" Pot2:");
-  Serial.println(pot2, 5);
-}

@@ -72,6 +72,8 @@ RRemoteVisWidget::RRemoteVisWidget() {
     setRepresentsLeftRemote(false);
 
     moveWidgetsAround();
+
+    potSelected_ = POT1_SELECTED;
 }
 
 void RRemoteVisWidget::setRepresentsLeftRemote(bool left) {
@@ -83,7 +85,9 @@ void RRemoteVisWidget::setRepresentsLeftRemote(bool left) {
     addWidget(&crosshair_);
     addWidget(&imu_);
     addWidget(&pot1_);
-    if(left_ == false) addWidget(&pot2_);
+    addWidget(&pot2_);
+
+    if(left) pot1_.setFrameColor(RDisplay::GREEN);
 
     moveWidgetsAround();
 }
@@ -137,6 +141,42 @@ Result RRemoteVisWidget::draw(ConsoleStream* stream) {
     }
 
     return RMultiWidget::draw(stream);
+}
+
+void RRemoteVisWidget::takeInputFocus() {
+    if(left_) {
+        RInput::input.setEncTurnCallback([this](float enc) { this->encTurn(enc); });
+        RInput::input.setLeftPressCallback([this]{ this->selectPot2();});
+        RInput::input.setLeftReleaseCallback([this]{ this->selectPot1();});
+    } else {
+        RInput::input.setEncTurnCallback(nullptr);
+    }
+}
+
+void RRemoteVisWidget::encTurn(float enc) {
+    if(left_) {
+        if(potSelected_ == POT1_SELECTED) {
+            RInput::input.pot1 += enc/360;
+            if(RInput::input.pot1 > 1.0) RInput::input.pot1 = 1.0;
+            if(RInput::input.pot1 < 0) RInput::input.pot1 = 0;
+        } else {
+            RInput::input.pot2 += enc/360;
+            if(RInput::input.pot2 > 1.0) RInput::input.pot2 = 1.0;
+            if(RInput::input.pot2 < 0) RInput::input.pot2 = 0;
+        }
+    }
+}
+
+void RRemoteVisWidget::selectPot1() {
+    pot2_.setFrameColor(pot1_.frameColor());
+    pot1_.setFrameColor(RDisplay::GREEN);
+    potSelected_ = POT1_SELECTED;
+}
+
+void RRemoteVisWidget::selectPot2() {
+    pot1_.setFrameColor(pot2_.frameColor());
+    pot2_.setFrameColor(RDisplay::GREEN);
+    potSelected_ = POT2_SELECTED;
 }
 
 Result RRemoteVisWidget::visualizeFromPacket(const bb::ControlPacket& packet) {

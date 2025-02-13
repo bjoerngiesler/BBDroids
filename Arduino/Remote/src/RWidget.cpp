@@ -106,8 +106,6 @@ void RWidget::setName(const String& name) {
 }
 
 void RWidget::takeInputFocus() {
-Console::console.printfBroadcast("Taking input focus in Base Widget\n");
-    RInput::input.clearCallbacks();
 }
 
 void RWidget::setAction(std::function<void(void)> cb) {

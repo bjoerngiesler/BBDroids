@@ -18,7 +18,7 @@ Result RRoundScaleWidget::draw(ConsoleStream* stream) {
 
     if(needsFullRedraw_) {
         RDisplay::display.circle(x, y, radius, bgCol_, true);
-        RDisplay::display.circle(x, y, radius, fgCol_, false);
+        RDisplay::display.circle(x, y, radius, frameCol_, false);
         needsFullRedraw_ = false;
         needsContentsRedraw_ = true;
     }

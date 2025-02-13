@@ -18,8 +18,13 @@ public:
     virtual void setPosition(int x, int y);
     virtual Result draw(ConsoleStream* stream);
     virtual Result visualizeFromPacket(const bb::ControlPacket& packet);
+    virtual void takeInputFocus();
+    void encTurn(float enc);
 
     RCrosshairWidget& crosshair() { return crosshair_; }
+
+    void selectPot1();
+    void selectPot2();
 
 protected:
     void moveWidgetsAround();
@@ -32,6 +37,11 @@ protected:
     bool left_;
     uint8_t bodyWidth_, bodyHeight_;
     RRoundScaleWidget pot1_, pot2_;
+    enum PotSelected {
+        POT1_SELECTED,
+        POT2_SELECTED
+    };
+    PotSelected potSelected_;
 };
 
 #endif // RREMOTEVISWIDGET_H

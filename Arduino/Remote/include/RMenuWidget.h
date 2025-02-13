@@ -22,6 +22,7 @@ public:
 
   void up();
   void down();
+  void encTurn(float enc);
   void select();
   void resetCursor();
 

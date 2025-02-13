@@ -29,8 +29,8 @@ RRemote::RRemote():
   params_.config.leftIsPrimary = true;
   params_.config.ledBrightness = 7;
   params_.config.sendRepeats = 3;
-  params_.config.lIncrRotBtn = RInput::BUTTON_LEFT;
-  params_.config.rIncrRotBtn = RInput::BUTTON_RIGHT;
+  params_.config.lIncrRotBtn = RInput::BUTTON_4;
+  params_.config.rIncrRotBtn = RInput::BUTTON_4;
   params_.config.lIncrTransBtn = RInput::BUTTON_NONE;
   params_.config.rIncrTransBtn = RInput::BUTTON_NONE;
   params_.config.deadbandPercent = 8;
@@ -117,7 +117,6 @@ Result RRemote::start(ConsoleStream *stream) {
   showMain();
   drawGUI();
   delay(10);
-  showMessage("Welcome!\n\nMonaco\nCtrl System\nSW " VERSION_STRING, 3000, RDisplay::LIGHTBLUE2);
   mainWidget_->setNeedsFullRedraw();
   leftSeqnum_.setNeedsFullRedraw();
   droidSeqnum_.setNeedsFullRedraw();
@@ -183,6 +182,7 @@ void RRemote::parameterChangedCallback(const String& name) {
 void RRemote::setMainWidget(RWidget* widget) {
   widget->setPosition(RDisplay::MAIN_X, RDisplay::MAIN_Y);
   widget->setSize(RDisplay::MAIN_WIDTH, RDisplay::MAIN_HEIGHT);
+  RInput::input.clearCallbacks();
   widget->takeInputFocus();
   widget->setNeedsFullRedraw();
   widget->setNeedsContentsRedraw();
@@ -277,20 +277,20 @@ void RRemote::populateMenus() {
   lRIncrRotMenu_.clear();
   lRIncrRotMenu_.setName("Incr Rotation");
   lRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButtonCB(RInput::BUTTON_NONE, true);showMain();}, RInput::BUTTON_NONE);
-  lRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButtonCB(RInput::BUTTON_LEFT, true);showMain();}, RInput::BUTTON_LEFT);
-  lRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButtonCB(RInput::BUTTON_RIGHT, true);showMain();}, RInput::BUTTON_RIGHT);
-  lRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButtonCB(RInput::BUTTON_PINKY, true);showMain();}, RInput::BUTTON_PINKY);
-  lRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButtonCB(RInput::BUTTON_INDEX, true);showMain();}, RInput::BUTTON_INDEX);
+  lRIncrRotMenu_.addEntry("Button 1", [=]{setIncrRotButtonCB(RInput::BUTTON_1, true);showMain();}, RInput::BUTTON_1);
+  lRIncrRotMenu_.addEntry("Button 2", [=]{setIncrRotButtonCB(RInput::BUTTON_2, true);showMain();}, RInput::BUTTON_2);
+  lRIncrRotMenu_.addEntry("Button 3", [=]{setIncrRotButtonCB(RInput::BUTTON_3, true);showMain();}, RInput::BUTTON_3);
+  lRIncrRotMenu_.addEntry("Button 4", [=]{setIncrRotButtonCB(RInput::BUTTON_4, true);showMain();}, RInput::BUTTON_4);
   lRIncrRotMenu_.addEntry("<--", [=]{showMenu(&leftRemoteMenu_);});
   lRIncrRotMenu_.highlightWidgetsWithTag(params_.config.lIncrRotBtn);
 
   rRIncrRotMenu_.clear();
   rRIncrRotMenu_.setName("Incr Rotation");
   rRIncrRotMenu_.addEntry("Disable", [=]{setIncrRotButtonCB(RInput::BUTTON_NONE, false);showMain();}, RInput::BUTTON_NONE);
-  rRIncrRotMenu_.addEntry("Left Button", [=]{setIncrRotButtonCB(RInput::BUTTON_LEFT, false);showMain();}, RInput::BUTTON_LEFT);
-  rRIncrRotMenu_.addEntry("Right Button", [=]{setIncrRotButtonCB(RInput::BUTTON_RIGHT, false);showMain();}, RInput::BUTTON_RIGHT);
-  rRIncrRotMenu_.addEntry("Pinky Button", [=]{setIncrRotButtonCB(RInput::BUTTON_PINKY, false);showMain();}, RInput::BUTTON_PINKY);
-  rRIncrRotMenu_.addEntry("Index Button", [=]{setIncrRotButtonCB(RInput::BUTTON_INDEX, false);showMain();}, RInput::BUTTON_INDEX);
+  rRIncrRotMenu_.addEntry("Button 1", [=]{setIncrRotButtonCB(RInput::BUTTON_1, false);showMain();}, RInput::BUTTON_1);
+  rRIncrRotMenu_.addEntry("Button 2", [=]{setIncrRotButtonCB(RInput::BUTTON_2, false);showMain();}, RInput::BUTTON_2);
+  rRIncrRotMenu_.addEntry("Button 3", [=]{setIncrRotButtonCB(RInput::BUTTON_3, false);showMain();}, RInput::BUTTON_3);
+  rRIncrRotMenu_.addEntry("Button 4", [=]{setIncrRotButtonCB(RInput::BUTTON_4, false);showMain();}, RInput::BUTTON_4);
   rRIncrRotMenu_.addEntry("<--", [=]{showMenu(&rightRemoteMenu_);});
   rRIncrRotMenu_.highlightWidgetsWithTag(params_.config.rIncrRotBtn);
 
@@ -325,7 +325,6 @@ void RRemote::drawGUI() {
 }
 
 void RRemote::setTopTitle(const String& title) {
-  Console::console.printfBroadcast("Top title: \"%s\"\n", title.c_str());
   topLabel_.setTitle(title);
 }
 
@@ -519,7 +518,6 @@ void RRemote::finishCalibrationCB(bool left) {
   Runloop::runloop.excuseOverrun();
   if(left) {
     showMain();
-    RInput::input.setTopRightLongPressCallback([=]{RRemote::remote.showMenu(&mainMenu_);});
     RInput::input.setConfirmShortPressCallback([=]{RRemote::remote.showMenu(&mainMenu_);});
     remoteVisL_.crosshair().showMinMaxRect(false);
 
@@ -950,15 +948,15 @@ void RRemote::printExtendedStatus(ConsoleStream* stream) {
   }
 
   if(RInput::input.mcpOK()) {      
-    stream->printf("Buttons: Pinky(%d):%c Index(%d):%c Joy(%d):%c Left(%d):%c Right(%d):%c Confirm(%d):%c TopLeft(%d):%c TopRight(%d):%c\n",
-                  RInput::BUTTON_PINKY, RInput::input.buttons[RInput::BUTTON_PINKY] ? 'X' : '_',
-                  RInput::BUTTON_INDEX, RInput::input.buttons[RInput::BUTTON_INDEX] ? 'X' : '_',
-                  RInput::BUTTON_JOY, RInput::input.buttons[RInput::BUTTON_JOY] ? 'X' : '_',
-                  RInput::BUTTON_LEFT, RInput::input.buttons[RInput::BUTTON_LEFT] ? 'X' : '_',
-                  RInput::BUTTON_RIGHT, RInput::input.buttons[RInput::BUTTON_RIGHT] ? 'X' : '_',
-                  RInput::BUTTON_CONFIRM, RInput::input.buttons[RInput::BUTTON_CONFIRM] ? 'X' : '_',
-                  RInput::BUTTON_TOP_LEFT, RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? 'X' : '_',
-                  RInput::BUTTON_TOP_RIGHT, RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? 'X' : '_');
+    stream->printf("Buttons: 1:%c 2:%c 3:%c 4:%c Joy:%c Confirm:%c Left:%c Right:%c\n",
+                  RInput::input.buttons[RInput::BUTTON_1] ? 'X' : '_',
+                  RInput::input.buttons[RInput::BUTTON_2] ? 'X' : '_',
+                  RInput::input.buttons[RInput::BUTTON_3] ? 'X' : '_',
+                  RInput::input.buttons[RInput::BUTTON_4] ? 'X' : '_',
+                  RInput::input.buttons[RInput::BUTTON_JOY] ? 'X' : '_',
+                  RInput::input.buttons[RInput::BUTTON_CONFIRM] ? 'X' : '_',
+                  RInput::input.buttons[RInput::BUTTON_LEFT] ? 'X' : '_',
+                  RInput::input.buttons[RInput::BUTTON_RIGHT] ? 'X' : '_');
   } else {
     stream->printf("Buttons: Error\n");
   }
@@ -988,14 +986,14 @@ void RRemote::printExtendedStatusLine(ConsoleStream *stream) {
     ax, ay, az,
     RInput::input.pot1, RInput::input.pot2,
     RInput::input.battery,
-    RInput::input.buttons[RInput::BUTTON_PINKY] ? '0' : '1',
-    RInput::input.buttons[RInput::BUTTON_INDEX] ? '0' : '1',
-    RInput::input.buttons[RInput::BUTTON_JOY] ? '0' : '1',
-    RInput::input.buttons[RInput::BUTTON_LEFT] ? '0' : '1',
-    RInput::input.buttons[RInput::BUTTON_RIGHT] ? '0' : '1',
-    RInput::input.buttons[RInput::BUTTON_CONFIRM] ? '0' : '1',
-    RInput::input.buttons[RInput::BUTTON_TOP_LEFT] ? '0' : '1',
-    RInput::input.buttons[RInput::BUTTON_TOP_RIGHT] ? '0' : '1');
+    RInput::input.buttons[RInput::BUTTON_1] ? '_' : 'X',
+    RInput::input.buttons[RInput::BUTTON_2] ? '_' : 'X',
+    RInput::input.buttons[RInput::BUTTON_3] ? '_' : 'X',
+    RInput::input.buttons[RInput::BUTTON_4] ? '_' : 'X',
+    RInput::input.buttons[RInput::BUTTON_JOY] ? '_' : 'X',
+    RInput::input.buttons[RInput::BUTTON_CONFIRM] ? '_' : 'X',
+    RInput::input.buttons[RInput::BUTTON_LEFT] ? '_' : 'X',
+    RInput::input.buttons[RInput::BUTTON_RIGHT] ? '_' : 'X');
 #endif
   if(stream)
     stream->printf("%s\n", buf);

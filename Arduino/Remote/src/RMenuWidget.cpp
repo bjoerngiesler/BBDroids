@@ -56,6 +56,20 @@ void RMenuWidget::down() {
   widgets_[cursor_]->setBackgroundColor(fgCol_);
   widgets_[cursor_]->setForegroundColor(bgCol_);
 }
+
+void RMenuWidget::encTurn(float enc) {
+  static float aggregate = 0.0f;
+  aggregate += enc;
+  while(aggregate > 50.0) {
+    down();
+    aggregate -= 50.0;
+  }
+  while(aggregate < -50.0) {
+    up();
+    aggregate += 50.0;
+  }
+}
+
   
 void RMenuWidget::select() {
   widgets_[cursor_]->triggerAction();
@@ -63,10 +77,11 @@ void RMenuWidget::select() {
 
 void RMenuWidget::takeInputFocus() {
   RInput::input.clearCallbacks();
-  RInput::input.setTopLeftShortPressCallback([this]{this->up();});
-  RInput::input.setTopRightShortPressCallback([this]{this->down();});
-  RInput::input.setTopRightLongPressCallback([this]{this->select();});
+  RInput::input.setLeftShortPressCallback([this]{this->up();});
+  RInput::input.setRightShortPressCallback([this]{this->down();});
+  RInput::input.setRightLongPressCallback([this]{this->select();});
   RInput::input.setConfirmShortPressCallback([this]{this->select();});
+  RInput::input.setEncTurnCallback([this](float enc) {this->encTurn(enc);});
   resetCursor();
 }
 

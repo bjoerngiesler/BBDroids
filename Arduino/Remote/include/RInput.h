@@ -13,53 +13,53 @@ public:
   static RInput input;
 
   enum Button {
-    BUTTON_PINKY     = 0,
-    BUTTON_INDEX     = 1,
-    BUTTON_JOY       = 2,
-    BUTTON_LEFT      = 3,
-    BUTTON_RIGHT     = 4,
-    BUTTON_CONFIRM   = 5,
-    BUTTON_TOP_LEFT  = 6,
-    BUTTON_TOP_RIGHT = 7,
-    BUTTON_NONE      = 8
+    BUTTON_1       = 0,
+    BUTTON_2       = 1,
+    BUTTON_3       = 2,
+    BUTTON_4       = 3,
+    BUTTON_JOY     = 4,
+    BUTTON_CONFIRM = 5,
+    BUTTON_LEFT    = 6,
+    BUTTON_RIGHT   = 7,
+    BUTTON_NONE    = 8
   };
 
   // Weird order given by ESP32 layout
 #if defined(ARDUINO_ARCH_ESP32)
 #if defined(LEFT_REMOTE)
   enum ButtonPin {
-    BUTTON_PIN_PINKY     = 2,
-    BUTTON_PIN_INDEX     = 4,
-    BUTTON_PIN_JOY       = 5,
-    BUTTON_PIN_LEFT      = 7,
-    BUTTON_PIN_RIGHT     = 6,
-    BUTTON_PIN_CONFIRM   = 3,
-    BUTTON_PIN_TOP_LEFT  = 1,
-    BUTTON_PIN_TOP_RIGHT = 0
+    BUTTON_PIN_1       = 2,
+    BUTTON_PIN_2       = 4,
+    BUTTON_PIN_3       = 6,
+    BUTTON_PIN_4       = 7,
+    BUTTON_PIN_JOY     = 5,
+    BUTTON_PIN_CONFIRM = 3,
+    BUTTON_PIN_LEFT    = 1,
+    BUTTON_PIN_RIGHT   = 0
   };
 #else
   enum ButtonPin {
-    BUTTON_PIN_PINKY     = 5,
-    BUTTON_PIN_INDEX     = 4,
-    BUTTON_PIN_JOY       = 1,
-    BUTTON_PIN_LEFT      = 2,
-    BUTTON_PIN_RIGHT     = 3,
-    BUTTON_PIN_CONFIRM   = 7,
-    BUTTON_PIN_TOP_LEFT  = 6,
-    BUTTON_PIN_TOP_RIGHT = 0
+    BUTTON_PIN_1       = 5,
+    BUTTON_PIN_2       = 4,
+    BUTTON_PIN_3       = 1,
+    BUTTON_PIN_4       = 2,
+    BUTTON_PIN_JOY     = 3,
+    BUTTON_PIN_CONFIRM = 7,
+    BUTTON_PIN_LEFT    = 6,
+    BUTTON_PIN_RIGHT   = 0
   };
 #endif
 
 #else
   enum ButtonPin {
-    BUTTON_PIN_PINKY     = 0,
-    BUTTON_PIN_INDEX     = 1,
-    BUTTON_PIN_JOY       = 2,
-    BUTTON_PIN_LEFT      = 3,
-    BUTTON_PIN_RIGHT     = 4,
-    BUTTON_PIN_CONFIRM   = 5,
-    BUTTON_PIN_TOP_LEFT  = 6,
-    BUTTON_PIN_TOP_RIGHT = 7
+    BUTTON_PIN_1       = 0,
+    BUTTON_PIN_2       = 1,
+    BUTTON_PIN_3       = 2,
+    BUTTON_PIN_4       = 3,
+    BUTTON_PIN_JOY     = 4,
+    BUTTON_PIN_CONFIRM = 5,
+    BUTTON_PIN_LEFT    = 6,
+    BUTTON_PIN_RIGHT   = 7
   };
 #endif
   struct AxisCalib {
@@ -105,21 +105,40 @@ public:
 
   std::map<Button,bool> buttons, buttonsChanged;
 
-  bool btnTopLChanged, btnTopRChanged, btnConfirmChanged;
+  bool btnLChanged, btnRChanged, btnConfirmChanged;
   
-  void setTopLeftShortPressCallback(std::function<void(void)> cb) { tlShortPressCB_ = cb; }
-  void setTopLeftLongPressCallback(std::function<void(void)> cb) { tlLongPressCB_ = cb; }
-  void setTopRightShortPressCallback(std::function<void(void)> cb) { trShortPressCB_ = cb; }
-  void setTopRightLongPressCallback(std::function<void(void)> cb) { trLongPressCB_ = cb; }
+  void setLeftShortPressCallback(std::function<void(void)> cb) { lShortPressCB_ = cb; }
+  void setLeftLongPressCallback(std::function<void(void)> cb) { lLongPressCB_ = cb; }
+  void setLeftPressCallback(std::function<void(void)> cb) { lPressCB_ = cb; }
+  void setLeftReleaseCallback(std::function<void(void)> cb) { lReleaseCB_ = cb; }
+
+  void setRightShortPressCallback(std::function<void(void)> cb) { rShortPressCB_ = cb; }
+  void setRightLongPressCallback(std::function<void(void)> cb) { rLongPressCB_ = cb; }
+  void setRightPressCallback(std::function<void(void)> cb) { rPressCB_ = cb; }
+  void setRightReleaseCallback(std::function<void(void)> cb) { rReleaseCB_ = cb; }
+
   void setConfirmShortPressCallback(std::function<void(void)> cb) { cShortPressCB_ = cb; }
   void setConfirmLongPressCallback(std::function<void(void)> cb) { cLongPressCB_ = cb; }
+  void setConfirmPressCallback(std::function<void(void)> cb) { cPressCB_ = cb; }
+  void setConfirmReleaseCallback(std::function<void(void)> cb) { cReleaseCB_ = cb; }
+
+  void setEncTurnCallback(std::function<void(float)> cb) { encTurnCB_ = cb; }
+
   void setAllCallbacks(std::function<void(void)> cb) {
-    tlShortPressCB_ = cb;
-    tlLongPressCB_ = cb;
-    trShortPressCB_ = cb;
-    trLongPressCB_ = cb;
+    lShortPressCB_ = cb;
+    lLongPressCB_ = cb;
+    lPressCB_ = cb;
+    lReleaseCB_ = cb;
+
+    rShortPressCB_ = cb;
+    rLongPressCB_ = cb;
+    rPressCB_ = cb;
+    rReleaseCB_ = cb;
+
     cShortPressCB_ = cb;
     cLongPressCB_ = cb;
+    cPressCB_ = cb;
+    cReleaseCB_ = cb;
   }
   void clearCallbacks();
 
@@ -130,15 +149,20 @@ protected:
   Adafruit_MCP23X17 mcp_; bool mcpOK_;
 #endif
 
-  void btnTopLeftPressed();
-  void btnTopLeftReleased();
-  void btnTopRightPressed();
-  void btnTopRightReleased();
+  void btnLeftPressed();
+  void btnLeftReleased();
+  void btnRightPressed();
+  void btnRightReleased();
   void btnConfirmPressed();
   void btnConfirmReleased();
+  void processEncoder();
 
-  unsigned long tlms_, trms_, cms_;
-  std::function<void(void)> tlShortPressCB_, tlLongPressCB_, trShortPressCB_, trLongPressCB_, cShortPressCB_, cLongPressCB_;
+  unsigned long lms_, rms_, cms_;
+  std::function<void(void)> lShortPressCB_, lLongPressCB_, lPressCB_, lReleaseCB_;
+  std::function<void(void)> rShortPressCB_, rLongPressCB_, rPressCB_, rReleaseCB_;
+  std::function<void(void)> cShortPressCB_, cLongPressCB_, cPressCB_, cReleaseCB_;
+  std::function<void(float)> encTurnCB_;
+
   unsigned long longPressThresh_;
   Button incrementalPos_, incrementalRot_; 
   float incRotR_, incRotP_, incRotH_;
@@ -153,6 +177,11 @@ protected:
   bb::IMU imu_;
   unsigned long lastMotionMS_;
   bool joyAtZero_;
+
+#if defined(LEFT_REMOTE)
+  float lastEncDeg_;
+  bb::LowPassFilter encTurnFilter_;
+#endif
 };
 
 #endif // REMOTEINPUT_H
