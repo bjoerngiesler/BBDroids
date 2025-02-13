@@ -114,6 +114,8 @@ class Console: public Subsystem {
 public:
 	static Console console;
 
+	static std::vector<String> split(const String& str);
+
 	virtual Result initialize(int bps=115200) { 
 		Serial.begin(bps); 
 		serialStream_ = new SerialConsoleStream(Serial);
@@ -140,7 +142,6 @@ public:
 
 protected:
 	Console();
-	std::vector<String> split(const String& str);
 	ConsoleStream *serialStream_;
 	std::vector<ConsoleStream*> streams_;
 	Subsystem* firstResponder_;
