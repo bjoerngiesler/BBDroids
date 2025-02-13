@@ -58,15 +58,14 @@ void RMenuWidget::down() {
 }
 
 void RMenuWidget::encTurn(float enc) {
-  static float aggregate = 0.0f;
-  aggregate += enc;
-  while(aggregate > 50.0) {
+  currentEnc_ += enc;
+  while(currentEnc_ > 50.0) {
     down();
-    aggregate -= 50.0;
+    currentEnc_ -= 50.0;
   }
-  while(aggregate < -50.0) {
+  while(currentEnc_ < -50.0) {
     up();
-    aggregate += 50.0;
+    currentEnc_ += 50.0;
   }
 }
 

@@ -368,8 +368,7 @@ void RInput::btnConfirmReleased() {
   if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
     if(cShortPressCB_ != nullptr) {
       cShortPressCB_();
-    } else {
-    }
+    } 
   } else if(cLongPressCB_ != nullptr){
     cLongPressCB_();
   }

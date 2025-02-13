@@ -30,6 +30,7 @@ public:
     virtual Result draw(ConsoleStream *stream=NULL);
 
     virtual void setTitle(const String& title);
+    virtual const String& title() { return title_; }
     void setJustification(HorizontalJustification hor, VerticalJustification ver);
     void setAutoscroll(bool autoscroll = true);
     void setAutoscrollTiming(float leftwait, float pixelwait, float rightwait);

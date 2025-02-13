@@ -65,6 +65,10 @@ RRemote::RRemote():
   droidSeqnum_.setSize(23, 8);
   droidSeqnum_.setPosition(rightSeqnum_.x()+rightSeqnum_.width()+4, leftSeqnum_.y());
   droidSeqnum_.setChar('D');
+
+  dialog_.setTitle("Hi! :-)");
+  dialog_.setValue(5);
+  dialog_.setRange(0, 10);
 }
 
 Result RRemote::initialize() { 
@@ -299,6 +303,7 @@ void RRemote::populateMenus() {
   leftRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibrationCB(true);});
   leftRemoteMenu_.addEntry("Set Primary", [=]{setLeftIsPrimaryCB(true);showMain();}, params_.config.leftIsPrimary?1:0);
   leftRemoteMenu_.addEntry("Factory Reset", [=]{factoryResetCB(true);});
+  leftRemoteMenu_.addEntry("LED Level...", [=]{showLEDBrightnessDialog();});
   leftRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
   leftRemoteMenu_.highlightWidgetsWithTag(1);
 
@@ -317,7 +322,8 @@ void RRemote::drawGUI() {
   leftSeqnum_.draw();
   rightSeqnum_.draw();
   droidSeqnum_.draw();
-  if(mainWidget_ != NULL) mainWidget_->draw();
+  if(dialogActive_) dialog_.draw();
+  else if(mainWidget_ != NULL) mainWidget_->draw();
   if(needsMenuRebuild_) {
     populateMenus();
     needsMenuRebuild_ = false;
@@ -618,6 +624,32 @@ void RRemote::showMessage(const String& msg, unsigned int delayms, uint8_t color
   message_.setFrameColor(color);
   message_.draw();
   if(delayms != 0) delay(delayms);
+}
+
+void RRemote::showDialog() {
+  dialogActive_ = true;
+  dialog_.setNeedsFullRedraw();
+  dialog_.takeInputFocus();
+}
+
+void RRemote::hideDialog() {
+  dialogActive_ = false;
+  mainWidget_->setNeedsFullRedraw();
+  mainWidget_->takeInputFocus();
+}
+
+void RRemote::showLEDBrightnessDialog() {
+  dialog_.setTitle("LED Level");
+  dialog_.setValue(params_.config.ledBrightness);
+  dialog_.setRange(0, 7);
+  dialog_.setOKCallback([=](int brt){setLEDBrightness(brt);});
+  showDialog();
+}
+
+void RRemote::setLEDBrightness(uint8_t brt) {
+  if(brt > 7) brt = 7;
+  params_.config.ledBrightness = brt;
+  RDisplay::display.setLEDBrightness(brt << 2);
 }
 
 #if defined(LEFT_REMOTE)

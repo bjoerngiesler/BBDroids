@@ -33,6 +33,7 @@ public:
 protected:
   uint8_t cursor_;
   uint8_t top_;
+  float currentEnc_;
 };
 
 

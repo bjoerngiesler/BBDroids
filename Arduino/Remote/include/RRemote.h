@@ -15,6 +15,7 @@
 #include "RRemoteVisWidget.h"
 #include "RRotaWidget.h"
 #include "RSeqnumWidget.h"
+#include "RDialogWidget.h"
 
 using namespace bb;
 
@@ -77,6 +78,10 @@ public:
   void storeParams();
 
   void showMessage(const String& str, unsigned int delayms=0, uint8_t color=RDisplay::WHITE);
+  void showDialog();
+  void hideDialog();
+  void showLEDBrightnessDialog();
+  void setLEDBrightness(uint8_t brt);
 
 #if defined(LEFT_REMOTE)
   Result sendConfigToRightRemote();
@@ -97,6 +102,8 @@ protected:
   RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_, leftRemoteMenu_, rightRemoteMenu_, droidMenu_;
   RMenuWidget lRIncrRotMenu_, rRIncrRotMenu_;
   RMessageWidget message_;
+  RDialogWidget dialog_;
+  bool dialogActive_;
   RLabelWidget topLabel_, bottomLabel_;
   RSeqnumWidget leftSeqnum_, rightSeqnum_, droidSeqnum_;
   RRotaWidget mainVis_;
