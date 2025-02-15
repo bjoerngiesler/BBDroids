@@ -31,6 +31,28 @@ void setup() {
   print_help();
 }
 
+bool readStringUntil(unsigned char c, String& str) { 
+	unsigned char input = Serial.read();
+  static String curStr_;
+
+	if(input == '\b') {
+		if(curStr_.length() > 0) curStr_.remove(curStr_.length()-1);
+		Serial.print(String("\r> ") + curStr_ + " \b");
+	} else {
+		curStr_ += (char)input;
+		Serial.print(String("\r> ") + curStr_);
+	}
+
+	Serial.flush();
+	str = curStr_;
+	if(input == c) {
+		curStr_ = "";
+		return true;
+	}
+
+	return false;
+}
+
 bool setID(uint8_t fromId, uint8_t toId) {
   if(fromId<0) {
     Serial.println("ID must be greater than zero.");
@@ -236,11 +258,10 @@ bool print_help() {
 
 void loop() {
   String command;
-  do {
-    command = Serial.readString();
-  } while(command == "");
-
-  Serial.print(command);
+  Serial.print("> ");
+  while(true) {
+    if(readStringUntil('\n', command) == true) break;
+  }
 
   std::vector<String> words = bb::Console::split(command);
 
