@@ -28,7 +28,7 @@ int bb::printf(const char* format, ...) {
 	return retval;
 }
 
-bb::SerialConsoleStream::SerialConsoleStream(HWSERIAL_CLASS& ser): ser_(ser), opened_(false), curStr_("") {
+bb::SerialConsoleStream::SerialConsoleStream(HWSERIAL_CLASS& ser): ser_(ser), opened_(false) {
 	lastCheck_ = micros();
 	checkInterval_ = 1000000;
 	if(ser_) {
@@ -59,9 +59,34 @@ bool bb::SerialConsoleStream::available() {
 	return ser_.available();
 }
 
+bool bb::SerialConsoleStream::readStringUntil(HWSERIAL_CLASS& ser, char c, String& str) { 
+	if(ser.available() == false) return false;
+
+	while(ser.available()) {
+		unsigned char input = Serial.read();
+
+		if(input == '\b') {
+			if(str.length() > 0) str.remove(str.length()-1);
+			ser.print(String("\r> ") + str + " \b");
+		} else {
+			str += (char)input;
+			ser.write(input);
+		}
+
+		ser.flush();
+		if(input == c) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
+#if 0
 bool bb::SerialConsoleStream::readStringUntil(unsigned char c, String& str) { 
 	if(!opened_) return false;
 
+	if(!ser_.available()) return;
 	unsigned char input = ser_.read();
 
 	if(input == '\b') {
@@ -81,6 +106,7 @@ bool bb::SerialConsoleStream::readStringUntil(unsigned char c, String& str) {
 
 	return false;
 }
+#endif
 
 int bb::SerialConsoleStream::printfFinal(const char* buf) {
 	return ser_.print(buf);
@@ -144,12 +170,13 @@ void bb::Console::removeConsoleStream(ConsoleStream* stream) {
 void bb::Console::handleStreamInput(ConsoleStream* stream) {
 	if(stream->available() == 0) return;
 
-	String str;
+	static String str;
 	if(stream->readStringUntil('\n', str) == false) return;
 
 	stream->printf("\r");
 	str.trim();
 	std::vector<String> words = split(str);
+	str = "";
 
 	if(words.size() == 0) {
 		stream->printf("> ");

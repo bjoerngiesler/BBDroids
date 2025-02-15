@@ -72,13 +72,13 @@ public:
 	unsigned long checkInterval() { return checkInterval_; }
 
 	virtual bool available();
-	virtual bool readStringUntil(unsigned char c, String& str);
+	static bool readStringUntil(HWSERIAL_CLASS& ser, char c, String& str);
+	virtual bool readStringUntil(unsigned char c, String& str) { return readStringUntil(ser_, c, str); }
 
 	virtual int printfFinal(const char* str);
 protected:
 	HWSERIAL_CLASS& ser_;
 	bool opened_;
-	String curStr_;
 	unsigned long checkInterval_, lastCheck_;
 };
 

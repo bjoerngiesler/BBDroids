@@ -7,7 +7,7 @@
 // For caution and testing, the define SIMULATION_ONLY disables actual changes
 // to be written. Comment it out to go to live mode.
 
-#include <Dynamixel2Arduino.h>
+#include <DynamixelShield.h>
 #include <vector>
 #include <BBConsole.h>
 
@@ -15,7 +15,7 @@
 #define DXL_PROTOCOL_VERSION 2.0
 
 #define MAXID 253
-Dynamixel2Arduino dxl;
+DynamixelShield dxl;
 bool dxlIDsFound[MAXID+1];
 
 bool print_help();
@@ -29,28 +29,8 @@ void setup() {
   Serial.println("===================");
 
   print_help();
-}
 
-bool readStringUntil(unsigned char c, String& str) { 
-	unsigned char input = Serial.read();
-  static String curStr_;
-
-	if(input == '\b') {
-		if(curStr_.length() > 0) curStr_.remove(curStr_.length()-1);
-		Serial.print(String("\r> ") + curStr_ + " \b");
-	} else {
-		curStr_ += (char)input;
-		Serial.print(String("\r> ") + curStr_);
-	}
-
-	Serial.flush();
-	str = curStr_;
-	if(input == c) {
-		curStr_ = "";
-		return true;
-	}
-
-	return false;
+  Serial.print("> ");
 }
 
 bool setID(uint8_t fromId, uint8_t toId) {
@@ -172,7 +152,13 @@ bool move(uint8_t id, float angle) {
     return false;
   }
   dxl.torqueOn(id);
-  return dxl.setGoalPosition(id, angle, UNIT_DEGREE);
+  if(dxl.setGoalPosition(id, angle, UNIT_DEGREE) == true) {
+    Serial.println("Success.");
+    return false;
+  } else {
+    Serial.println("Failure.");
+    return false;
+  }
 }
 
 bool set_id(uint8_t oldid, uint8_t newid) {
@@ -252,19 +238,10 @@ bool print_help() {
   Serial.println("    move ID ANGLE         Move servo ID to given angle. Switches on torque if necessary. No checks.");
   Serial.println("    set_id ID NEWID       Change servo ID to NEWID.");
   Serial.println("    set_baud ID BAUDRATE  Set ID's baud rate. Supported baud rates: 57600, 115200, 1000000. Do an init afterwards.");
-  Serial.print("> ");
   return true;
 }
 
-void loop() {
-  String command;
-  Serial.print("> ");
-  while(true) {
-    if(readStringUntil('\n', command) == true) break;
-  }
-
-  std::vector<String> words = bb::Console::split(command);
-
+void handleCommandline(const std::vector<String>& words) {
   if(words.size() == 0) return;
 
   if(words[0] == "help") {
@@ -281,11 +258,7 @@ void loop() {
       Serial.println("Wrong number of arguments!");
       return;
     }
-    if(init(words[1].toInt()) == false) {
-      Serial.println("Failure.");
-    } else {
-      Serial.println("Success.");
-    }
+    init(words[1].toInt());
     return;
   }
 
@@ -294,11 +267,7 @@ void loop() {
       Serial.println("Wrong number of arguments!");
       return;
     }
-    if(info(words[1].toInt()) == false) {
-      Serial.println("Failure.");
-    } else {
-      Serial.println("Success.");
-    }
+    info(words[1].toInt());
     return;
   }
 
@@ -307,11 +276,7 @@ void loop() {
       Serial.println("Wrong number of arguments!");
       return;
     }
-    if(move(words[1].toInt(), words[2].toFloat()) == false) {
-      Serial.println("Failure.");
-    } else {
-      Serial.println("Success.");
-    }
+    move(words[1].toInt(), words[2].toFloat());
     return;
   }
 
@@ -320,11 +285,7 @@ void loop() {
       Serial.println("Wrong number of arguments!");
       return;
     }
-    if(set_id(words[1].toInt(), words[2].toInt()) == false) {
-      Serial.println("Failure.");
-    } else {
-      Serial.println("Success.");
-    }
+    set_id(words[1].toInt(), words[2].toInt());
     return;
   }
   
@@ -333,13 +294,20 @@ void loop() {
       Serial.println("Wrong number of arguments!");
       return;
     }
-    if(set_baud(words[1].toInt(), words[2].toInt()) == false) {
-      Serial.println("Failure.");
-    } else {
-      Serial.println("Success.");
-    }
+    set_baud(words[1].toInt(), words[2].toInt());
     return;
   }
 
   Serial.println("Unknown command.");
+}
+
+void loop() {
+  static String command;
+  if(bb::SerialConsoleStream::readStringUntil(Serial, '\n', command) == false) return;
+
+  std::vector<String> words = bb::Console::split(command);
+  handleCommandline(words);
+  command = "";
+
+  Serial.print("> ");
 }

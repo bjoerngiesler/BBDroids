@@ -306,7 +306,7 @@ bb::Result DODroid::stepHead() {
     float aer = 90 + params_.aerialOffset + speedSP*params_.faAerialSpeedSP;
 
     aer = constrain(aer, 0, 180);
-    LOG(LOG_INFO, "Setting aerials to %f %f %f\n", aer+remoteAerial1_, aer+remoteAerial2_, aer+remoteAerial3_);
+    //LOG(LOG_INFO, "Setting aerials to %f %f %f\n", aer+remoteAerial1_, aer+remoteAerial2_, aer+remoteAerial3_);
     setAerials(constrain(aer + remoteAerial1_, 0, 180), 
                constrain(aer + remoteAerial2_, 0, 180),
                constrain(aer + remoteAerial3_, 0, 180));
@@ -559,7 +559,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     }
 
     if(packet.button5) {
-      LOG(LOG_INFO, "Setting aerial 1 to %d\n", params_.aerialAnim);
+      //LOG(LOG_INFO, "Setting aerial 1 to %d\n", params_.aerialAnim);
       remoteAerial1_ = params_.aerialAnim;
     } 
     else remoteAerial1_ = 0;
@@ -723,7 +723,7 @@ bool DODroid::setAerials(uint8_t a1, uint8_t a2, uint8_t a3) {
   Wire.write(aerials, sizeof(aerials));
   retval = Wire.endTransmission();
   if(retval == 0) return true;
-  LOG(LOG_ERROR, "Error %d moving aerials\n", retval);
+  //LOG(LOG_ERROR, "Error %d moving aerials\n", retval);
   return false;
 }
 
