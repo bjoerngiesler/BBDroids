@@ -7,7 +7,7 @@ RMenuWidget::RMenuWidget() {
   setFillsBackground();
 }
 
-void RMenuWidget::addEntry(const String& title, std::function<void(void)> callback, int tag) {
+RLabelWidget* RMenuWidget::addEntry(const String& title, std::function<void(void)> callback, int tag) {
   RLabelWidget *label = new RLabelWidget;
   label->setTitle(title);
   label->setFillsBackground();
@@ -28,6 +28,8 @@ void RMenuWidget::addEntry(const String& title, std::function<void(void)> callba
   label->setAction(callback);
 
   addWidget(label);
+
+  return label;
 }
 
 void RMenuWidget::clear() {

@@ -23,6 +23,7 @@ public:
     BUTTON_RIGHT   = 7,
     BUTTON_NONE    = 8
   };
+  static const uint8_t NUM_BUTTONS = 9;
 
   // Weird order given by ESP32 layout
 #if defined(ARDUINO_ARCH_ESP32)
@@ -41,9 +42,9 @@ public:
   enum ButtonPin {
     BUTTON_PIN_1       = 5,
     BUTTON_PIN_2       = 4,
-    BUTTON_PIN_3       = 1,
+    BUTTON_PIN_3       = 3,
     BUTTON_PIN_4       = 2,
-    BUTTON_PIN_JOY     = 3,
+    BUTTON_PIN_JOY     = 1,
     BUTTON_PIN_CONFIRM = 7,
     BUTTON_PIN_LEFT    = 6,
     BUTTON_PIN_RIGHT   = 0
@@ -155,7 +156,6 @@ protected:
   void btnRightReleased();
   void btnConfirmPressed();
   void btnConfirmReleased();
-  void processEncoder();
 
   unsigned long lms_, rms_, cms_;
   std::function<void(void)> lShortPressCB_, lLongPressCB_, lPressCB_, lReleaseCB_;
@@ -181,6 +181,7 @@ protected:
 #if defined(LEFT_REMOTE)
   float lastEncDeg_;
   bb::LowPassFilter encTurnFilter_;
+  void processEncoder();
 #endif
 };
 

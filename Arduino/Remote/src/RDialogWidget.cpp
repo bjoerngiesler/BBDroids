@@ -13,6 +13,7 @@ RDialogWidget::RDialogWidget() {
     setTitle("Dialog");
     setRange(0, 10);
     setValue(5);
+    setSuffix("");
 
     setDrawsFrame();
     setFillsBackground();
@@ -28,7 +29,12 @@ void RDialogWidget::setTitle(const String& title) {
 
 void RDialogWidget::setValue(int value) {
     value_ = value;
-    valueLabel_.setTitle(String(value_));
+    valueLabel_.setTitle(String(value_) + suffix_);
+}
+
+void RDialogWidget::setSuffix(const String& s) {
+    suffix_ = s;
+    valueLabel_.setTitle(String(value_) + suffix_);
 }
 
 void RDialogWidget::setRange(int min, int max) {

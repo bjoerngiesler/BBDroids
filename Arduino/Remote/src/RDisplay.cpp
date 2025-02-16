@@ -154,7 +154,7 @@ uint8_t RDisplay::sendBinCommand(const std::vector<uint8_t>& cmd, int timeout, b
     return 0;
   }
 
-  bb::printf("Available with %dus remaining.\n", timeout);
+  //bb::printf("Available with %dus remaining.\n", timeout);
 
   uint8_t retval = 0;
   while(ser_.available()) {
@@ -202,7 +202,7 @@ Result RDisplay::text(uint8_t x, uint8_t y, uint8_t color, const String& text) {
   std::vector<uint8_t> vec = {rd::CMD_TEXT|0x80, x, y, color};
   for(int i=0; i<text.length(); i++) vec.push_back(text[i]);
   vec.push_back(0);
-  sendBinCommand(vec, 1000);
+  sendBinCommand(vec, 200, true);
 #else
   String str = String((char)rd::CMD_TEXT) + x + "," + y + "," + color + ",\"" + text + "\"";
   if(!sendStringAndWaitForOK(str)) return RES_SUBSYS_COMM_ERROR; 

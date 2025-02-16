@@ -75,15 +75,19 @@ public:
   void startCalibration();
   void finishCalibration();
 
-  void storeParams();
+  void storeParams() {  ConfigStorage::storage.writeBlock(paramsHandle_);  }
 
   void showMessage(const String& str, unsigned int delayms=0, uint8_t color=RDisplay::WHITE);
   void showDialog();
   void hideDialog();
+  
+#if defined(LEFT_REMOTE)
   void showLEDBrightnessDialog();
   void setLEDBrightness(uint8_t brt);
-
-#if defined(LEFT_REMOTE)
+  void showJoyDeadbandDialog();
+  void setJoyDeadband(uint8_t db);
+  void showSendRepeatsDialog();
+  void setSendRepeats(uint8_t sr);
   Result sendConfigToRightRemote();
 #endif
 
@@ -99,7 +103,8 @@ protected:
   bool runningStatus_;
   Packet lastPacketSent_;
 
-  RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_, leftRemoteMenu_, rightRemoteMenu_, droidMenu_;
+  RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_;
+  RMenuWidget leftRemoteMenu_, rightRemoteMenu_, bothRemotesMenu_, droidMenu_;
   RMenuWidget lRIncrRotMenu_, rRIncrRotMenu_;
   RMessageWidget message_;
   RDialogWidget dialog_;
@@ -110,6 +115,7 @@ protected:
   RRemoteVisWidget remoteVisL_, remoteVisR_;
 
   RWidget* mainWidget_;
+  RLabelWidget *ledBrightnessLabel_, *deadbandPercentLabel_, *sendRepeatsLabel_;
 
   bool needsMenuRebuild_;
   std::vector<XBee::Node> discoveredNodes_;

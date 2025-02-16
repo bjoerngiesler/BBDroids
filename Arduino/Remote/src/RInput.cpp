@@ -264,9 +264,10 @@ void RInput::update() {
 
 #if defined(ARDUINO_ARCH_ESP32) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
   if(mcpOK_) {
-    for(uint8_t i = 0; i < buttons.size(); i++) {
-      Button b = pinToButton(ButtonPin(i));
-      if (mcp_.digitalRead(i) == LOW) {
+    for(uint8_t i = 0; i < NUM_BUTTONS; i++) {
+      Button b = Button(i);
+      ButtonPin pin = buttonToPin(b);
+      if (mcp_.digitalRead(int(pin)) == LOW) {
         if(buttons[b] == false) buttonsChanged[b] = true;
         else buttonsChanged[b] = false;
         buttons[b] = true;
@@ -275,7 +276,9 @@ void RInput::update() {
         else buttonsChanged[b] = false;
         buttons[b] = false;
       }
+      bb::printf("%d(%d):%d ", b, pin, buttons[b]);
     }
+    bb::printf("\n");
   } 
 #endif // ARDUINO_ARCH_ESP32
 
@@ -374,6 +377,7 @@ void RInput::btnConfirmReleased() {
   }
 }
 
+#if defined(LEFT_REMOTE)
 void RInput::processEncoder() {
   uint16_t enc = analogRead(P_A_POT1);
 
@@ -403,29 +407,26 @@ void RInput::processEncoder() {
     lastEncDeg_ = encDeg;
   }
 }
+#endif // LEFT_REMOTE
 
 void RInput::clearCallbacks() {
   setAllCallbacks(nullptr);
 }
 
 Result RInput::fillControlPacket(ControlPacket& packet) {
-#if defined(LEFT_REMOTE)
   packet.button0 = buttons[BUTTON_1];
   packet.button1 = buttons[BUTTON_2];
   packet.button2 = buttons[BUTTON_3];
   packet.button3 = buttons[BUTTON_4];
   packet.button4 = buttons[BUTTON_JOY];
+
+  #if defined(LEFT_REMOTE)
   packet.button5 = false;
   packet.button6 = false;
   packet.button7 = false;
 #else
-  packet.button0 = RInput::input.buttons[BUTTON_1];
-  packet.button1 = RInput::input.buttons[BUTTON_2];
-  packet.button2 = RInput::input.buttons[BUTTON_3];
-  packet.button3 = RInput::input.buttons[BUTTON_4];
-  packet.button4 = RInput::input.buttons[BUTTON_JOY];
-  packet.button5 = RInput::input.buttons[BUTTON_TOP_LEFT];
-  packet.button6 = RInput::input.buttons[BUTTON_TOP_RIGHT];
+  packet.button5 = RInput::input.buttons[BUTTON_LEFT];
+  packet.button6 = RInput::input.buttons[BUTTON_RIGHT];
   packet.button7 = RInput::input.buttons[BUTTON_CONFIRM];
 #endif
 

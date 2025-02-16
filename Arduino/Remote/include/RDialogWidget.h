@@ -10,6 +10,7 @@ public:
     virtual void setTitle(const String& title);
     virtual void setValue(int value);
     virtual void setRange(int max, int min);
+    virtual void setSuffix(const String& suffix);
     virtual void takeInputFocus();
     virtual void setOKCallback(std::function<void(int)> cb);
     virtual void setCancelCallback(std::function<void(void)> cb);
@@ -24,6 +25,7 @@ protected:
     float currentEnc_;
     std::function<void(int)> okCallback_;
     std::function<void(void)> cancelCallback_;
+    String suffix_;
 };
 
 #endif // RDIALOGWIDGET_H

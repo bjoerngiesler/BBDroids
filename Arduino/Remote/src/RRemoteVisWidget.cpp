@@ -21,10 +21,10 @@ static const uint8_t btn0Y = 110;
 static const uint8_t btn1Y = 40;
 static const uint8_t btnSideXL = 55;
 static const uint8_t btnSideXR = btnSideXL+bxr-bw-6;
-static const uint8_t btn2XL = 35;
-static const uint8_t btn3XL = 10;
-static const uint8_t btn2XR = btn2XL+bxr;
-static const uint8_t btn3XR = btn3XL+bxr;
+static const uint8_t btn2XL = 35;         // #2 is the right one
+static const uint8_t btn3XL = 10;         // #3 is the left one
+static const uint8_t btn2XR = btn3XL+bxr; // #2 is the left one
+static const uint8_t btn3XR = btn2XL+bxr; // #3 is the right one
 static const uint8_t btnTopY = 5;
 
 static const uint8_t potW = 19;
@@ -44,7 +44,9 @@ RRemoteVisWidget::RRemoteVisWidget() {
         b.setDrawsFrame();
         b.setFillsBackground();
         b.setTitle("");
-        b.setBackgroundColor(RDisplay::BLUE);
+        b.setBackgroundColor(RDisplay::DARKBLUE);
+        b.setFrameColor(RDisplay::LIGHTBLUE2);
+
     }
 
     mainBtns_[0].setSize(btnW, btnH);
@@ -56,7 +58,7 @@ RRemoteVisWidget::RRemoteVisWidget() {
         b.setDrawsFrame();
         b.setFillsBackground();
         b.setTitle("");
-        b.setBackgroundColor(RDisplay::RED);
+        b.setBackgroundColor(RDisplay::LIGHTGREEN1);
         b.setSize(battStateW, battStateW);
     }
 
@@ -182,6 +184,12 @@ void RRemoteVisWidget::selectPot2() {
 Result RRemoteVisWidget::visualizeFromPacket(const bb::ControlPacket& packet) {
     crosshair_.setHorVer(packet.getAxis(0, bb::ControlPacket::UNIT_UNITY_CENTERED), 
                          packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED));
+    if(EPSILON(packet.getAxis(0)) && EPSILON(packet.getAxis(1))) {
+        crosshair_.setCursorColor(RDisplay::WHITE);
+    } else {
+        crosshair_.setCursorColor(RDisplay::LIGHTGREEN1);
+    }
+
     imu_.setRPH(packet.getAxis(2, bb::ControlPacket::UNIT_DEGREES_CENTERED), 
                 packet.getAxis(3, bb::ControlPacket::UNIT_DEGREES_CENTERED),
                 packet.getAxis(4, bb::ControlPacket::UNIT_DEGREES));
@@ -194,28 +202,28 @@ Result RRemoteVisWidget::visualizeFromPacket(const bb::ControlPacket& packet) {
         mainBtns_[0].setFrameColor(RDisplay::RED);
     } else {
         mainBtns_[0].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[0].setFrameColor(RDisplay::DIMBLUE);
+        mainBtns_[0].setFrameColor(RDisplay::LIGHTBLUE2);
     }
     if(packet.button1) {
         mainBtns_[1].setBackgroundColor(RDisplay::LIGHTRED1);
         mainBtns_[1].setFrameColor(RDisplay::RED);
     } else {
         mainBtns_[1].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[1].setFrameColor(RDisplay::DIMBLUE);
+        mainBtns_[1].setFrameColor(RDisplay::LIGHTBLUE2);
     }
     if(packet.button2) {
         mainBtns_[2].setBackgroundColor(RDisplay::LIGHTRED1);
         mainBtns_[2].setFrameColor(RDisplay::RED);
     } else {
         mainBtns_[2].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[2].setFrameColor(RDisplay::DIMBLUE);
+        mainBtns_[2].setFrameColor(RDisplay::LIGHTBLUE2);
     }
     if(packet.button3) {
         mainBtns_[3].setBackgroundColor(RDisplay::LIGHTRED1);
         mainBtns_[3].setFrameColor(RDisplay::RED);
     } else {
         mainBtns_[3].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[3].setFrameColor(RDisplay::DIMBLUE);
+        mainBtns_[3].setFrameColor(RDisplay::LIGHTBLUE2);
     }
     if(packet.button4) {
         crosshair_.setBackgroundColor(RDisplay::RED);

@@ -257,16 +257,19 @@ void RRemote::showPairRemoteMenu() {
 }
 
 void RRemote::populateMenus() {
+#if defined(LEFT_REMOTE)
   mainMenu_.setName("Main Menu");
   pairMenu_.setName("Pair");
   leftRemoteMenu_.setName("Left Remote");
   rightRemoteMenu_.setName("Right Remote");
+  bothRemotesMenu_.setName("Both Remotes");
   droidMenu_.setName("Droid");
   
   mainMenu_.clear();
   if(!params_.droidAddress.isZero()) mainMenu_.addEntry("Droid...", [=]() { showMenu(&droidMenu_); });
   mainMenu_.addEntry("Left Remote...", [=]() { showMenu(&leftRemoteMenu_); });
   if(!params_.otherRemoteAddress.isZero()) mainMenu_.addEntry("Right Remote...", [=]() { showMenu(&rightRemoteMenu_); });
+  mainMenu_.addEntry("Both Remotes...", [=](){showMenu(&bothRemotesMenu_);});
   mainMenu_.addEntry("Pair...", [=]() { RRemote::remote.showMenu(&pairMenu_); });
   mainMenu_.addEntry("<--", []() { RRemote::remote.showMain(); });
   
@@ -303,7 +306,6 @@ void RRemote::populateMenus() {
   leftRemoteMenu_.addEntry("Calib Joystick", [=]{startCalibrationCB(true);});
   leftRemoteMenu_.addEntry("Set Primary", [=]{setLeftIsPrimaryCB(true);showMain();}, params_.config.leftIsPrimary?1:0);
   leftRemoteMenu_.addEntry("Factory Reset", [=]{factoryResetCB(true);});
-  leftRemoteMenu_.addEntry("LED Level...", [=]{showLEDBrightnessDialog();});
   leftRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
   leftRemoteMenu_.highlightWidgetsWithTag(1);
 
@@ -314,6 +316,13 @@ void RRemote::populateMenus() {
   rightRemoteMenu_.addEntry("Factory Reset", [=]() {factoryResetCB(false);});
   rightRemoteMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
   rightRemoteMenu_.highlightWidgetsWithTag(1);
+
+  bothRemotesMenu_.clear();
+  bothRemotesMenu_.addEntry("LED Level", [=]{showLEDBrightnessDialog();});
+  bothRemotesMenu_.addEntry("Joy Deadband", [=]{showJoyDeadbandDialog();});
+  bothRemotesMenu_.addEntry("Send Repeats", [=]{showSendRepeatsDialog();});
+  bothRemotesMenu_.addEntry("<--", [=]() {showMenu(&mainMenu_);});
+#endif // LEFT_REMOTE
 }
 
 void RRemote::drawGUI() {
@@ -638,9 +647,12 @@ void RRemote::hideDialog() {
   mainWidget_->takeInputFocus();
 }
 
+#if defined(LEFT_REMOTE)
+
 void RRemote::showLEDBrightnessDialog() {
   dialog_.setTitle("LED Level");
   dialog_.setValue(params_.config.ledBrightness);
+  dialog_.setSuffix("");
   dialog_.setRange(0, 7);
   dialog_.setOKCallback([=](int brt){setLEDBrightness(brt);});
   showDialog();
@@ -648,12 +660,54 @@ void RRemote::showLEDBrightnessDialog() {
 
 void RRemote::setLEDBrightness(uint8_t brt) {
   if(brt > 7) brt = 7;
-  params_.config.ledBrightness = brt;
+  if(brt == params_.config.ledBrightness) return;
+  params_.config.ledBrightness = ledBrightness_ = brt;
   RDisplay::display.setLEDBrightness(brt << 2);
+  sendConfigToRightRemote();
+  storeParams();
 }
 
-#if defined(LEFT_REMOTE)
+void RRemote::showJoyDeadbandDialog() {
+  dialog_.setTitle("Joy Deadb.");
+  dialog_.setValue(params_.config.deadbandPercent);
+  dialog_.setSuffix("%");
+  dialog_.setRange(0, 15);
+  dialog_.setOKCallback([=](int db){setJoyDeadband(db);});
+  showDialog();
+}
+
+void RRemote::setJoyDeadband(uint8_t db) {
+  if(db > 15) db = 15;
+  if(db == params_.config.deadbandPercent) return;
+  params_.config.deadbandPercent = deadbandPercent_ = db;
+  RInput::input.setDeadbandPercent(db);
+  sendConfigToRightRemote();
+  storeParams();
+}
+
+void RRemote::showSendRepeatsDialog() {
+  dialog_.setTitle("Send Reps");
+  dialog_.setValue(params_.config.sendRepeats);
+  dialog_.setSuffix("");
+  dialog_.setRange(0, 7);
+  dialog_.setOKCallback([=](int sr){setSendRepeats(sr);});
+  showDialog();
+}
+
+void RRemote::setSendRepeats(uint8_t sr) {
+  if(sr > 7) sr = 7;
+  if(sr == params_.config.sendRepeats) return;
+  params_.config.sendRepeats = sendRepeats_ = sr;
+  sendConfigToRightRemote();
+  storeParams();
+}
+
 Result RRemote::sendConfigToRightRemote() {
+  if(params_.otherRemoteAddress.isZero()) {
+    LOG(LOG_WARN, "Trying to send to right remote but address is 0\n");
+    return RES_CONFIG_INVALID_HANDLE;
+  }
+
   ConfigPacket packet;
   ConfigPacket::ConfigReplyType reply;
   packet.type = bb::ConfigPacket::CONFIG_SET_REMOTE_PARAMS;
