@@ -80,6 +80,8 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 				stream->printf("%d...", baudRatesToTry[i]); 
 			}
 			
+			uart_->end();
+			delay(100);
 			uart_->begin(baudRatesToTry[i]);
 			
 			if(enterATModeIfNecessary() == RES_OK) {
@@ -370,6 +372,7 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 	}
 
 	uart_->write("+++");
+	delay(1000);
 
 	bool success = false;
 
@@ -377,13 +380,13 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 		unsigned char c;
 
 		while(uart_->available()) {
-			c = uart_->read(); 
+			c = uart_->read();
 			if(c == 'O') {
-				if(!uart_->available()) delayMicroseconds(200);
+				if(!uart_->available()) delay(1);
 				if(!uart_->available()) continue;
 				c = uart_->read();
 				if(c == 'K') {
-					if(!uart_->available()) delayMicroseconds(200);
+					if(!uart_->available()) delay(1);
 					if(!uart_->available()) continue;
 					c = uart_->read();
 					if(c == '\r') {
