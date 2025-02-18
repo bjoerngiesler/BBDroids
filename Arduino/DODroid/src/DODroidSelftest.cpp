@@ -250,7 +250,9 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     else mot.set(pwm);
 
     DOBattStatus::batt.updateCurrent();
+    DOBattStatus::batt.updateVoltage();
     float mA = DOBattStatus::batt.current();
+    float V = DOBattStatus::batt.voltage();
     
     imu_.update();
     imu_.getFilteredPRH(p, r, h);
@@ -271,7 +273,7 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     distance = enc.presentPosition()-startPosition;
 
     if(fabs(mA) > ST_ABORT_MILLIAMPS) { 
-      bb::printf("Current meter reports %fmA of current, higher than threshold of %f\n", mA, ST_ABORT_MILLIAMPS);
+      bb::printf("Current meter reports %fmA/%fV of current, higher than threshold of %fmA\n", mA, V, ST_ABORT_MILLIAMPS);
       blockedcount++;
     } else {
       blockedcount = 0;

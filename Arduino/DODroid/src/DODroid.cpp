@@ -298,8 +298,8 @@ bb::Result DODroid::stepHead() {
     float headPitch = -nod - params_.leanHeadToBody*lean_ + remoteP_ - params_.neckOffset - params_.headPitchOffset;
     headPitch += params_.faHeadPitchSpeedSP*speedSP;
     bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 + headPitch);
-    bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh - remoteH_ + params_.headHeadingOffset);
-    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh - remoteR_ + params_.headRollOffset);
+    bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh + remoteH_ + params_.headHeadingOffset);
+    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh + remoteR_ + params_.headRollOffset);
   }
 
   if(aerialsOK_) {
@@ -468,6 +468,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     Runloop::runloop.scheduleTimedCallback(100, [=]{ setLED(LED_COMM, OFF); commLEDOn_ = false; });
   }
 
+  // Check for duplicates and lost packets
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
     if(seqnum == lastLeftSeqnum_) return RES_OK; // duplicate
     if(WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8) != 1) {
@@ -491,8 +492,11 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     return RES_SUBSYS_COMM_ERROR;
   }
 
+  // Hardcoded axis / trigger mapping starts here
   if(packet.primary == true) {
     msLastPrimaryCtrlPacket_ = millis();
+    
+    // Joystick button switches drive mode
     if(packet.button4 && !lastBtn4_) {
       if(driveMode_ == DRIVE_OFF) {
         switchDrive(DRIVE_POSITION);
@@ -501,15 +505,17 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       }
     }
 
+    // If button 3 is held, axes 2, 3, 4 (IMU rot) control the head
     if(packet.button3) {
-      remoteR_ = -packet.getAxis(2, ControlPacket::UNIT_DEGREES_CENTERED);
+      remoteR_ = packet.getAxis(2, ControlPacket::UNIT_DEGREES_CENTERED);
       remoteP_ = packet.getAxis(3, ControlPacket::UNIT_DEGREES_CENTERED);
-      remoteH_ = -packet.getAxis(4, ControlPacket::UNIT_DEGREES_CENTERED);
+      remoteH_ = packet.getAxis(4, ControlPacket::UNIT_DEGREES_CENTERED);
       annealR_ = fabs(remoteR_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
       annealP_ = fabs(remoteP_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
       annealH_ = fabs(remoteH_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
     }
 
+    // Button 0, 1, 2 play different sounds
     if(packet.button0 && !lastBtn0_) DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING);
     else if(packet.button1 && !lastBtn1_) DOSound::sound.playFolderRandom(DOSound::FOLDER_POSITIVE);
     else if(packet.button2 && !lastBtn2_) DOSound::sound.playFolderRandom(DOSound::FOLDER_NEGATIVE);
@@ -520,19 +526,17 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     lastBtn3_ = packet.button3;
     lastBtn4_ = packet.button4;
 
+    // If drive system is on, joystick controls rotation and speed
     if(driveMode_ != DRIVE_OFF) {
-      float vel = packet.getAxis(1);
       float rot = packet.getAxis(0);
+      float vel = packet.getAxis(1);
 
-      if(EPSILON(vel) && EPSILON(rot)) { // no drive input - joystick at zero
-        float lSpeed = leftEncoder_.presentSpeed(), rSpeed = rightEncoder_.presentSpeed();
-        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && 
-           driveMode_ == DRIVE_VELOCITY && 
-           fabs(lSpeed) < 1.0 && fabs(rSpeed) < 1.0) {
-          LOG(LOG_INFO, "Switching to position control mode, present speed left: %f, right: %f\n", lSpeed, rSpeed);
+      // Joystick at zero for >500ms? Switch to position control mode
+      if(EPSILON(vel) && EPSILON(rot)) { 
+        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && driveMode_ == DRIVE_VELOCITY) {
           switchDrive(DRIVE_POSITION);
         }
-      } else { // have drive input
+      } else { // We have drive input - switch to velocity control mode
         if(driveMode_ == DRIVE_POSITION) {
           switchDrive(DRIVE_VELOCITY);
         }
@@ -550,7 +554,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       setLED(LED_DRIVE, OFF);
     }
 
-    //DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
+    DOSound::sound.setVolume(int(30.0 * packet.getAxis(9)));
   } else { // secondary remote
     lean_ = -1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange;
 
@@ -558,10 +562,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       balanceController_.setGoal(params_.leanHeadToBody*lean_-pitchAtRest_);
     }
 
-    if(packet.button5) {
-      //LOG(LOG_INFO, "Setting aerial 1 to %d\n", params_.aerialAnim);
-      remoteAerial1_ = params_.aerialAnim;
-    } 
+    if(packet.button5) remoteAerial1_ = params_.aerialAnim;
     else remoteAerial1_ = 0;
     if(packet.button6) remoteAerial2_ = params_.aerialAnim;
     else remoteAerial2_ = 0;
@@ -723,7 +724,7 @@ bool DODroid::setAerials(uint8_t a1, uint8_t a2, uint8_t a3) {
   Wire.write(aerials, sizeof(aerials));
   retval = Wire.endTransmission();
   if(retval == 0) return true;
-  //LOG(LOG_ERROR, "Error %d moving aerials\n", retval);
+  LOG(LOG_ERROR, "Error %d moving aerials\n", retval);
   return false;
 }
 
