@@ -9,7 +9,7 @@
 
 bb::XBee bb::XBee::xbee;
 
-static std::vector<unsigned int> baudRatesToTry = { 9600, 57600, 115200, 19200, 28800, 38400, 76800 }; // start with 115200, then try 9600
+static std::vector<unsigned int> baudRatesToTry = { 115200, 9600, 57600, 19200, 28800, 38400, 76800 }; // start with 115200, then try 9600
 
 bb::XBee::XBee() {
 	uart_ = &Serial1;
