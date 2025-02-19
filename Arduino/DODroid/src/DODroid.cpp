@@ -49,7 +49,8 @@ DODroid::DODroid():
 "\tselftest\tRun self test\n"\
 "\tsafety {on|off}\tSwitch safety functions on/off\n"\
 "\tdrive {off|pos|vel}\tSwitch drive system to off, position control, or velocity control\n"\
-"\tplay_sound [<folder>] <num>\tPlay sound\n";
+"\tplay_sound [<folder>] <num>\tPlay sound\n"\
+"\tset_aerials A1 [A2 A3]\tMove aerials. A1, A2, A3: Angle between 0 and 180\n";
   started_ = false;
 
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
@@ -104,6 +105,8 @@ Result DODroid::initialize() {
   addParameter("fa_head_heading_turn", "Free Anim: Head heading on turn speed", params_.faHeadHeadingTurn, -INT_MAX, INT_MAX);
   addParameter("fa_aerial_speed", "Free Anim: Aerial position on wheel speed setpoint", params_.faAerialSpeedSP, -INT_MAX, INT_MAX);
   addParameter("fa_head_anneal_time", "Free Anim: Head anneal time", params_.faHeadAnnealTime, -INT_MAX, INT_MAX);
+
+  addParameter("auto_pos_control", "Automatically switch to position control", params_.autoPosControl);
 
   paramsHandle_ = ConfigStorage::storage.reserveBlock("d-o", sizeof(params_), (uint8_t*)&params_);
   if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
@@ -214,33 +217,41 @@ void DODroid::setControlParameters() {
 }
 
 Result DODroid::step() {
-  if((Runloop::runloop.getSequenceNumber() % 100) == 0 && driveMode_ == DRIVE_OFF) {
-    Runloop::runloop.excuseOverrun();
-    DOSound::sound.checkSDCard();
-  }
-
+  unsigned long seqnum = Runloop::runloop.getSequenceNumber();
+  
+  // We're broken; still send out the state packet.
   if(!imu_.available() || !DOBattStatus::batt.available()) {
-    if((Runloop::runloop.getSequenceNumber() % 4) == 0) {
+    if((seqnum % 4) == 0) {
       fillAndSendStatePacket();
     }
     LOG(LOG_FATAL, "IMU or battery missing - critical error\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
+  // Look for battery undervoltage
   if((Runloop::runloop.getSequenceNumber() % 1000) == 0) {
     stepPowerProtect();
+  }
+
+  // Check if SD card was changed
+  if((seqnum % 1000) == 0 && driveMode_ == DRIVE_OFF) {
+    Runloop::runloop.excuseOverrun();
+    DOSound::sound.checkSDCard();
   }
 
   // Encoder and IMU updates are needed for everything, so we do them here.
   leftEncoder_.update();  
   rightEncoder_.update();  
-
   imu_.update();
 
-  stepHead();
-  stepDrive();
+  // We only run head and drive control at 50Hz
+  if((seqnum % 2) == 0) {
+    stepHead();
+  } else {
+    stepDrive();
+  }
 
-  if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
+  if((seqnum % 4) == 0) {
     fillAndSendStatePacket();
     if(XBee::xbee.isStarted() && Servos::servos.isStarted()) setLED(LED_STATUS, GREEN);
     else setLED(LED_STATUS, YELLOW);
@@ -301,7 +312,7 @@ bb::Result DODroid::stepHead() {
     bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh + remoteH_ + params_.headHeadingOffset);
     bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh + remoteR_ + params_.headRollOffset);
   }
-
+  
   if(aerialsOK_) {
     float aer = 90 + params_.aerialOffset + speedSP*params_.faAerialSpeedSP;
 
@@ -439,6 +450,9 @@ void DODroid::printExtendedStatus(ConsoleStream *stream) {
   float p, r, h;
   imu_.getFilteredPRH(p, r, h);
   stream->printf("IMU: P%.2f R%.2f H%.2f\n", p, r, h);
+  DOBattStatus::batt.updateCurrent();
+  DOBattStatus::batt.updateVoltage();
+  stream->printf("Battery: %fmA, %fV\n", DOBattStatus::batt.current(), DOBattStatus::batt.voltage());
 }
 
 Result DODroid::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet) {
@@ -499,7 +513,11 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     // Joystick button switches drive mode
     if(packet.button4 && !lastBtn4_) {
       if(driveMode_ == DRIVE_OFF) {
-        switchDrive(DRIVE_POSITION);
+        if(params_.autoPosControl == true) {
+          switchDrive(DRIVE_POSITION);
+        } else {
+          switchDrive(DRIVE_VELOCITY);
+        }
       } else {
         switchDrive(DRIVE_OFF);
       }
@@ -532,7 +550,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       float vel = packet.getAxis(1);
 
       // Joystick at zero for >500ms? Switch to position control mode
-      if(EPSILON(vel) && EPSILON(rot)) { 
+      if(EPSILON(vel) && EPSILON(rot) && params_.autoPosControl == true) { 
         if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && driveMode_ == DRIVE_VELOCITY) {
           switchDrive(DRIVE_POSITION);
         }
@@ -562,12 +580,12 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       balanceController_.setGoal(params_.leanHeadToBody*lean_-pitchAtRest_);
     }
 
-    if(packet.button5) remoteAerial1_ = params_.aerialAnim;
-    else remoteAerial1_ = 0;
+    if(packet.button5) remoteAerial3_ = params_.aerialAnim;
+    else remoteAerial3_ = 0;
     if(packet.button6) remoteAerial2_ = params_.aerialAnim;
     else remoteAerial2_ = 0;
-    if(packet.button7) remoteAerial3_ = params_.aerialAnim;
-    else remoteAerial3_ = 0;
+    if(packet.button7) remoteAerial1_ = params_.aerialAnim;
+    else remoteAerial1_ = 0;
   }
 
   return RES_OK;
@@ -617,6 +635,20 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
       switchDrive(DRIVE_VELOCITY);
       return RES_OK;
     } else return RES_CMD_INVALID_ARGUMENT;
+  }
+
+  else if(words[0] == "set_aerials") {
+    if(words.size() == 2) {
+      float angle = words[1].toFloat();
+      if(setAerials(angle, angle, angle) == true) return RES_OK;
+      return RES_CMD_FAILURE;
+    } else if(words.size() == 4) {
+      float a1 = words[1].toFloat(), a2 = words[2].toFloat(), a3 = words[3].toFloat();
+      if(setAerials(a1, a2, a3) == true) return RES_OK;
+      return RES_CMD_FAILURE;
+    }
+
+    return RES_CMD_INVALID_ARGUMENT_COUNT;
   }
   
   return bb::Subsystem::handleConsoleCommand(words, stream);
@@ -716,7 +748,7 @@ Result DODroid::fillAndSendStatePacket() {
 
 
 bool DODroid::setAerials(uint8_t a1, uint8_t a2, uint8_t a3) {
-  if(aerialsOK_ == false) return false;
+  //if(aerialsOK_ == false) return false;
 
   int retval;
   uint8_t aerials[3] = {a1, a2, a3};

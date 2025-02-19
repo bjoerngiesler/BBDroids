@@ -273,32 +273,32 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     distance = enc.presentPosition()-startPosition;
 
     if(fabs(mA) > ST_ABORT_MILLIAMPS) { 
-      bb::printf("Current meter reports %fmA/%fV of current, higher than threshold of %fmA\n", mA, V, ST_ABORT_MILLIAMPS);
+      LOG(LOG_WARN, "Current meter reports %.1fmA/%.1fV of current, higher than threshold of %.1fmA\n", mA, V, ST_ABORT_MILLIAMPS);
       blockedcount++;
     } else {
       blockedcount = 0;
     }
 
     if(fabs(distance) > ST_ABORT_DISTANCE) {
-      Console::console.printfBroadcast("Distance criterion triggered (fabs(%f) > %f)\n", distance, ST_ABORT_DISTANCE);
+      LOG(LOG_INFO, "Distance criterion triggered (fabs(%f) > %f)\n", distance, ST_ABORT_DISTANCE);
       break;
     } 
     
     if(fabs(hdiffmax) > ST_ABORT_HEADING_CHANGE) {
-      Console::console.printfBroadcast("Heading criterion triggered (fabs(%f) > %f)\n", hdiffmax, ST_ABORT_HEADING_CHANGE);
+      LOG(LOG_INFO, "Heading criterion triggered (fabs(%f) > %f)\n", hdiffmax, ST_ABORT_HEADING_CHANGE);
       break;
     }
 
     if(fabs(axmax) > ST_ABORT_ACCEL) {
-      Console::console.printfBroadcast("X max accel criterion triggered (fabs(%f) > %f)\n", fabs(axmax), ST_ABORT_ACCEL);
+      LOG(LOG_INFO, "X max accel criterion triggered (fabs(%f) > %f)\n", fabs(axmax), ST_ABORT_ACCEL);
       break;
     }
     if(fabs(aymax) > ST_ABORT_ACCEL) {
-      Console::console.printfBroadcast("Y max accel criterion triggered (fabs(%f) > %f)\n", fabs(aymax), ST_ABORT_ACCEL);
+      LOG(LOG_INFO, "Y max accel criterion triggered (fabs(%f) > %f)\n", fabs(aymax), ST_ABORT_ACCEL);
       break;
     }
     if(blockedcount > 10) {
-      Console::console.printfBroadcast("Motor load criterion triggered %d times (%f > %f)\n", blockedcount, mA, ST_ABORT_MILLIAMPS);
+      LOG(LOG_INFO, "Motor load criterion triggered %d times (%f > %f)\n", blockedcount, mA, ST_ABORT_MILLIAMPS);
       break;
     }
 
@@ -307,7 +307,7 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     if(microsPerLoop > tdiff) delayMicroseconds(microsPerLoop - tdiff);
   }
 
-  Console::console.printfBroadcast("PWM at end: %d\n", pwm);
+  LOG(LOG_INFO, "PWM at end: %d\n", pwm);
 
   for(; pwm>=ST_MIN_PWM; pwm -= pwmStep) {
     unsigned long us0 = micros();
@@ -319,7 +319,7 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
 
   // Current too high? Motor blocked.
   if(blockedcount > 5) {
-    Console::console.printfBroadcast("Motor pulling too much power. Likely blocked!\n");
+    LOG(LOG_ERROR, "Motor pulling too much power. Likely blocked!\n");
     return MOTOR_BLOCKED;
   }
 
@@ -327,7 +327,7 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
 
   // High acceleration in y? Probably IMU is turned by 90°
   if(fabs(aymax) > ST_MIN_ACCEL && (aymax < -fabs(axmax) || aymax > fabs(axmax))) {
-    Console::console.printfBroadcast("Accel in Y direction %f higher than in x %f. IMU likely rotated 90°!\n", aymax, axmax);
+    LOG(LOG_ERROR, "Accel in Y direction %f higher than in x %f. IMU likely rotated 90°!\n", aymax, axmax);
     return MOTOR_OTHER;
   }
 
@@ -337,12 +337,12 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
   if(fabs(distance) < ST_MIN_DISTANCE) {
     // ...but measured enough acceleration? Motor is connected, encoder likely isn't.
     if(fabs(axmax) > ST_MIN_ACCEL) {
-      Console::console.printfBroadcast("Distance of %f (<%f) too low, but accel of %f measured. Encoder likely disconnected!\n",
-                                       distance, ST_MIN_DISTANCE, axmax);
+      LOG(LOG_ERROR, "Distance of %f (<%f) too low, but accel of %f measured. Encoder likely disconnected!\n",
+          distance, ST_MIN_DISTANCE, axmax);
       return MOTOR_ENC_DISCONNECTED;
     } else { // ...and not measured enough acceleration? Motor is likely not connected.
-      Console::console.printfBroadcast("Distance of %f (<%f) and accel of %f (<%f) both too low. Motor likely disconnected!\n",
-                                       distance, ST_MIN_DISTANCE, axmax, ST_MIN_ACCEL);
+      LOG(LOG_ERROR, "Distance of %f (<%f) and accel of %f (<%f) both too low. Motor likely disconnected!\n",
+          distance, ST_MIN_DISTANCE, axmax, ST_MIN_ACCEL);
       return MOTOR_DISCONNECTED;
     }
   }

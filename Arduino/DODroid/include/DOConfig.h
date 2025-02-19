@@ -63,6 +63,8 @@ struct DOParams {
     float faHeadAnnealTime   = .5;    // Time it takes for all head axes ot return to 0 after control has been relinquished.
     float faHeadAnnealDelay  = .3;    // Delay before we anneal the head position if button is released
 
+    bool autoPosControl      = false;
+
     bb::HWAddress leftRemoteAddress = {0,0};
     bb::HWAddress rightRemoteAddress = {0,0};
 };

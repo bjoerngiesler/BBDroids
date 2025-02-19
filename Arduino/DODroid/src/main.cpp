@@ -66,6 +66,7 @@ void setup() {
   Serial.println("Starting up...");
 
   Wire.begin();
+  Wire.setClock(1000000);
 
   setupBoardComm();
 
@@ -76,7 +77,6 @@ void setup() {
 
   initializeSubsystems();
   startSubsystems();
-  Wire.setClock(400000);
 
   Console::console.printfBroadcast("D-O\n");
   Console::console.printfBroadcast("Firmware version 0.0\n");
