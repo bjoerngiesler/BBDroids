@@ -9,7 +9,7 @@
 
 bb::XBee bb::XBee::xbee;
 
-static std::vector<unsigned int> baudRatesToTry = { 115200, 9600, 57600, 19200, 28800, 38400, 76800 }; // start with 115200, then try 9600
+static std::vector<unsigned int> baudRatesToTry = { 9600, 57600, 115200, 19200, 28800, 38400, 76800 }; // start with 115200, then try 9600
 
 bb::XBee::XBee() {
 	uart_ = &Serial1;
@@ -80,7 +80,7 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 				stream->printf("%d...", baudRatesToTry[i]); 
 			}
 			
-			uart_->end();
+			//uart_->end();
 			delay(100);
 			uart_->begin(baudRatesToTry[i]);
 			
@@ -381,6 +381,7 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 
 		while(uart_->available()) {
 			c = uart_->read();
+			bb::printf("Read %c\n", c);
 			if(c == 'O') {
 				if(!uart_->available()) delay(1);
 				if(!uart_->available()) continue;

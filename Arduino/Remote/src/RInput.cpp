@@ -276,9 +276,9 @@ void RInput::update() {
         else buttonsChanged[b] = false;
         buttons[b] = false;
       }
-      bb::printf("%d(%d):%d ", b, pin, buttons[b]);
+      //bb::printf("%d(%d):%d ", b, pin, buttons[b]);
     }
-    bb::printf("\n");
+    //bb::printf("\n");
   } 
 #endif // ARDUINO_ARCH_ESP32
 
