@@ -93,4 +93,5 @@ class DataPlot:
 			print("%f; " % v, end='', file=self.recordFile_)
 		print("%f" % vector[-1], file=self.recordFile_)		
 
-
+	def autofit(self):
+		dpg.fit_axis_data(self.yAxis_)

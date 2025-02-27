@@ -127,7 +127,6 @@ class BB8DearPyGui:
 			if packet is None:
 				break
 
-
 			# dpg.configure_item(self.seqnumText, default_value="Sequence: %d" % self.handler.getSeqNum())
 			# if self.lastSeqnum is not None and self.handler.getSeqNum() != (self.lastSeqnum+1)%256:
 			# 	fd = (self.handler.getSeqNum() - (self.lastSeqnum+1)%256)

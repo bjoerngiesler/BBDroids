@@ -17,7 +17,7 @@ from DataPlot import DataPlot
 from Filters import CurioResHPF as HPF
 from Filters import CurioResBPF as BPF
 from Filters import CurioResLPF as LPF
-from Filters import MultiFilter
+from Filters import MultiFilter as MF
 
 def appendMaxLen(l, item, maxlen):
 	l.append(item)
@@ -39,12 +39,12 @@ class BBRemotePlot:
 		self.azList = []
 		self.aList = []
 
-		aLowFilterFreq = 1
-		aHighFilterFreq = 20000
-		self.axFilter = MultiFilter(aLowFilterFreq, aHighFilterFreq, self.frequency)
-		self.ayFilter = MultiFilter(aLowFilterFreq, aHighFilterFreq, self.frequency)
-		self.azFilter = MultiFilter(aLowFilterFreq, aHighFilterFreq, self.frequency)
-		self.filterAccel = False	
+		aLowFilterFreq = 10
+		aHighFilterFreq = 20
+		self.axFilter = MF(aLowFilterFreq, aHighFilterFreq, self.frequency)
+		self.ayFilter = MF(aLowFilterFreq, aHighFilterFreq, self.frequency)
+		self.azFilter = MF(aLowFilterFreq, aHighFilterFreq, self.frequency)
+		self.filterAccel = True	
 		
 		self.vx = 0
 		self.vy = 0
@@ -54,10 +54,10 @@ class BBRemotePlot:
 		self.vzList = []
 		self.vList = []
 
-		self.vxFilter = MultiFilter(aLowFilterFreq, aHighFilterFreq, self.frequency)
-		self.vyFilter = MultiFilter(aLowFilterFreq, aHighFilterFreq, self.frequency)
-		self.vzFilter = MultiFilter(aLowFilterFreq, aHighFilterFreq, self.frequency)
-		self.filterVel = True
+		self.vxFilter = MF(aLowFilterFreq, aHighFilterFreq, self.frequency)
+		self.vyFilter = MF(aLowFilterFreq, aHighFilterFreq, self.frequency)
+		self.vzFilter = MF(aLowFilterFreq, aHighFilterFreq, self.frequency)
+		self.filterVel = False
 
 		self.x = 0
 		self.y = 0
@@ -86,16 +86,11 @@ class BBRemotePlot:
 				continue
 			print("Reading from ", file)
 			f.write("remote running_status on\n")
+			f.write("remote calibrate_imu\n")
 
 			fd = f.fileno()
 			flag = fcntl.fcntl(fd, fcntl.F_GETFD)
-			print(flag)
-			print(os.O_NONBLOCK)
 			fcntl.fcntl(fd, fcntl.F_SETFD, flag | os.O_NONBLOCK)
-			flag = fcntl.fcntl(fd, fcntl.F_GETFD)
-			print(flag)
-			if flag & os.O_NONBLOCK:
-			    print("O_NONBLOCK!!")
 
 		return f
 
@@ -172,9 +167,9 @@ class BBRemotePlot:
 		self.vList = appendMaxLen(self.vList, v, self.listlen)
 
 		# Integrate once more for position
-		self.x = self.x + self.vx*dt + ax*dt*dt/2.0
-		self.y = self.y + self.vy*dt + ay*dt*dt/2.0
-		self.z = self.z + self.vz*dt + az*dt*dt/2.0
+		self.x = self.x + self.vx*dt + (ax/2)*dt*dt
+		self.y = self.y + self.vy*dt + (ay/2)*dt*dt
+		self.z = self.z + self.vz*dt + (az/2)*dt*dt
 
 		# Collect and plot position
 		self.xList = appendMaxLen(self.xList, self.x, self.listlen)
@@ -190,7 +185,6 @@ class BBRemotePlot:
 		dpg.set_value(self.axSeries, [self.seqnumList, self.axList])
 		dpg.set_value(self.aySeries, [self.seqnumList, self.ayList])
 		dpg.set_value(self.azSeries, [self.seqnumList, self.azList])
-		dpg.set_value(self.aSeries, [self.seqnumList, self.aList])
 
 		# Create accel FFT
 		if len(self.aList) > 10:
@@ -205,7 +199,6 @@ class BBRemotePlot:
 		dpg.set_value(self.vxSeries, [self.seqnumList, self.vxList])
 		dpg.set_value(self.vySeries, [self.seqnumList, self.vyList])
 		dpg.set_value(self.vzSeries, [self.seqnumList, self.vzList])
-		dpg.set_value(self.vSeries, [self.seqnumList, self.vList])
 
 		# Create vel FFT
 		if len(self.vList) > 10:
@@ -261,7 +254,7 @@ class BBRemotePlot:
 						self.velFFTSeries = dpg.add_line_series([], [], label="FFT", parent=self.velFFTYAxis)
 
 				with dpg.group(horizontal=True):
-					with dpg.plot(label="Pos", width=w*2, height=h):
+					with dpg.plot(label="Pos", width=w, height=h):
 						dpg.add_plot_legend()
 						self.posXAxis = dpg.add_plot_axis(dpg.mvXAxis, label="t", auto_fit=True)
 						self.posYAxis = dpg.add_plot_axis(dpg.mvYAxis, label="m", auto_fit=True)
@@ -269,6 +262,7 @@ class BBRemotePlot:
 						self.ySeries = dpg.add_line_series([], [], label="y", parent=self.posYAxis)
 						self.zSeries = dpg.add_line_series([], [], label="z", parent=self.posYAxis)
 					self.pauseButton = dpg.add_button(label="Pause", callback=self.pauseCallback)
+					self.zeroButton = dpg.add_button(label="Zero", callback=self.zeroCallback)
 
 	def pauseCallback(self):
 		if self.paused == True:
@@ -278,6 +272,14 @@ class BBRemotePlot:
 			dpg.configure_item(self.pauseButton, label="Continue")
 			self.paused = True
 
+	def zeroCallback(self):
+		self.vx = 0
+		self.vy = 0
+		self.vz = 0
+		self.x = 0
+		self.y = 0
+		self.z = 0
+	
 	def runStandalone(self):
 		dpg.create_context()
 		dpg.create_viewport()
