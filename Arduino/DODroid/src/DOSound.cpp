@@ -21,7 +21,10 @@ bool DOSound::begin(Uart *ser) {
   Console::console.printfBroadcast("Setting up sound...\n");
   ser->begin(9600);
   if(dfp_.begin(*ser)) {
-    checkSDCard();
+    for(int i=0; i<3; i++) {
+      if(checkSDCard() == true) break;
+      delay(1000);
+    }
     dfp_.volume(30);
     available_ = true;
     return true;

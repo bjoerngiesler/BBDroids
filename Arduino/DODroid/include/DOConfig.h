@@ -16,7 +16,7 @@ static const float         WHEEL_DISTANCE = 95.0;                      // Distan
 // Parameters - all of these can be set from the commandline and stored in flash.
 struct DOParams {
     float neckRange         = 30.0; // Careful with this, easy to nosedive if the drive controller and neck aren't working together well.
-    float neckOffset        = -4.0;  
+    float neckOffset        = 0.0;  
     float headRollRange     = 45.0;
     float headRollOffset    = 0.0;
     float headPitchRange    = 45.0; 

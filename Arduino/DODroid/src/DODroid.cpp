@@ -298,19 +298,23 @@ bb::Result DODroid::stepHead() {
   if(speedSP == 0) accelSP = 0;
 
   if(servosOK_) {
-    float nod = params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
-    if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
-    else nod += params_.faNeckSpeedSP*speedSP;
-    nod += params_.neckOffset;
-    nod += lean_;
-    nod = constrain(nod, -params_.neckRange, params_.neckRange);
-    bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
+    if(headIsOn_) {
+      float nod = params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
+      if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
+      else nod += params_.faNeckSpeedSP*speedSP;
+      nod += lean_;
+      nod = constrain(nod, -params_.neckRange, params_.neckRange);
 
-    float headPitch = -nod - params_.leanHeadToBody*lean_ + remoteP_ - params_.neckOffset - params_.headPitchOffset;
-    headPitch += params_.faHeadPitchSpeedSP*speedSP;
-    bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 + headPitch);
-    bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh + remoteH_ + params_.headHeadingOffset);
-    bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh + remoteR_ + params_.headRollOffset);
+      bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod + params_.neckOffset);
+
+      float headPitch = -nod - params_.leanHeadToBody*lean_ + remoteP_ - params_.neckOffset - params_.headPitchOffset;
+      headPitch += params_.faHeadPitchSpeedSP*speedSP;
+      bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 + headPitch);
+      bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh + remoteH_ + params_.headHeadingOffset);
+      bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh + remoteR_ + params_.headRollOffset);
+    } else {
+      bb::Servos::servos.setGoal(SERVO_NECK, 180);
+    }
   }
   
   if(aerialsOK_) {
