@@ -11,16 +11,18 @@ static const uint8_t       BUILDER_ID = 0; // Reserved values: 0 Bjoern, 1 Felix
 static const uint8_t       DROID_ID   = 0;
 static const float         WHEEL_CIRCUMFERENCE = 722.566;              // Wheel circumference in mm for D-O, required to convert between speed over ground to encoder ticks
 static const float         WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979.2 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
+//static const float         WHEEL_TICKS_PER_TURN = 489.6 * (97.0/18.0); // 979.2 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
 static const float         WHEEL_DISTANCE = 95.0;                      // Distance between the drive wheels
+static const bool          HEAD_COUNTERWEIGHT = true;                  // set to false if you're running without a head counterweight
 
 // Parameters - all of these can be set from the commandline and stored in flash.
 struct DOParams {
-    float neckRange         = 30.0; // Careful with this, easy to nosedive if the drive controller and neck aren't working together well.
+    float neckRange         = 45.0; // Careful with this, easy to nosedive if the drive controller and neck aren't working together well.
     float neckOffset        = 0.0;  
     float headRollRange     = 45.0;
     float headRollOffset    = 0.0;
     float headPitchRange    = 45.0; 
-    float headPitchOffset   = 3.0;
+    float headPitchOffset   = 0.0;
     float headHeadingRange  = 90.0;
     float headHeadingOffset = 0.0;
 
@@ -30,7 +32,7 @@ struct DOParams {
     float wheelKi           = 0.8;
     float wheelKd           = 0.0;
 
-    float balKp             = 20;
+    float balKp             = 10;
     float balKi             = 0;
     float balKd             = 0;
 
@@ -53,17 +55,18 @@ struct DOParams {
     // Be aware of the units!!! E.g. target unit for servo free animation is always degrees, but input may be something else.
     // Example - faNeckSpeed has input unit of mm/s, going up to maxSpeed, so is probably much below 1.
     float faNeckIMUAccel     = 0;     // Move neck by acceleration from the IMU
-    float faNeckSPAccel      = -0.01; // Move neck by acceleration from speed setpoint
-    float faNeckSpeed        = -0.02; // Move neck by absolute speed over ground
-    float faNeckSpeedSP      = -0.04; // Move neck by speed *setpoint* over ground. 
-    float faHeadPitchSpeedSP = 0.03;  // Pitch up head at higher speeds to counteract the neck speed setpoint
-    float faHeadRollTurn     = .10;   // Move head roll by IMU turn speed
-    float faHeadHeadingTurn  = .14;   // Move head heading by IMU turn speed
-    float faAerialSpeedSP   = .05;    // Move aerials by speed over ground
-    float faHeadAnnealTime   = .5;    // Time it takes for all head axes ot return to 0 after control has been relinquished.
-    float faHeadAnnealDelay  = .3;    // Delay before we anneal the head position if button is released
+    float faNeckIMUPitch     = .8;
+    float faNeckSPAccel      = -0.005; // Move neck by acceleration from speed setpoint
+    float faNeckSpeed        = -0.01;  // Move neck by absolute speed over ground
+    float faNeckSpeedSP      = -0.04;  // Move neck by speed *setpoint* over ground. 
+    float faHeadPitchSpeedSP = -0.01;    // Pitch up head at higher speeds to counteract the neck speed setpoint
+    float faHeadRollTurn     = .10;    // Move head roll by IMU turn speed
+    float faHeadHeadingTurn  = .14;    // Move head heading by IMU turn speed
+    float faAerialSpeedSP   = .05;     // Move aerials by speed over ground
+    float faHeadAnnealTime   = .5;     // Time it takes for all head axes ot return to 0 after control has been relinquished.
+    float faHeadAnnealDelay  = .3;     // Delay before we anneal the head position if button is released
 
-    bool autoPosControl      = false;
+    bool autoPosControl      = true;
 
     bb::HWAddress leftRemoteAddress = {0,0};
     bb::HWAddress rightRemoteAddress = {0,0};

@@ -299,15 +299,26 @@ bb::Result DODroid::stepHead() {
 
   if(servosOK_) {
     if(headIsOn_) {
-      float nod = params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
-      if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
-      else nod += params_.faNeckSpeedSP*speedSP;
+      float nod;
+      if(HEAD_COUNTERWEIGHT == false) {
+        nod = params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
+        if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
+        else nod += params_.faNeckSpeedSP*speedSP;
+      } else {
+        nod = params_.faNeckIMUPitch*p + params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
+        if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
+        else nod += params_.faNeckSpeedSP*speedSP;
+
+      }
+
       nod += lean_;
       nod = constrain(nod, -params_.neckRange, params_.neckRange);
-
       bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod + params_.neckOffset);
 
-      float headPitch = -nod - params_.leanHeadToBody*lean_ + remoteP_ - params_.neckOffset - params_.headPitchOffset;
+      float headPitch = -nod;
+      //headPitch -= params_.leanHeadToBody*lean_;
+      headPitch += remoteP_;
+      headPitch -= (params_.neckOffset - params_.headPitchOffset);
       headPitch += params_.faHeadPitchSpeedSP*speedSP;
       bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 + headPitch);
       bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh + remoteH_ + params_.headHeadingOffset);
@@ -576,8 +587,10 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       setLED(LED_DRIVE, OFF);
     }
 
+    lean_ = -packet.getAxis(8, bb::ControlPacket::UNIT_UNITY) * params_.neckRange;
     DOSound::sound.setVolume(int(30.0 * packet.getAxis(9)));
   } else { // secondary remote
+#if 0
     lean_ = -1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange;
 
     if(headIsOn_) {
@@ -590,6 +603,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     else remoteAerial2_ = 0;
     if(packet.button7) remoteAerial1_ = params_.aerialAnim;
     else remoteAerial1_ = 0;
+#endif
   }
 
   return RES_OK;

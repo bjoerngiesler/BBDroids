@@ -25,7 +25,7 @@ bool DOSound::begin(Uart *ser) {
       if(checkSDCard() == true) break;
       delay(1000);
     }
-    dfp_.volume(30);
+    dfp_.volume(10);
     available_ = true;
     return true;
   } 
