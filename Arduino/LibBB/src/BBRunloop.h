@@ -56,7 +56,7 @@ protected:
 	unsigned long seqnum_;
 	unsigned long cycleTime_;
 	unsigned long startTime_;
-	bool runningStatus_;
+	bool runningStatus_, suppressOverrun_;
 	bool excuseOverrun_;
 };
 

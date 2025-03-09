@@ -10,9 +10,11 @@ bb::Runloop::Runloop() {
 	description_ = "Main runloop";
 	help_ = "Started once after all subsystems are added. Its start() only returns if stop() is called.\n"\
 "Commands:\n"\
-"\trunning_status [on|off]: Print running status on timing";
+"\trunning_status [on|off]:    Print running status on timing\n"\
+"\tsuppress_overrun [on|off]:  Suppress overrun messages";
 	cycleTime_ = DEFAULT_CYCLETIME;
 	runningStatus_ = false;
+	suppressOverrun_ = false;
 	excuseOverrun_ = false;
 }
 
@@ -71,7 +73,7 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		// ...and bicker if we overran the allotted time.
 		if(looptime <= cycleTime_) {
 			delayMicroseconds(cycleTime_-looptime);
-		} else if(excuseOverrun_ == false) {
+		} else if(excuseOverrun_ == false && suppressOverrun_ == false) {
 			Console::console.printfBroadcast("%d/%dus spent in loop: ", looptime, cycleTime_);
 			for(auto& t: timingInfo) {
 				Console::console.printfBroadcast(t.c_str());
@@ -102,6 +104,11 @@ bb::Result bb::Runloop::handleConsoleCommand(const std::vector<String>& words, C
 	if(words[0] == "running_status") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		runningStatus_ = words[1] == "on" ? true : false;
+		return RES_OK;
+	}
+	if(words[0] == "suppress_overrun") {
+		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+		suppressOverrun_ = words[1] == "on" ? true : false;
 		return RES_OK;
 	}
 

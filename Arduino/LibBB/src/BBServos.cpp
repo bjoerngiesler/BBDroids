@@ -525,6 +525,7 @@ bool bb::Servos::setRange(uint8_t id, float min, float max, ValueType t) {
     s->min = computeRawValue(max, t);
   }
 
+  bb::printf("Min: %d max: %d\n", s->min, s->max);
   setGoal(id, constrain(s->goal, s->min, s->max), VALUE_RAW);
 
   return true;
