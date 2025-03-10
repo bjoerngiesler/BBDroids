@@ -11,7 +11,6 @@ static const uint8_t       BUILDER_ID = 0; // Reserved values: 0 Bjoern, 1 Felix
 static const uint8_t       DROID_ID   = 0;
 static const float         WHEEL_CIRCUMFERENCE = 722.566;              // Wheel circumference in mm for D-O, required to convert between speed over ground to encoder ticks
 static const float         WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979.2 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
-//static const float         WHEEL_TICKS_PER_TURN = 489.6 * (97.0/18.0); // 979.2 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
 static const float         WHEEL_DISTANCE = 95.0;                      // Distance between the drive wheels
 static const bool          HEAD_COUNTERWEIGHT = true;                  // set to false if you're running without a head counterweight
 
@@ -32,7 +31,7 @@ struct DOParams {
     float wheelKi           = 0.8;
     float wheelKd           = 0.0;
 
-    float balKp             = 10;
+    float balKp             = 20;
     float balKi             = 0;
     float balKd             = 0;
 
