@@ -6,6 +6,8 @@
 #include <DFPlayerMini_Fast.h>
 #include <map>
 
+// #define CHECK_SDCARD
+
 class DOSound {
 public:
   static DOSound sound;
@@ -24,7 +26,11 @@ public:
   bool begin(Uart *ser);
   bool available() { return available_; }
   bool checkSDCard(); // CAREFUL - takes up to 71ms!
+#if defined(CHECK_SDCARD)
   bool sdCardInserted() { return fileCount_ != -1; }
+#else
+bool sdCardInserted() { return fileCount_ != -1; }
+#endif
   bool playFolder(Folder folder, int fileNumber);
   bool playFolderRandom(Folder folder);
   bool playSystemSound(int snd);
