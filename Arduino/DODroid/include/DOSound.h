@@ -6,7 +6,7 @@
 #include <DFPlayerMini_Fast.h>
 #include <map>
 
-// #define CHECK_SDCARD
+#define CHECK_SDCARD
 
 class DOSound {
 public:
@@ -29,7 +29,7 @@ public:
 #if defined(CHECK_SDCARD)
   bool sdCardInserted() { return fileCount_ != -1; }
 #else
-bool sdCardInserted() { return fileCount_ != -1; }
+  bool sdCardInserted() { return true; }
 #endif
   bool playFolder(Folder folder, int fileNumber);
   bool playFolderRandom(Folder folder);
