@@ -73,11 +73,11 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 
 	currentBPS_ = 0;
 	if(currentBPS_ == 0) {
-		if(stream) stream->printf("auto-detecting BPS... ");
+		if(stream) stream->printf("Auto-detecting BPS: ");
 		
 		for(size_t i=0; i<baudRatesToTry.size(); i++) {
 			if(stream) {
-				stream->printf("%d...", baudRatesToTry[i]); 
+				stream->printf("%d... ", baudRatesToTry[i]); 
 			}
 			
 			//uart_->end();
@@ -121,16 +121,12 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 		atmode_timeout_ = strtol(retval.c_str(), 0, 16) * 100;
 	}
 
-	retval = sendStringAndWaitForResponse("ATMM");
-	if(retval != "") {
-		Console::console.printfBroadcast("MM response: %s\n", retval.c_str());
-	}
 	retval = sendStringAndWaitForResponse("ATMM=3");
-	if(retval != "") {
+	if(retval != "OK") {
 		Console::console.printfBroadcast("MM=3 response: %s\n", retval.c_str());
 	}
 	retval = sendStringAndWaitForResponse("ATRR");
-	if(retval != "") {
+	if(retval != "OK") {
 		Console::console.printfBroadcast("RR response: %s\n", retval.c_str());
 	}
 
@@ -353,20 +349,16 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 		return RES_OK;
 	}
 
-	Console::console.printfBroadcast("Entering AT mode.\n");
-	//Console::console.printfBroadcast("Wait 1s... ");
-
 	int numDiscardedBytes = 0;
 
 	for(int timeout = 0; timeout < 1000; timeout++) {
 		if(uart_->available()) {
-			Console::console.printfBroadcast("Discarding ");
+			Console::console.printfBroadcast("discarding ");
 			while(uart_->available())  {
 				uart_->read();
 				Console::console.printfBroadcast(".");
 				numDiscardedBytes++;
 			}
-			Console::console.printfBroadcast("\n");
 		}
 		delay(1);
 	}
@@ -381,7 +373,6 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 
 		while(uart_->available()) {
 			c = uart_->read();
-			bb::printf("Read %c\n", c);
 			if(c == 'O') {
 				if(!uart_->available()) delay(1);
 				if(!uart_->available()) continue;
@@ -409,9 +400,8 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 
 
 	if(success) {
-		Console::console.printfBroadcast("Successfully entered AT Mode\n");
 		if(numDiscardedBytes) {
-			Console::console.printfBroadcast("Discarded %d bytes while entering AT mode.\n", numDiscardedBytes);
+			Console::console.printfBroadcast(" discarded %d bytes while entering AT mode...", numDiscardedBytes);
 		}
 		atmode_millis_ = millis();
 		atmode_ = true;
@@ -419,7 +409,7 @@ bb::Result bb::XBee::enterATModeIfNecessary(ConsoleStream *stream) {
 		return RES_OK;
 	}
 
-	Console::console.printfBroadcast("no response to +++\n");
+	Console::console.printfBroadcast("no response entering AT mode. ");
 	return RES_COMM_TIMEOUT;
 }
 

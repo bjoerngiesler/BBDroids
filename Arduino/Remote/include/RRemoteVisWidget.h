@@ -17,7 +17,7 @@ public:
 
     virtual void setPosition(int x, int y);
     virtual Result draw(ConsoleStream* stream);
-    virtual Result visualizeFromPacket(const bb::ControlPacket& packet);
+    virtual Result visualizeFromControlPacket(const bb::ControlPacket& packet);
     virtual void takeInputFocus();
     void encTurn(float enc);
 

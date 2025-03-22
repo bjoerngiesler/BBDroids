@@ -3,10 +3,8 @@
 
 #include <Adafruit_NeoPixel.h>
 #include <LibBB.h>
-#if defined(LEFT_REMOTE)
 #if !defined(ARDUINO_ARCH_ESP32)
 #include <SoftwareSerial.h>
-#endif
 #endif
 #include <vector>
 
@@ -103,12 +101,10 @@ protected:
   bool sendStringAndWaitForOK(const String& str, int timeout=1, bool nl=true);
   uint8_t sendBinCommand(const std::vector<uint8_t>& cmd, int timeout=1000, bool waitForResponse=false);
 
-#if defined(LEFT_REMOTE)
 #if defined(ARDUINO_ARCH_ESP32)
   HardwareSerial& ser_;
 #else
   SerialPIO ser_;
-#endif
 #endif
   bool left_led_state_, right_led_state_;
   unsigned long last_millis_;

@@ -11,19 +11,43 @@
 #error VERSION not defined
 #endif
 
-#if defined(LEFT_REMOTE) && defined(RIGHT_REMOTE)
-#error Both LEFT_REMOTE and RIGHT_REMOTE defined, this will not work!
-#elif !defined(LEFT_REMOTE) && !defined(RIGHT_REMOTE)
-#error Neither LEFT_REMOTE nor RIGHT_REMOTE defined, this will not work!
-#endif
-
 #if defined(ARDUINO_ARCH_ESP32)
 
-// The ESP32 remote uses a different pinout, and much less pins because
-// it employs a MPC23017 i2c I/O expander for the buttons.
+struct Pins {
+    uint8_t P_D_NEOPIXEL;
+    uint8_t P_A_JOY_VER, P_A_JOY_HOR; 
+    uint8_t P_A_BATT_CHECK;
+    uint8_t P_D_XBEE_RX, P_D_XBEE_TX;
+    uint8_t P_D_DISPLAY_RX, P_D_DISPLAY_TX;
+    uint8_t P_A_POT1, P_A_POT2;
+    uint8_t P_D_RST_IOEXP;
+};
 
-#if defined(LEFT_REMOTE)
+static const Pins leftRemotePins = {
+    D0,         // P_D_NEOPIXEL
+    A1, A2,     // P_A_JOY_VER, P_A_JOY_HOR
+    A3,         // P_A_BATT_CHECK
+    D7, D6,     // P_D_XBEE_RX, P_D_XBEE_TX
+    D8, D9,     // P_D_DISPLAY_RX, P_D_DISPLAY_TX
+    A10, 0xff,  // P_A_POT1, UNDEF(P_A_POT2),
+    0xff        // UNDEF(P_D_RST_IOEXP)
+};
 
+static const Pins rightRemotePins = {
+    D9,         // P_D_NEOPIXEL
+    A8, A3,     // P_A_JOY_VER, P_A_JOY_HOR,
+    A10,        // P_A_BATT_CHECK
+    D7, D6,     // P_D_XBEE_RX, P_D_XBEE_TX
+    0xff, 0xff, // UNDEF(P_D_DISPLAY_RX, P_D_DISPLAY_TX)
+    A0, A1,     // P_A_POT1, P_A_POT2,
+    D2          // P_D_RST_IOEXP
+};
+
+extern Pins pins;
+extern bool isLeftRemote;
+
+/*
+// LEFT_REMOTE
 static const uint8_t P_D_NEOPIXEL   = D0;
 static const uint8_t P_A_JOY_VER    = A1;
 static const uint8_t P_A_JOY_HOR    = A2;
@@ -34,9 +58,7 @@ static const uint8_t P_D_DISPLAY_RX = D8;
 static const uint8_t P_D_DISPLAY_TX = D9;
 static const uint8_t P_A_POT1       = A10;
  
- 
-#else // !defined(LEFT_REMOTE)
-
+// RIGHT REMOTE
 static const uint8_t P_A_POT1       = A0;
 static const uint8_t P_A_POT2       = A1;
 static const uint8_t P_D_RST_IOEXP  = D2;
@@ -46,8 +68,9 @@ static const uint8_t P_D_XBEE_RX    = D7;
 static const uint8_t P_A_JOY_VER    = A8;
 static const uint8_t P_D_NEOPIXEL   = D9;
 static const uint8_t P_A_BATT_CHECK = A10;
+*/
 
-#endif
+static const uint8_t P_DETECT_WHICH_REMOTE = A2;
 
 #else // !defined(ARDUINO_ARCH_ESP32)
 

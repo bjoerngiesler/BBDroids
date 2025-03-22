@@ -1,10 +1,11 @@
 #include "RRotaWidget.h"
 #include "RRemote.h"
+#include "RUI.h"
 
 void RRotaWidget::showIndex(unsigned int i) {
     if(i >= widgets_.size()) return;
     index_ = i;
-    RRemote::remote.setTopTitle(name());
+    RUI::ui.setTopTitle(name());
     takeInputFocus();
     widgetsChanged_ = true;
 }

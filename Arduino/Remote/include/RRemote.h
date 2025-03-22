@@ -4,18 +4,7 @@
 #include <LibBB.h>
 #include <deque>
 #include "Config.h"
-
-#include "RWidget.h"
-#include "RMenuWidget.h"
-#include "RMessageWidget.h"
-#include "RGraphsWidget.h"
-#include "RCrosshairWidget.h"
-#include "RLabelWidget.h"
-#include "RIMUWidget.h"
-#include "RRemoteVisWidget.h"
-#include "RRotaWidget.h"
-#include "RSeqnumWidget.h"
-#include "RDialogWidget.h"
+#include "RInput.h"
 
 using namespace bb;
 
@@ -28,6 +17,8 @@ public:
     MODE_CONTROLSILENT = 1,
     MODE_CALIBRATION   = 2
   };
+
+  void setIsLeftRemote();
 
   Result initialize();
   Result start(ConsoleStream *stream = NULL);
@@ -46,52 +37,44 @@ public:
   virtual void printExtendedStatus(ConsoleStream *stream = NULL);
   void printExtendedStatusLine(ConsoleStream *stream = NULL); 
 
-
-  void setMainWidget(RWidget* widget);
-
-  void showPairDroidMenu();
-  void showPairRemoteMenu();
-  void showMenu(RMenuWidget* menu);
-  void showGraphs();
-  void showMain();
-
-  void populateMenus();
-  void drawGUI();
-
-  void setTopTitle(const String& title);
-
   // Pairing callbacks
   void selectDroid(const HWAddress& address);
   void selectRightRemote(const HWAddress& address);
 
   // Other callbacks
-  void setIncrRotButtonCB(RInput::Button button, bool left);
-  void factoryResetCB(bool left);
-  void startCalibrationCB(bool left);
-  void finishCalibrationCB(bool left);
-  void setLeftIsPrimaryCB(bool yesno);
+  void setLEDBrightness(uint8_t brt);
+  uint8_t ledBrightness() { return params_.config.ledBrightness; }
 
-  void factoryReset();
+  void setJoyDeadband(uint8_t db);
+  uint8_t joyDeadband() { return params_.config.deadbandPercent; }
+
+  void setSendRepeats(uint8_t sr);
+  uint8_t sendRepeats() { return params_.config.sendRepeats; }
+
   void startCalibration();
   void finishCalibration();
-
-  void storeParams() {  ConfigStorage::storage.writeBlock(paramsHandle_);  }
-
-  void showMessage(const String& str, unsigned int delayms=0, uint8_t color=RDisplay::WHITE);
-  void showDialog();
-  void hideDialog();
+  void factoryReset();
   
-#if defined(LEFT_REMOTE)
-  void showLEDBrightnessDialog();
-  void setLEDBrightness(uint8_t brt);
-  void showJoyDeadbandDialog();
-  void setJoyDeadband(uint8_t db);
-  void showSendRepeatsDialog();
-  void setSendRepeats(uint8_t sr);
-  Result sendConfigToRightRemote();
-#endif
+  void sendFactoryReset();
 
+  Result sendConfigToRightRemote();
+  void storeParams() { ConfigStorage::storage.writeBlock(paramsHandle_);  }
   void runTestsuite();
+
+  const HWAddress& droidAddress() { return params_.droidAddress; }
+  const HWAddress& otherRemoteAddress() { return params_.otherRemoteAddress; }
+
+  RInput::Button incrRotButton(PacketSource source);
+  void setIncrRotButton(PacketSource source, RInput::Button btn);
+
+  PacketSource primary() { return params_.config.leftIsPrimary ? PACKET_SOURCE_LEFT_REMOTE : PACKET_SOURCE_RIGHT_REMOTE; }
+  void setLeftIsPrimary(bool yesno);
+
+  // Callbacks
+  void setIncrRotButtonCB(RInput::Button button, bool left);
+  void sendStartCalibration();
+  void finishCalibrationCB(bool left);
+
 
 protected:
   RRemote();
@@ -103,28 +86,7 @@ protected:
   bool runningStatus_;
   Packet lastPacketSent_;
 
-  RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_;
-  RMenuWidget leftRemoteMenu_, rightRemoteMenu_, bothRemotesMenu_, droidMenu_;
-  RMenuWidget lRIncrRotMenu_, rRIncrRotMenu_;
-  RMessageWidget message_;
-  RDialogWidget dialog_;
-  bool dialogActive_;
-  RLabelWidget topLabel_, bottomLabel_;
-  RSeqnumWidget leftSeqnum_, rightSeqnum_, droidSeqnum_;
-  RRotaWidget mainVis_;
-  RRemoteVisWidget remoteVisL_, remoteVisR_;
-
-  RWidget* mainWidget_;
-  RLabelWidget *ledBrightnessLabel_, *deadbandPercentLabel_, *sendRepeatsLabel_;
-
-  bool needsMenuRebuild_;
-  std::vector<XBee::Node> discoveredNodes_;
-
-  RWidget titleWidget;
-
-#if defined(LEFT_REMOTE)
   Packet lastPacketFromDroid_, lastPacketFromRightRemote_;
-#endif
 
   float deltaR_, deltaP_, deltaH_;
 
@@ -147,7 +109,6 @@ protected:
   static bb::ConfigStorage::HANDLE paramsHandle_;
   unsigned int ledBrightness_, deadbandPercent_, sendRepeats_;
   
-  uint8_t lastRightSeqnum_, lastDroidSeqnum_;
   unsigned long lastRightMs_, lastDroidMs_;
 };
 

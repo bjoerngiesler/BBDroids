@@ -27,30 +27,15 @@ public:
 
   // Weird order given by ESP32 layout
 #if defined(ARDUINO_ARCH_ESP32)
-#if defined(LEFT_REMOTE)
-  enum ButtonPin {
-    BUTTON_PIN_1       = 2,
-    BUTTON_PIN_2       = 4,
-    BUTTON_PIN_3       = 6,
-    BUTTON_PIN_4       = 7,
-    BUTTON_PIN_JOY     = 5,
-    BUTTON_PIN_CONFIRM = 3,
-    BUTTON_PIN_LEFT    = 1,
-    BUTTON_PIN_RIGHT   = 0
-  };
-#else
-  enum ButtonPin {
-    BUTTON_PIN_1       = 5,
-    BUTTON_PIN_2       = 4,
-    BUTTON_PIN_3       = 3,
-    BUTTON_PIN_4       = 2,
-    BUTTON_PIN_JOY     = 1,
-    BUTTON_PIN_CONFIRM = 7,
-    BUTTON_PIN_LEFT    = 6,
-    BUTTON_PIN_RIGHT   = 0
-  };
-#endif
-
+  typedef uint8_t ButtonPin;
+  static ButtonPin BUTTON_PIN_1;
+  static ButtonPin BUTTON_PIN_2;
+  static ButtonPin BUTTON_PIN_3;
+  static ButtonPin BUTTON_PIN_4;
+  static ButtonPin BUTTON_PIN_JOY;
+  static ButtonPin BUTTON_PIN_CONFIRM;
+  static ButtonPin BUTTON_PIN_LEFT;
+  static ButtonPin BUTTON_PIN_RIGHT;
 #else
   enum ButtonPin {
     BUTTON_PIN_1       = 0,
@@ -69,6 +54,7 @@ public:
     uint16_t min, max, center;
   };
 
+  static void initButtonPinMapping();
   static Button pinToButton(ButtonPin index);
   static ButtonPin buttonToPin(Button index);
 
@@ -178,11 +164,9 @@ protected:
   unsigned long lastMotionMS_;
   bool joyAtZero_;
 
-#if defined(LEFT_REMOTE)
   float lastEncDeg_;
   bb::LowPassFilter encTurnFilter_;
   void processEncoder();
-#endif
 };
 
 #endif // REMOTEINPUT_H

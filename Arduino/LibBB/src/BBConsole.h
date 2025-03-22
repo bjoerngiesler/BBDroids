@@ -116,8 +116,14 @@ public:
 
 	static std::vector<String> split(const String& str);
 
-	virtual Result initialize(int bps=115200) { 
+	//! Initialize, opening the Serial port using Serial.begin(bps)
+	virtual Result initialize(int bps) { 
 		Serial.begin(bps); 
+		return initialize();
+	}
+
+	//! Initialize, assuming the Serial port is already opened
+	virtual Result initialize() { 
 		serialStream_ = new SerialConsoleStream(Serial);
 		addConsoleStream(serialStream_); 
 		return Subsystem::initialize(); 

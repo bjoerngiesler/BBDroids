@@ -181,7 +181,7 @@ void RRemoteVisWidget::selectPot2() {
     potSelected_ = POT2_SELECTED;
 }
 
-Result RRemoteVisWidget::visualizeFromPacket(const bb::ControlPacket& packet) {
+Result RRemoteVisWidget::visualizeFromControlPacket(const bb::ControlPacket& packet) {
     crosshair_.setHorVer(packet.getAxis(0, bb::ControlPacket::UNIT_UNITY_CENTERED), 
                          packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED));
     if(EPSILON(packet.getAxis(0)) && EPSILON(packet.getAxis(1))) {

@@ -20,14 +20,8 @@ static const int CURSOR_SIZE = 5;
 RDisplay RDisplay::display;
 
 RDisplay::RDisplay():
-#if defined(LEFT_REMOTE)
-#if defined(ARDUINO_ARCH_ESP32)
   ser_(Serial2),
-#else
-  ser_(P_DISPLAY_RX, P_DISPLAY_TX),
-#endif
-#endif // LEFT_REMOTE
-  statusPixels_(2, P_D_NEOPIXEL, NEO_GRB+NEO_KHZ800)
+  statusPixels_(2, pins.P_D_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 {
   name_ = "display";
 	description_ = "Display";
@@ -35,49 +29,44 @@ RDisplay::RDisplay():
 }
 
 Result RDisplay::initialize() {
-  pinMode(P_D_NEOPIXEL, OUTPUT);
+  pinMode(pins.P_D_NEOPIXEL, OUTPUT);
   statusPixels_.begin();
   setLED(LED_COMM, 0, 0, 0);
   setLED(LED_STATUS, 150, 150, 150);
- 
-#if defined(LEFT_REMOTE)
+
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, LOW);
-#endif
-  
+  digitalWrite(LED_BUILTIN, isLeftRemote ? HIGH : LOW);
   return Subsystem::initialize();
 }
 
 Result RDisplay::start(ConsoleStream *stream) {
-#if defined(LEFT_REMOTE)
   last_millis_ = millis();
   left_led_state_ = false;
   right_led_state_ = false;
 
-  ser_.begin(921600);
-  while(ser_.available()) ser_.read(); // readEmpty
+  if(isLeftRemote) {
+    bb::printf("Initializing display...");
+    ser_.begin(921600);
+    while(ser_.available()) ser_.read(); // readEmpty
 
-#if defined(BINARY)
+  #if defined(BINARY)
+    uint8_t retval = sendBinCommand({rd::CMD_LOGO|0x80, 1}, 100000, true);
+    while(ser_.available()) Console::console.printfBroadcast("0x%x\n", ser_.read());
+    if(retval != (rd::CMD_NOP|0x80)) {
+  #else
+    if(sendStringAndWaitForOK(String((char)rd::CMD_LOGO)+"1") == false) {
+  #endif
 
-  uint8_t retval = sendBinCommand({rd::CMD_LOGO|0x80, 1}, 100000, true);
-  while(ser_.available()) Console::console.printfBroadcast("0x%x\n", ser_.read());
-  if(retval != (rd::CMD_NOP|0x80)) {
-#else
-  if(sendStringAndWaitForOK(String((char)rd::CMD_LOGO)+"1") == false) {
-#endif
-
-    Console::console.printfBroadcast("Display failure, got 0x%x instead of 0x%x\n", retval, rd::CMD_NOP|0x80);
-    return RES_SUBSYS_COMM_ERROR;
+      bb::printf("failure, got 0x%x instead of 0x%x\n", retval, rd::CMD_NOP|0x80);
+      return RES_SUBSYS_COMM_ERROR;
+    }
+    bb::printf("OK\n");
   }
-  Console::console.printfBroadcast("Display OK\n");
 
   operationStatus_ = RES_OK;
   started_ = true;
 
   return RES_OK;
-#else
-  return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-#endif
 }
 	
 Result RDisplay::stop(ConsoleStream *stream) {
@@ -99,7 +88,11 @@ Result RDisplay::step() {
 }
 
 String RDisplay::sendStringAndWaitForResponse(const String& str, int timeout, bool nl) {
-#if defined(LEFT_REMOTE)
+  if(!isLeftRemote) {
+    bb::printf("RDisplay::sendStringAndWaitForResponse() called in right remote, only defined for left remote\n");
+    return "";
+  }
+
   ser_.print(str);
   if(nl) {
     ser_.print("\n");
@@ -117,7 +110,6 @@ String RDisplay::sendStringAndWaitForResponse(const String& str, int timeout, bo
   if(readString(retval)) {
     return retval;
   }
-#endif
 
   return "";
 }
@@ -130,7 +122,11 @@ bool RDisplay::sendStringAndWaitForOK(const String& str, int timeout, bool nl) {
 }
 
 uint8_t RDisplay::sendBinCommand(const std::vector<uint8_t>& cmd, int timeout, bool waitForResponse) {
-#if defined(LEFT_REMOTE)
+  if(!isLeftRemote) {
+    bb::printf("RDisplay::sendStringAndWaitForResponse() called in right remote, only defined for left remote\n");
+    return 0;
+  }
+
   //Console::console.printfBroadcast("Sending... ");
   for(auto byte: cmd) {
     //Console::console.printfBroadcast("%x ", byte);
@@ -162,13 +158,14 @@ uint8_t RDisplay::sendBinCommand(const std::vector<uint8_t>& cmd, int timeout, b
     //Console::console.printfBroadcast("Read 0x%x\n", retval);
   }
   return retval;
-#endif
-
-  return 0;
 }
 
 bool RDisplay::readString(String& str, unsigned char terminator) {
-#if defined(LEFT_REMOTE)
+  if(!isLeftRemote) {
+    bb::printf("RDisplay::sendStringAndWaitForResponse() called in right remote, only defined for left remote\n");
+    return false;
+  }
+
 	while(true) {
 		int to = 0;
 		while(!ser_.available()) {
@@ -183,9 +180,7 @@ bool RDisplay::readString(String& str, unsigned char terminator) {
 		str += (char)c;
 		if(c == terminator) return true;
 	}
-#else
   return false;
-#endif
 }
 
 Result RDisplay::cls() {

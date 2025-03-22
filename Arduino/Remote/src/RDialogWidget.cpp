@@ -1,5 +1,6 @@
 #include "RDialogWidget.h"
 #include "RRemote.h"
+#include "RUI.h"
 
 RDialogWidget::RDialogWidget() {
     titleLabel_.setAutosize();
@@ -85,10 +86,10 @@ void RDialogWidget::encInput(float enc) {
 
 void RDialogWidget::ok() {
     if(okCallback_ != nullptr) okCallback_(value_);
-    RRemote::remote.hideDialog();
+    RUI::ui.hideDialog();
 }
 
 void RDialogWidget::cancel() {
     if(cancelCallback_ != nullptr) cancelCallback_();
-    RRemote::remote.hideDialog();
+    RUI::ui.hideDialog();
 }

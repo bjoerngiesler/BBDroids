@@ -15,8 +15,12 @@ int getAnalogReadResolution() { return 12; } // whatever
 #include <WiFiClient.h>
 #include <WiFiAP.h>
 
+Pins pins = leftRemotePins;
+bool isLeftRemote;
+
 void setup() {
   Serial.begin(2000000);
+  Serial.println("BBDroids Remote Software");
 #if !defined(ARDUINO_ARCH_ESP32)
   rp2040.enableDoubleResetBootloader();
 #endif
@@ -24,10 +28,34 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
-#if !defined(LEFT_REMOTE)
-  pinMode(P_D_RST_IOEXP, OUTPUT);
-  digitalWrite(P_D_RST_IOEXP, HIGH);
-#endif
+  isLeftRemote = false;
+  pinMode(P_DETECT_WHICH_REMOTE, INPUT);
+  digitalWrite(P_DETECT_WHICH_REMOTE, HIGH);
+  delay(100);
+
+  uint16_t val = analogRead(P_DETECT_WHICH_REMOTE);
+  uint16_t thresh = 500;
+  uint16_t min = 2048-thresh, max = 2048+thresh;
+  Serial.print("Read "); Serial.print(val);
+  if(val < min || val > max) {
+    Serial.println(" -- this is the RIGHT remote!");
+    pins = rightRemotePins;
+  } else {
+    Serial.println(" -- this is the LEFT remote!");
+    isLeftRemote = true;
+    pins = leftRemotePins;
+  }
+  delay(1000);
+
+  if(isLeftRemote) {
+    Serial2.setPins(pins.P_D_DISPLAY_RX, pins.P_D_DISPLAY_TX);
+    XBee::xbee.setName("LeftRemote");
+  } else {
+    pinMode(pins.P_D_RST_IOEXP, OUTPUT);
+    digitalWrite(pins.P_D_RST_IOEXP, HIGH);
+    XBee::xbee.setName("RightRemote");
+  }
+
 
   Console::console.initialize();
   Console::console.start();
@@ -38,31 +66,16 @@ void setup() {
   ConfigStorage::storage.initialize();
   Runloop::runloop.initialize();
 
-#if defined(LEFT_REMOTE)
-#if defined(ARDUINO_ARCH_ESP32)
-  Serial2.setPins(P_D_DISPLAY_RX, P_D_DISPLAY_TX);
-#endif
-#endif
   RDisplay::display.initialize();
   RDisplay::display.start();
   RDisplay::display.setLEDBrightness(16);
 
   RRemote::remote.initialize();
 
-#if defined(LEFT_REMOTE)
-  //uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_L, BUILDER_ID, REMOTE_ID);
-  uint16_t station = 0xffff;
-#else 
-  uint16_t station = XBee::makeStationID(XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
-#endif
-  Serial1.setPins(P_D_XBEE_RX, P_D_XBEE_TX);
+  uint16_t station = XBee::makeStationID(isLeftRemote ? XBee::REMOTE_BAVARIAN_L : XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
+  Serial1.setPins(pins.P_D_XBEE_RX, pins.P_D_XBEE_TX);
   XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200, &Serial1);
 
-#if defined(LEFT_REMOTE)
-  XBee::xbee.setName("LeftRemote");
-#else
-  XBee::xbee.setName("RightRemote");
-#endif
   XBee::xbee.start();
   XBee::xbee.setAPIMode(true);
 

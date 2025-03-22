@@ -51,17 +51,47 @@ void bRISR(void) {
 }
 #endif // ARDUINO_ARCH_ESP32
 
+RInput::ButtonPin RInput::BUTTON_PIN_1;
+RInput::ButtonPin RInput::BUTTON_PIN_2;
+RInput::ButtonPin RInput::BUTTON_PIN_3;
+RInput::ButtonPin RInput::BUTTON_PIN_4;
+RInput::ButtonPin RInput::BUTTON_PIN_JOY;
+RInput::ButtonPin RInput::BUTTON_PIN_CONFIRM;
+RInput::ButtonPin RInput::BUTTON_PIN_LEFT;
+RInput::ButtonPin RInput::BUTTON_PIN_RIGHT;
+
+void RInput::initButtonPinMapping() {
+  if(isLeftRemote) {
+    BUTTON_PIN_1       = 2;
+    BUTTON_PIN_2       = 4;
+    BUTTON_PIN_3       = 6;
+    BUTTON_PIN_4       = 7;
+    BUTTON_PIN_JOY     = 5;
+    BUTTON_PIN_CONFIRM = 3;
+    BUTTON_PIN_LEFT    = 1;
+    BUTTON_PIN_RIGHT   = 0;
+  } else {
+    BUTTON_PIN_1       = 5;
+    BUTTON_PIN_2       = 4;
+    BUTTON_PIN_3       = 3;
+    BUTTON_PIN_4       = 2;
+    BUTTON_PIN_JOY     = 1;
+    BUTTON_PIN_CONFIRM = 7;
+    BUTTON_PIN_LEFT    = 6;
+    BUTTON_PIN_RIGHT   = 0;
+  };
+}
+
 RInput::Button RInput::pinToButton(RInput::ButtonPin pin) {
-  switch(pin) {
-    case BUTTON_PIN_1:       return BUTTON_1; break;
-    case BUTTON_PIN_2:       return BUTTON_2; break;
-    case BUTTON_PIN_3:       return BUTTON_3; break;
-    case BUTTON_PIN_4:       return BUTTON_4; break;
-    case BUTTON_PIN_JOY:     return BUTTON_JOY; break;
-    case BUTTON_PIN_CONFIRM: return BUTTON_CONFIRM; break;
-    case BUTTON_PIN_LEFT:    return BUTTON_LEFT; break;
-    case BUTTON_PIN_RIGHT:   default: return BUTTON_RIGHT; break;
-  }
+  if(pin==BUTTON_PIN_1) return BUTTON_1;
+  else if(pin==BUTTON_PIN_2) return BUTTON_2; 
+  else if(pin==BUTTON_PIN_3) return BUTTON_3;
+  else if(pin==BUTTON_PIN_4) return BUTTON_4;
+  else if(pin==BUTTON_PIN_JOY) return BUTTON_JOY;
+  else if(pin==BUTTON_PIN_CONFIRM) return BUTTON_CONFIRM;
+  else if(pin==BUTTON_PIN_LEFT) return BUTTON_LEFT;
+  else if(pin==BUTTON_PIN_RIGHT) return BUTTON_RIGHT;
+  return BUTTON_RIGHT;
 }
 
 RInput::ButtonPin RInput::buttonToPin(RInput::Button button) {
@@ -116,13 +146,10 @@ RInput::RInput(): joyHFilter_(100, 0.01), joyVFilter_(100, 0.01), imu_(IMU_ADDR)
   incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
   joyAtZero_ = false;
   imu_.setRotationAroundZ(bb::IMU::ROTATE_180);
-
-#if defined(LEFT_REMOTE)
-  pinMode(P_A_POT1, INPUT_PULLDOWN);
-#endif
 }
 
 bool RInput::begin() {
+  initButtonPinMapping();
   for(int i=0; i<10; i++) {
     if(initIMU() == true) break;
     delay(100);
@@ -171,13 +198,13 @@ void RInput::testMatrix() {
 }
 
 void RInput::update() {
-#if defined(LEFT_REMOTE)
-  joyRawH = analogRead(P_A_JOY_HOR);
-  joyRawV = 4095 - analogRead(P_A_JOY_VER);
-#else
-  joyRawH = 4095 - analogRead(P_A_JOY_HOR);
-  joyRawV = analogRead(P_A_JOY_VER);
-#endif
+  if(isLeftRemote) {
+    joyRawH = analogRead(pins.P_A_JOY_HOR);
+    joyRawV = 4095 - analogRead(pins.P_A_JOY_VER);
+  } else {
+    joyRawH = 4095 - analogRead(pins.P_A_JOY_HOR);
+    joyRawV = analogRead(pins.P_A_JOY_VER);
+  }
 
   minJoyRawH = min(minJoyRawH, joyRawH);
   maxJoyRawH = max(maxJoyRawH, joyRawH);
@@ -215,18 +242,18 @@ void RInput::update() {
   }
   joyV = constrain(joyV, -1.0f, 1.0f);
   
-  battRaw = analogRead(P_A_BATT_CHECK);
+  battRaw = analogRead(pins.P_A_BATT_CHECK);
   float battCooked = (battRaw/4095.0)*3.1;
   (void)battCooked;
   battRaw = constrain(battRaw, MIN_ANALOG_IN_VDIV, MAX_ANALOG_IN_VDIV);
   battery = float(battRaw-MIN_ANALOG_IN_VDIV)/float(MAX_ANALOG_IN_VDIV-MIN_ANALOG_IN_VDIV);
   
-#if defined(LEFT_REMOTE)
-  processEncoder();
-#else
-  pot1 = (float)((4095-analogRead(P_A_POT1)) / 4096.0f); 
-  pot2 = (float)((4095-analogRead(P_A_POT2)) / 4096.0f);
-#endif
+  if(isLeftRemote) {
+    processEncoder();
+  } else {
+    pot1 = (float)((4095-analogRead(pins.P_A_POT1)) / 4096.0f); 
+    pot2 = (float)((4095-analogRead(pins.P_A_POT2)) / 4096.0f);
+  }
 
   if(imu_.available()) {
     imu_.update();
@@ -377,9 +404,8 @@ void RInput::btnConfirmReleased() {
   }
 }
 
-#if defined(LEFT_REMOTE)
 void RInput::processEncoder() {
-  uint16_t enc = analogRead(P_A_POT1);
+  uint16_t enc = analogRead(pins.P_A_POT1);
 
   // Remove spurious stuff arount zero
   static uint16_t deadband = 70;
@@ -407,7 +433,6 @@ void RInput::processEncoder() {
     lastEncDeg_ = encDeg;
   }
 }
-#endif // LEFT_REMOTE
 
 void RInput::clearCallbacks() {
   setAllCallbacks(nullptr);
@@ -420,15 +445,15 @@ Result RInput::fillControlPacket(ControlPacket& packet) {
   packet.button3 = buttons[BUTTON_4];
   packet.button4 = buttons[BUTTON_JOY];
 
-  #if defined(LEFT_REMOTE)
-  packet.button5 = false;
-  packet.button6 = false;
-  packet.button7 = false;
-#else
-  packet.button5 = RInput::input.buttons[BUTTON_LEFT];
-  packet.button6 = RInput::input.buttons[BUTTON_RIGHT];
-  packet.button7 = RInput::input.buttons[BUTTON_CONFIRM];
-#endif
+  if(isLeftRemote) {
+    packet.button5 = false;
+    packet.button6 = false;
+    packet.button7 = false;
+  } else {
+    packet.button5 = RInput::input.buttons[BUTTON_LEFT];
+    packet.button6 = RInput::input.buttons[BUTTON_RIGHT];
+    packet.button7 = RInput::input.buttons[BUTTON_CONFIRM];
+  }
 
   packet.setAxis(0, joyH, bb::ControlPacket::UNIT_UNITY_CENTERED);
   packet.setAxis(1, joyV, bb::ControlPacket::UNIT_UNITY_CENTERED);
