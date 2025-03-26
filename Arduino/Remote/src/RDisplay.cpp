@@ -20,7 +20,7 @@ static const int CURSOR_SIZE = 5;
 RDisplay RDisplay::display;
 
 RDisplay::RDisplay():
-  ser_(Serial2),
+  ser_(Serial2),   
   statusPixels_(2, pins.P_D_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 {
   name_ = "display";
@@ -29,6 +29,7 @@ RDisplay::RDisplay():
 }
 
 Result RDisplay::initialize() {
+  statusPixels_.setPin(pins.P_D_NEOPIXEL);
   pinMode(pins.P_D_NEOPIXEL, OUTPUT);
   statusPixels_.begin();
   setLED(LED_COMM, 0, 0, 0);

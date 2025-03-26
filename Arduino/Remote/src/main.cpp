@@ -72,9 +72,8 @@ void setup() {
 
   RRemote::remote.initialize();
 
-  uint16_t station = XBee::makeStationID(isLeftRemote ? XBee::REMOTE_BAVARIAN_L : XBee::REMOTE_BAVARIAN_R, BUILDER_ID, REMOTE_ID);
   Serial1.setPins(pins.P_D_XBEE_RX, pins.P_D_XBEE_TX);
-  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200, &Serial1);
+  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, 115200, &Serial1);
 
   XBee::xbee.start();
   XBee::xbee.setAPIMode(true);

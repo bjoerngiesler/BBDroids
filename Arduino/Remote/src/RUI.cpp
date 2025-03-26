@@ -78,8 +78,12 @@ void RUI::showPairDroidMenu() {
     pairDroidMenu_.clear();
     int num = 0;
     for(auto& n: discoveredNodes_) {
-      if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_DROID) continue;
-      Console::console.printfBroadcast("Station \"%s\", ID 0x%x\n", n.name, n.stationId);
+      bb::PairingPacket pairing;
+      pairing.type = PairingPacket::PAIRING_INFO_REQ;
+      Result res = XBee::xbee.sendPairingPacket(n.address, PACKET_SOURCE_LEFT_REMOTE, pairing, Runloop::runloop.sequenceNumber());
+      if(res != RES_OK || pairing.type != PairingPacket::PAIRING_INFO_REQ || pairing.pairingPayload.info.packetSource != PACKET_SOURCE_DROID) 
+        continue;
+  
       pairDroidMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.address); showMain(); });
       num++;
     }
@@ -104,7 +108,12 @@ void RUI::showPairRemoteMenu() {
   
     int num = 0;
     for(auto& n: discoveredNodes_) {
-      if(XBee::stationTypeFromId(n.stationId) != XBee::STATION_REMOTE) continue;
+      bb::PairingPacket pairing;
+      pairing.type = PairingPacket::PAIRING_INFO_REQ;
+      Result res = XBee::xbee.sendPairingPacket(n.address, PACKET_SOURCE_LEFT_REMOTE, pairing, Runloop::runloop.sequenceNumber());
+      if(res != RES_OK || pairing.type != PairingPacket::PAIRING_INFO_REQ || pairing.pairingPayload.info.packetSource != PACKET_SOURCE_RIGHT_REMOTE) 
+        continue;
+
       pairRemoteMenu_.addEntry(n.name, [=]() { RRemote::remote.selectRightRemote(n.address); showMain(); });
       num++;
     }
@@ -307,10 +316,10 @@ void RUI::showCalibration(PacketSource source) {
 void RUI::hideCalibration(PacketSource source) {
     switch(source) {
     case PACKET_SOURCE_LEFT_REMOTE:
-        remoteVisR_.crosshair().showMinMaxRect(false);
+        remoteVisL_.crosshair().showMinMaxRect(false);
         break;
     case PACKET_SOURCE_RIGHT_REMOTE:
-        remoteVisL_.crosshair().showMinMaxRect(false);
+        remoteVisR_.crosshair().showMinMaxRect(false);
         break;
     default:
         bb::printf("Error: showCalibration() called with argument %d\n", source);        

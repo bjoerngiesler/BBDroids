@@ -48,7 +48,7 @@ uint8_t bb::Packet::calculateCRC() {
 	return calcCRC7((const uint8_t*)this, sizeof(Packet));
 }
 
-bb::Result bb::PacketReceiver::incomingPacket(const HWAddress& station, uint8_t rssi, const Packet& packet) {
+bb::Result bb::PacketReceiver::incomingPacket(const HWAddress& station, uint8_t rssi, Packet& packet) {
 	Result res;
 	ConfigPacket::ConfigReplyType reply = packet.payload.config.reply;
 	Packet packet2 = packet;
@@ -82,6 +82,27 @@ bb::Result bb::PacketReceiver::incomingPacket(const HWAddress& station, uint8_t 
 		return XBee::xbee.sendTo(station, packet2, false);
 		break;
 	case bb::PACKET_TYPE_PAIRING:
+		bb::printf("Pairing packet from 0x%lx:%lx\n", station.addrHi, station.addrLo);
+		switch(packet.payload.pairing.type) {
+		// we're handling info packets here. Everything else will be passed on.
+		case bb::PairingPacket::PAIRING_INFO_REQ:
+			packet.payload.pairing.pairingPayload.info = { packetSource(), builderId(), stationId(), stationDetail() };
+			packet.payload.pairing.reply = PairingPacket::PAIRING_OK;
+			return XBee::xbee.sendTo(station, packet, false);
+			break;		
+
+		default:
+			res = incomingPairingPacket(station, packet.source, rssi, packet.seqnum, packet.payload.pairing);
+			if(res == RES_OK) {
+				bb::printf("Sending reply with OK flag set\n");
+				packet.payload.pairing.reply = PairingPacket::PAIRING_OK;
+			} else {
+				bb::printf("Sending reply with ERROR flag set\n");
+				packet.payload.pairing.reply = PairingPacket::PAIRING_ERROR;
+			}
+			return XBee::xbee.sendTo(station, packet, false);
+			break;
+		}
 	default:
 		return incomingPairingPacket(station, packet.source, rssi, packet.seqnum, packet.payload.pairing);
 	}
@@ -105,7 +126,7 @@ bb::Result bb::PacketReceiver::incomingStatePacket(const HWAddress& station, bb:
 	return RES_OK;
 }
 
-bb::Result bb::PacketReceiver::incomingConfigPacket(const HWAddress& station, bb::PacketSource source, uint8_t rssi, uint8_t seqnum, const bb::ConfigPacket& packet) {
+bb::Result bb::PacketReceiver::incomingConfigPacket(const HWAddress& station, bb::PacketSource source, uint8_t rssi, uint8_t seqnum, bb::ConfigPacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;
@@ -114,7 +135,7 @@ bb::Result bb::PacketReceiver::incomingConfigPacket(const HWAddress& station, bb
 	return RES_OK;
 }
 
-bb::Result bb::PacketReceiver::incomingPairingPacket(const HWAddress& station, bb::PacketSource source, uint8_t rssi, uint8_t seqnum, const bb::PairingPacket& packet) {
+bb::Result bb::PacketReceiver::incomingPairingPacket(const HWAddress& station, bb::PacketSource source, uint8_t rssi, uint8_t seqnum, bb::PairingPacket& packet) {
 	(void)station;
 	(void)source;
 	(void)rssi;

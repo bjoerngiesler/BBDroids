@@ -38,8 +38,7 @@ void initializeSubsystems() {
   Runloop::runloop.initialize();
   WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
   WifiServer::server.setOTANameAndPassword("D-O", "OTA");
-  uint16_t station = XBee::makeStationID(XBee::DROID_DIFF_UNSTABLE, BUILDER_ID, DROID_ID);
-  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, station, 115200, serialTXSerial);
+  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, 115200, serialTXSerial);
   XBee::xbee.setDebugFlags((XBee::DebugFlags)(XBee::DEBUG_PROTOCOL|XBee::DEBUG_XBEE_COMM));
   XBee::xbee.setName(DROID_NAME);
   Servos::servos.initialize();

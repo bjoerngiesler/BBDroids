@@ -9,7 +9,7 @@
 
 bb::XBee bb::XBee::xbee;
 
-static std::vector<unsigned int> baudRatesToTry = { 9600, 57600, 115200, 19200, 28800, 38400, 76800 }; // start with 115200, then try 9600
+static std::vector<unsigned int> baudRatesToTry = { 115200, 9600, 57600, 19200, 28800, 38400, 76800 }; // start with 115200, then try 9600
 
 bb::XBee::XBee() {
 	uart_ = &Serial1;
@@ -33,14 +33,13 @@ bb::XBee::XBee() {
 
 	addParameter("channel", "Communication channel (between 11 and 26, usually 12)", params_.chan, 11, 26);
 	addParameter("pan", "Personal Area Network ID (16bit, 65535 is broadcast)", params_.pan, 0, 65535);
-	addParameter("station", "Station ID (MY) for this device (16bit)", params_.station, 0, 65535);
 	addParameter("bps", "Communication bps rate", params_.bps, 0, 200000);
 }
 
 bb::XBee::~XBee() {
 }
 
-bb::Result bb::XBee::initialize(uint8_t chan, uint16_t pan, uint16_t station, uint32_t bps, HardwareSerial *uart) {
+bb::Result bb::XBee::initialize(uint8_t chan, uint16_t pan, uint32_t bps, HardwareSerial *uart) {
 	if(operationStatus_ != RES_SUBSYS_NOT_INITIALIZED) return RES_SUBSYS_ALREADY_INITIALIZED;
 
 	paramsHandle_ = ConfigStorage::storage.reserveBlock("xbee", sizeof(params_), (uint8_t*)&params_);
@@ -52,7 +51,6 @@ bb::Result bb::XBee::initialize(uint8_t chan, uint16_t pan, uint16_t station, ui
 		memset(&params_, 0, sizeof(params_));
 		params_.chan = chan;
 		params_.pan = pan;
-		params_.station = station;
 		params_.bps = bps;
 	}
 
@@ -130,19 +128,18 @@ bb::Result bb::XBee::start(ConsoleStream *stream) {
 		Console::console.printfBroadcast("RR response: %s\n", retval.c_str());
 	}
 
-	if(setConnectionInfo(params_.chan, params_.pan, params_.station, true) != RES_OK) {
+	if(setConnectionInfo(params_.chan, params_.pan, true) != RES_OK) {
 		if(stream) stream->printf("Setting connection info failed.\n");
 		return RES_SUBSYS_COMM_ERROR;
 	}
 
-	uint8_t chan; uint16_t pan; uint16_t station; 
-	if(getConnectionInfo(chan, pan, station, true) != RES_OK) {
+	uint8_t chan; uint16_t pan; 
+	if(getConnectionInfo(chan, pan, true) != RES_OK) {
 		if(stream) stream->printf("Getting connection info failed.\n");
 		return RES_SUBSYS_COMM_ERROR;
 	}
 	params_.chan = chan;
 	params_.pan = pan;
-	params_.station = station;
 
 	if(strlen(params_.name) != 0) {
 		String str = String("ATNI") + params_.name;
@@ -238,8 +235,6 @@ bb::Result bb::XBee::parameterValue(const String& name, String& value) {
 		value = String(params_.chan); return RES_OK; 
 	} else if(name == "pan") {
 		value = String(params_.pan); return RES_OK;
-	} else if(name == "station") {
-		value = String(params_.station); return RES_OK;
 	} else if(name == "bps") {
 		value = String(params_.bps); return RES_OK;
 	} 
@@ -252,13 +247,10 @@ bb::Result bb::XBee::setParameterValue(const String& name, const String& value) 
 
 	if(name == "channel") { 
 		params_.chan = value.toInt();
-		res = setConnectionInfo(params_.chan, params_.pan, params_.station, false);
+		res = setConnectionInfo(params_.chan, params_.pan, false);
 	} else if(name == "pan") {
 		params_.pan = value.toInt();
-		res = setConnectionInfo(params_.chan, params_.pan, params_.station, false);
-	} else if(name == "station") {
-		params_.station = value.toInt();
-		res = setConnectionInfo(params_.chan, params_.pan, params_.station, false);
+		res = setConnectionInfo(params_.chan, params_.pan, false);
 	} else if(name == "bps") {
 		params_.bps = value.toInt();
 		res = RES_OK;
@@ -476,10 +468,9 @@ bb::Result bb::XBee::changeBPSTo(uint32_t bps, ConsoleStream *stream, bool stayI
 	return RES_OK;
 }
 
-bb::Result bb::XBee::setConnectionInfo(uint8_t chan, uint16_t pan, uint16_t station, bool stayInAT) {
+bb::Result bb::XBee::setConnectionInfo(uint8_t chan, uint16_t pan, bool stayInAT) {
 	params_.chan = chan;
 	params_.pan = pan;
-	params_.station = station;
 
 	enterATModeIfNecessary();
 
@@ -493,8 +484,8 @@ bb::Result bb::XBee::setConnectionInfo(uint8_t chan, uint16_t pan, uint16_t stat
 		if(!stayInAT) leaveATMode();
 		return RES_COMM_TIMEOUT;
 	}
-	if(sendStringAndWaitForOK(String("ATMY=")+String(station, HEX)) == false) {
-		if(debug_ & DEBUG_PROTOCOL) Console::console.printfBroadcast("ERROR: Setting MY to 0x%x failed!\n", station);
+	if(sendStringAndWaitForOK("ATMY=FFFE") == false) {
+		if(debug_ & DEBUG_PROTOCOL) Console::console.printfBroadcast("ERROR: Setting MY to 0xfffe failed!\n");
 		if(!stayInAT) leaveATMode();
 		return RES_COMM_TIMEOUT;
 	}
@@ -504,7 +495,7 @@ bb::Result bb::XBee::setConnectionInfo(uint8_t chan, uint16_t pan, uint16_t stat
 	return RES_OK;
 }
 
-bb::Result bb::XBee::getConnectionInfo(uint8_t& chan, uint16_t& pan, uint16_t& station, bool stayInAT) {
+bb::Result bb::XBee::getConnectionInfo(uint8_t& chan, uint16_t& pan, bool stayInAT) {
 	enterATModeIfNecessary();
 
 	String retval;
@@ -517,11 +508,6 @@ bb::Result bb::XBee::getConnectionInfo(uint8_t& chan, uint16_t& pan, uint16_t& s
 	retval = sendStringAndWaitForResponse("ATID");
 	if(retval == "") return RES_COMM_TIMEOUT;
 	pan = strtol(retval.c_str(), 0, 16);
-	delay(1);
-
-	retval = sendStringAndWaitForResponse("ATMY");
-	if(retval == "") return RES_COMM_TIMEOUT;
-	station = strtol(retval.c_str(), 0, 16);
 	delay(1);
 
 	if(!stayInAT) leaveATMode();
@@ -575,7 +561,6 @@ bb::Result bb::XBee::discoverNodes(std::vector<bb::XBee::Node>& nodes) {
 
 			APIFrame::ATResponseND *r = (APIFrame::ATResponseND*)data;
 			Node n;
-			n.stationId = r->my;
 			n.address = {r->addrHi, r->addrLo};
 			n.rssi = r->rssi;
 			memset(n.name, 0, sizeof(n.name));
@@ -583,7 +568,7 @@ bb::Result bb::XBee::discoverNodes(std::vector<bb::XBee::Node>& nodes) {
 				strncpy(n.name, r->name, strlen(r->name));
 			}
 
-			Console::console.printfBroadcast("Discovered station 0x%x at address 0x%lx:%lx, RSSI %d, name \"%s\"\n", n.stationId, n.address.addrHi, n.address.addrLo, n.rssi, n.name);
+			Console::console.printfBroadcast("Discovered station at address 0x%lx:%lx, RSSI %d, name \"%s\"\n", n.address.addrHi, n.address.addrLo, n.rssi, n.name);
 			nodes.push_back(n);	
 		}
 	}
@@ -715,7 +700,7 @@ bb::Result bb::XBee::sendConfigPacket(const HWAddress& dest,
 			timeout--;
 			delay(1);
 			if(timeout < 0) {
-				Console::console.printfBroadcast("Timeout.\n");
+				Console::console.printfBroadcast("sendConfigPacket(): Timeout while waiting for response.\n");
 				return RES_COMM_TIMEOUT;
 			}
 		}
@@ -743,6 +728,55 @@ bb::Result bb::XBee::sendConfigPacket(const HWAddress& dest,
 		}
 
 		replyType = rPacket.payload.config.reply;
+		return RES_OK;
+	}
+}
+
+bb::Result bb::XBee::sendPairingPacket(const HWAddress& dest, bb::PacketSource src, PairingPacket& pairing, uint8_t seqnum) {
+	bb::Packet sPacket(bb::PACKET_TYPE_PAIRING, src, seqnum);
+	sPacket.payload.pairing = pairing;
+
+	bb::printf("Sending pairing packet to 0x%lx:%lx\n", dest.addrHi, dest.addrLo);
+	Result res = sendTo(dest, sPacket, false);
+	if(res != RES_OK) {
+		bb::printf("sendPairingPacket(): sendTo(): %s\n", errorMessage(res));
+		return res;
+	}
+
+	int timeout = 500;
+	while(true) {
+		while(uart_->available() == false) {
+			timeout--;
+			delay(1);
+			if(timeout < 0) {
+				bb::printf("Timeout.\n");
+				return RES_COMM_TIMEOUT;
+			}
+		}
+		HWAddress srcAddr;
+		uint8_t rssi;
+		Packet rPacket;
+		Result res = receiveAPIMode(srcAddr, rssi, rPacket);
+		if(res != RES_OK) {
+			bb::printf("sendPairingPacket(): receiveAPIMode(): %s\n", errorMessage(res));
+			return res;
+		}
+
+		if(rPacket.type != PACKET_TYPE_PAIRING) {
+			bb::printf("sendPairingPacket(): Discarding packet of type %d while waiting for reply\n", rPacket.type);
+			continue;
+		}
+		if(rPacket.seqnum != sPacket.seqnum) {
+			bb::printf("sendPairingPacket(): Discarding packet with seqnum %d while waiting for %d\n", rPacket.seqnum, sPacket.seqnum);
+			continue;
+		}
+		if(rPacket.payload.config.type != sPacket.payload.config.type) {
+			bb::printf("sendPairingPacket(): Discarding packet with type %d while waiting for %d\n", 
+			rPacket.payload.config.type, sPacket.payload.config.type);
+			continue;
+		}
+
+		pairing = rPacket.payload.pairing;
 		return RES_OK;
 	}
 }
@@ -787,6 +821,7 @@ bb::Result bb::XBee::receiveAPIMode(HWAddress& srcAddr, uint8_t& rssi, Packet& p
 	//Console::console.printfBroadcast("Received frame of length %d, first char 0x%x\n", frame.length(), frame.data()[0]);
 
 	if(frame.is16BitRXPacket()) { // 16bit address frame
+		bb::printf("16bit address packet!\n");
 		if(frame.length() != sizeof(bb::Packet) + 5) {
 			Console::console.printfBroadcast("Invalid API Mode 16bit addr packet size %d (expected %d)\n", frame.length(), sizeof(bb::Packet) + 5);
 			return RES_SUBSYS_COMM_ERROR;

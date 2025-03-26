@@ -127,6 +127,8 @@ Result DODroid::initialize() {
  
   imu_.setRotationAroundZ(bb::IMU::ROTATE_90);
 
+  setPacketSource(PACKET_SOURCE_DROID);
+
   return Subsystem::initialize();
 }
 
@@ -313,16 +315,15 @@ bb::Result DODroid::stepHead() {
 
       nod += lean_;
       nod = constrain(nod, -params_.neckRange, params_.neckRange);
-      bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod + params_.neckOffset);
+      bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
 
       float headPitch = -nod;
       //headPitch -= params_.leanHeadToBody*lean_;
       headPitch += remoteP_;
-      headPitch -= (params_.neckOffset - params_.headPitchOffset);
       headPitch += params_.faHeadPitchSpeedSP*speedSP;
       bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 + headPitch);
-      bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh + remoteH_ + params_.headHeadingOffset);
-      bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh + remoteR_ + params_.headRollOffset);
+      bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh + remoteH_);
+      bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh + remoteR_);
     } else {
       bb::Servos::servos.setGoal(SERVO_NECK, 180);
     }
@@ -569,7 +570,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
         if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && driveMode_ == DRIVE_VELOCITY) {
           switchDrive(DRIVE_POSITION);
         }
-      } else { // We have drive input - switch to velocity control mode
+      } else { // We have drive input - switch to velocity control modex
         if(driveMode_ == DRIVE_POSITION) {
           switchDrive(DRIVE_VELOCITY);
         }

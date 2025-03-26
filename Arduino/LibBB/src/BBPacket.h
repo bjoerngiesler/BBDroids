@@ -19,6 +19,20 @@ namespace bb {
 // See https://github.com/bjoerngiesler/Droids/wiki/10-Remote-Control for documentation
 //
 
+enum PacketType {
+	PACKET_TYPE_CONTROL  = 0,
+	PACKET_TYPE_STATE    = 1,
+	PACKET_TYPE_CONFIG   = 2,
+	PACKET_TYPE_PAIRING  = 3
+};
+
+enum PacketSource {
+	PACKET_SOURCE_LEFT_REMOTE    = 0,
+	PACKET_SOURCE_RIGHT_REMOTE   = 1,
+	PACKET_SOURCE_DROID          = 2,
+	PACKET_SOURCE_TEST_ONLY      = 3
+};
+
 struct __attribute__ ((packed)) ControlPacket {
 
 #define AXIS_MAX1   1023
@@ -183,7 +197,6 @@ struct __attribute__((packed)) RemoteConfigPacket {
 
 struct __attribute__ ((packed)) ConfigPacket {
 	static const uint64_t MAGIC = 0xbadeaffebabeface;
-#define CONFIG_TYPE_BITS 6 // allows for 63 config types
 
 	enum ConfigType {
 		CONFIG_SET_LEFT_REMOTE_ID       = 0,  // L->R - parameter: address
@@ -194,7 +207,7 @@ struct __attribute__ ((packed)) ConfigPacket {
 		CONFIG_SET_DOME_CONTROL_MODE    = 5,  // L->D - parameter: control mode
 		CONFIG_SET_ARMS_CONTROL_MODE    = 6,  // L->D - parameter: control mode
 		CONFIG_SET_SOUND_CONTROL_MODE   = 7,  // L->D - parameter: control mode
-		CONFIG_FACTORY_RESET            = (1<<CONFIG_TYPE_BITS)-1 // L->R - parameter: MAGIC
+		CONFIG_FACTORY_RESET            = 63  // L->R - parameter: MAGIC
 	};
 
 	enum ConfigReplyType {
@@ -204,8 +217,8 @@ struct __attribute__ ((packed)) ConfigPacket {
 		CONFIG_REPLY_ERROR            = 3  // Something went wrong
 	};
 
-	ConfigType      type  : CONFIG_TYPE_BITS;
-	ConfigReplyType reply : 8-CONFIG_TYPE_BITS;
+	ConfigType      type  : 6;
+	ConfigReplyType reply : 2;
 	union {
 		HWAddress address;
 		uint64_t magic;
@@ -214,21 +227,28 @@ struct __attribute__ ((packed)) ConfigPacket {
 };
 
 struct __attribute__ ((packed)) PairingPacket {
-	uint8_t dummy;
-};
+	enum PairingType {
+		PAIRING_INFO_REQ = 0
+	};
 
-enum PacketType {
-	PACKET_TYPE_CONTROL  = 0,
-	PACKET_TYPE_STATE    = 1,
-	PACKET_TYPE_CONFIG   = 2,
-	PACKET_TYPE_PAIRING  = 3
-};
+	enum PairingReplyType {
+		PAIRING_OK    = 0,
+		PAIRING_ERROR = 1
+	};
 
-enum PacketSource {
-	PACKET_SOURCE_LEFT_REMOTE    = 0,
-	PACKET_SOURCE_RIGHT_REMOTE   = 1,
-	PACKET_SOURCE_DROID          = 2,
-	PACKET_SOURCE_TEST_ONLY      = 3
+	PairingType      type: 7;
+	PairingReplyType reply: 1;
+
+	struct __attribute__ ((packed)) PairingInfo {
+		PacketSource packetSource;
+		uint8_t      builderId;
+		uint8_t      stationId;
+		uint8_t      stationDetail;
+	};
+
+	union {
+		PairingInfo info;
+	} pairingPayload;
 };
 
 struct __attribute__ ((packed)) Packet {
@@ -261,13 +281,37 @@ struct PacketFrame {
 	uint8_t crc;
 };
 
+/*!
+	\class PacketReceiver
+	\brief Subclass for communication packet receivers.
+
+	This class implements a fully functional incomingPacket() that will call 
+	incomingControlPacket(), incomingStatePacket(), incomingConfigPacket() and
+	incomingPairingPacket(). All of these are just stubs.
+
+	Please note that PAIRING_INFO_REQ packets are handled in incomingPacket().
+	All other packets are passed on to subclass implementations of incoming*Packet().
+*/
 class PacketReceiver { 
 public:
-	virtual Result incomingPacket(const HWAddress& src, uint8_t rssi, const Packet& packet);
+	void setPacketSource(PacketSource src) { source_ = src; }
+	PacketSource packetSource() { return source_; }
+	void setBuilderId(uint8_t builderId) { builderId_ = builderId; }
+	uint8_t builderId() { return builderId_; }
+	void setStationId(uint8_t stationId) { stationId_ = stationId; }
+	uint8_t stationId() { return stationId_; }
+	void setStationDetail(uint8_t stationDetail) { stationDetail_ = stationDetail; }
+	uint8_t stationDetail() { return stationDetail_; }
+
+	virtual Result incomingPacket(const HWAddress& src, uint8_t rssi, Packet& packet);
 	virtual Result incomingControlPacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet);
 	virtual Result incomingStatePacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, const StatePacket& packet);
-	virtual Result incomingConfigPacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet);
-	virtual Result incomingPairingPacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, const PairingPacket& packet);
+	virtual Result incomingConfigPacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, ConfigPacket& packet);
+	virtual Result incomingPairingPacket(const HWAddress& src, PacketSource source, uint8_t rssi, uint8_t seqnum, PairingPacket& packet);
+
+protected:
+	uint8_t builderId_, stationId_, stationDetail_;
+	PacketSource source_;
 };
 
 /*

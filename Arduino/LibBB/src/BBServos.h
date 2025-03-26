@@ -72,6 +72,8 @@ public:
 
   uint32_t computeRawValue(float val, ValueType t=VALUE_DEGREE);
 
+  Result write() { return syncWriteInfo(); }
+
 protected:
   Servos();
   DynamixelShield dxl_;

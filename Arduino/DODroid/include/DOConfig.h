@@ -17,7 +17,7 @@ static const bool          HEAD_COUNTERWEIGHT = true;                  // set to
 // Parameters - all of these can be set from the commandline and stored in flash.
 struct DOParams {
     float neckRange         = 45.0; // Careful with this, easy to nosedive if the drive controller and neck aren't working together well.
-    float neckOffset        = 0.0;  
+    float neckOffset        = 0.0;
     float headRollRange     = 45.0;
     float headRollOffset    = 0.0;
     float headPitchRange    = 45.0; 
@@ -39,7 +39,7 @@ struct DOParams {
     float posKi             = 0.2;
     float posKd             = 0;
 
-    float maxSpeed          = 800;
+    float maxSpeed          = 1000;
     float accel             = 2500;
 
     float aerialOffset     = 0;

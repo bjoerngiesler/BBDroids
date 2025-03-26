@@ -76,7 +76,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   imu_.update(true);
   float ax, ay, az;
   imu_.getAccelMeasurement(ax, ay, az);
-  if(fabs(ax) > 0.1 || fabs(ay) > 0.1 || fabs(az) < 0.9) {
+  if(fabs(ax) > 0.2 || fabs(ay) > 0.2 || fabs(az) < 0.9) {
     Console::console.printfBroadcast("Critical error: Droid not upright (ax %f, ay %f, az %f)!\n", ax, ay, az);
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
@@ -177,25 +177,31 @@ Result DODroid::servoTest(ConsoleStream *stream) {
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
+  bb::Servos::servos.setOffset(SERVO_NECK, params_.neckOffset);
+  bb::Servos::servos.setOffset(SERVO_HEAD_PITCH, params_.headPitchOffset);
+  bb::Servos::servos.setOffset(SERVO_HEAD_HEADING, params_.headHeadingOffset);
+  bb::Servos::servos.setOffset(SERVO_HEAD_ROLL, params_.headRollOffset);
+
+  bb::Servos::servos.setRange(SERVO_NECK, 180-params_.neckRange, 180+params_.neckRange);
+  bb::Servos::servos.setRange(SERVO_HEAD_PITCH, 180-params_.headPitchRange, 180+params_.headPitchRange);
+  bb::Servos::servos.setRange(SERVO_HEAD_HEADING, 180-params_.headHeadingRange, 180+params_.headHeadingRange);
+  bb::Servos::servos.setRange(SERVO_HEAD_ROLL, 180-params_.headRollRange, 180+params_.headRollRange);
+
   if(bb::Servos::servos.hasServoWithID(SERVO_NECK) == false) {
     Console::console.printfBroadcast("Critical error: Neck servo missing!\n");
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   } else if(bb::Servos::servos.home(SERVO_NECK, 5.0, 95, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  } else {
-    bb::Servos::servos.setRange(SERVO_NECK, 180-params_.neckRange, 180+params_.neckRange);
-    bb::Servos::servos.setOffset(SERVO_NECK, params_.neckOffset);
   }
 
+  bb::Servos::servos.setOffset(SERVO_HEAD_PITCH, params_.headPitchOffset);
   if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_PITCH) == false) {
     Console::console.printfBroadcast("Degraded: Head pitch servo missing.\n");
   } else if(bb::Servos::servos.home(SERVO_HEAD_PITCH, 5.0, 50, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   } else {
-    bb::Servos::servos.setRange(SERVO_HEAD_PITCH, 180-params_.headPitchRange, 180+params_.headPitchRange);
-    bb::Servos::servos.setOffset(SERVO_HEAD_PITCH, params_.headPitchOffset);
     headIsOn_ = true;
   }
 
@@ -205,8 +211,6 @@ Result DODroid::servoTest(ConsoleStream *stream) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   } else {
-    bb::Servos::servos.setRange(SERVO_HEAD_HEADING, 180-params_.headHeadingRange, 180+params_.headHeadingRange);
-    bb::Servos::servos.setOffset(SERVO_HEAD_HEADING, params_.headHeadingOffset);
     headIsOn_ = true;
   }
 
@@ -216,8 +220,7 @@ Result DODroid::servoTest(ConsoleStream *stream) {
     Console::console.printfBroadcast("Homing servos failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   } else {
-    bb::Servos::servos.setRange(SERVO_HEAD_ROLL, 180-params_.headRollRange, 180+params_.headRollRange);
-    bb::Servos::servos.setOffset(SERVO_HEAD_ROLL, params_.headRollOffset);
+    headIsOn_ = true;
   }
 
   servosOK_ = true;
@@ -275,8 +278,6 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     if(fabs(mA) > ST_ABORT_MILLIAMPS) { 
       LOG(LOG_WARN, "Current meter reports %.1fmA/%.1fV of current, higher than threshold of %.1fmA\n", mA, V, ST_ABORT_MILLIAMPS);
       blockedcount++;
-    } else {
-      blockedcount = 0;
     }
 
     if(fabs(distance) > ST_ABORT_DISTANCE) {
@@ -353,8 +354,14 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
 
   // Not enough heading change observed? We're likely sitting in the station.
   if(fabs(hdiffmax) < ST_MIN_HEADING_CHANGE) {
-    Console::console.printfBroadcast("Heading change %f too small, we're likely in the station, encoder/motor reverse detection cannot be distinguished!\n",
+    Console::console.printfBroadcast("Heading change %f too small, we're likely in the station, can't distinguish if encoder and motor are both reversed!\n",
                                      hdiffmax);
+    if((reverse && distance >= 0) ||
+       (!reverse && distance <= 0)) {
+      Console::console.printfBroadcast("%s, motor and encoder direction disagree. Encoder or motor likely reversed.\n",
+                                        reverse ? "Reverse" : "Forward");
+      return MOTOR_ENC_REVERSED;
+    }
   } else if(hdiffmax > 0) { // turned in the wrong direction
     if((reverse && distance >= 0) ||
        (!reverse && distance <= 0)) {

@@ -47,28 +47,6 @@ public:
 		REMOTE_RESERVED6  = 7
 	};
 
-	static uint16_t makeStationID(DroidType dtype, uint8_t builderid, uint8_t stationid) {
-		return STATION_DROID << 14 | dtype << 11 | (builderid & 0x7f) << 4 | (stationid & 0x0f);
-	}
-	static uint16_t makeStationID(RemoteType rtype, uint8_t builderid, uint8_t stationid) {
-		return STATION_REMOTE << 14 | rtype << 11 | (builderid & 0x7f) << 4 | (stationid & 0x0f);
-	}
-	static StationType stationTypeFromId(uint16_t id) {
-		return (StationType)((id>>14)&0x3);
-	}
-	static DroidType droidTypeFromId(uint16_t id) {
-		return (DroidType)((id>>11)&0x7);
-	}
-	static RemoteType remoteTypeFromId(uint16_t id) {
-		return (RemoteType)((id>>11)&0x7);
-	}
-	static uint8_t builderIDFromId(uint16_t id) {
-		return (id>>4)&0x7f;
-	}
-	static uint8_t stationIDFromId(uint16_t id) {
-		return id&0x7;
-	}
-
 	HWAddress hwAddress() { return hwAddress_; }
 
 	virtual Result start(ConsoleStream *stream = NULL);
@@ -76,7 +54,7 @@ public:
 	virtual Result step();
 	virtual Result parameterValue(const String& name, String& value);
 	virtual Result setParameterValue(const String& name, const String& value);
-	virtual Result initialize(uint8_t chan, uint16_t pan, uint16_t station, uint32_t bps, HardwareSerial *uart=&Serial1);
+	virtual Result initialize(uint8_t chan, uint16_t pan, uint32_t bps, HardwareSerial *uart=&Serial1);
 	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
 	Result addPacketReceiver(PacketReceiver *receiver);
@@ -84,7 +62,6 @@ public:
 
 	void setChannel(uint8_t chan) { params_.chan = chan; }
 	void setPAN(uint16_t pan) { params_.pan = pan; }
-	void setStation(uint16_t station) { params_.station = station; }
 	void setBPS(uint32_t bps) { params_.bps = bps; }
 	void setName(const char* name) { memset(params_.name, 0, 20); snprintf(params_.name, 19, name); }
 
@@ -93,14 +70,13 @@ public:
 	bool isInATMode();
 	Result changeBPSTo(uint32_t bps, ConsoleStream *stream=NULL, bool stayInAT=false);
 	int getCurrentBPS() { return currentBPS_; }
-	Result setConnectionInfo(uint8_t chan, uint16_t pan, uint16_t station, bool stayInAT=false);
-	Result getConnectionInfo(uint8_t& chan, uint16_t& pan, uint16_t& station, bool stayInAT=false);
+	Result setConnectionInfo(uint8_t chan, uint16_t pan, bool stayInAT=false);
+	Result getConnectionInfo(uint8_t& chan, uint16_t& pan, bool stayInAT=false);
 
 	Result setAPIMode(bool onoff);
 	Result sendAPIModeATCommand(uint8_t frameID, const char* cmd, uint32_t& argument, bool request=false);
 
 	struct Node {
-		uint16_t stationId;
 		HWAddress address;
 		uint8_t rssi;
 		char name[20];
@@ -110,11 +86,12 @@ public:
 	Result send(const String& str);
 	Result send(const uint8_t *bytes, size_t size);
 	Result send(const Packet& packet);
-	Result sendTo(const HWAddress& dest, const Packet& packet, bool ack) { return sendToXBee(dest, packet, ack); }
+	Result sendTo(const HWAddress& dest, const Packet& packet, bool ack) { return sendToXBee3(dest, packet, ack); }
 	Result sendToXBee3(const HWAddress& dest, const Packet& packet, bool ack);
 	Result sendToXBee(const HWAddress& dest, const Packet& packet, bool ack);
 	Result sendConfigPacket(const HWAddress& dest, bb::PacketSource src, const ConfigPacket& packet, ConfigPacket::ConfigReplyType& replyType,
 	                        uint8_t seqnum, bool waitForReply = true);
+	Result sendPairingPacket(const HWAddress& dest, bb::PacketSource src, PairingPacket& packet, uint8_t seqnum);
 	int numFailedACKs();
 	
 	bool available();
@@ -143,7 +120,7 @@ protected:
 
 	typedef struct {
 		int chan;
-		int pan, station;
+		int pan;
 		int bps;
 		char name[20];
 	} XBeeParams;

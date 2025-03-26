@@ -66,6 +66,9 @@ Result RRemote::initialize() {
     RUI::ui.setSeqnumState(PACKET_SOURCE_RIGHT_REMOTE, params_.otherRemoteAddress.isZero() != false);
     RUI::ui.setSeqnumState(PACKET_SOURCE_DROID, params_.droidAddress.isZero() != false);
     RUI::ui.setSeqnumState(PACKET_SOURCE_LEFT_REMOTE, true);
+    setPacketSource(PACKET_SOURCE_LEFT_REMOTE);
+  } else {
+    setPacketSource(PACKET_SOURCE_RIGHT_REMOTE);
   }
 
   return Subsystem::initialize();
@@ -297,6 +300,8 @@ void RRemote::finishCalibration() {
     Runloop::runloop.excuseOverrun();
     RUI::ui.hideCalibration(PACKET_SOURCE_LEFT_REMOTE);
     RUI::ui.showMain();
+  } else {
+    RInput::input.clearCallbacks();
   }
 }
 
@@ -518,7 +523,22 @@ Result RRemote::incomingStatePacket(const HWAddress& srcAddr, PacketSource sourc
   return RES_OK;    
 }
 
-Result RRemote::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet) {
+Result RRemote::incomingPairingPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, PairingPacket& packet) {
+  if(isLeftRemote) {
+    LOG(LOG_ERROR, "Address 0x%lx:%lx sent Config packet to left remote - should never happen\n", srcAddr.addrHi, srcAddr.addrLo);
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
+  Console::console.printfBroadcast("Got pairing packet from 0x%lx:%lx, type %d\n", srcAddr, packet.type);
+
+  switch(packet.type) {
+  default:
+    LOG(LOG_ERROR, "Unknown config packet type 0x%x.\n", packet.type);
+    return RES_SUBSYS_COMM_ERROR;
+  }
+}
+
+Result RRemote::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, ConfigPacket& packet) {
   if(isLeftRemote) {
     LOG(LOG_ERROR, "Address 0x%lx:%lx sent Config packet to left remote - should never happen\n", srcAddr.addrHi, srcAddr.addrLo);
     return RES_SUBSYS_COMM_ERROR;

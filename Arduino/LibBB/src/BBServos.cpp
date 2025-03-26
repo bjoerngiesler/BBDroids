@@ -93,58 +93,58 @@ Result bb::Servos::start(ConsoleStream* stream) {
     if(stream) stream->printf("scan successful at %dbps, enumerating up to %d...", bps, MAX_SERVO_ID);
 
     for (uint8_t id = 1; id <= MAX_SERVO_ID; id++) {
-      if (dxl_.ping(id)) {
-        uint16_t model = dxl_.getModelNumber(id);
-        if(stream) stream->printf("#%d: model # %d... ", id, model);
+      if (dxl_.ping(id) == false) continue;
 
-        Servo servo;
-        servo.id = id;
-        servo.goal = dxl_.getPresentPosition(id);
-        servo.profileVel = dxl_.readControlTableItem(ControlTableItem::PROFILE_VELOCITY, id);
-        servo.present = dxl_.getPresentPosition(id); 
-        servo.load = dxl_.readControlTableItem(ControlTableItem::PRESENT_LOAD, id);
-        servo.min = dxl_.readControlTableItem(ControlTableItem::MIN_POSITION_LIMIT, id);
-        servo.max = dxl_.readControlTableItem(ControlTableItem::MAX_POSITION_LIMIT, id);
-        servo.offset = 0;
-        servos_.push_back(servo);
+      uint16_t model = dxl_.getModelNumber(id);
+      if(stream) stream->printf("#%d: model # %d... ", id, model);
 
-        if (ctrlPresentPos_.addr == 0) {
-          ctrlPresentPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
-          ctrlGoalPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
-          ctrlProfileVel_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
-          // PRESENT_LOAD and PRESENT_CURRENT have the same addresses but different names (and units - 0.1% vs mA). Robotis, why do you do this to us?
-          ctrlPresentLoad_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
-          if(ctrlPresentLoad_.addr == 0) ctrlPresentLoad_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT); 
-        } else {
-          DYNAMIXEL::ControlTableItemInfo_t item;
-          item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
-          if (item.addr != ctrlPresentPos_.addr || item.addr_length != ctrlPresentPos_.addr_length) {
-            if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
-            return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-          }
-          item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
-          if (item.addr != ctrlGoalPos_.addr || item.addr_length != ctrlGoalPos_.addr_length) {
-            if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
-            return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-          }
-          item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
-          if (item.addr != ctrlProfileVel_.addr || item.addr_length != ctrlProfileVel_.addr_length) {
-            if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
-            return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-          }
-          item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
-          if(item.addr == 0) item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT);
-          if (item.addr != ctrlPresentLoad_.addr || item.addr_length != ctrlPresentLoad_.addr_length) {
-            if (stream) stream->printf("Servos use differing control tables, that is not supported currently! (addr %d!=%d, length %d!=%d)\n", item.addr, ctrlPresentLoad_.addr, item.addr_length, ctrlPresentLoad_.addr_length);
-            return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-          }
+      Servo servo;
+      servo.id = id;
+      servo.goal = dxl_.getPresentPosition(id);
+      servo.profileVel = dxl_.readControlTableItem(ControlTableItem::PROFILE_VELOCITY, id);
+      servo.present = dxl_.getPresentPosition(id); 
+      servo.load = dxl_.readControlTableItem(ControlTableItem::PRESENT_LOAD, id);
+      servo.min = dxl_.readControlTableItem(ControlTableItem::MIN_POSITION_LIMIT, id);
+      servo.max = dxl_.readControlTableItem(ControlTableItem::MAX_POSITION_LIMIT, id);
+      servo.offset = 0;
+      servos_.push_back(servo);
+
+      if (ctrlPresentPos_.addr == 0) {
+        ctrlPresentPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
+        ctrlGoalPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
+        ctrlProfileVel_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
+        // PRESENT_LOAD and PRESENT_CURRENT have the same addresses but different names (and units - 0.1% vs mA). Robotis, why do you do this to us?
+        ctrlPresentLoad_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
+        if(ctrlPresentLoad_.addr == 0) ctrlPresentLoad_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT); 
+      } else {
+        DYNAMIXEL::ControlTableItemInfo_t item;
+        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
+        if (item.addr != ctrlPresentPos_.addr || item.addr_length != ctrlPresentPos_.addr_length) {
+          if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
         }
-      } 
+        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
+        if (item.addr != ctrlGoalPos_.addr || item.addr_length != ctrlGoalPos_.addr_length) {
+          if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
+        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
+        if (item.addr != ctrlProfileVel_.addr || item.addr_length != ctrlProfileVel_.addr_length) {
+          if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
+        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
+        if(item.addr == 0) item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT);
+        if (item.addr != ctrlPresentLoad_.addr || item.addr_length != ctrlPresentLoad_.addr_length) {
+          if (stream) stream->printf("Servos use differing control tables, that is not supported currently! (addr %d!=%d, length %d!=%d)\n", item.addr, ctrlPresentLoad_.addr, item.addr_length, ctrlPresentLoad_.addr_length);
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
+      }
     } 
     break;
-
-    if (stream) stream->printf("\n");
   }
+
+  if (stream) stream->printf("done.\n");
 
   for(auto id: requiredIds_) {
     if(servoWithID(id) == NULL) {
@@ -388,13 +388,14 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
   // set goal. Can't do this in one with profile velocity setting.
   if(id == ID_ALL) {
     for(auto& s: servos_) {
-      setGoal(s.id, (s.max - s.min)/2, VALUE_RAW); // FIXME Maybe home pos is not in the middle?
+      setGoal(s.id, s.min + (s.max - s.min)/2, VALUE_RAW); // FIXME Maybe home pos is not in the middle?
       int offs = (int)s.present - (int)s.goal;
       if(offs < 0) offs = -offs;
       if(offs > maxoffs) maxoffs = offs;
     }
   } else {
-    setGoal(id, (s->max - s->min)/2, VALUE_RAW);
+    bb::printf("Setting goal: %d\n", s->min + (s->max - s->min)/2);
+    setGoal(id, s->min + (s->max - s->min)/2, VALUE_RAW);
     maxoffs = abs((int)s->present - (int)s->goal);
   }      
   res = syncWriteInfo();
@@ -403,7 +404,7 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
   // how many ms should it take to reach the goal?
   float timeToReachGoalMS = maxoffs / ((vel * 4096.0) / 60000);
 
-  //Console::console.printfBroadcast("Time to reach the goal: %f\n", timeToReachGoalMS);
+  Console::console.printfBroadcast("Time to reach the goal: %f\n", timeToReachGoalMS);
 
   int timeRemaining = (int)(2*timeToReachGoalMS);
   bool allReachedGoal = false;
@@ -413,7 +414,7 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
     if(id == ID_ALL) {
       for(auto& s: servos_) {
         int diff = abs((int)s.present - (int)s.goal);
-        //Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s.id, s.present, s.goal, diff, s.load, rawVel);
+        // Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s.id, s.present, s.goal, diff, s.load, rawVel);
         if(diff > 10) allReachedGoal = false;
         if(abs(s.load) > maxLoad) {
           Console::console.printfBroadcast("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.\n",
@@ -424,7 +425,7 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
       }
     } else {
       int diff = abs((int)s->present - (int)s->goal);
-      //Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s->id, s->present, s->goal, diff, s->load, rawVel);
+      // Console::console.printfBroadcast("%d Servo %d: Pos %d Offs %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s->id, s->present, s->offset, s->goal, diff, s->load, rawVel);
       if(diff > 10) allReachedGoal = false;
       if(ABS(s->load) > maxLoad) {
         Console::console.printfBroadcast("ERROR: MAX LOAD OF %d EXCEEDED BY SERVO %d (%d)!!! SWITCHING OFF.", maxLoad, s->id, s->load);

@@ -29,7 +29,8 @@ public:
 
   Result incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet);
   Result incomingStatePacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const StatePacket& packet);
-  Result incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet);
+  Result incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, ConfigPacket& packet);
+  Result incomingPairingPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, PairingPacket& packet);
   Result fillAndSend();
   
   void updateStatusLED();
