@@ -52,7 +52,7 @@ public:
   void switchDrive(DriveMode mode);
 
   virtual Result incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet);
-  virtual Result incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet);
+  virtual Result incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, ConfigPacket& packet);
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   virtual Result setParameterValue(const String& name, const String& stringVal);
 

@@ -29,7 +29,7 @@ RRemote::RRemote():
   params_.otherRemoteAddress = {0,0};
   params_.config.leftIsPrimary = true;
   params_.config.ledBrightness = 7;
-  params_.config.sendRepeats = 3;
+  params_.config.sendRepeats = 1;
   params_.config.lIncrRotBtn = RInput::BUTTON_4;
   params_.config.rIncrRotBtn = RInput::BUTTON_4;
   params_.config.lIncrTransBtn = RInput::BUTTON_NONE;
@@ -394,7 +394,7 @@ bb::Result RRemote::fillAndSend() {
   // both remotes send to droid (unless we're calibrating)
   if(!params_.droidAddress.isZero() && mode_ == MODE_REGULAR) {
     for(int i=0; i<params_.config.sendRepeats+1; i++) {
-      bb::printf("Sending retry %d to 0x%lx:%lx\n", i, params_.droidAddress.addrHi, params_.droidAddress.addrLo);
+      delayMicroseconds(random(100));
       res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
     }
     if(res != RES_OK) {

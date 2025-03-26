@@ -471,7 +471,7 @@ void DODroid::printExtendedStatus(ConsoleStream *stream) {
   stream->printf("Battery: %fmA, %fV\n", DOBattStatus::batt.current(), DOBattStatus::batt.voltage());
 }
 
-Result DODroid::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ConfigPacket& packet) {
+Result DODroid::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, ConfigPacket& packet) {
   if(source == PACKET_SOURCE_LEFT_REMOTE && packet.type == ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID) {
     Console::console.printfBroadcast("setting left remote id to 0x%lx:%lx.\n", packet.cfgPayload.address.addrHi, packet.cfgPayload.address.addrLo);
     params_.leftRemoteAddress = packet.cfgPayload.address;
@@ -683,13 +683,11 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
 }
 
 Result DODroid::fillAndSendStatePacket() {
+  if(params_.leftRemoteAddress.isZero()) return RES_OK;
+
   Packet packet(PACKET_TYPE_STATE, PACKET_SOURCE_DROID, sequenceNumber());
   packet.payload.state.battery = DOBattStatus::batt.available() ? StatePacket::STATUS_OK : StatePacket::STATUS_ERROR;
-
-  if(!params_.leftRemoteAddress.isZero()) {
-    XBee::xbee.sendTo(params_.leftRemoteAddress, packet, false);
-  }
-
+  XBee::xbee.sendTo(params_.leftRemoteAddress, packet, false);
   return RES_OK;
 
   LargeStatePacket p;
