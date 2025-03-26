@@ -108,7 +108,6 @@ Result RRemote::step() {
     if(millis()-lastDroidMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_DROID, true);
     if(millis()-lastRightMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
   }
-  bb::printf("%d(%d): %ld, ", ++pos, bb::Runloop::runloop.getSequenceNumber(), micros()-us1);
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
     if(runningStatus_) {
@@ -121,13 +120,11 @@ Result RRemote::step() {
   } else {
     RDisplay::display.setLED(RDisplay::LED_COMM, RDisplay::LED_OFF);
   }
-  bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
   if((bb::Runloop::runloop.getSequenceNumber() % 10) == 0) {
     if(RInput::input.secondsSinceLastMotion() > 10) RDisplay::display.setLEDBrightness(1);
     else RDisplay::display.setLEDBrightness(params_.config.ledBrightness << 2);
   }
-  bb::printf("%d: %ld\n", ++pos, micros()-us1);
 
   return RES_OK;
 }
@@ -368,11 +365,15 @@ Result RRemote::sendConfigToRightRemote() {
 }
 
 bb::Result RRemote::fillAndSend() {
+  unsigned long us1 = micros();
+  int pos = 0;
+
   Packet packet(PACKET_TYPE_CONTROL, isLeftRemote ? PACKET_SOURCE_LEFT_REMOTE : PACKET_SOURCE_RIGHT_REMOTE, sequenceNumber());
 
   packet.payload.control.primary = (params_.config.leftIsPrimary && isLeftRemote);
 
   RInput::input.fillControlPacket(packet.payload.control);
+  bb::printf("%d: %ld, ", ++pos, micros()-us1);
   if(isLeftRemote) RUI::ui.visualizeFromControlPacket(PACKET_SOURCE_LEFT_REMOTE, packet.seqnum, packet.payload.control);
 
   Result res = RES_OK;
@@ -388,11 +389,11 @@ bb::Result RRemote::fillAndSend() {
   }
 
   if(!isLeftRemote && !params_.otherRemoteAddress.isZero()) { // right remote sends to left remote
-    unsigned long us = micros();
     res = bb::XBee::xbee.sendTo(params_.otherRemoteAddress, packet, false);
-    
+
     if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
   }
+  bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
   // both remotes send to droid (unless we're calibrating)
   if(!params_.droidAddress.isZero() && mode_ == MODE_REGULAR) {
@@ -403,9 +404,11 @@ bb::Result RRemote::fillAndSend() {
       r = 255; g = 0; b = 0;
     }
   }
+  bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
   RDisplay::display.setLED(RDisplay::LED_COMM, r, g, b);
 
+  bb::printf("%d: %ld\n", ++pos, micros()-us1);
   return res;
 }
 
