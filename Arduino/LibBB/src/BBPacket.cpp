@@ -86,13 +86,17 @@ bb::Result bb::PacketReceiver::incomingPacket(const HWAddress& station, uint8_t 
 		switch(packet.payload.pairing.type) {
 		// we're handling info packets here. Everything else will be passed on.
 		case bb::PairingPacket::PAIRING_INFO_REQ:
+			bb::printf("Pairing packet type PAIRING_INFO_REQ, answering with {%d,%d,%d,%d}\n", packetSource(), builderId(), stationId(), stationDetail());
 			packet.payload.pairing.pairingPayload.info = { packetSource(), builderId(), stationId(), stationDetail() };
 			packet.payload.pairing.reply = PairingPacket::PAIRING_OK;
-			return XBee::xbee.sendTo(station, packet, false);
+			res = XBee::xbee.sendTo(station, packet, false);
+			bb::printf("Returning packet to 0x%lx:%lx, result: %s\n", station.addrHi, station.addrLo, errorMessage(res));
+			return res;
 			break;		
 
 		default:
-			res = incomingPairingPacket(station, packet.source, rssi, packet.seqnum, packet.payload.pairing);
+		bb::printf("Pairing packet type %d, passing on\n", packet.payload.pairing.type);
+		res = incomingPairingPacket(station, packet.source, rssi, packet.seqnum, packet.payload.pairing);
 			if(res == RES_OK) {
 				bb::printf("Sending reply with OK flag set\n");
 				packet.payload.pairing.reply = PairingPacket::PAIRING_OK;
