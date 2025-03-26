@@ -86,7 +86,7 @@ public:
 	Result send(const String& str);
 	Result send(const uint8_t *bytes, size_t size);
 	Result send(const Packet& packet);
-	Result sendTo(const HWAddress& dest, const Packet& packet, bool ack) { return sendToXBee3(dest, packet, ack); }
+	Result sendTo(const HWAddress& dest, const Packet& packet, bool ack) { return sendToXBee(dest, packet, ack); }
 	Result sendToXBee3(const HWAddress& dest, const Packet& packet, bool ack);
 	Result sendToXBee(const HWAddress& dest, const Packet& packet, bool ack);
 	Result sendConfigPacket(const HWAddress& dest, bb::PacketSource src, const ConfigPacket& packet, ConfigPacket::ConfigReplyType& replyType,
