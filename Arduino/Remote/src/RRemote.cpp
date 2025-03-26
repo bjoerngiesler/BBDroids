@@ -101,13 +101,15 @@ Result RRemote::stop(ConsoleStream *stream) {
 
 Result RRemote::step() {
   if(!started_) return RES_SUBSYS_NOT_STARTED;
+  unsigned long us1 = micros(), pos = 0;
 
   RInput::input.update();
   if(isLeftRemote) {
     if(millis()-lastDroidMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_DROID, true);
     if(millis()-lastRightMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
   }
-  
+  bb::printf("%d(%d): %ld, ", ++pos, bb::Runloop::runloop.getSequenceNumber(), micros()-us1);
+
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
     if(runningStatus_) {
       printExtendedStatusLine();
@@ -119,11 +121,13 @@ Result RRemote::step() {
   } else {
     RDisplay::display.setLED(RDisplay::LED_COMM, RDisplay::LED_OFF);
   }
+  bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
   if((bb::Runloop::runloop.getSequenceNumber() % 10) == 0) {
     if(RInput::input.secondsSinceLastMotion() > 10) RDisplay::display.setLEDBrightness(1);
     else RDisplay::display.setLEDBrightness(params_.config.ledBrightness << 2);
   }
+  bb::printf("%d: %ld\n", ++pos, micros()-us1);
 
   return RES_OK;
 }

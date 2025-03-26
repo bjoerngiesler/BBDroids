@@ -198,8 +198,6 @@ void RInput::testMatrix() {
 }
 
 void RInput::update() {
-  unsigned long us1 = micros(), pos = 0;
-
   if(isLeftRemote) {
     joyRawH = analogRead(pins.P_A_JOY_HOR);
     joyRawV = 4095 - analogRead(pins.P_A_JOY_VER);
@@ -240,8 +238,6 @@ void RInput::update() {
     joyV = 0;
   }
   joyV = constrain(joyV, -1.0f, 1.0f);
-
-  bb::printf("%d: %ld, ", ++pos, micros()-us1);
   
   battRaw = analogRead(pins.P_A_BATT_CHECK);
   float battCooked = (battRaw/4095.0)*3.1;
@@ -255,8 +251,6 @@ void RInput::update() {
     pot1 = (float)((4095-analogRead(pins.P_A_POT1)) / 4096.0f); 
     pot2 = (float)((4095-analogRead(pins.P_A_POT2)) / 4096.0f);
   }
-
-  bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
   if(imu_.available()) {
     imu_.update();
@@ -282,8 +276,6 @@ void RInput::update() {
     lastIncPosMicros_ = micros();
   }
 
-  bb::printf("%d: %ld, ", ++pos, micros()-us1);
-
   #if defined(ARDUINO_ARCH_ESP32) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
   if(mcpOK_) {
     for(uint8_t i = 0; i < NUM_BUTTONS; i++) {
@@ -302,9 +294,6 @@ void RInput::update() {
     }
   } 
 #endif // ARDUINO_ARCH_ESP32
-
-bb::printf("%d: %ld, ", ++pos, micros()-us1);
-
   if(buttonsChanged[BUTTON_LEFT]) {
     if(buttons[BUTTON_LEFT]) btnLeftPressed();
     else btnLeftReleased();
@@ -337,7 +326,6 @@ bb::printf("%d: %ld, ", ++pos, micros()-us1);
       }
     }
   }
-  bb::printf("%d: %ld\n", ++pos, micros()-us1);
 }
 
 float RInput::secondsSinceLastMotion() {
