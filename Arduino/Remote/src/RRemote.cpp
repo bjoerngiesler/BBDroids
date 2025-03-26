@@ -103,9 +103,11 @@ Result RRemote::step() {
   if(!started_) return RES_SUBSYS_NOT_STARTED;
 
   RInput::input.update();
-  if(millis()-lastDroidMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_DROID, true);
-  if(millis()-lastRightMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
-
+  if(isLeftRemote) {
+    if(millis()-lastDroidMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_DROID, true);
+    if(millis()-lastRightMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
+  }
+  
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
     if(runningStatus_) {
       printExtendedStatusLine();
@@ -296,12 +298,11 @@ void RRemote::finishCalibration() {
   }
   mode_ = MODE_REGULAR;
 
+  RInput::input.clearCallbacks();
   if(isLeftRemote) {
     Runloop::runloop.excuseOverrun();
     RUI::ui.hideCalibration(PACKET_SOURCE_LEFT_REMOTE);
     RUI::ui.showMain();
-  } else {
-    RInput::input.clearCallbacks();
   }
 }
 

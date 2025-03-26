@@ -305,7 +305,6 @@ void RInput::update() {
       }
       //bb::printf("%d(%d):%d ", b, pin, buttons[b]);
     }
-    //bb::printf("\n");
   } 
 #endif // ARDUINO_ARCH_ESP32
 

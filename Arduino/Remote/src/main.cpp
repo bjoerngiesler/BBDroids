@@ -45,7 +45,6 @@ void setup() {
     isLeftRemote = true;
     pins = leftRemotePins;
   }
-  delay(1000);
 
   if(isLeftRemote) {
     Serial2.setPins(pins.P_D_DISPLAY_RX, pins.P_D_DISPLAY_TX);
@@ -56,12 +55,15 @@ void setup() {
     XBee::xbee.setName("RightRemote");
   }
 
+  delay(200);
 
   Console::console.initialize();
   Console::console.start();
 
   Wire.begin();
   Wire.setClock(400000UL);
+
+  delay(200);
 
   ConfigStorage::storage.initialize();
   Runloop::runloop.initialize();
