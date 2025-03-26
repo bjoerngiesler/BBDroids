@@ -82,7 +82,7 @@ void RUI::showPairDroidMenu() {
       bb::PairingPacket pairing;
       pairing.type = PairingPacket::PAIRING_INFO_REQ;
       Result res = RES_COMM_TIMEOUT;
-      for(int i=0; i<3 && res == RES_COMM_TIMEOUT; i++) {
+      for(int i=0; i<5 && res == RES_COMM_TIMEOUT; i++) {
         res = XBee::xbee.sendPairingPacket(n.address, PACKET_SOURCE_LEFT_REMOTE, pairing, Runloop::runloop.sequenceNumber());
       }
       
@@ -123,7 +123,10 @@ void RUI::showPairRemoteMenu() {
     for(auto& n: discoveredNodes_) {
       bb::PairingPacket pairing;
       pairing.type = PairingPacket::PAIRING_INFO_REQ;
-      Result res = XBee::xbee.sendPairingPacket(n.address, PACKET_SOURCE_LEFT_REMOTE, pairing, Runloop::runloop.sequenceNumber());
+      Result res = RES_COMM_TIMEOUT;
+      for(int i=0; i<5 && res == RES_COMM_TIMEOUT; i++) {
+        res = XBee::xbee.sendPairingPacket(n.address, PACKET_SOURCE_LEFT_REMOTE, pairing, Runloop::runloop.sequenceNumber());
+      }
       if(res != RES_OK || pairing.type != PairingPacket::PAIRING_INFO_REQ || pairing.pairingPayload.info.packetSource != PACKET_SOURCE_RIGHT_REMOTE) 
         continue;
 

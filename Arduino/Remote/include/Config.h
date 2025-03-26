@@ -123,8 +123,8 @@ static const uint8_t REMOTE_ID = 0;
 
 static const uint8_t IMU_ADDR           = 0x6b;
 
-static const uint8_t MCP_ADDR1           = 0x26;
-static const uint8_t MCP_ADDR2           = 0x27;
+static const uint8_t MCP_ADDR1           = 0x27;
+static const uint8_t MCP_ADDR2           = 0x26;
 
 //static float MAX_VOLTAGE = 4.2;
 //static float MIN_VOLTAGE = 3.7;
