@@ -365,15 +365,11 @@ Result RRemote::sendConfigToRightRemote() {
 }
 
 bb::Result RRemote::fillAndSend() {
-  unsigned long us1 = micros();
-  int pos = 0;
-
   Packet packet(PACKET_TYPE_CONTROL, isLeftRemote ? PACKET_SOURCE_LEFT_REMOTE : PACKET_SOURCE_RIGHT_REMOTE, sequenceNumber());
 
   packet.payload.control.primary = (params_.config.leftIsPrimary && isLeftRemote);
 
   RInput::input.fillControlPacket(packet.payload.control);
-  bb::printf("%d: %ld, ", ++pos, micros()-us1);
   if(isLeftRemote) RUI::ui.visualizeFromControlPacket(PACKET_SOURCE_LEFT_REMOTE, packet.seqnum, packet.payload.control);
 
   Result res = RES_OK;
@@ -393,22 +389,20 @@ bb::Result RRemote::fillAndSend() {
 
     if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
   }
-  bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
   // both remotes send to droid (unless we're calibrating)
   if(!params_.droidAddress.isZero() && mode_ == MODE_REGULAR) {
     for(int i=0; i<params_.config.sendRepeats+1; i++) {
+      bb::printf("Sending retry %d to 0x%lx:%lx\n", i, params_.droidAddress.addrHi, params_.droidAddress.addrLo);
       res = bb::XBee::xbee.sendTo(params_.droidAddress, packet, false);
     }
     if(res != RES_OK) {
       r = 255; g = 0; b = 0;
     }
   }
-  bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
   RDisplay::display.setLED(RDisplay::LED_COMM, r, g, b);
 
-  bb::printf("%d: %ld\n", ++pos, micros()-us1);
   return res;
 }
 
