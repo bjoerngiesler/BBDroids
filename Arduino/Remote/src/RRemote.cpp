@@ -79,6 +79,7 @@ Result RRemote::start(ConsoleStream *stream) {
   runningStatus_ = false;
   operationStatus_ = RES_OK;
 
+  bb::printf("Starting RInput\n");
   if(RInput::input.begin() == false) {
     LOG(LOG_FATAL, "Error initializing RInput\n");
   }

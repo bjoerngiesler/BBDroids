@@ -81,7 +81,10 @@ void RUI::showPairDroidMenu() {
       bb::printf("Found node at 0x%lx:%lx, sending PAIRING_INFO_REQ\n", n.address.addrHi, n.address.addrLo);
       bb::PairingPacket pairing;
       pairing.type = PairingPacket::PAIRING_INFO_REQ;
-      Result res = XBee::xbee.sendPairingPacket(n.address, PACKET_SOURCE_LEFT_REMOTE, pairing, Runloop::runloop.sequenceNumber());
+      Result res = RES_COMM_TIMEOUT;
+      for(int i=0; i<3 && res == RES_COMM_TIMEOUT; i++) {
+        res = XBee::xbee.sendPairingPacket(n.address, PACKET_SOURCE_LEFT_REMOTE, pairing, Runloop::runloop.sequenceNumber());
+      }
       
       if(res != RES_OK) {
         bb::printf("Couldn't send PAIRING_INFO_REQ: %s\n", errorMessage(res));

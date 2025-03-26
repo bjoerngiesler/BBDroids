@@ -120,16 +120,37 @@ bool RInput::initIMU() {
 }
 
 bool RInput::initMCP() {
-  if(mcp_.begin_I2C(MCP_ADDR1) == 0) {
-    if(mcp_.begin_I2C(MCP_ADDR2) == 0) { // HAAAAAACK!!! to fix my stupid right remote with a bad solder joint
-      Console::console.printfBroadcast("Couldn't initialize MCP!\n");
-      mcpOK_ = false;
-      return false;
+  bb::printf("Initializing MCP... ");
+
+  mcpOK_ = false;
+
+  // determine addr
+  uint8_t addr = 0x00;
+  Wire.beginTransmission(MCP_ADDR1);
+  if(Wire.endTransmission() == 0) {
+    addr = MCP_ADDR1;
+  } else {
+    Wire.beginTransmission(MCP_ADDR2);
+    if(Wire.endTransmission() == 0) {
+      addr = MCP_ADDR2;
     }
   }
+
+  if(addr == 0x0) {
+    bb::printf("failed (not found at 0x%x or 0x%x).\n", MCP_ADDR1, MCP_ADDR2);
+    return false;
+  }
+
+  if(mcp_.begin_I2C(addr) == false) {
+    bb::printf("failed on 0x%x\n", addr);
+    return false;
+  }
+  
   for (uint8_t i = 0; i < 8; i++) {
     mcp_.pinMode(i, INPUT_PULLUP);
   }
+
+  bb::printf("success at 0x%x\n", addr);
   mcpOK_ = true;
   return true;
 }

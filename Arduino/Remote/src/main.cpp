@@ -20,7 +20,7 @@ bool isLeftRemote;
 
 void setup() {
   Serial.begin(2000000);
-  while(!Serial);
+
   Serial.println("BBDroids Remote Software");
 #if !defined(ARDUINO_ARCH_ESP32)
   rp2040.enableDoubleResetBootloader();
