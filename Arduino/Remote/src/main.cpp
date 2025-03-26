@@ -20,6 +20,7 @@ bool isLeftRemote;
 
 void setup() {
   Serial.begin(2000000);
+  while(!Serial);
   Serial.println("BBDroids Remote Software");
 #if !defined(ARDUINO_ARCH_ESP32)
   rp2040.enableDoubleResetBootloader();
@@ -55,7 +56,7 @@ void setup() {
     XBee::xbee.setName("RightRemote");
   }
 
-  delay(200);
+  delay(1000);
 
   Console::console.initialize();
   Console::console.start();

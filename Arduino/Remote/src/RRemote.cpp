@@ -388,7 +388,9 @@ bb::Result RRemote::fillAndSend() {
   }
 
   if(!isLeftRemote && !params_.otherRemoteAddress.isZero()) { // right remote sends to left remote
+    unsigned long us = micros();
     res = bb::XBee::xbee.sendTo(params_.otherRemoteAddress, packet, false);
+    
     if(res != RES_OK) Console::console.printfBroadcast("%s\n", errorMessage(res));
   }
 

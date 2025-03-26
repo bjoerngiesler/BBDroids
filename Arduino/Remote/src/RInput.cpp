@@ -123,6 +123,7 @@ bool RInput::initMCP() {
   if(mcp_.begin_I2C(MCP_ADDR1) == 0) {
     if(mcp_.begin_I2C(MCP_ADDR2) == 0) { // HAAAAAACK!!! to fix my stupid right remote with a bad solder joint
       Console::console.printfBroadcast("Couldn't initialize MCP!\n");
+      mcpOK_ = false;
       return false;
     }
   }
@@ -158,6 +159,8 @@ bool RInput::begin() {
     if(initMCP() == true) break;
     delay(100);
   }
+  if(!imuOK()) bb::printf("Error: Could not initialize IMU\n");
+  if(!mcpOK()) bb::printf("Error: Could not initialize MCP\n");
   return imuOK() && mcpOK();
 }
 
@@ -290,9 +293,10 @@ void RInput::update() {
         else buttonsChanged[b] = false;
         buttons[b] = false;
       }
-      //bb::printf("%d(%d):%d ", b, pin, buttons[b]);
     }
-  } 
+  } else {
+    bb::printf("MCP not OK\n");
+  }
 #endif // ARDUINO_ARCH_ESP32
   if(buttonsChanged[BUTTON_LEFT]) {
     if(buttons[BUTTON_LEFT]) btnLeftPressed();
