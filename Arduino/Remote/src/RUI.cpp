@@ -78,12 +78,22 @@ void RUI::showPairDroidMenu() {
     pairDroidMenu_.clear();
     int num = 0;
     for(auto& n: discoveredNodes_) {
+      bb::printf("Found node at 0x%lx:%lx, sending PAIRING_INFO_REQ\n", n.address.addrHi, n.address.addrLo);
       bb::PairingPacket pairing;
       pairing.type = PairingPacket::PAIRING_INFO_REQ;
       Result res = XBee::xbee.sendPairingPacket(n.address, PACKET_SOURCE_LEFT_REMOTE, pairing, Runloop::runloop.sequenceNumber());
-      if(res != RES_OK || pairing.type != PairingPacket::PAIRING_INFO_REQ || pairing.pairingPayload.info.packetSource != PACKET_SOURCE_DROID) 
+      
+      if(res != RES_OK) {
+        bb::printf("Couldn't send PAIRING_INFO_REQ: %s\n", errorMessage(res));
         continue;
-  
+      } else if(pairing.type != PairingPacket::PAIRING_INFO_REQ) {
+        bb::printf("PAIRING_INFO_REQ returned %d packet instead of %d\n", pairing.type, PairingPacket::PAIRING_INFO_REQ);
+        continue;
+      } else if(pairing.pairingPayload.info.packetSource != PACKET_SOURCE_DROID) {
+        bb::printf("This is not a droid but a %d\n", pairing.pairingPayload.info.packetSource);
+        continue;
+      }
+      bb::printf("This is a droid, adding to the menu.\n");
       pairDroidMenu_.addEntry(n.name, [=]() { RRemote::remote.selectDroid(n.address); showMain(); });
       num++;
     }
