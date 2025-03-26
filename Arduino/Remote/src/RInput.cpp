@@ -198,6 +198,8 @@ void RInput::testMatrix() {
 }
 
 void RInput::update() {
+  unsigned long us1 = micros(), pos = 0;
+
   if(isLeftRemote) {
     joyRawH = analogRead(pins.P_A_JOY_HOR);
     joyRawV = 4095 - analogRead(pins.P_A_JOY_VER);
@@ -215,7 +217,6 @@ void RInput::update() {
   float joyFilteredV = joyVFilter_.filter(joyRawV);
   unsigned int deadbandAbs = rint(4096*(deadbandPercent_/100.0f)/2.0f);
 
-  //Console::console.printfBroadcast("Deadband percent: %d Absolute: %d\n", deadbandPercent_, deadbandAbs);
   joyAtZero_ = true;
 
   if(joyFilteredH < hCalib.center - deadbandAbs) {
@@ -232,15 +233,15 @@ void RInput::update() {
   if(joyFilteredV < vCalib.center-deadbandAbs) {
     joyAtZero_ = false;
     joyV = float(2047-map(joyFilteredV, vCalib.min, vCalib.center-deadbandAbs, 0, 2047)) / 2048.0f;
-    //Console::console.printfBroadcast("Mapping %f from %d to %d-%d = %f\n", joyFilteredV, vCalib.min, vCalib.center, deadbandAbs, joyV);
   } else if(joyFilteredV > vCalib.center+deadbandAbs) {
     joyAtZero_ = false;
     joyV = float(2047-map(joyFilteredV, vCalib.center+deadbandAbs, vCalib.max, 2047, 4095)) / 2048.0f;
-    //Console::console.printfBroadcast("Mapping %f from %d+%d to %d = %f\n", joyFilteredV, vCalib.center, deadbandAbs, vCalib.max, joyV);
   } else {
     joyV = 0;
   }
   joyV = constrain(joyV, -1.0f, 1.0f);
+
+  bb::printf("%d: %ld, ", ++pos, micros()-us1);
   
   battRaw = analogRead(pins.P_A_BATT_CHECK);
   float battCooked = (battRaw/4095.0)*3.1;
@@ -254,6 +255,8 @@ void RInput::update() {
     pot1 = (float)((4095-analogRead(pins.P_A_POT1)) / 4096.0f); 
     pot2 = (float)((4095-analogRead(pins.P_A_POT2)) / 4096.0f);
   }
+
+  bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
   if(imu_.available()) {
     imu_.update();
@@ -275,21 +278,13 @@ void RInput::update() {
       incPosX_ += incVelX_*dt + (incAccX_*dt)*(incAccX_*dt)/2.0;
       incPosY_ += incVelY_*dt + (incAccY_*dt)*(incAccY_*dt)/2.0;
       incPosZ_ += incVelZ_*dt + (incAccZ_*dt)*(incAccZ_*dt)/2.0;
-      if(incrementalPos_ != BUTTON_NONE && buttons[incrementalPos_] == true) {
-#if 0
-      Console::console.printfBroadcast("ax:%f,ay:%f,az:%f,p:%f,r:%f,h:%f,gx:%f,gy:%f,gz:%f,ax:%f,ay:%f,az:%f,X:%f,Y:%f,Z:%f\n", 
-      ax, ay, az, p, r, h, gravx, gravy, gravz, incAccX_, incAccY_, incAccZ_, incPosX_, incPosY_, incPosZ_);
-#else
-      //Console::console.printfBroadcast("ax:%f,ay:%f,az:%f,X:%f,Y:%f,Z:%f\n", incAccX_, incAccY_, incAccZ_, incPosX_, incPosY_, incPosZ_);
-#endif
-      }
     }
     lastIncPosMicros_ = micros();
-  } else {
   }
 
+  bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
-#if defined(ARDUINO_ARCH_ESP32) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
+  #if defined(ARDUINO_ARCH_ESP32) // ESP reads buttons from the MCP expander. Non-ESP does it from the interrupt routine block above.
   if(mcpOK_) {
     for(uint8_t i = 0; i < NUM_BUTTONS; i++) {
       Button b = Button(i);
@@ -307,6 +302,8 @@ void RInput::update() {
     }
   } 
 #endif // ARDUINO_ARCH_ESP32
+
+bb::printf("%d: %ld, ", ++pos, micros()-us1);
 
   if(buttonsChanged[BUTTON_LEFT]) {
     if(buttons[BUTTON_LEFT]) btnLeftPressed();
@@ -340,6 +337,7 @@ void RInput::update() {
       }
     }
   }
+  bb::printf("%d: %ld\n", ++pos, micros()-us1);
 }
 
 float RInput::secondsSinceLastMotion() {
