@@ -70,6 +70,7 @@ public:
 
   PacketSource primary() { return params_.config.leftIsPrimary ? PACKET_SOURCE_LEFT_REMOTE : PACKET_SOURCE_RIGHT_REMOTE; }
   void setLeftIsPrimary(bool yesno);
+  bool isPrimary() { return (isLeftRemote && params_.config.leftIsPrimary) || (!isLeftRemote && !params_.config.leftIsPrimary);}
 
   // Callbacks
   void setIncrRotButtonCB(RInput::Button button, bool left);

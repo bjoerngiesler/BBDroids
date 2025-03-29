@@ -86,8 +86,12 @@ public:
 	Result send(const String& str);
 	Result send(const uint8_t *bytes, size_t size);
 	Result send(const Packet& packet);
+
+	//! Send a packet to the given 64bit HW address. Uses sendToXBee(), not sendtoXBee3(), because the latter is not supported by all firmwares.
 	Result sendTo(const HWAddress& dest, const Packet& packet, bool ack) { return sendToXBee(dest, packet, ack); }
+	//! Send using the newer 0x10 instruction, which is not supported by older firmwares
 	Result sendToXBee3(const HWAddress& dest, const Packet& packet, bool ack);
+	//! Send using the old 0x00 instruction, deprecated but still supported by all firmwares
 	Result sendToXBee(const HWAddress& dest, const Packet& packet, bool ack);
 	Result sendConfigPacket(const HWAddress& dest, bb::PacketSource src, const ConfigPacket& packet, ConfigPacket::ConfigReplyType& replyType,
 	                        uint8_t seqnum, bool waitForReply = true);

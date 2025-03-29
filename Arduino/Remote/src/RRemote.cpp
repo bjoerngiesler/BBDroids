@@ -368,7 +368,7 @@ Result RRemote::sendConfigToRightRemote() {
 bb::Result RRemote::fillAndSend() {
   Packet packet(PACKET_TYPE_CONTROL, isLeftRemote ? PACKET_SOURCE_LEFT_REMOTE : PACKET_SOURCE_RIGHT_REMOTE, sequenceNumber());
 
-  packet.payload.control.primary = (params_.config.leftIsPrimary && isLeftRemote);
+  packet.payload.control.primary = isPrimary();
 
   RInput::input.fillControlPacket(packet.payload.control);
   if(isLeftRemote) RUI::ui.visualizeFromControlPacket(PACKET_SOURCE_LEFT_REMOTE, packet.seqnum, packet.payload.control);
@@ -624,6 +624,7 @@ void RRemote::printExtendedStatus(ConsoleStream* stream) {
   stream->printf(isLeftRemote ? "Left remote status\n" : "Right remote status\n");
   stream->printf("Software version: " VERSION_STRING "\n");
   stream->printf("Sequence number: %ld\n", seqnum_);
+  stream->printf("Primary remote: %s\n", isPrimary() ? "Yes" : "No");
   stream->printf("Addressing:\n");
   stream->printf("\tThis remote:  0x%lx:%lx\n", XBee::xbee.hwAddress().addrHi, XBee::xbee.hwAddress().addrLo);
   stream->printf("\tOther remote: 0x%lx:%lx\n", params_.otherRemoteAddress.addrHi, params_.otherRemoteAddress.addrLo);

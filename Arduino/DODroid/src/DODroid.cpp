@@ -158,6 +158,8 @@ Result DODroid::start(ConsoleStream* stream) {
     headIsOn_ = false;
   }
 
+  bb::Servos::servos.setProfileVelocity(SERVO_NECK, 100);
+
   if(operationStatus_ == RES_DROID_VOLTAGE_TOO_LOW) {
     if(DOBattStatus::batt.voltage() < 1.0) {
       LOG(LOG_ERROR, "No power (%.fV), USB only!\n", DOBattStatus::batt.voltage());
@@ -588,11 +590,9 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       setLED(LED_DRIVE, OFF);
     }
 
-    lean_ = -packet.getAxis(8, bb::ControlPacket::UNIT_UNITY) * params_.neckRange;
     DOSound::sound.setVolume(int(30.0 * packet.getAxis(9)));
   } else { // secondary remote
-#if 0
-    lean_ = -1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange;
+    lean_ = leanFilter_.filter(-1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange);
 
     if(headIsOn_) {
       balanceController_.setGoal(params_.leanHeadToBody*lean_-pitchAtRest_);
@@ -604,7 +604,6 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     else remoteAerial2_ = 0;
     if(packet.button7) remoteAerial1_ = params_.aerialAnim;
     else remoteAerial1_ = 0;
-#endif
   }
 
   return RES_OK;

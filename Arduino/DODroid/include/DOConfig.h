@@ -48,7 +48,7 @@ struct DOParams {
     float speedAxisGain     = 1.0;
     float rotAxisGain       = 0.4;
 
-    float leanHeadToBody    = 0.8;
+    float leanHeadToBody    = 0.0;
 
     // Free animation parameters. 
     // Be aware of the units!!! E.g. target unit for servo free animation is always degrees, but input may be something else.

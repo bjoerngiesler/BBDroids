@@ -76,7 +76,7 @@ void setup() {
   RRemote::remote.initialize();
 
   Serial1.setPins(pins.P_D_XBEE_RX, pins.P_D_XBEE_TX);
-  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, 115200, &Serial1);
+  XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, 230400, &Serial1);
 
   XBee::xbee.start();
   XBee::xbee.setAPIMode(true);

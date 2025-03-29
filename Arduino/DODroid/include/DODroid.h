@@ -98,6 +98,8 @@ protected:
   
   MotorStatus leftMotorStatus_, rightMotorStatus_;
 
+  bb::LowPassFilter leanFilter_;
+
   int numLeftCtrlPackets_, numRightCtrlPackets_;
   uint8_t lastLeftSeqnum_, lastRightSeqnum_;
   unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_, msLastPrimaryCtrlPacket_;
