@@ -62,6 +62,7 @@ void startSubsystems() {
 
 void setup() {
   Serial.begin(2000000);
+  while(!Serial);
   Serial.println("Starting up...");
 
   Wire.begin();

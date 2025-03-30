@@ -8,6 +8,75 @@ DODroid DODroid::droid;
 DOParams DODroid::params_;
 bb::ConfigStorage::HANDLE DODroid::paramsHandle_;
 
+static uint16_t pwmPeriod;
+
+static void configureTimers() {
+  REG_GCLK_GENDIV = GCLK_GENDIV_DIV(1) | GCLK_GENDIV_ID(4);
+  while(GCLK->STATUS.bit.SYNCBUSY); 
+
+  // Set the clock source, duty cycle, and enable GCLK5  
+  REG_GCLK_GENCTRL = GCLK_GENCTRL_SRC_DFLL48M |  // Set 48MHz source
+                     GCLK_GENCTRL_IDC |          // Improve Duty Cycle
+                     GCLK_GENCTRL_GENEN |        // Enable GCLK
+                     GCLK_GENCTRL_ID(4);         // For GLCK5    
+  while(GCLK->STATUS.bit.SYNCBUSY);    
+
+  // Route GLCK5 to TCC0 & TCC1, and enable the clock.
+  REG_GCLK_CLKCTRL = GCLK_CLKCTRL_ID_TCC0_TCC1 | // Route GCLK5 to TCC0 & 1
+                     GCLK_CLKCTRL_CLKEN |        // Enable the clock
+                     GCLK_CLKCTRL_GEN_GCLK4;     // Select GCLK5
+  while(GCLK->STATUS.bit.SYNCBUSY);  
+
+  // Route to multiplexer...
+  PORT->Group[g_APinDescription[P_LEFT_PWMA].ulPort].PINCFG[g_APinDescription[P_LEFT_PWMA].ulPin].bit.PMUXEN = 1;
+  PORT->Group[g_APinDescription[P_LEFT_PWMB].ulPort].PINCFG[g_APinDescription[P_LEFT_PWMB].ulPin].bit.PMUXEN = 1;
+  PORT->Group[g_APinDescription[P_RIGHT_PWMA].ulPort].PINCFG[g_APinDescription[P_RIGHT_PWMA].ulPin].bit.PMUXEN = 1;
+  PORT->Group[g_APinDescription[P_RIGHT_PWMB].ulPort].PINCFG[g_APinDescription[P_RIGHT_PWMB].ulPin].bit.PMUXEN = 1;
+  // ...and in the MUX to peripheral function F. Here comes the messy bit (data sheet page 30, table 7.1)
+  // LEFT_PWMA is Pin 18 -> PA04, which gets TCC0/WO[0] in port function E
+  PORT->Group[g_APinDescription[P_LEFT_PWMA].ulPort].PMUX[g_APinDescription[P_LEFT_PWMA].ulPin >> 1].reg |= PORT_PMUX_PMUXE_E;
+  // LEFT_PWMB is Pin 19 -> PA05, which gets TCC0/WO[1] in port function E
+  PORT->Group[g_APinDescription[P_LEFT_PWMB].ulPort].PMUX[g_APinDescription[P_LEFT_PWMB].ulPin >> 1].reg |= PORT_PMUX_PMUXO_E;
+  // RIGHT_PWMA is Pin 3 -> PA11, which gets TCC0/WO[3] in port function F
+  PORT->Group[g_APinDescription[P_RIGHT_PWMA].ulPort].PMUX[g_APinDescription[P_RIGHT_PWMA].ulPin >> 1].reg |= PORT_PMUX_PMUXE_F;
+  // RIGHT_PWMB is Pin 2 -> PA10, which gets TCC0/WO[2] in port function F
+  PORT->Group[g_APinDescription[P_RIGHT_PWMB].ulPort].PMUX[g_APinDescription[P_RIGHT_PWMB].ulPin >> 1].reg |= PORT_PMUX_PMUXO_F;  
+
+  double fPWM = 20000;
+  double fBus = 48000000;
+  pwmPeriod = int(fBus / fPWM)-1;
+
+  REG_TCC0_WAVE |= TCC_WAVE_WAVEGEN_NPWM;
+  REG_TCC0_PER = pwmPeriod;
+  REG_TCC0_CTRLA |= TCC_CTRLA_PRESCALER_DIV1 | TCC_CTRLA_ENABLE;     // Requires SYNC on CTRLA
+  while(TCC0->SYNCBUSY.bit.ENABLE || TCC0->SYNCBUSY.bit.WAVE || TCC0->SYNCBUSY.bit.PER);
+}
+
+static void customAnalogWrite(uint8_t pin, uint8_t dutycycle) {
+  uint16_t dc = map(dutycycle, 0, 255, 0, pwmPeriod);
+
+  switch(pin) {
+  case P_LEFT_PWMA: // WO[0] -> CCB0
+    REG_TCC0_CCB0 = dc;
+    while(TCC0->SYNCBUSY.bit.CCB0);
+    break;
+  case P_LEFT_PWMB: // WO[1] -> CCB1
+    REG_TCC0_CCB1 = dc;
+    while(TCC0->SYNCBUSY.bit.CCB1);
+    break;
+  case P_RIGHT_PWMA: // WO[3] -> CCB3
+    REG_TCC0_CCB3 = dc;
+    while(TCC0->SYNCBUSY.bit.CCB3);
+    break;
+  case P_RIGHT_PWMB: // WO[2] -> CCB2
+    REG_TCC0_CCB2 = dc;
+    while(TCC0->SYNCBUSY.bit.CCB2);
+    break;
+  default:
+    bb::printf("ERROR - Unknown pin %d in customAnalogWrite()\n", pin);
+  }
+}
+
 DODroid::DODroid():
   imu_(IMU_ADDR),
 
@@ -36,6 +105,10 @@ DODroid::DODroid():
   digitalWrite(PULL_DOWN_15, LOW);
   pinMode(PULL_DOWN_20, OUTPUT);
   digitalWrite(PULL_DOWN_20, LOW);
+
+  configureTimers();
+  leftMotor_.setCustomAnalogWrite(&customAnalogWrite);
+  rightMotor_.setCustomAnalogWrite(&customAnalogWrite);
 
   statusPixels_.begin();
   statusPixels_.setBrightness(10);
@@ -133,7 +206,6 @@ Result DODroid::initialize() {
 }
 
 Result DODroid::start(ConsoleStream* stream) {
-  lastBtn0_ = lastBtn1_ = lastBtn2_ = lastBtn3_ = lastBtn4_ = false;
   leftMotorStatus_ = MOTOR_UNTESTED;
   rightMotorStatus_ = MOTOR_UNTESTED;
   servosOK_ = false;
@@ -339,7 +411,7 @@ bb::Result DODroid::stepHead() {
                constrain(aer + remoteAerial3_, 0, 180));
   }
 
-  if(lastBtn3_ == false && (float(millis())/1000.0f > annealTime_ + params_.faHeadAnnealDelay)) {
+  if(lastPrimaryCtrlPacket_.button3 == false && (float(millis())/1000.0f > annealTime_ + params_.faHeadAnnealDelay)) {
     if(remoteP_ > 0.5) {
       remoteP_ -= annealP_;
       if(remoteP_ < 0) remoteP_ = 0;
@@ -363,7 +435,7 @@ bb::Result DODroid::stepHead() {
       remoteR_ += annealR_;
       if(remoteR_ > 0) remoteR_ = 0;
     } else remoteR_ = 0;
-  } else if(lastBtn3_ == true){
+  } else if(lastPrimaryCtrlPacket_.button3 == true){
     annealTime_ = float(millis()) / 1000.0f;
   }
   
@@ -527,7 +599,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     msLastPrimaryCtrlPacket_ = millis();
     
     // Joystick button switches drive mode
-    if(packet.button4 && !lastBtn4_) {
+    if(packet.button4 && !lastPrimaryCtrlPacket_.button4) {
       if(driveMode_ == DRIVE_OFF) {
         if(params_.autoPosControl == true) {
           switchDrive(DRIVE_POSITION);
@@ -550,15 +622,9 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     }
 
     // Button 0, 1, 2 play different sounds
-    if(packet.button0 && !lastBtn0_) DOSound::sound.playFolderRandom(DOSound::FOLDER_GREETING);
-    else if(packet.button1 && !lastBtn1_) DOSound::sound.playFolderRandom(DOSound::FOLDER_POSITIVE);
-    else if(packet.button2 && !lastBtn2_) DOSound::sound.playFolderRandom(DOSound::FOLDER_NEGATIVE);
-
-    lastBtn0_ = packet.button0;
-    lastBtn1_ = packet.button1;
-    lastBtn2_ = packet.button2;
-    lastBtn3_ = packet.button3;
-    lastBtn4_ = packet.button4;
+    if(packet.button0 && !lastPrimaryCtrlPacket_.button0) DOSound::sound.playFolderNext(2);
+    else if(packet.button1 && !lastPrimaryCtrlPacket_.button1) DOSound::sound.playFolderNext(3);
+    else if(packet.button2 && !lastPrimaryCtrlPacket_.button2) DOSound::sound.playFolderNext(4);
 
     // If drive system is on, joystick controls rotation and speed
     if(driveMode_ != DRIVE_OFF) {
@@ -589,12 +655,19 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     }
 
     DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
+    lastPrimaryCtrlPacket_ = packet;
   } else { // secondary remote
     lean_ = leanFilter_.filter(-1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange);
 
     if(headIsOn_) {
       balanceController_.setGoal(params_.leanHeadToBody*lean_-pitchAtRest_);
     }
+
+    if(packet.button0 && !lastSecondaryCtrlPacket_.button0) DOSound::sound.playFolderNext(5);
+    else if(packet.button1 && !lastSecondaryCtrlPacket_.button1) DOSound::sound.playFolderNext(6);
+    else if(packet.button2 && !lastSecondaryCtrlPacket_.button2) DOSound::sound.playFolderNext(7);
+
+    lastSecondaryCtrlPacket_ = packet;
   }
 
   if(source == PACKET_SOURCE_RIGHT_REMOTE) {
@@ -624,7 +697,7 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
       bool retval = DOSound::sound.playSound(words[1].toInt());
       if(retval == false) stream->printf("Error\n");      
     } if(words.size() == 3) {
-      bool retval = DOSound::sound.playFolder(DOSound::Folder(words[1].toInt()), words[2].toInt());
+      bool retval = DOSound::sound.playFolder((unsigned int)(words[1].toInt()), words[2].toInt());
       if(retval == false) stream->printf("Error\n");
     }
     return RES_OK;

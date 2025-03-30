@@ -12,16 +12,6 @@ class DOSound {
 public:
   static DOSound sound;
 
-  enum Folder {
-    FOLDER_SYSTEM   = 1,
-    FOLDER_GREETING = 2,
-    FOLDER_POSITIVE = 3,
-    FOLDER_NEGATIVE = 4,
-    FOLDER_CURIOUS  = 5
-  };
-
-  static const uint8_t FOLDER_MAX = 5;
-
   DOSound();
   bool begin(Uart *ser);
   bool available() { return available_; }
@@ -31,16 +21,22 @@ public:
 #else
   bool sdCardInserted() { return true; }
 #endif
-  bool playFolder(Folder folder, int fileNumber);
-  bool playFolderRandom(Folder folder);
+  bool playFolder(unsigned int folder, unsigned int fileNumber);
+  bool playFolderRandom(unsigned int folder);
+  bool playFolderNext(unsigned int folder);
   bool playSystemSound(int snd);
-  bool playSound(int fileNumber);
+  bool playSound(unsigned int fileNumber);
   bool setVolume(uint8_t vol);
 
 private:
   DFPlayerMini_Fast dfp_;
   bool available_;
-  std::map<Folder, int> folderCounts_;
+  struct FolderContents {
+    unsigned int count;
+    unsigned int next;
+  };
+
+  std::map<unsigned int, FolderContents> folders_;
   int fileCount_;
 };
 

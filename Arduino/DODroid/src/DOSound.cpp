@@ -33,32 +33,49 @@ bool DOSound::begin(Uart *ser) {
   return false;
 }
 
-bool DOSound::playSound(int fileNumber) {
+bool DOSound::playSound(unsigned int fileNumber) {
   if(!available_ || !sdCardInserted()) return false;
   dfp_.play(fileNumber);
   return true;
 }
 
-bool DOSound::playFolder(Folder folder, int filenumber) {
+bool DOSound::playFolder(unsigned int folder, unsigned int filenumber) {
   if(!available_ || !sdCardInserted()) return false;
   dfp_.playFolder(int(folder), filenumber);
   return true;
 }
 
-bool DOSound::playFolderRandom(Folder folder) {
+bool DOSound::playFolderRandom(unsigned int folder) {
   if(!available_ || !sdCardInserted()) return false;
-  if(folderCounts_.find(folder) == folderCounts_.end()) {
+  if(folders_.find(folder) == folders_.end()) {
     Console::console.printfBroadcast("No folder with number %d\n", int(folder));
     return false;
   }
-  Console::console.printfBroadcast("%d files in folder %d\n", folderCounts_[folder], int(folder));
-  int num = random(1, folderCounts_[folder]+1);
+  Console::console.printfBroadcast("%d files in folder %d\n", folders_[folder].count, int(folder));
+  int num = random(0, folders_[folder].count);
   Console::console.printfBroadcast("Playing file %d\n", num);
-  return playFolder(folder, num);
+  if(playFolder(folder, num+1) == true) {
+    folders_[folder].next = (folders_[folder].next+1)%folders_[folder].count;
+    return true;
+  } else return false;
+}
+
+bool DOSound::playFolderNext(unsigned int folder) {
+  if(!available_ || !sdCardInserted()) return false;
+  if(folders_.find(folder) == folders_.end()) {
+    Console::console.printfBroadcast("No folder with number %d\n", int(folder));
+    return false;
+  }
+  Console::console.printfBroadcast("%d files in folder %d\n", folders_[folder].count, int(folder));
+  Console::console.printfBroadcast("Playing file %d\n", folders_[folder].next);
+  if(playFolder(folder, folders_[folder].next+1) == true) {
+    folders_[folder].next = (folders_[folder].next+1)%folders_[folder].count;
+    return true;
+  } else return false;
 }
 
 bool DOSound::playSystemSound(int snd) { 
-  if(playFolder(FOLDER_SYSTEM, (int)snd) == true) {
+  if(playFolder(1, (int)snd) == true) {
     delay(1200);
     return true;
   }
@@ -81,15 +98,16 @@ bool DOSound::checkSDCard() {
     fileCount_ = fc;
     Console::console.printfBroadcast("SD card inserted!\n");
     Console::console.printfBroadcast("    %d overall files\n", fileCount_);
-    for(int i=1; i<=FOLDER_MAX; i++) {
+    for(unsigned int i=1; i<=8; i++) {
       int num = dfp_.numTracksInFolder(i);
       Console::console.printfBroadcast("    %d files in folder %d\n", num, i);
-      folderCounts_[Folder(i)] = num;
+      if(num > 0)
+        folders_[i] = {num, 0};
     }
     Console::console.printfBroadcast("Playing initial system sound.\n");
-    dfp_.playFolder(int(FOLDER_SYSTEM), SystemSounds::SOUND_SYSTEM_READY);
-    dfp_.playFolder(int(FOLDER_SYSTEM), SystemSounds::SOUND_SYSTEM_READY);
-    dfp_.playFolder(int(FOLDER_SYSTEM), SystemSounds::SOUND_SYSTEM_READY);
+    dfp_.playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY);
+    dfp_.playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY);
+    dfp_.playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY);
     Console::console.printfBroadcast("Done.\n");
     return true;
   } else {

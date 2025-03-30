@@ -18,7 +18,6 @@ bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_
 
   digitalWrite(pin_a_, LOW);
   digitalWrite(pin_b_, LOW);
-  analogWrite(pin_pwm_, 0);
   if(pin_en_ != PIN_OFF) {
     digitalWrite(pin_en_, LOW);
     en_ = false;
@@ -28,6 +27,8 @@ bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_
 
   speed_ = 0;
   reverse_ = false;
+
+  customAnalogWrite_ = nullptr;
 }
 
 bb::DCMotor::DCMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b) {
@@ -46,10 +47,10 @@ bb::DCMotor::DCMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b) {
     pinMode(pin_pwm_, OUTPUT);
   if(pin_en_ != PIN_OFF)
     pinMode(pin_en_, OUTPUT);
-  analogWrite(pin_a_, 0);
-  analogWrite(pin_b_, 0);
 
   speed_ = 0;
+
+  customAnalogWrite_ = nullptr;
 }
 
 void bb::DCMotor::setEnabled(bool en) {
@@ -71,27 +72,27 @@ bb::Result bb::DCMotor::set(float speed) {
       digitalWrite(pin_a_, LOW);
       digitalWrite(pin_b_, LOW);
       speed = 0;
-      analogWrite(pin_pwm_, 0);
+      write(pin_pwm_, 0);
     } else if(speed_ > 0) { // forward
       digitalWrite(pin_a_, HIGH);
       digitalWrite(pin_b_, LOW);
-      analogWrite(pin_pwm_, speed_);
+      write(pin_pwm_, speed_);
     } else { // backward
       digitalWrite(pin_a_, LOW);
       digitalWrite(pin_b_, HIGH);
-      analogWrite(pin_pwm_, -speed_);
+      write(pin_pwm_, -speed_);
     }
   } else {
     if(speed_ > -1 && speed_ <1) {
-      analogWrite(pin_a_, 0);
-      analogWrite(pin_b_, 0);
+      write(pin_a_, 0);
+      write(pin_b_, 0);
       speed_ = 0;
     } else if(speed_ > 0) { // forward
-      analogWrite(pin_a_, 0);
-      analogWrite(pin_b_, speed_);
+      write(pin_a_, 0);
+      write(pin_b_, speed_);
     } else { // backward
-      analogWrite(pin_a_, -speed_);
-      analogWrite(pin_b_, 0);
+      write(pin_a_, -speed_);
+      write(pin_b_, 0);
     }
   }
 
@@ -104,10 +105,10 @@ bb::Result bb::DCMotor::brake(float force) {
   if(scheme_ == SCHEME_A_B_PWM) {
     digitalWrite(pin_a_, HIGH);
     digitalWrite(pin_b_, HIGH);
-    analogWrite(pin_pwm_, constrain(force, 0, 255));
+    write(pin_pwm_, constrain(force, 0, 255));
   } else {
-    analogWrite(pin_a_, constrain(force, 0, 255));
-    analogWrite(pin_b_, constrain(force, 0, 255));
+    write(pin_a_, constrain(force, 0, 255));
+    write(pin_b_, constrain(force, 0, 255));
   }
 
   return RES_OK;
@@ -117,3 +118,11 @@ void bb::DCMotor::setReverse(bool reverse) {
   reverse_ = reverse;
 }
 
+void bb::DCMotor::setCustomAnalogWrite(void(*cust)(uint8_t pin, uint8_t dutycycle)) {
+  customAnalogWrite_ = cust;
+}
+
+void bb::DCMotor::write(uint8_t pin, uint8_t dutycycle) {
+  if(customAnalogWrite_ != nullptr) customAnalogWrite_(pin, dutycycle);
+  else analogWrite(pin, dutycycle);
+}

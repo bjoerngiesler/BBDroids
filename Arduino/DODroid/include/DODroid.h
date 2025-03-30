@@ -103,13 +103,13 @@ protected:
   int numLeftCtrlPackets_, numRightCtrlPackets_;
   uint8_t lastLeftSeqnum_, lastRightSeqnum_;
   unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_, msLastPrimaryCtrlPacket_;
+  bb::ControlPacket lastPrimaryCtrlPacket_, lastSecondaryCtrlPacket_;
   float msSinceDriveInput_;
 
   DriveMode driveMode_;
   bool driveSafety_;
   
   bool servosOK_, aerialsOK_;
-  bool lastBtn0_, lastBtn1_, lastBtn2_, lastBtn3_, lastBtn4_;
   float remoteP_, remoteH_, remoteR_;
   float pitchAtRest_;
   float remoteAerial1_, remoteAerial2_, remoteAerial3_;

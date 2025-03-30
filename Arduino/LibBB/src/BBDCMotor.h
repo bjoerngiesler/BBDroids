@@ -53,7 +53,14 @@ public:
   virtual uint8_t deadband() { return deadband_; }
   virtual void setDeadband(uint8_t db) { deadband_ = db; }
 
+  // Use this to provide a custom analogWrite() function to the motor, e.g. if you're doing your own timer setup
+  void setCustomAnalogWrite(void(*cust)(uint8_t pin, uint8_t dutycycle));
+  void write(uint8_t pin, uint8_t dutycycle);
+
 protected:
+
+  void (*customAnalogWrite_)(uint8_t pin, uint8_t dutycycle);
+
   uint8_t pin_a_, pin_b_, pin_pwm_, pin_en_;
   uint8_t deadband_;
   float speed_;
