@@ -106,8 +106,6 @@ protected:
 #else
   SerialPIO ser_;
 #endif
-  bool left_led_state_, right_led_state_;
-  unsigned long last_millis_;
   Adafruit_NeoPixel statusPixels_;
 };
 

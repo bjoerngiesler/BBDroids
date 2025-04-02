@@ -230,6 +230,21 @@ void RUI::drawGUI() {
       populateMenus();
       needsMenuRebuild_ = false;
     }
+    needsScreensaverRedraw_ = true;
+}
+
+void RUI::drawScreensaver() {
+    if(needsScreensaverRedraw_) {
+        RDisplay::display.rect(0, 0, RDisplay::DISPLAY_WIDTH, RDisplay::DISPLAY_HEIGHT, RDisplay::BLACK, true);
+        topLabel_.setNeedsFullRedraw();
+        bottomLabel_.setNeedsFullRedraw();
+        leftSeqnum_.setNeedsFullRedraw();
+        rightSeqnum_.setNeedsFullRedraw();
+        droidSeqnum_.setNeedsFullRedraw();
+        if(dialogActive_) dialog_.setNeedsFullRedraw();
+        if(mainWidget_ != nullptr) mainWidget_->setNeedsFullRedraw();
+        needsScreensaverRedraw_ = false;
+    }
 }
 
 void RUI::setTopTitle(const String& title) {

@@ -31,6 +31,7 @@ public:
     void setNeedsMenuRebuild(bool yesno = true) { needsMenuRebuild_ = yesno; }
     void populateMenus();
     void drawGUI();
+    void drawScreensaver();
 
     void setTopTitle(const String& title);
 
@@ -71,7 +72,7 @@ protected:
     RWidget* mainWidget_;
     RLabelWidget *ledBrightnessLabel_, *deadbandPercentLabel_, *sendRepeatsLabel_;
 
-    bool needsMenuRebuild_;
+    bool needsMenuRebuild_, needsScreensaverRedraw_;
 
     std::vector<XBee::Node> discoveredNodes_;
 

@@ -117,14 +117,20 @@ Result RRemote::step() {
     fillAndSend();
   } else if((bb::Runloop::runloop.getSequenceNumber() % 4) == 1) {
     updateStatusLED();
-    if(isLeftRemote) RUI::ui.drawGUI();
+    if(isLeftRemote) {
+      if(RInput::input.secondsSinceLastMotion() > 10.0) RUI::ui.drawScreensaver();
+      else RUI::ui.drawGUI();
+    }
   } else {
     RDisplay::display.setLED(RDisplay::LED_COMM, RDisplay::LED_OFF);
   }
 
   if((bb::Runloop::runloop.getSequenceNumber() % 10) == 0) {
-    if(RInput::input.secondsSinceLastMotion() > 10) RDisplay::display.setLEDBrightness(1);
-    else RDisplay::display.setLEDBrightness(params_.config.ledBrightness << 2);
+    if(RInput::input.secondsSinceLastMotion() > 10 || params_.config.ledBrightness <= 2) {
+      RDisplay::display.setLEDBrightness(1);
+    } else {
+      RDisplay::display.setLEDBrightness(params_.config.ledBrightness << 2);
+    }
   }
 
   return RES_OK;

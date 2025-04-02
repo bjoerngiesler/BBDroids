@@ -41,10 +41,6 @@ Result RDisplay::initialize() {
 }
 
 Result RDisplay::start(ConsoleStream *stream) {
-  last_millis_ = millis();
-  left_led_state_ = false;
-  right_led_state_ = false;
-
   if(isLeftRemote) {
     bb::printf("Initializing display...");
     ser_.begin(921600);
