@@ -419,8 +419,8 @@ void RInput::btnConfirmReleased() {
     } else if(cLongPressCB_ != nullptr){
       cLongPressCB_();
     }
-  } else if(millis() - cms_ >= longPressThresh_) {
-    setFaceButtonsLocked(false);
+  } else if(millis() - cms_ >= longPressThresh_ && cLongPressCB_ != nullptr) {
+    cLongPressCB_();
   }
 }
 

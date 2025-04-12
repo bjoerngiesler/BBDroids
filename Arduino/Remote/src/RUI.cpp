@@ -460,6 +460,7 @@ void RUI::visualizeFromStatePacket(bb::PacketSource source, uint8_t seqnum, cons
 }
 
 void RUI::toggleLockFaceButtons() {
+    bb::printf("toggle lock face buttons\n");
     if(RInput::input.faceButtonsLocked()) {
         bb::printf("Unlocking!\n");
         RInput::input.setFaceButtonsLocked(false);
