@@ -162,25 +162,26 @@ struct __attribute__ ((packed)) StatePacket {
 		STATUS_OK		= 0,
 		STATUS_DEGRADED	= 1,
 		STATUS_ERROR	= 2,
-		STATUS_CRITICAL	= 3
+		STATUS_NA       = 3 // not applicable - doesn't exist
 	};
 
-	enum ControlType {
-		CONTROL_OFF		 	 = 0,
-		CONTROL_RC			 = 1,
-		CONTROL_RC_FREE_ANIM = 2,
-		CONTROL_AUTOMATIC	 = 3
+	enum DriveMode {
+		DRIVE_OFF        = 0,
+		DRIVE_VEL        = 1,
+		DRIVE_AUTO_POS   = 2,
+		DRIVE_POS        = 3,
+		DRIVE_AUTONOMOUS = 4
 	};
 
-	StatusType battery 	: 2;
-	StatusType drive 	: 2;
-	StatusType servos   : 2;
-	StatusType comm		: 2;
+	StatusType batt1Status 	: 2;
+	StatusType batt2Status 	: 2;
+	StatusType driveStatus 	: 2;
+	StatusType servoStatus  : 2;
 
-	ControlType driveControl : 2;
-	ControlType domeControl	 : 2;
-	ControlType armsControl	 : 2;
-	ControlType soundControl : 2;
+	uint8_t batt1Voltage    : 4; // 0: empty (D-O: <=13V) or other error; 15: full (D-O: >16V)
+	uint8_t batt2Voltage    : 4; // 0: empty (D-O: <=13V) or other error; 15: full (D-O: >16V)
+
+	DriveMode driveMode     : 3;
 };
 
 struct __attribute__((packed)) RemoteConfigPacket {
@@ -264,6 +265,8 @@ struct __attribute__ ((packed)) Packet {
 		PairingPacket pairing;
 	} payload;
 
+	mutable uint8_t crc : 8;
+
 	Packet(PacketType t, PacketSource s, unsigned long seq) {
 		type = t;
 		source = s;
@@ -271,7 +274,7 @@ struct __attribute__ ((packed)) Packet {
 		reserved = 0;
 	}
 	Packet() { }
-	uint8_t calculateCRC();
+	uint8_t calculateCRC() const;
 };
 
 static const uint8_t MAX_SEQUENCE_NUMBER = 8;

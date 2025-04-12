@@ -5,27 +5,37 @@
 using namespace bb;
 
 DOSound DOSound::sound;
+#define DOSOUND_REPEATS 3
+#define DOSOUND_DELAY_US 100
 
 DOSound::DOSound() {
   available_ = false;
   fileCount_ = -1;
+  ser_ = nullptr;
 }
 
-bool DOSound::begin(Uart *ser) {
-  if(ser == NULL) {
+void DOSound::setSerial(Uart *ser) {
+  ser_ = ser;
+}
+
+bool DOSound::begin() {
+  if(ser_ == NULL) {
     Console::console.printfBroadcast("Serial is NULL!\n"); 
     available_ = false;
     return false;
   } 
 
   Console::console.printfBroadcast("Setting up sound...\n");
-  ser->begin(9600);
-  if(dfp_.begin(*ser)) {
+  ser_->begin(9600);
+  if(dfp_.begin(*ser_)) {
     for(int i=0; i<3; i++) {
       if(checkSDCard() == true) break;
       delay(1000);
     }
-    dfp_.volume(10);
+    for(int i=0; i<DOSOUND_REPEATS; i++) {
+      dfp_.volume(10);
+      delayMicroseconds(DOSOUND_DELAY_US);
+    }
     available_ = true;
     return true;
   } 
@@ -35,13 +45,19 @@ bool DOSound::begin(Uart *ser) {
 
 bool DOSound::playSound(unsigned int fileNumber) {
   if(!available_ || !sdCardInserted()) return false;
-  dfp_.play(fileNumber);
+  for(int i=0; i<DOSOUND_REPEATS; i++) {
+    dfp_.play(fileNumber);
+    delayMicroseconds(DOSOUND_DELAY_US);
+  }
   return true;
 }
 
-bool DOSound::playFolder(unsigned int folder, unsigned int filenumber) {
-  if(!available_ || !sdCardInserted()) return false;
-  dfp_.playFolder(int(folder), filenumber);
+bool DOSound::playFolder(unsigned int folder, unsigned int filenumber, bool override) {
+  if((!available_ || !sdCardInserted()) && override == false) return false;
+  for(int i=0; i<DOSOUND_REPEATS; i++) {
+    dfp_.playFolder(int(folder), filenumber);
+    delayMicroseconds(DOSOUND_DELAY_US);
+  }
   return true;
 }
 
@@ -84,12 +100,23 @@ bool DOSound::playSystemSound(int snd) {
 
 bool DOSound::setVolume(uint8_t vol) {
   if(!available_) return false;
-  dfp_.volume(vol);
+  for(int i=0; i<DOSOUND_REPEATS; i++) {
+    dfp_.volume(vol);
+    delayMicroseconds(DOSOUND_DELAY_US);
+  }
   return true;
 }
 
 bool DOSound::checkSDCard() {
-  int fc = dfp_.numSdTracks();
+  int fc = -1;
+  for(int i=0; i<DOSOUND_REPEATS; i++) {
+    int fc_ = dfp_.numSdTracks();
+    if(fc_ != -1) {
+      fc = fc_;
+      break;
+    }
+    delayMicroseconds(DOSOUND_DELAY_US);
+  }
 
   if(fileCount_ == -1) {
     if(fc == -1) {
@@ -105,9 +132,7 @@ bool DOSound::checkSDCard() {
         folders_[i] = {num, 0};
     }
     Console::console.printfBroadcast("Playing initial system sound.\n");
-    dfp_.playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY);
-    dfp_.playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY);
-    dfp_.playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY);
+    playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY, true);
     Console::console.printfBroadcast("Done.\n");
     return true;
   } else {

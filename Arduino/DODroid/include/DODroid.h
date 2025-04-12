@@ -44,9 +44,10 @@ public:
   void setControlParameters();
 
   enum DriveMode {
-    DRIVE_OFF = 0,
-    DRIVE_VELOCITY = 1,
-    DRIVE_POSITION = 2
+    DRIVE_OFF      = 0,
+    DRIVE_VEL      = 1,
+    DRIVE_POS      = 2,
+    DRIVE_AUTO_POS = 3
   };
 
   void switchDrive(DriveMode mode);
@@ -94,7 +95,8 @@ protected:
   bb::PIDController balanceController_;
   DOPosControlInput posInput_;
   DOPosControlOutput posOutput_;
-  bb::PIDController posController_;
+  bb::PIDController autoPosController_, posController_; 
+  float posControllerZero_;
   
   MotorStatus leftMotorStatus_, rightMotorStatus_;
 

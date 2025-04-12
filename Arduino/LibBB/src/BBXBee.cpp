@@ -620,6 +620,8 @@ bb::Result bb::XBee::send(const bb::Packet& packet) {
 bb::Result bb::XBee::sendToXBee3(const HWAddress& dest, const bb::Packet& packet, bool ack) {
 	uint8_t buf[14+sizeof(packet)];
 
+	packet.crc = packet.calculateCRC();
+
 	buf[0] = 0x10; // transmit request
 	buf[1] = 0x0;  // no response frame
 	buf[2] = (dest.addrHi >> 24) & 0xff;
@@ -650,6 +652,8 @@ bb::Result bb::XBee::sendToXBee3(const HWAddress& dest, const bb::Packet& packet
 
 bb::Result bb::XBee::sendToXBee(const HWAddress& dest, const bb::Packet& packet, bool ack) {
 	uint8_t buf[11+sizeof(packet)];
+
+	packet.crc = packet.calculateCRC();
 
 	buf[0] = 0x0;  // transmit request - 64bit frame. This is deprecated.
 	buf[1] = 0x0;  // no response frame
@@ -846,6 +850,12 @@ bb::Result bb::XBee::receiveAPIMode(HWAddress& srcAddr, uint8_t& rssi, Packet& p
 #endif
 	} else {
 		Console::console.printfBroadcast("Unknown frame type 0x%x\n", frame.data()[0]);
+		return RES_SUBSYS_COMM_ERROR;
+	}
+
+	uint8_t crc = packet.calculateCRC();
+	if(packet.calculateCRC() != packet.crc) {
+		bb::printf("Error: Wrong CRC 0x%x, expected 0x%x\n", crc, packet.crc);
 		return RES_SUBSYS_COMM_ERROR;
 	}
 
@@ -1093,6 +1103,17 @@ void bb::XBee::APIFrame::calcChecksum() {
 	checksum_ = 0xff - (checksum_ & 0xff);
 }
 
+bool bb::XBee::APIFrame::verifyChecksum(uint8_t checksum) {
+	uint16_t sum = checksum;
+	if(data_ != NULL) {
+		for(uint16_t i=0; i<length_; i++) {
+			sum += data_[i];
+		}
+	}
+	if((sum & 0xff) == 0xff) return true;
+	return false;
+}
+
 bb::XBee::APIFrame bb::XBee::APIFrame::atRequest(uint8_t frameID, uint16_t command) {
 	APIFrame frame(4);
 
@@ -1233,7 +1254,7 @@ bb::Result bb::XBee::receive(APIFrame& frame) {
 	if(!uart_->available()) delayMicroseconds(200);
 	uint8_t checksum = readEscapedByte(uart_);
 
-	if(frame.checksum() != checksum) {
+	if(frame.verifyChecksum(checksum) == false) {
 		//Console::console.printfBroadcast("Checksum invalid - expected 0x%x, got 0x%x\n", frame.checksum(), checksum);
 		return RES_SUBSYS_COMM_ERROR;
 	}

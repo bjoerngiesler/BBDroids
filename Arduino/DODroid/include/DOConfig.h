@@ -27,7 +27,7 @@ struct DOParams {
 
     float motorDeadband     = 10.0;
 
-    float wheelKp           = 0.10;
+    float wheelKp           = 0.9;
     float wheelKi           = 0.8;
     float wheelKd           = 0.0;
 
@@ -35,7 +35,11 @@ struct DOParams {
     float balKi             = 0;
     float balKd             = 0;
 
-    float posKp             = 6;
+    float autoPosKp             = 6;
+    float autoPosKi             = 0.2;
+    float autoPosKd             = 0;
+
+    float posKp             = 1.2;
     float posKi             = 0.2;
     float posKd             = 0;
 

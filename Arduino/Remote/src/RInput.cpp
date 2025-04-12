@@ -235,8 +235,10 @@ void RInput::update() {
   minJoyRawV = min(minJoyRawV, joyRawV);
   maxJoyRawV = max(maxJoyRawV, joyRawV);
 
-  float joyFilteredH = joyHFilter_.filter(joyRawH);
-  float joyFilteredV = joyVFilter_.filter(joyRawV);
+  //float joyFilteredH = joyHFilter_.filter(joyRawH);
+  //float joyFilteredV = joyVFilter_.filter(joyRawV);
+  float joyFilteredH = joyRawH;
+  float joyFilteredV = joyRawV;
   unsigned int deadbandAbs = rint(4096*(deadbandPercent_/100.0f)/2.0f);
 
   joyAtZero_ = true;
@@ -365,10 +367,12 @@ bool RInput::anyButtonPressed() {
 
 void RInput::btnLeftPressed() {
   lms_ = millis();
-  if(lPressCB_ != nullptr) lPressCB_();
+  if(lPressCB_ != nullptr && faceButtonsLocked_ == false) lPressCB_();
 }
 
 void RInput::btnLeftReleased() {
+  if(faceButtonsLocked_ == true) return;
+
   if(lReleaseCB_ != nullptr) lReleaseCB_();
   
   if(millis() - lms_ < longPressThresh_ || lLongPressCB_ == nullptr) {
@@ -382,10 +386,12 @@ void RInput::btnLeftReleased() {
 
 void RInput::btnRightPressed() {
   rms_ = millis();
-  if(rPressCB_ != nullptr) rPressCB_();
+  if(rPressCB_ != nullptr && faceButtonsLocked_ == false) rPressCB_();
 }
 
 void RInput::btnRightReleased() {
+  if(faceButtonsLocked_ == true) return;
+
   if(rReleaseCB_ != nullptr) rReleaseCB_();
 
   if(millis() - rms_ < longPressThresh_ || rLongPressCB_ == nullptr) {
@@ -399,18 +405,22 @@ void RInput::btnRightReleased() {
 
 void RInput::btnConfirmPressed() {
   cms_ = millis();
-  if(cPressCB_ != nullptr) cPressCB_();
+  if(cPressCB_ != nullptr && faceButtonsLocked_ == false) cPressCB_();
 }
 
 void RInput::btnConfirmReleased() {
-  if(cReleaseCB_ != nullptr) cReleaseCB_();
+  if(faceButtonsLocked_ == false) {
+    if(cReleaseCB_ != nullptr) cReleaseCB_();
 
-  if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
-    if(cShortPressCB_ != nullptr) {
-      cShortPressCB_();
-    } 
-  } else if(cLongPressCB_ != nullptr){
-    cLongPressCB_();
+    if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
+      if(cShortPressCB_ != nullptr) {
+        cShortPressCB_();
+      } 
+    } else if(cLongPressCB_ != nullptr){
+      cLongPressCB_();
+    }
+  } else if(millis() - cms_ >= longPressThresh_) {
+    setFaceButtonsLocked(false);
   }
 }
 
@@ -444,6 +454,10 @@ void RInput::processEncoder() {
   }
 }
 
+void RInput::setFaceButtonsLocked(bool yn) {
+  faceButtonsLocked_ = yn;
+}
+
 void RInput::clearCallbacks() {
   setAllCallbacks(nullptr);
 }
@@ -455,7 +469,7 @@ Result RInput::fillControlPacket(ControlPacket& packet) {
   packet.button3 = buttons[BUTTON_4];
   packet.button4 = buttons[BUTTON_JOY];
 
-  if(isLeftRemote) {
+  if(isLeftRemote && faceButtonsLocked() == false) {
     packet.button5 = false;
     packet.button6 = false;
     packet.button7 = false;

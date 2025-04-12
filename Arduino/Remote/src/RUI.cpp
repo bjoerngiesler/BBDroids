@@ -17,6 +17,12 @@ RUI::RUI() {
     topLabel_.setPosition(0, 0);
     topLabel_.setFrameType(RLabelWidget::FRAME_BOTTOM);
     topLabel_.setTitle("Top Label");
+
+    lockedLabel_.setSize(RDisplay::DISPLAY_WIDTH, RDisplay::CHAR_HEIGHT);
+    lockedLabel_.setPosition(0, 0);
+    lockedLabel_.setFrameType(RLabelWidget::FRAME_BOTTOM);
+    lockedLabel_.setBackgroundColor(RDisplay::DARKBLUE);
+    lockedLabel_.setTitle("LOCKED");
   
     bottomLabel_.setSize(RDisplay::DISPLAY_WIDTH, RDisplay::CHAR_HEIGHT+4);
     bottomLabel_.setPosition(0, RDisplay::DISPLAY_HEIGHT-RDisplay::CHAR_HEIGHT-3);
@@ -147,6 +153,7 @@ void RUI::showMenu(RMenuWidget* menu) {
 void RUI::showMain() {
     setMainWidget(&mainVis_);
     RInput::input.setConfirmShortPressCallback([=]{RUI::ui.showMenu(&mainMenu_);});
+    RInput::input.setConfirmLongPressCallback([=]{RUI::ui.toggleLockFaceButtons();});
 }
 
 void RUI::populateMenus() {
@@ -219,7 +226,11 @@ void RUI::populateMenus() {
 }
 
 void RUI::drawGUI() {
-    topLabel_.draw();
+    if(RInput::input.faceButtonsLocked()) {
+        lockedLabel_.draw();
+    } else {
+        topLabel_.draw();
+    }
     bottomLabel_.draw();
     leftSeqnum_.draw();
     rightSeqnum_.draw();
@@ -445,5 +456,17 @@ void RUI::visualizeFromStatePacket(bb::PacketSource source, uint8_t seqnum, cons
         break;
     default:
           break;
+    }
+}
+
+void RUI::toggleLockFaceButtons() {
+    if(RInput::input.faceButtonsLocked()) {
+        bb::printf("Unlocking!\n");
+        RInput::input.setFaceButtonsLocked(false);
+        topLabel_.setNeedsFullRedraw();
+    } else {
+        bb::printf("Locking!\n");
+        RInput::input.setFaceButtonsLocked(true);
+        lockedLabel_.setNeedsFullRedraw();
     }
 }

@@ -49,21 +49,26 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   if(antErr != 0) {
     Console::console.printfBroadcast("Aerial error: 0x%x\n", antErr);
   } else {
-    uint8_t step=4, d=25;
+    uint8_t step=1, d=5;
+    uint8_t min = 30, max = 150, mid = 90;
     aerialsOK_ = true;
-    for(uint8_t val = 0; val < 180; val+=step) {
+    uint8_t val = mid;
+    for(; val < max; val+=step) {
       setAerials(val, val, val);
       delay(d);
     }
-    for(uint8_t val = 180; val > 0; val-=step) {
+    delay(10*d);
+    for(; val > min; val-=step) {
       setAerials(val, val, val);
       delay(d);
     }
-    for(uint8_t val = 0; val < 90; val+=step) {
+    delay(10*d);
+    for(; val < mid; val+=step) {
       setAerials(val, val, val);
       delay(d);
     }
-    setAerials(90, 90, 90);
+    delay(10*d);
+    setAerials(mid, mid, mid);
   }
 
   // Check IMU

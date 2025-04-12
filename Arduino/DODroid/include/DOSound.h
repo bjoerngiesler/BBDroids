@@ -13,7 +13,8 @@ public:
   static DOSound sound;
 
   DOSound();
-  bool begin(Uart *ser);
+  void setSerial(Uart *ser);
+  bool begin();
   bool available() { return available_; }
   bool checkSDCard(); // CAREFUL - takes up to 71ms!
 #if defined(CHECK_SDCARD)
@@ -21,7 +22,7 @@ public:
 #else
   bool sdCardInserted() { return true; }
 #endif
-  bool playFolder(unsigned int folder, unsigned int fileNumber);
+  bool playFolder(unsigned int folder, unsigned int fileNumber, bool override=false);
   bool playFolderRandom(unsigned int folder);
   bool playFolderNext(unsigned int folder);
   bool playSystemSound(int snd);
@@ -38,6 +39,8 @@ private:
 
   std::map<unsigned int, FolderContents> folders_;
   int fileCount_;
+
+  Uart *ser_;
 };
 
 #endif // SOUND_H

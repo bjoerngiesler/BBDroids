@@ -62,18 +62,17 @@ void startSubsystems() {
 
 void setup() {
   Serial.begin(2000000);
-  while(!Serial);
   Serial.println("Starting up...");
 
   Wire.begin();
-  Wire.setClock(1000000);
+  Wire.setClock(1000000UL);
 
   setupBoardComm();
 
   Console::console.initialize();
   Console::console.start();
 
-  DOSound::sound.begin(dfplayerSerial);
+  DOSound::sound.setSerial(dfplayerSerial);
 
   initializeSubsystems();
   startSubsystems();

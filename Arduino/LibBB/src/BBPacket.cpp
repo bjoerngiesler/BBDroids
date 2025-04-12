@@ -44,8 +44,8 @@ static uint8_t calcCRC7(const uint8_t *buffer, size_t len) {
 	return crc;
 }
 
-uint8_t bb::Packet::calculateCRC() {
-	return calcCRC7((const uint8_t*)this, sizeof(Packet));
+uint8_t bb::Packet::calculateCRC() const {
+	return calcCRC7((const uint8_t*)this, sizeof(Packet)-1);
 }
 
 bb::Result bb::PacketReceiver::incomingPacket(const HWAddress& station, uint8_t rssi, Packet& packet) {

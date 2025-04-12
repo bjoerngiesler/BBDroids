@@ -151,6 +151,7 @@ protected:
 		virtual uint8_t checksum() const { return checksum_; }
 
 		void calcChecksum();
+		bool verifyChecksum(uint8_t checksum);
 
 		static APIFrame atRequest(uint8_t frameID, uint16_t command);
 		bool isATRequest();

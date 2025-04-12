@@ -93,6 +93,9 @@ public:
   std::map<Button,bool> buttons, buttonsChanged;
 
   bool btnLChanged, btnRChanged, btnConfirmChanged;
+
+  void setFaceButtonsLocked(bool yesno);
+  bool faceButtonsLocked() { return faceButtonsLocked_; }
   
   void setLeftShortPressCallback(std::function<void(void)> cb) { lShortPressCB_ = cb; }
   void setLeftLongPressCallback(std::function<void(void)> cb) { lLongPressCB_ = cb; }
@@ -148,6 +151,8 @@ protected:
   std::function<void(void)> rShortPressCB_, rLongPressCB_, rPressCB_, rReleaseCB_;
   std::function<void(void)> cShortPressCB_, cLongPressCB_, cPressCB_, cReleaseCB_;
   std::function<void(float)> encTurnCB_;
+
+  bool faceButtonsLocked_;
 
   unsigned long longPressThresh_;
   Button incrementalPos_, incrementalRot_; 

@@ -96,6 +96,7 @@ DODroid::DODroid():
 
   posInput_(leftEncoder_, rightEncoder_),
   posOutput_(velOutput_),
+  autoPosController_(posInput_, posOutput_),
   posController_(posInput_, posOutput_),
 
   statusPixels_(3, P_STATUS_NEOPIXEL, NEO_GRB+NEO_KHZ800)
@@ -141,7 +142,7 @@ Result DODroid::initialize() {
   addParameter("head_roll_range", "Head roll servo movement range", params_.headRollRange, -INT_MAX, INT_MAX);
   addParameter("head_roll_offset", "Head roll servo servo offset", params_.headRollOffset, -INT_MAX, INT_MAX);
   addParameter("head_pitch_range", "Head pitch servo movement range", params_.headPitchRange, -INT_MAX, INT_MAX);
-  addParameter("head_pitch_offset", "Head pitch servo servo offset", params_.headPitchOffset, -INT_MAX, INT_MAX);
+  addParameter("head_pitch_offset", "Head pitch servo offset", params_.headPitchOffset, -INT_MAX, INT_MAX);
   addParameter("head_heading_range", "Head heading servo movement range", params_.headHeadingRange, -INT_MAX, INT_MAX);
   addParameter("head_heading_offset", "Head heading servo servo offset", params_.headHeadingOffset, -INT_MAX, INT_MAX);
 
@@ -154,6 +155,10 @@ Result DODroid::initialize() {
   addParameter("bal_kp", "Proportional constant for balance PID controller", params_.balKp, -INT_MAX, INT_MAX);
   addParameter("bal_ki", "Integrative constant for balance PID controller", params_.balKi, -INT_MAX, INT_MAX);
   addParameter("bal_kd", "Derivative constant for balance PID controller", params_.balKd, -INT_MAX, INT_MAX);
+
+  addParameter("auto_pos_kp", "Proportional constant for position PID controller", params_.autoPosKp, -INT_MAX, INT_MAX);
+  addParameter("auto_pos_ki", "Integrative constant for position PID controller", params_.autoPosKi, -INT_MAX, INT_MAX);
+  addParameter("auto_pos_kd", "Derivative constant for position PID controller", params_.autoPosKd, -INT_MAX, INT_MAX);
 
   addParameter("pos_kp", "Proportional constant for position PID controller", params_.posKp, -INT_MAX, INT_MAX);
   addParameter("pos_ki", "Integrative constant for position PID controller", params_.posKi, -INT_MAX, INT_MAX);
@@ -217,6 +222,7 @@ Result DODroid::start(ConsoleStream* stream) {
 
   imu_.begin();
   DOBattStatus::batt.begin();
+  DOSound::sound.begin();
 
   //operationStatus_ = RES_OK;
   operationStatus_ = selfTest();
@@ -287,6 +293,7 @@ void DODroid::setControlParameters() {
   velOutput_.setAcceleration(params_.accel);
   velOutput_.setMaxSpeed(params_.maxSpeed);
 
+  autoPosController_.setControlParameters(params_.autoPosKp, params_.autoPosKi, params_.autoPosKd);
   posController_.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
 }
 
@@ -379,18 +386,17 @@ bb::Result DODroid::stepHead() {
         if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
         else nod += params_.faNeckSpeedSP*speedSP;
       } else {
-        nod = params_.faNeckIMUPitch*p + params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
+        nod = params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
         if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
         else nod += params_.faNeckSpeedSP*speedSP;
-
       }
-
       nod += lean_;
-      nod = constrain(nod, -params_.neckRange, params_.neckRange);
-      bb::Servos::servos.setGoal(SERVO_NECK, 180 + nod);
+
+      float neck = nod + params_.faNeckIMUPitch*p;
+      neck = constrain(neck, -params_.neckRange, params_.neckRange);
+      bb::Servos::servos.setGoal(SERVO_NECK, 180 + neck);
 
       float headPitch = -nod;
-      //headPitch -= params_.leanHeadToBody*lean_;
       headPitch += remoteP_;
       headPitch += params_.faHeadPitchSpeedSP*speedSP;
       bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 + headPitch);
@@ -454,7 +460,8 @@ bb::Result DODroid::stepDrive() {
     balanceController_.update();
     lSpeedController_.update();
     rSpeedController_.update();
-    if(driveMode_ == DRIVE_POSITION) posController_.update();
+    if(driveMode_ == DRIVE_POS) posController_.update();
+    else if(driveMode_ == DRIVE_AUTO_POS) autoPosController_.update();
   } else {
     leftMotor_.set(0);
     rightMotor_.set(0);
@@ -469,8 +476,11 @@ void DODroid::switchDrive(DriveMode mode) {
   rSpeedController_.setGoal(0);
   balanceController_.reset();
   balanceController_.setGoal(-pitchAtRest_);
+  autoPosController_.reset();
+  autoPosController_.setPresentAsGoal();
   posController_.reset();
   posController_.setPresentAsGoal();
+  posControllerZero_ = posController_.present();
 
   driveMode_ = mode;
   Console::console.printfBroadcast("Drive mode: ");
@@ -480,14 +490,20 @@ void DODroid::switchDrive(DriveMode mode) {
       Console::console.printfBroadcast("off\n"); 
       break;
     
-    case DRIVE_VELOCITY: 
+    case DRIVE_VEL: 
       setLED(LED_DRIVE, GREEN);
       Console::console.printfBroadcast("velocity\n"); 
       break;
 
-    case DRIVE_POSITION: default: 
-      setLED(LED_DRIVE, BLUE);
+    case DRIVE_POS: 
+      setLED(LED_DRIVE, YELLOW);
       Console::console.printfBroadcast("position\n"); 
+      break;
+
+    case DRIVE_AUTO_POS:
+    default: 
+      setLED(LED_DRIVE, BLUE);
+      Console::console.printfBroadcast("auto position\n"); 
       break;
   }
 }
@@ -600,11 +616,11 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     
     // Joystick button switches drive mode
     if(packet.button4 && !lastPrimaryCtrlPacket_.button4) {
-      if(driveMode_ == DRIVE_OFF) {
+      if(driveMode_ == DRIVE_OFF || driveMode_ == DRIVE_POS) {
         if(params_.autoPosControl == true) {
-          switchDrive(DRIVE_POSITION);
+          switchDrive(DRIVE_AUTO_POS);
         } else {
-          switchDrive(DRIVE_VELOCITY);
+          switchDrive(DRIVE_VEL);
         }
       } else {
         switchDrive(DRIVE_OFF);
@@ -631,23 +647,30 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       float rot = packet.getAxis(0);
       float vel = packet.getAxis(1);
 
-      // Joystick at zero for >500ms? Switch to position control mode
+      // Joystick at zero for >500ms and in velocity control mode? 
+      // ==> Switch to auto position control mode
       if(EPSILON(vel) && EPSILON(rot) && params_.autoPosControl == true) { 
-        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && driveMode_ == DRIVE_VELOCITY) {
-          switchDrive(DRIVE_POSITION);
+        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && 
+           driveMode_ == DRIVE_VEL) {
+          switchDrive(DRIVE_AUTO_POS);
         }
       } else { // We have drive input - switch to velocity control modex
-        if(driveMode_ == DRIVE_POSITION) {
-          switchDrive(DRIVE_VELOCITY);
+        if(driveMode_ == DRIVE_AUTO_POS) {
+          switchDrive(DRIVE_VEL);
         }
         msSinceDriveInput_ = millis();
       }
 
-      if(driveMode_ == DRIVE_VELOCITY) {
+      if(driveMode_ == DRIVE_VEL) {
         vel = constrain(vel * params_.maxSpeed * params_.speedAxisGain, -params_.maxSpeed, params_.maxSpeed);
         rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
         velOutput_.setGoalVelocity(vel);
         velOutput_.setGoalRotation(rot);
+      } else if(driveMode_ == DRIVE_POS) {
+        float posDelta = packet.getAxis(1) * 1000; // FIXME - should be a constant
+        posController_.setGoal(posControllerZero_ + posDelta);
+        //rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
+        //velOutput_.setGoalRotation(rot);
       }
 
     } else {
@@ -657,6 +680,15 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
     lastPrimaryCtrlPacket_ = packet;
   } else { // secondary remote
+    // Joystick button switches drive mode
+    if(packet.button4 && !lastSecondaryCtrlPacket_.button4) {
+      if(driveMode_ != DRIVE_POS) {
+        switchDrive(DRIVE_POS);
+      } else {
+        switchDrive(DRIVE_OFF);
+      }
+    }
+    
     lean_ = leanFilter_.filter(-1 * packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED) * params_.neckRange);
 
     if(headIsOn_) {
@@ -720,10 +752,10 @@ Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
       switchDrive(DRIVE_OFF);
       return RES_OK;
     } else if(words[1] == "pos") {
-      switchDrive(DRIVE_POSITION);
+      switchDrive(DRIVE_POS);
       return RES_OK;
     } else if(words[1] == "vel") {
-      switchDrive(DRIVE_VELOCITY);
+      switchDrive(DRIVE_VEL);
       return RES_OK;
     } else return RES_CMD_INVALID_ARGUMENT;
   }
@@ -758,7 +790,63 @@ Result DODroid::fillAndSendStatePacket() {
   if(params_.leftRemoteAddress.isZero()) return RES_OK;
 
   Packet packet(PACKET_TYPE_STATE, PACKET_SOURCE_DROID, sequenceNumber());
-  packet.payload.state.battery = DOBattStatus::batt.available() ? StatePacket::STATUS_OK : StatePacket::STATUS_ERROR;
+
+  // battery
+  if(DOBattStatus::batt.available() == false) {
+    packet.payload.state.batt1Status = StatePacket::STATUS_ERROR;
+    packet.payload.state.batt1Voltage = 0;
+  } else if(DOBattStatus::batt.voltage() < 5.0) { // USB
+    packet.payload.state.batt1Status = StatePacket::STATUS_DEGRADED;
+    packet.payload.state.batt1Voltage = 0;
+  } else {
+    packet.payload.state.batt1Status = StatePacket::STATUS_OK;
+    if(DOBattStatus::batt.voltage() < 13) packet.payload.state.batt1Voltage = 0;
+    else if(DOBattStatus::batt.voltage() > 16) packet.payload.state.batt1Voltage = 15;
+    else {
+      float v = 15.0f*(DOBattStatus::batt.voltage()-POWER_BATT_MIN)/(POWER_BATT_MAX-POWER_BATT_MIN);
+      packet.payload.state.batt1Voltage = (unsigned int)rintf(v);
+    }
+  }
+  packet.payload.state.batt2Status = StatePacket::STATUS_NA;
+  packet.payload.state.batt2Voltage = 0;
+
+  // motors
+  if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
+    packet.payload.state.driveStatus = StatePacket::STATUS_OK;
+  } else {
+    packet.payload.state.driveStatus = StatePacket::STATUS_ERROR;
+  }
+
+  // servos
+  if(!Servos::servos.isStarted()) {
+    packet.payload.state.servoStatus = StatePacket::STATUS_ERROR;
+  } else if(Servos::servos.hasServoWithID(SERVO_NECK)) {
+    if(Servos::servos.hasServoWithID(SERVO_HEAD_HEADING) &&
+       Servos::servos.hasServoWithID(SERVO_HEAD_PITCH) &&
+       Servos::servos.hasServoWithID(SERVO_HEAD_ROLL)) {
+      packet.payload.state.servoStatus = StatePacket::STATUS_OK;
+    } else {
+      packet.payload.state.servoStatus = StatePacket::STATUS_DEGRADED;
+    }
+  }
+
+  // drive mode
+  switch(driveMode_) {
+  case DRIVE_VEL:
+    packet.payload.state.driveMode = StatePacket::DRIVE_VEL;
+    break;
+  case DRIVE_AUTO_POS:
+    packet.payload.state.driveMode = StatePacket::DRIVE_AUTO_POS;
+    break;
+  case DRIVE_POS:
+    packet.payload.state.driveMode = StatePacket::DRIVE_POS;
+    break;
+  case DRIVE_OFF:
+  default:
+    packet.payload.state.driveMode = StatePacket::DRIVE_OFF;
+    break;
+  }
+
   XBee::xbee.sendTo(params_.leftRemoteAddress, packet, false);
   return RES_OK;
 
@@ -776,7 +864,7 @@ Result DODroid::fillAndSendStatePacket() {
 
   if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
     p.drive[0].errorState = ERROR_OK;   
-    p.drive[0].controlMode = (driveMode_ != DRIVE_OFF) ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
+    //p.drive[0].controlMode = (driveMode_ != DRIVE_OFF) ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
 
     p.drive[0].presentPWM = balanceController_.present();
     p.drive[0].presentPos = leftEncoder_.presentPosition();
@@ -792,7 +880,7 @@ Result DODroid::fillAndSendStatePacket() {
 
   if(leftMotorStatus_ == MOTOR_OK) {
     p.drive[1].errorState = ERROR_OK;
-    p.drive[1].controlMode = (driveMode_ != DRIVE_OFF) ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
+    // p.drive[1].controlMode = (driveMode_ != DRIVE_OFF) ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
     p.drive[1].presentPWM = leftMotor_.present();
     p.drive[1].presentPos = leftEncoder_.presentPosition();
     p.drive[1].presentSpeed = leftEncoder_.presentSpeed();
@@ -808,7 +896,7 @@ Result DODroid::fillAndSendStatePacket() {
 
   if(rightMotorStatus_ == MOTOR_OK) {
     p.drive[2].errorState = ERROR_OK;
-    p.drive[2].controlMode = (driveMode_ != DRIVE_OFF) ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
+    //p.drive[2].controlMode = (driveMode_ != DRIVE_OFF) ? bb::StatePacket::CONTROL_RC : bb::StatePacket::CONTROL_OFF;
     p.drive[2].presentPWM = rightMotor_.present();
     p.drive[2].presentPos = rightEncoder_.presentPosition();
     p.drive[2].presentSpeed = rightEncoder_.presentSpeed();

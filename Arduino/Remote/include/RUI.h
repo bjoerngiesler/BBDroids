@@ -54,6 +54,8 @@ public:
     void visualizeFromControlPacket(bb::PacketSource source, uint8_t seqnum, const bb::ControlPacket& packet);
     void visualizeFromStatePacket(bb::PacketSource source, uint8_t seqnum, const bb::StatePacket& packet);
 
+    void toggleLockFaceButtons();
+
 protected:
     RUI();
 
@@ -63,7 +65,7 @@ protected:
     RMessageWidget message_;
     RDialogWidget dialog_;
     bool dialogActive_;
-    RLabelWidget topLabel_, bottomLabel_;
+    RLabelWidget topLabel_, bottomLabel_, lockedLabel_;
     RSeqnumWidget leftSeqnum_, rightSeqnum_, droidSeqnum_;
     RRotaWidget mainVis_;
     RRemoteVisWidget remoteVisL_, remoteVisR_;
