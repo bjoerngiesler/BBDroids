@@ -102,7 +102,6 @@ Result RRemote::stop(ConsoleStream *stream) {
 
 Result RRemote::step() {
   if(!started_) return RES_SUBSYS_NOT_STARTED;
-  unsigned long us1 = micros(), pos = 0;
 
   RInput::input.update();
   if(isLeftRemote) {

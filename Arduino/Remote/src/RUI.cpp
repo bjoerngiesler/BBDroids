@@ -10,8 +10,10 @@ RUI::RUI() {
     remoteVisL_.setName("Left Remote");
     remoteVisR_.setRepresentsLeftRemote(false);
     remoteVisR_.setName("Right Remote");
+    droidVis_.setName("Droid");
     mainVis_.addWidget(&remoteVisL_);
     mainVis_.addWidget(&remoteVisR_);
+    mainVis_.addWidget(&droidVis_);
   
     topLabel_.setSize(RDisplay::DISPLAY_WIDTH, RDisplay::CHAR_HEIGHT);
     topLabel_.setPosition(0, 0);
@@ -452,6 +454,8 @@ void RUI::visualizeFromStatePacket(bb::PacketSource source, uint8_t seqnum, cons
           }
         
         lastDroidSeqnum_ = seqnum;
+
+        droidVis_.visualizeFromStatePacket(packet);
     
         break;
     default:

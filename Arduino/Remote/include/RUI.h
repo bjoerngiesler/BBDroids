@@ -9,6 +9,7 @@
 #include "RLabelWidget.h"
 #include "RIMUWidget.h"
 #include "RRemoteVisWidget.h"
+#include "RDroidVisWidget.h"
 #include "RRotaWidget.h"
 #include "RSeqnumWidget.h"
 #include "RDialogWidget.h"
@@ -69,6 +70,7 @@ protected:
     RSeqnumWidget leftSeqnum_, rightSeqnum_, droidSeqnum_;
     RRotaWidget mainVis_;
     RRemoteVisWidget remoteVisL_, remoteVisR_;
+    RDroidVisWidget droidVis_;
     RWidget titleWidget;
 
     RWidget* mainWidget_;

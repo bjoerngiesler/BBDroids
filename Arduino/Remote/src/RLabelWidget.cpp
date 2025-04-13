@@ -123,6 +123,8 @@ Result RLabelWidget::draw(ConsoleStream *stream) {
 }
 
 void RLabelWidget::setTitle(const String& title) {
+    if(title_ == title) return;
+    
     title_ = title;
 
     if(linebreak_) {
