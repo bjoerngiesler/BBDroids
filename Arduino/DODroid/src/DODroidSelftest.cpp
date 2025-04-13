@@ -78,22 +78,25 @@ Result DODroid::selfTest(ConsoleStream *stream) {
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
-  imu_.update(true);
-  float ax, ay, az;
-  imu_.getAccelMeasurement(ax, ay, az);
-  if(fabs(ax) > 0.2 || fabs(ay) > 0.2 || fabs(az) < 0.9) {
-    Console::console.printfBroadcast("Critical error: Droid not upright (ax %f, ay %f, az %f)!\n", ax, ay, az);
+
+  float p, r, h;
+  for(unsigned int i=0; i<100; i++) {
+    imu_.update(true);
+  }
+  imu_.getFilteredPRH(p, r, h);
+  if(fabs(p) > 5 || fabs(r) > 5) {
+    Console::console.printfBroadcast("Critical error: Droid not upright (p %f, r %f)!\n", p, r);
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
-  Console::console.printfBroadcast("IMU OK. Down vector: %.2f %.2f %.2f\n", ax, ay, az);
+  Console::console.printfBroadcast("IMU OK. Pitch %.2f, Roll %.2f\n", p, r);
 
   DOSound::sound.playSystemSound(SystemSounds::CALIBRATING);
   imu_.calibrate(stream);
+
   for(int i=0; i<100; i++) {
     imu_.update(true);
   }
-  float p, r, h;
   imu_.getFilteredPRH(p, r, h);
   pitchAtRest_ = p;
   balanceController_.setGoal(-pitchAtRest_);
