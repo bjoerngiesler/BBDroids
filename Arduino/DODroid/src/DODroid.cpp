@@ -560,9 +560,13 @@ void DODroid::printExtendedStatus(ConsoleStream *stream) {
   if(rightMotorStatus_ == MOTOR_OK) stream->printf("\tRight OK, encoder %f\n", rightEncoder_.presentPosition());
   else stream->printf("\tRight status: %s, encoder at %.2fmm\n", motorStatusToString(rightMotorStatus_), rightEncoder_.presentPosition());
 
-  float p, r, h;
+  float p, r, h, ax, ay, az;
   imu_.getFilteredPRH(p, r, h);
-  stream->printf("IMU: Pitch %.2f Roll %.2f Heading %.2f\n", p, r, h);
+  imu_.getAccelMeasurement(ax, ay, az);
+  stream->printf("IMU:\n");
+  stream->printf("\tPitch %.2f Roll %.2f Heading %.2f\n", p, r, h);
+  stream->printf("\tAx %.2f Ay %.2f Az %.2f\n", ax, ay, az);
+
   DOBattStatus::batt.updateCurrent();
   DOBattStatus::batt.updateVoltage();
   stream->printf("Battery: %.2fmA, %.2fV\n", DOBattStatus::batt.current(), DOBattStatus::batt.voltage());
