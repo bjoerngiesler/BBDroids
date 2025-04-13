@@ -173,7 +173,6 @@ struct __attribute__ ((packed)) StatePacket {
 		DRIVE_AUTONOMOUS = 4
 	};
 
-	StatusType droidStatus  : 2,
 	StatusType batt1Status 	: 2;
 	StatusType batt2Status 	: 2;
 	StatusType driveStatus 	: 2;
@@ -181,6 +180,8 @@ struct __attribute__ ((packed)) StatePacket {
 
 	uint8_t batt1Voltage    : 4; // 0: empty (D-O: <=13V) or other error; 15: full (D-O: >16V)
 	uint8_t batt2Voltage    : 4; // 0: empty (D-O: <=13V) or other error; 15: full (D-O: >16V)
+
+	StatusType droidStatus  : 2;
 
 	DriveMode driveMode     : 3;
 };

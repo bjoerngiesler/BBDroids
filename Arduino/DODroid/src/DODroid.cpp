@@ -800,6 +800,10 @@ Result DODroid::fillAndSendStatePacket() {
 
   Packet packet(PACKET_TYPE_STATE, PACKET_SOURCE_DROID, sequenceNumber());
 
+  // droid overall
+  if(operationStatus_ == RES_OK) packet.payload.state.droidStatus = StatePacket::STATUS_OK;
+  else packet.payload.state.droidStatus = StatePacket::STATUS_ERROR;
+
   // battery
   if(DOBattStatus::batt.available() == false) {
     packet.payload.state.batt1Status = StatePacket::STATUS_ERROR;
