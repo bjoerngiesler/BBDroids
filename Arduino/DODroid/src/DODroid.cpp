@@ -469,6 +469,14 @@ bb::Result DODroid::stepDrive() {
   return RES_OK;
 }
 
+bb::Result DODroid::stepIfNotStarted() {
+  if(imu_.available()) imu_.update();
+  if((Runloop::runloop.getSequenceNumber() % 4) == 0) {
+    fillAndSendStatePacket();
+  }
+  return RES_OK;
+}
+
 void DODroid::switchDrive(DriveMode mode) {
   lSpeedController_.reset();
   lSpeedController_.setGoal(0);
@@ -537,7 +545,8 @@ String DODroid::statusLine() {
 }
 
 void DODroid::printExtendedStatus(ConsoleStream *stream) {
-  stream->printf("Started: %s, Operation status: %s\n", started_?"yes":"no", errorMessage(operationStatus_));
+  stream->printf("Started: %s\n", started_?"yes":"no");
+  stream->printf("Operation status: %s\n", errorMessage(operationStatus_));
 
   stream->printf("Control packets received:\n");
   stream->printf("\tFrom left remote: %d\n", numLeftCtrlPackets_);
@@ -546,17 +555,17 @@ void DODroid::printExtendedStatus(ConsoleStream *stream) {
   stream->printf("Motors:\n");
   leftEncoder_.update();
   if(leftMotorStatus_ == MOTOR_OK) stream->printf("\tLeft OK, encoder %f\n", leftEncoder_.presentPosition());
-  else stream->printf("\tLeft Err %d, encoder %f\n", leftMotorStatus_, leftEncoder_.presentPosition());
+  else stream->printf("\tLeft status: %s, encoder at %.2fmm\n", motorStatusToString(leftMotorStatus_), leftEncoder_.presentPosition());
   rightEncoder_.update();
   if(rightMotorStatus_ == MOTOR_OK) stream->printf("\tRight OK, encoder %f\n", rightEncoder_.presentPosition());
-  else stream->printf("\tRight Err %d, encoder %f\n", rightMotorStatus_, rightEncoder_.presentPosition());
+  else stream->printf("\tRight status: %s, encoder at %.2fmm\n", motorStatusToString(rightMotorStatus_), rightEncoder_.presentPosition());
 
   float p, r, h;
   imu_.getFilteredPRH(p, r, h);
-  stream->printf("IMU: P%.2f R%.2f H%.2f\n", p, r, h);
+  stream->printf("IMU: Pitch %.2f Roll %.2f Heading %.2f\n", p, r, h);
   DOBattStatus::batt.updateCurrent();
   DOBattStatus::batt.updateVoltage();
-  stream->printf("Battery: %fmA, %fV\n", DOBattStatus::batt.current(), DOBattStatus::batt.voltage());
+  stream->printf("Battery: %.2fmA, %.2fV\n", DOBattStatus::batt.current(), DOBattStatus::batt.voltage());
 }
 
 Result DODroid::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, ConfigPacket& packet) {

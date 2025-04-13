@@ -28,11 +28,27 @@ public:
     MOTOR_OTHER            = 8 // for example IMU broken
   };
 
+  const char* motorStatusToString(MotorStatus status) const {
+    switch(status) {
+    case MOTOR_UNTESTED:          return "untested"; break;
+    case MOTOR_OK:                return "OK"; break;
+    case MOTOR_DISCONNECTED:      return "disconnected"; break;
+    case MOTOR_ENC_DISCONNECTED:  return "encoder disconnected"; break;
+    case MOTOR_REVERSED:          return "reversed"; break;
+    case MOTOR_ENC_REVERSED:      return "encoder reversed"; break;
+    case MOTOR_BOTH_REVERSED:     return "motor and encoder reversed"; break;
+    case MOTOR_BLOCKED:           return "blocked"; break;
+    case MOTOR_OTHER: default:    return "unknown error"; break;
+    }
+    return "???";
+  }
+
   DODroid();
   virtual Result initialize();
   virtual Result start(ConsoleStream *stream = NULL);
   virtual Result stop(ConsoleStream *stream = NULL);
 	virtual Result step();
+  virtual Result stepIfNotStarted();
   Result stepPowerProtect();
   Result stepDrive();
   Result stepHead();

@@ -54,6 +54,8 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 				//Console::console.printfBroadcast("Calling step() in %s...", s->name());
 				s->step();
 				//¨Console::console.printfBroadcast("done.\n");
+			} else {
+				s->stepIfNotStarted();
 			}
 			String str = String(s->name())  + ": " + (micros()-us) + "us ";
 			timingInfo.push_back(str);

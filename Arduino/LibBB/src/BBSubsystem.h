@@ -46,6 +46,7 @@ public:
 	virtual Result start(ConsoleStream *stream) = 0;
 	virtual Result stop(ConsoleStream *stream) = 0;
 	virtual Result step() = 0;
+	virtual Result stepIfNotStarted() { return RES_OK; }
 	virtual bool isStarted() { return started_; }
 	virtual Result operationStatus() { return operationStatus_; }
 	virtual unsigned long sequenceNumber(bool autoincrement = true) { unsigned long s = seqnum_; if(autoincrement) seqnum_++; return s; }

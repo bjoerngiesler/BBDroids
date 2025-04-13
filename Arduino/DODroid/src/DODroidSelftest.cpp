@@ -313,8 +313,6 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     if(microsPerLoop > tdiff) delayMicroseconds(microsPerLoop - tdiff);
   }
 
-  LOG(LOG_INFO, "PWM at end: %d\n", pwm);
-
   for(; pwm>=ST_MIN_PWM; pwm -= pwmStep) {
     unsigned long us0 = micros();
     if(reverse) mot.set(-pwm);

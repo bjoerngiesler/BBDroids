@@ -173,6 +173,7 @@ struct __attribute__ ((packed)) StatePacket {
 		DRIVE_AUTONOMOUS = 4
 	};
 
+	StatusType droidStatus  : 2,
 	StatusType batt1Status 	: 2;
 	StatusType batt2Status 	: 2;
 	StatusType driveStatus 	: 2;
