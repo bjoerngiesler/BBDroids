@@ -173,17 +173,23 @@ struct __attribute__ ((packed)) StatePacket {
 		DRIVE_AUTONOMOUS = 4
 	};
 
-	StatusType batt1Status 	: 2;
-	StatusType batt2Status 	: 2;
-	StatusType driveStatus 	: 2;
-	StatusType servoStatus  : 2;
+	StatusType battStatus 	: 2; // bit 0..1
+	StatusType driveStatus 	: 2; // bit 2..3
+	StatusType servoStatus  : 2; // bit 4..5
+	StatusType droidStatus  : 2; // bit 6..7
 
-	uint8_t batt1Voltage    : 4; // 0: empty (D-O: <=13V) or other error; 15: full (D-O: >16V)
-	uint8_t batt2Voltage    : 4; // 0: empty (D-O: <=13V) or other error; 15: full (D-O: >16V)
+	// byte 2
+	DriveMode driveMode     : 3; // bit 8..10
+	uint8_t reserved1       : 5; // bit 11..15
 
-	StatusType droidStatus  : 2;
-
-	DriveMode driveMode     : 3;
+	// byte 3
+	int16_t speed           : 12; // bit 16..27, unit mm/s, range -4095..4095 or -14.7kph..14.7kph.
+	
+	uint16_t pitch          : 10; // bit 28..37, in 360/1024 deg steps
+	uint16_t roll           : 10; // bit 38..47, in 360/1024 deg steps
+	uint16_t heading        : 10; // bit 48..57, in 360/1024 deg steps
+	uint8_t battCurrent     : 6;  // bit 58..63 - in 100mA steps starting at 0, so this goes up to 6.3A 
+	uint8_t battVoltage     : 8;  // bit 64..71 - in 0.1V steps starting at a base voltage of 3V, so this goes up to 28.5V
 };
 
 struct __attribute__((packed)) RemoteConfigPacket {

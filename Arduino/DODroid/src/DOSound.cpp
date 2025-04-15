@@ -5,7 +5,7 @@
 using namespace bb;
 
 DOSound DOSound::sound;
-#define DOSOUND_REPEATS 3
+#define DOSOUND_REPEATS 1
 #define DOSOUND_DELAY_US 100
 
 DOSound::DOSound() {

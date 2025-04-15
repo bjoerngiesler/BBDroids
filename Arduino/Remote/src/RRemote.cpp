@@ -105,8 +105,8 @@ Result RRemote::step() {
 
   RInput::input.update();
   if(isLeftRemote) {
-    if(millis()-lastDroidMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_DROID, true);
-    if(millis()-lastRightMs_ > 500) RUI::ui.setSeqnumNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
+    if(millis()-lastDroidMs_ > 500) RUI::ui.setNoComm(PACKET_SOURCE_DROID, true);
+    if(millis()-lastRightMs_ > 500) RUI::ui.setNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
   }
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
@@ -741,7 +741,7 @@ void RRemote::sendFactoryReset() {
 
   params_.otherRemoteAddress = {0, 0};
   ConfigStorage::storage.writeBlock(paramsHandle_);
-  RUI::ui.setSeqnumNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
+  RUI::ui.setNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
   RUI::ui.setNeedsMenuRebuild();
 }
 

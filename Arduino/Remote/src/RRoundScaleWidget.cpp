@@ -2,7 +2,9 @@
 
 RRoundScaleWidget::RRoundScaleWidget() {
     angle_ = oldAngle_ = 0;
-    start_ = end_ = 0;
+    start_ = 0;
+    end_ = 360;
+    min_ = 0; max_ = infinityf();
     infinite_ = true;
 }
 
@@ -41,16 +43,29 @@ Result RRoundScaleWidget::draw(ConsoleStream* stream) {
     return RES_OK;
 }
 
-void RRoundScaleWidget::setAngle(float angle) {
-    angle_ = DEG_TO_RAD*angle;
-    setNeedsContentsRedraw();
-}
-    
-void RRoundScaleWidget::setStartEndAngle(float start, float end) {
-    start_ = DEG_TO_RAD*start; end_ = DEG_TO_RAD*end; infinite_ = false;
+void RRoundScaleWidget::setAngle(float angle, bool radians) {
+    if(radians) angle_ = angle;
+    else angle_ = DEG_TO_RAD*angle;
     setNeedsContentsRedraw();
 }
 
+void RRoundScaleWidget::setStartEndAngle(float start, float end) {
+    start_ = DEG_TO_RAD*start; end_ = DEG_TO_RAD*end; 
+    infinite_ = false;
+    setNeedsContentsRedraw();
+}
+
+void RRoundScaleWidget::setValue(float value) {
+    value = constrain(value, min_, max_);
+    float angle = start_ + (value-min_)/(max_-min_) * (end_-start_);
+    setAngle(angle, true);
+}
+
+void RRoundScaleWidget::setMinMaxValue(float min, float max) {
+    min_ = min; max_ = max;
+}
+
+    
 void RRoundScaleWidget::setInfinite() {
     infinite_ = true;
     setNeedsContentsRedraw();

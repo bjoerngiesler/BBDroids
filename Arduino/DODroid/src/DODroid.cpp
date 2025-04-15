@@ -310,7 +310,7 @@ Result DODroid::step() {
   }
 
   // Look for battery undervoltage
-  if((Runloop::runloop.getSequenceNumber() % 1000) == 0) {
+  if((Runloop::runloop.getSequenceNumber() % 100) == 0) {
     stepPowerProtect();
   }
 
@@ -343,6 +343,7 @@ Result DODroid::step() {
 
 bb::Result DODroid::stepPowerProtect() {
   DOBattStatus::batt.updateVoltage();
+  DOBattStatus::batt.updateCurrent();
 
   // CRITICAL: Switch everything off (except the neck servo, so that we don't drop the head) and go into endless loop if power 
   if(DOBattStatus::batt.voltage() > 2.0 &&
@@ -471,8 +472,14 @@ bb::Result DODroid::stepDrive() {
 
 bb::Result DODroid::stepIfNotStarted() {
   if(imu_.available()) imu_.update();
+  leftEncoder_.update();
+  rightEncoder_.update();
   if((Runloop::runloop.getSequenceNumber() % 4) == 0) {
     fillAndSendStatePacket();
+  }
+  if((Runloop::runloop.getSequenceNumber() % 100) == 0 && DOBattStatus::batt.available()) {
+    DOBattStatus::batt.updateVoltage();
+    DOBattStatus::batt.updateCurrent();
   }
   return RES_OK;
 }
@@ -800,7 +807,7 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
 }
 
 Result DODroid::fillAndSendStatePacket() {
-  if(params_.leftRemoteAddress.isZero()) return RES_OK;
+  //if(params_.leftRemoteAddress.isZero()) return RES_OK;
 
   Packet packet(PACKET_TYPE_STATE, PACKET_SOURCE_DROID, sequenceNumber());
 
@@ -810,22 +817,20 @@ Result DODroid::fillAndSendStatePacket() {
 
   // battery
   if(DOBattStatus::batt.available() == false) {
-    packet.payload.state.batt1Status = StatePacket::STATUS_ERROR;
-    packet.payload.state.batt1Voltage = 0;
-  } else if(DOBattStatus::batt.voltage() < 5.0) { // USB
-    packet.payload.state.batt1Status = StatePacket::STATUS_DEGRADED;
-    packet.payload.state.batt1Voltage = 0;
+    packet.payload.state.battStatus = StatePacket::STATUS_ERROR;
+    packet.payload.state.battVoltage = 0;
   } else {
-    packet.payload.state.batt1Status = StatePacket::STATUS_OK;
-    if(DOBattStatus::batt.voltage() < 13) packet.payload.state.batt1Voltage = 0;
-    else if(DOBattStatus::batt.voltage() > 16) packet.payload.state.batt1Voltage = 15;
-    else {
-      float v = 15.0f*(DOBattStatus::batt.voltage()-POWER_BATT_MIN)/(POWER_BATT_MAX-POWER_BATT_MIN);
-      packet.payload.state.batt1Voltage = (unsigned int)rintf(v);
-    }
+    if(DOBattStatus::batt.voltage() < 3.0) packet.payload.state.battStatus = StatePacket::STATUS_DEGRADED;
+    else packet.payload.state.battStatus = StatePacket::STATUS_OK;
+    
+    float v = (DOBattStatus::batt.voltage() - 3.0f)*10;
+    v = constrain(v, 0.0, 255.0);
+    packet.payload.state.battVoltage = (unsigned int)rintf(v);
+    
+    float c = DOBattStatus::batt.current() / 100.0f;
+    c = constrain(c, 0.0, 63.0);
+    packet.payload.state.battCurrent = (unsigned int)ceilf(c);
   }
-  packet.payload.state.batt2Status = StatePacket::STATUS_NA;
-  packet.payload.state.batt2Voltage = 0;
 
   // motors
   if(leftMotorStatus_ == MOTOR_OK && rightMotorStatus_ == MOTOR_OK) {
@@ -863,6 +868,22 @@ Result DODroid::fillAndSendStatePacket() {
     packet.payload.state.driveMode = StatePacket::DRIVE_OFF;
     break;
   }
+
+  // IMU
+  float pitch, roll, heading;
+  if(imu_.available()) {
+    imu_.getFilteredPRH(pitch, roll, heading);
+    packet.payload.state.pitch = rint((pitch*1024.0f)/360.0f);
+    packet.payload.state.roll = rint((roll*1024)/360.0f);
+    packet.payload.state.heading = rint((heading*1024.0f)/360.0f);
+  } else {
+    bb::printf("IMU not available\n");
+  }
+
+  // Speed in mm/s
+  packet.payload.state.speed = (leftEncoder_.present() + rightEncoder_.present())/2;
+
+  if(params_.leftRemoteAddress.isZero()) return RES_OK;
 
   XBee::xbee.sendTo(params_.leftRemoteAddress, packet, false);
   return RES_OK;

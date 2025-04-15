@@ -50,7 +50,7 @@ public:
     void hideCalibration(bb::PacketSource source);
 
     void setSeqnumState(bb::PacketSource source, bool active);
-    void setSeqnumNoComm(bb::PacketSource source, bool nocomm);
+    void setNoComm(bb::PacketSource source, bool nocomm);
 
     void visualizeFromControlPacket(bb::PacketSource source, uint8_t seqnum, const bb::ControlPacket& packet);
     void visualizeFromStatePacket(bb::PacketSource source, uint8_t seqnum, const bb::StatePacket& packet);

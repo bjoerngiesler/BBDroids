@@ -388,10 +388,11 @@ void RUI::setSeqnumState(bb::PacketSource source, bool active) {
     }
 }
   
-void RUI::setSeqnumNoComm(bb::PacketSource source, bool nocomm) {
+void RUI::setNoComm(bb::PacketSource source, bool nocomm) {
     switch(source) {
         case PACKET_SOURCE_DROID:
             droidSeqnum_.setNoComm(nocomm);
+            droidVis_.reset();
             break;
         case PACKET_SOURCE_LEFT_REMOTE:
             leftSeqnum_.setNoComm(nocomm);
