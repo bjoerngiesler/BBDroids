@@ -18,7 +18,7 @@ void DOSound::setSerial(Uart *ser) {
   ser_ = ser;
 }
 
-bool DOSound::begin() {
+bool DOSound::begin() {  
   if(ser_ == NULL) {
     Console::console.printfBroadcast("Serial is NULL!\n"); 
     available_ = false;

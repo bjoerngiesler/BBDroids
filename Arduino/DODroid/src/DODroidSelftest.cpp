@@ -74,7 +74,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   // Check IMU
   DOSound::sound.playSystemSound(SystemSounds::IMU);
   if(imu_.available() == false) {
-    Console::console.printfBroadcast("Critical error: IMU not available!\n");
+    bb::printf("Critical error: IMU not available!\n");
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
@@ -85,11 +85,11 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   }
   imu_.getFilteredPRH(p, r, h);
   if(fabs(p) > 5 || fabs(r) > 5) {
-    Console::console.printfBroadcast("Critical error: Droid not upright (p %f, r %f)!\n", p, r);
+    bb::printf("Critical error: Droid not upright (p %f, r %f)!\n", p, r);
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
-  Console::console.printfBroadcast("IMU OK. Pitch %.2f, Roll %.2f\n", p, r);
+  bb::printf("IMU OK. Pitch %.2f, Roll %.2f\n", p, r);
 
   DOSound::sound.playSystemSound(SystemSounds::CALIBRATING);
   imu_.calibrate(stream);
@@ -100,7 +100,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   imu_.getFilteredPRH(p, r, h);
   pitchAtRest_ = p;
   balanceController_.setGoal(-pitchAtRest_);
-  Console::console.printfBroadcast("IMU calibrated. Pitch angle at rest: %f\n", pitchAtRest_);
+  bb::printf("IMU calibrated. Pitch angle at rest: %f\n", pitchAtRest_);
   DOSound::sound.playSystemSound(SystemSounds::OK);
 
 

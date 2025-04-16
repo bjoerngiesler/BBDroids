@@ -42,9 +42,10 @@ static void configureTimers() {
   // RIGHT_PWMB is Pin 2 -> PA10, which gets TCC0/WO[2] in port function F
   PORT->Group[g_APinDescription[P_RIGHT_PWMB].ulPort].PMUX[g_APinDescription[P_RIGHT_PWMB].ulPin >> 1].reg |= PORT_PMUX_PMUXO_F;  
 
+  int prescaler = 1;
   double fPWM = 20000;
   double fBus = 48000000;
-  pwmPeriod = int(fBus / fPWM)-1;
+  pwmPeriod = int(fBus / (prescaler*fPWM))-1;
 
   REG_TCC0_WAVE |= TCC_WAVE_WAVEGEN_NPWM;
   REG_TCC0_PER = pwmPeriod;
@@ -55,6 +56,7 @@ static void configureTimers() {
 static void customAnalogWrite(uint8_t pin, uint8_t dutycycle) {
   uint16_t dc = map(dutycycle, 0, 255, 0, pwmPeriod);
 
+  noInterrupts();
   switch(pin) {
   case P_LEFT_PWMA: // WO[0] -> CCB0
     REG_TCC0_CCB0 = dc;
@@ -73,8 +75,10 @@ static void customAnalogWrite(uint8_t pin, uint8_t dutycycle) {
     while(TCC0->SYNCBUSY.bit.CCB2);
     break;
   default:
-    bb::printf("ERROR - Unknown pin %d in customAnalogWrite()\n", pin);
+    //bb::printf("ERROR - Unknown pin %d in customAnalogWrite()\n", pin);
+    break;
   }
+  interrupts();
 }
 
 DODroid::DODroid():
@@ -107,10 +111,6 @@ DODroid::DODroid():
   pinMode(PULL_DOWN_20, OUTPUT);
   digitalWrite(PULL_DOWN_20, LOW);
 
-  configureTimers();
-  leftMotor_.setCustomAnalogWrite(&customAnalogWrite);
-  rightMotor_.setCustomAnalogWrite(&customAnalogWrite);
-
   statusPixels_.begin();
   statusPixels_.setBrightness(10);
   statusPixels_.show();
@@ -137,6 +137,12 @@ DODroid::DODroid():
 }
 
 Result DODroid::initialize() {
+  if(Serial) {
+    configureTimers();
+    leftMotor_.setCustomAnalogWrite(&customAnalogWrite);
+    rightMotor_.setCustomAnalogWrite(&customAnalogWrite);
+  }
+
   addParameter("neck_range", "Neck servo movement range", params_.neckRange, -INT_MAX, INT_MAX);
   addParameter("neck_offset", "Neck servo offset", params_.neckOffset, -INT_MAX, INT_MAX);
   addParameter("head_roll_range", "Head roll servo movement range", params_.headRollRange, -INT_MAX, INT_MAX);
@@ -452,7 +458,7 @@ bb::Result DODroid::stepHead() {
 bb::Result DODroid::stepDrive() {
   unsigned long timeSinceLastPrimary = WRAPPEDDIFF(millis(), msLastPrimaryCtrlPacket_, ULONG_MAX);
   if(timeSinceLastPrimary > 500 && driveMode_ != DRIVE_OFF && driveSafety_ == true) {
-    Console::console.printfBroadcast("No control packet from primary in %dms. Switching drive off.\n", timeSinceLastPrimary);
+    bb::printf("No control packet from primary in %ldms. Switching drive off.\n", timeSinceLastPrimary);
     switchDrive(DRIVE_OFF);
     DOSound::sound.playSystemSound(SystemSounds::DISCONNECTED);
   }
@@ -498,27 +504,27 @@ void DODroid::switchDrive(DriveMode mode) {
   posControllerZero_ = posController_.present();
 
   driveMode_ = mode;
-  Console::console.printfBroadcast("Drive mode: ");
+  bb::printf("Drive mode: ");
   switch(driveMode_) {
     case DRIVE_OFF: 
       setLED(LED_DRIVE, OFF);
-      Console::console.printfBroadcast("off\n"); 
+      bb::printf("off\n"); 
       break;
     
     case DRIVE_VEL: 
       setLED(LED_DRIVE, GREEN);
-      Console::console.printfBroadcast("velocity\n"); 
+      bb::printf("vel\n"); 
       break;
 
     case DRIVE_POS: 
       setLED(LED_DRIVE, YELLOW);
-      Console::console.printfBroadcast("position\n"); 
+      bb::printf("pos\n"); 
       break;
 
     case DRIVE_AUTO_POS:
     default: 
       setLED(LED_DRIVE, BLUE);
-      Console::console.printfBroadcast("auto position\n"); 
+      bb::printf("auto position\n"); 
       break;
   }
 }
@@ -603,7 +609,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     } else setLED(LED_COMM, GREEN);
   
     commLEDOn_ = true;
-    Runloop::runloop.scheduleTimedCallback(100, [=]{ setLED(LED_COMM, OFF); commLEDOn_ = false; });
+    //Runloop::runloop.scheduleTimedCallback(100, [=]{ setLED(LED_COMM, OFF); commLEDOn_ = false; });
   }
 
   // Check for duplicates and lost packets
@@ -807,7 +813,7 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
 }
 
 Result DODroid::fillAndSendStatePacket() {
-  //if(params_.leftRemoteAddress.isZero()) return RES_OK;
+  if(params_.leftRemoteAddress.isZero()) return RES_OK;
 
   Packet packet(PACKET_TYPE_STATE, PACKET_SOURCE_DROID, sequenceNumber());
 
