@@ -2,6 +2,8 @@
 #include "DOConfig.h"
 #include "DOBattStatus.h"
 #include "DOSound.h"
+#include <SAMD_PWM.h>
+#include <map>
 #include "../resources/systemsounds.h"
 
 DODroid DODroid::droid;
@@ -9,76 +11,32 @@ DOParams DODroid::params_;
 bb::ConfigStorage::HANDLE DODroid::paramsHandle_;
 
 static uint16_t pwmPeriod;
+static float minPwmFreq = 200.0f;
+static float maxPwmFreq = 500.0f;
+static float detune = 0.0f;
+static std::map<uint8_t, SAMD_PWM*> pwms;
 
 static void configureTimers() {
-  REG_GCLK_GENDIV = GCLK_GENDIV_DIV(1) | GCLK_GENDIV_ID(4);
-  while(GCLK->STATUS.bit.SYNCBUSY); 
-
-  // Set the clock source, duty cycle, and enable GCLK5  
-  REG_GCLK_GENCTRL = GCLK_GENCTRL_SRC_DFLL48M |  // Set 48MHz source
-                     GCLK_GENCTRL_IDC |          // Improve Duty Cycle
-                     GCLK_GENCTRL_GENEN |        // Enable GCLK
-                     GCLK_GENCTRL_ID(4);         // For GLCK5    
-  while(GCLK->STATUS.bit.SYNCBUSY);    
-
-  // Route GLCK5 to TCC0 & TCC1, and enable the clock.
-  REG_GCLK_CLKCTRL = GCLK_CLKCTRL_ID_TCC0_TCC1 | // Route GCLK5 to TCC0 & 1
-                     GCLK_CLKCTRL_CLKEN |        // Enable the clock
-                     GCLK_CLKCTRL_GEN_GCLK4;     // Select GCLK5
-  while(GCLK->STATUS.bit.SYNCBUSY);  
-
-  // Route to multiplexer...
-  PORT->Group[g_APinDescription[P_LEFT_PWMA].ulPort].PINCFG[g_APinDescription[P_LEFT_PWMA].ulPin].bit.PMUXEN = 1;
-  PORT->Group[g_APinDescription[P_LEFT_PWMB].ulPort].PINCFG[g_APinDescription[P_LEFT_PWMB].ulPin].bit.PMUXEN = 1;
-  PORT->Group[g_APinDescription[P_RIGHT_PWMA].ulPort].PINCFG[g_APinDescription[P_RIGHT_PWMA].ulPin].bit.PMUXEN = 1;
-  PORT->Group[g_APinDescription[P_RIGHT_PWMB].ulPort].PINCFG[g_APinDescription[P_RIGHT_PWMB].ulPin].bit.PMUXEN = 1;
-  // ...and in the MUX to peripheral function F. Here comes the messy bit (data sheet page 30, table 7.1)
-  // LEFT_PWMA is Pin 18 -> PA04, which gets TCC0/WO[0] in port function E
-  PORT->Group[g_APinDescription[P_LEFT_PWMA].ulPort].PMUX[g_APinDescription[P_LEFT_PWMA].ulPin >> 1].reg |= PORT_PMUX_PMUXE_E;
-  // LEFT_PWMB is Pin 19 -> PA05, which gets TCC0/WO[1] in port function E
-  PORT->Group[g_APinDescription[P_LEFT_PWMB].ulPort].PMUX[g_APinDescription[P_LEFT_PWMB].ulPin >> 1].reg |= PORT_PMUX_PMUXO_E;
-  // RIGHT_PWMA is Pin 3 -> PA11, which gets TCC0/WO[3] in port function F
-  PORT->Group[g_APinDescription[P_RIGHT_PWMA].ulPort].PMUX[g_APinDescription[P_RIGHT_PWMA].ulPin >> 1].reg |= PORT_PMUX_PMUXE_F;
-  // RIGHT_PWMB is Pin 2 -> PA10, which gets TCC0/WO[2] in port function F
-  PORT->Group[g_APinDescription[P_RIGHT_PWMB].ulPort].PMUX[g_APinDescription[P_RIGHT_PWMB].ulPin >> 1].reg |= PORT_PMUX_PMUXO_F;  
-
-  int prescaler = 1;
-  double fPWM = 20000;
-  double fBus = 48000000;
-  pwmPeriod = int(fBus / (prescaler*fPWM))-1;
-
-  REG_TCC0_WAVE |= TCC_WAVE_WAVEGEN_NPWM;
-  REG_TCC0_PER = pwmPeriod;
-  REG_TCC0_CTRLA |= TCC_CTRLA_PRESCALER_DIV1 | TCC_CTRLA_ENABLE;     // Requires SYNC on CTRLA
-  while(TCC0->SYNCBUSY.bit.ENABLE || TCC0->SYNCBUSY.bit.WAVE || TCC0->SYNCBUSY.bit.PER);
+  pwms[P_LEFT_PWMA] = new SAMD_PWM(P_LEFT_PWMA, minPwmFreq, 0);
+  pwms[P_LEFT_PWMB] = new SAMD_PWM(P_LEFT_PWMB, minPwmFreq, 0);;
+  pwms[P_RIGHT_PWMA] = new SAMD_PWM(P_RIGHT_PWMA, minPwmFreq, 0);
+  pwms[P_RIGHT_PWMB] = new SAMD_PWM(P_RIGHT_PWMB, minPwmFreq, 0);
+  pwms[P_LEFT_PWMA]->setPWM();
+  pwms[P_LEFT_PWMB]->setPWM();
+  pwms[P_RIGHT_PWMA]->setPWM();
+  pwms[P_RIGHT_PWMB]->setPWM();
 }
 
 static void customAnalogWrite(uint8_t pin, uint8_t dutycycle) {
-  uint16_t dc = map(dutycycle, 0, 255, 0, pwmPeriod);
-
-  noInterrupts();
-  switch(pin) {
-  case P_LEFT_PWMA: // WO[0] -> CCB0
-    REG_TCC0_CCB0 = dc;
-    while(TCC0->SYNCBUSY.bit.CCB0);
-    break;
-  case P_LEFT_PWMB: // WO[1] -> CCB1
-    REG_TCC0_CCB1 = dc;
-    while(TCC0->SYNCBUSY.bit.CCB1);
-    break;
-  case P_RIGHT_PWMA: // WO[3] -> CCB3
-    REG_TCC0_CCB3 = dc;
-    while(TCC0->SYNCBUSY.bit.CCB3);
-    break;
-  case P_RIGHT_PWMB: // WO[2] -> CCB2
-    REG_TCC0_CCB2 = dc;
-    while(TCC0->SYNCBUSY.bit.CCB2);
-    break;
-  default:
-    //bb::printf("ERROR - Unknown pin %d in customAnalogWrite()\n", pin);
-    break;
+  SAMD_PWM* pwm = pwms[pin];
+  if(pwm == nullptr) {
+    bb::printf("NULL for pwm pin %d\n", pin);
+    return;
   }
-  interrupts();
+  float f = map(dutycycle, 0, 255, minPwmFreq, maxPwmFreq);
+  if(pin == P_RIGHT_PWMA || pin == P_RIGHT_PWMB) f += detune/2;
+  else f -= detune/2;
+  pwm->setPWM(pin, f, map(dutycycle, 0, 255, 0.0, 100.0));
 }
 
 DODroid::DODroid():
@@ -137,12 +95,6 @@ DODroid::DODroid():
 }
 
 Result DODroid::initialize() {
-  if(Serial) {
-    configureTimers();
-    leftMotor_.setCustomAnalogWrite(&customAnalogWrite);
-    rightMotor_.setCustomAnalogWrite(&customAnalogWrite);
-  }
-
   addParameter("neck_range", "Neck servo movement range", params_.neckRange, -INT_MAX, INT_MAX);
   addParameter("neck_offset", "Neck servo offset", params_.neckOffset, -INT_MAX, INT_MAX);
   addParameter("head_roll_range", "Head roll servo movement range", params_.headRollRange, -INT_MAX, INT_MAX);
@@ -191,6 +143,10 @@ Result DODroid::initialize() {
   addParameter("fa_head_anneal_time", "Free Anim: Head anneal time", params_.faHeadAnnealTime, -INT_MAX, INT_MAX);
 
   addParameter("auto_pos_control", "Automatically switch to position control", params_.autoPosControl);
+
+  configureTimers();
+  leftMotor_.setCustomAnalogWrite(&customAnalogWrite);
+  rightMotor_.setCustomAnalogWrite(&customAnalogWrite);
 
   paramsHandle_ = ConfigStorage::storage.reserveBlock("d-o", sizeof(params_), (uint8_t*)&params_);
   if(ConfigStorage::storage.blockIsValid(paramsHandle_)) {
