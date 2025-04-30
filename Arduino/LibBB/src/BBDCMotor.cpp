@@ -43,6 +43,9 @@ bb::DCMotor::DCMotor(uint8_t pin_pwm_a, uint8_t pin_pwm_b) {
   pinMode(pin_a_, OUTPUT);
   pinMode(pin_b_, OUTPUT);
 
+  digitalWrite(pin_a_, LOW);
+  digitalWrite(pin_b_, LOW);
+
   if(pin_pwm_ != PIN_OFF)
     pinMode(pin_pwm_, OUTPUT);
   if(pin_en_ != PIN_OFF)
