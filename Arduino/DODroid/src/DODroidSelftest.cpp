@@ -255,6 +255,10 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
 
   unsigned long microsPerLoop = (unsigned long)(1e6 / imu_.dataRate());
 
+  DOBattStatus::batt.updateCurrent();
+  DOBattStatus::batt.updateVoltage();
+  float mAAtRest = DOBattStatus::batt.current();
+
   for(pwm = ST_MIN_PWM; pwm < ST_MAX_PWM; pwm += pwmStep) {
     unsigned long us0 = micros();
     if(reverse) mot.set(-pwm);
@@ -283,7 +287,7 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     enc.update();
     distance = enc.presentPosition()-startPosition;
 
-    if(fabs(mA) > ST_ABORT_MILLIAMPS) { 
+    if(fabs(mA) > mAAtRest + ST_ABORT_MILLIAMPS) { 
       LOG(LOG_WARN, "Current meter reports %.1fmA/%.1fV of current, higher than threshold of %.1fmA\n", mA, V, ST_ABORT_MILLIAMPS);
       blockedcount++;
     }
@@ -302,12 +306,14 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
       LOG(LOG_INFO, "X max accel criterion triggered (fabs(%f) > %f)\n", fabs(axmax), ST_ABORT_ACCEL);
       break;
     }
+
     if(fabs(aymax) > ST_ABORT_ACCEL) {
       LOG(LOG_INFO, "Y max accel criterion triggered (fabs(%f) > %f)\n", fabs(aymax), ST_ABORT_ACCEL);
       break;
     }
+
     if(blockedcount > 10) {
-      LOG(LOG_INFO, "Motor load criterion triggered %d times (%f > %f)\n", blockedcount, mA, ST_ABORT_MILLIAMPS);
+      LOG(LOG_INFO, "Motor load criterion triggered %d times (%f > %f+%f)\n", blockedcount, mA, mAAtRest, ST_ABORT_MILLIAMPS);
       break;
     }
 
@@ -325,7 +331,7 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
   mot.set(0.0);
 
   // Current too high? Motor blocked.
-  if(blockedcount > 5) {
+  if(blockedcount > 10) {
     LOG(LOG_ERROR, "Motor pulling too much power. Likely blocked!\n");
     return MOTOR_BLOCKED;
   }

@@ -10,7 +10,6 @@ DODroid DODroid::droid;
 DOParams DODroid::params_;
 bb::ConfigStorage::HANDLE DODroid::paramsHandle_;
 
-static uint16_t pwmPeriod;
 static float minPwmFreq = 200.0f;
 static float maxPwmFreq = 500.0f;
 static float detune = 0.0f;

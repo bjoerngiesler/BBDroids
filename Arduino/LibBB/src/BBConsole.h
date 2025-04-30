@@ -118,7 +118,7 @@ public:
 
 	//! Initialize, opening the Serial port using Serial.begin(bps)
 	virtual Result initialize(int bps) { 
-		Serial.begin(bps); 
+		//Serial.begin(bps); 
 		return initialize();
 	}
 

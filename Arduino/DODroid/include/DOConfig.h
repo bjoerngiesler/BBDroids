@@ -87,7 +87,7 @@ static const float ST_ABORT_DISTANCE       = (2*WHEEL_DISTANCE*M_PI)/4.0;
 static const float ST_MIN_DISTANCE         = ST_ABORT_DISTANCE / 8.0;     
 static const float ST_ABORT_ACCEL          = 2.0;
 static const float ST_MIN_ACCEL            = ST_ABORT_ACCEL / 3.0;
-static const float ST_ABORT_MILLIAMPS      = 1800;
+static const float ST_ABORT_MILLIAMPS      = 1800; // pure motor current - added to current measured at rest
 static const float ST_ABORT_HEADING_CHANGE = 45.0;
 static const float ST_MIN_HEADING_CHANGE   = ST_ABORT_HEADING_CHANGE / 4.0;
 
