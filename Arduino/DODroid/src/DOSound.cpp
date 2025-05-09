@@ -44,7 +44,16 @@ bool DOSound::begin() {
 }
 
 bool DOSound::playSound(unsigned int fileNumber) {
-  if(!available_ || !sdCardInserted()) return false;
+  if(!available_) {
+    bb::printf("Sound system not available!\n");
+    return false;
+  }
+
+  if(!sdCardInserted()) {
+    bb::printf("SD card not inserted!\n");
+    return false;
+  } 
+
   for(int i=0; i<DOSOUND_REPEATS; i++) {
     dfp_.play(fileNumber);
     delayMicroseconds(DOSOUND_DELAY_US);
@@ -53,7 +62,16 @@ bool DOSound::playSound(unsigned int fileNumber) {
 }
 
 bool DOSound::playFolder(unsigned int folder, unsigned int filenumber, bool override) {
-  if((!available_ || !sdCardInserted()) && override == false) return false;
+  if(!available_) {
+    bb::printf("Sound system not available!\n");
+    if(override == false) return false;
+  }
+
+  if(!sdCardInserted()) {
+    bb::printf("SD card not inserted!\n");
+    if(override == false) return false;
+  } 
+
   for(int i=0; i<DOSOUND_REPEATS; i++) {
     dfp_.playFolder(int(folder), filenumber);
     delayMicroseconds(DOSOUND_DELAY_US);
@@ -62,14 +80,23 @@ bool DOSound::playFolder(unsigned int folder, unsigned int filenumber, bool over
 }
 
 bool DOSound::playFolderRandom(unsigned int folder) {
-  if(!available_ || !sdCardInserted()) return false;
-  if(folders_.find(folder) == folders_.end()) {
-    Console::console.printfBroadcast("No folder with number %d\n", int(folder));
+  if(!available_) {
+    bb::printf("Sound system not available!\n");
     return false;
   }
-  Console::console.printfBroadcast("%d files in folder %d\n", folders_[folder].count, int(folder));
+
+  if(!sdCardInserted()) {
+    bb::printf("SD card not inserted!\n");
+    return false;
+  } 
+
+  if(folders_.find(folder) == folders_.end()) {
+    bb::printf("No folder with number %d\n", int(folder));
+    return false;
+  }
+  bb::printf("%d files in folder %d\n", folders_[folder].count, int(folder));
   int num = random(0, folders_[folder].count);
-  Console::console.printfBroadcast("Playing file %d\n", num);
+  bb::printf("Playing file %d\n", num);
   if(playFolder(folder, num+1) == true) {
     folders_[folder].next = (folders_[folder].next+1)%folders_[folder].count;
     return true;
@@ -77,13 +104,22 @@ bool DOSound::playFolderRandom(unsigned int folder) {
 }
 
 bool DOSound::playFolderNext(unsigned int folder) {
-  if(!available_ || !sdCardInserted()) return false;
-  if(folders_.find(folder) == folders_.end()) {
-    Console::console.printfBroadcast("No folder with number %d\n", int(folder));
+  if(!available_) {
+    bb::printf("Sound system not available!\n");
     return false;
   }
-  Console::console.printfBroadcast("%d files in folder %d\n", folders_[folder].count, int(folder));
-  Console::console.printfBroadcast("Playing file %d\n", folders_[folder].next);
+
+  if(!sdCardInserted()) {
+    bb::printf("SD card not inserted!\n");
+    return false;
+  } 
+
+  if(folders_.find(folder) == folders_.end()) {
+    bb::printf("No folder with number %d\n", int(folder));
+    return false;
+  }
+  bb::printf("%d files in folder %d\n", folders_[folder].count, int(folder));
+  bb::printf("Playing file %d\n", folders_[folder].next);
   if(playFolder(folder, folders_[folder].next+1) == true) {
     folders_[folder].next = (folders_[folder].next+1)%folders_[folder].count;
     return true;
@@ -129,7 +165,7 @@ bool DOSound::checkSDCard() {
       int num = dfp_.numTracksInFolder(i);
       Console::console.printfBroadcast("    %d files in folder %d\n", num, i);
       if(num > 0)
-        folders_[i] = {num, 0};
+        folders_[i] = {unsigned(num), 0};
     }
     Console::console.printfBroadcast("Playing initial system sound.\n");
     playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY, true);

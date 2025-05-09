@@ -62,13 +62,11 @@ DODroid::DODroid():
 
   statusPixels_(3, P_STATUS_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 {
-  // Pull down the ENABLE pins for the motor controllers. FIXME I *think* this isn't needed for D-Ov2Evo, test!
-#if 0
+  // Pull down the GND pins for the motor controllers.
   pinMode(PULL_DOWN_15, OUTPUT);
   digitalWrite(PULL_DOWN_15, LOW);
   pinMode(PULL_DOWN_20, OUTPUT);
   digitalWrite(PULL_DOWN_20, LOW);
-#endif
 
   statusPixels_.begin();
   statusPixels_.setBrightness(10);
