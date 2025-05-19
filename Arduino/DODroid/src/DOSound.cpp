@@ -10,6 +10,7 @@ DOSound DOSound::sound;
 
 DOSound::DOSound() {
   available_ = false;
+  dumbMode_ = false;
   fileCount_ = -1;
   ser_ = nullptr;
 }
@@ -20,12 +21,12 @@ void DOSound::setSerial(Uart *ser) {
 
 bool DOSound::begin() {  
   if(ser_ == NULL) {
-    Console::console.printfBroadcast("Serial is NULL!\n"); 
+    bb::printf("Serial is NULL!\n"); 
     available_ = false;
     return false;
   } 
 
-  Console::console.printfBroadcast("Setting up sound...\n");
+  bb::printf("Setting up sound... ");
   ser_->begin(9600);
   if(dfp_.begin(*ser_)) {
     for(int i=0; i<3; i++) {
@@ -37,9 +38,10 @@ bool DOSound::begin() {
       delayMicroseconds(DOSOUND_DELAY_US);
     }
     available_ = true;
+    bb::printf("OK\n");
     return true;
   } 
-
+  bb::printf("failure\n");
   return false;
 }
 
@@ -49,7 +51,7 @@ bool DOSound::playSound(unsigned int fileNumber) {
     return false;
   }
 
-  if(!sdCardInserted()) {
+  if(dumbMode_ == false && sdCardInserted() == false) {
     bb::printf("SD card not inserted!\n");
     return false;
   } 
@@ -67,7 +69,7 @@ bool DOSound::playFolder(unsigned int folder, unsigned int filenumber, bool over
     if(override == false) return false;
   }
 
-  if(!sdCardInserted()) {
+  if(dumbMode_ == false && sdCardInserted() == false) {
     bb::printf("SD card not inserted!\n");
     if(override == false) return false;
   } 
@@ -85,7 +87,7 @@ bool DOSound::playFolderRandom(unsigned int folder) {
     return false;
   }
 
-  if(!sdCardInserted()) {
+  if(dumbMode_ == false && sdCardInserted() == false) {
     bb::printf("SD card not inserted!\n");
     return false;
   } 
@@ -109,7 +111,7 @@ bool DOSound::playFolderNext(unsigned int folder) {
     return false;
   }
 
-  if(!sdCardInserted()) {
+  if(dumbMode_ == false && sdCardInserted() == false) {
     bb::printf("SD card not inserted!\n");
     return false;
   } 
@@ -127,7 +129,7 @@ bool DOSound::playFolderNext(unsigned int folder) {
 }
 
 bool DOSound::playSystemSound(int snd) { 
-  if(playFolder(1, (int)snd) == true) {
+  if(playFolder(1, (int)snd, true) == true) {
     delay(1200);
     return true;
   }
@@ -159,22 +161,30 @@ bool DOSound::checkSDCard() {
       return false; // no change
     }
     fileCount_ = fc;
-    Console::console.printfBroadcast("SD card inserted!\n");
-    Console::console.printfBroadcast("    %d overall files\n", fileCount_);
+    bb::printf("SD card inserted!\n");
+    bb::printf("    %d overall files\n", fileCount_);
     for(unsigned int i=1; i<=8; i++) {
       int num = dfp_.numTracksInFolder(i);
-      Console::console.printfBroadcast("    %d files in folder %d\n", num, i);
+      bb::printf("    %d files in folder %d\n", num, i);
       if(num > 0)
         folders_[i] = {unsigned(num), 0};
     }
-    Console::console.printfBroadcast("Playing initial system sound.\n");
+
+    if(fileCount_ > 0 && folders_.size() == 0) {
+      bb::printf("No folders found. Bad DFPlayer or wrong folder structure. Entering dumb mode.\n");
+      dumbMode_ = true;
+    } else {
+      dumbMode_ = false;
+    }
+
+    bb::printf("Playing initial system sound.\n");
     playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY, true);
-    Console::console.printfBroadcast("Done.\n");
+    bb::printf("Done.\n");
     return true;
   } else {
     if(fc == fileCount_) return true; // no change
     if(fc == -1) {
-      Console::console.printfBroadcast("SD card removed!\n");
+      bb::printf("SD card removed!\n");
       fileCount_ = -1;
       return false;
     }

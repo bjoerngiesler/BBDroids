@@ -32,6 +32,7 @@ public:
 private:
   DFPlayerMini_Fast dfp_;
   bool available_;
+  bool dumbMode_;
   struct FolderContents {
     unsigned int count;
     unsigned int next;
