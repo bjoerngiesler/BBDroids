@@ -87,22 +87,27 @@ bool DOSound::playFolderRandom(unsigned int folder) {
     return false;
   }
 
-  if(dumbMode_ == false && sdCardInserted() == false) {
-    bb::printf("SD card not inserted!\n");
-    return false;
-  } 
+  if(dumbMode_ == false) {
+    if(sdCardInserted() == false) {
+      bb::printf("SD card not inserted!\n");
+      return false;
+    } 
 
-  if(folders_.find(folder) == folders_.end()) {
-    bb::printf("No folder with number %d\n", int(folder));
-    return false;
+    if(folders_.find(folder) == folders_.end()) {
+      bb::printf("No folder with number %d\n", int(folder));
+      return false;
+    }
+    bb::printf("%d files in folder %d\n", folders_[folder].count, int(folder));
+    int num = random(0, folders_[folder].count);
+    bb::printf("Playing file %d\n", num);
+    if(playFolder(folder, num+1) == true) {
+      folders_[folder].next = (folders_[folder].next+1)%folders_[folder].count;
+      return true;
+    } else return false;
+  } else { // dumbMode_ == true
+    bb::printf("Dumb mode, playing first file in folder %d\n", folder);
+    return playFolder(folder, 1);
   }
-  bb::printf("%d files in folder %d\n", folders_[folder].count, int(folder));
-  int num = random(0, folders_[folder].count);
-  bb::printf("Playing file %d\n", num);
-  if(playFolder(folder, num+1) == true) {
-    folders_[folder].next = (folders_[folder].next+1)%folders_[folder].count;
-    return true;
-  } else return false;
 }
 
 bool DOSound::playFolderNext(unsigned int folder) {
@@ -111,21 +116,27 @@ bool DOSound::playFolderNext(unsigned int folder) {
     return false;
   }
 
-  if(dumbMode_ == false && sdCardInserted() == false) {
-    bb::printf("SD card not inserted!\n");
-    return false;
-  } 
+  if(dumbMode_ == false) {
+    if(sdCardInserted() == false) {
+      bb::printf("SD card not inserted!\n");
+      return false;
+    } 
+    if(folders_.find(folder) == folders_.end()) {
+      bb::printf("No folder with number %d\n", int(folder));
+      return false;
+    }
 
-  if(folders_.find(folder) == folders_.end()) {
-    bb::printf("No folder with number %d\n", int(folder));
-    return false;
+    bb::printf("%d files in folder %d\n", folders_[folder].count, int(folder));
+    bb::printf("Playing file %d\n", folders_[folder].next);
+
+    if(playFolder(folder, folders_[folder].next+1) == true) {
+      folders_[folder].next = (folders_[folder].next+1)%folders_[folder].count;
+      return true;
+    } else return false;
+  } else { // dumbMode_ == true
+    bb::printf("Dumb mode, playing first file in folder %d\n", folder);
+    return playFolder(folder, 1);
   }
-  bb::printf("%d files in folder %d\n", folders_[folder].count, int(folder));
-  bb::printf("Playing file %d\n", folders_[folder].next);
-  if(playFolder(folder, folders_[folder].next+1) == true) {
-    folders_[folder].next = (folders_[folder].next+1)%folders_[folder].count;
-    return true;
-  } else return false;
 }
 
 bool DOSound::playSystemSound(int snd) { 
