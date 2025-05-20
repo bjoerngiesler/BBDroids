@@ -157,6 +157,8 @@ bool DOSound::setVolume(uint8_t vol) {
 }
 
 bool DOSound::checkSDCard() {
+  if(dumbMode_) return false;
+
   int fc = -1;
   for(int i=0; i<DOSOUND_REPEATS; i++) {
     int fc_ = dfp_.numSdTracks();
