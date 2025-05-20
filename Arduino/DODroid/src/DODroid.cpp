@@ -352,7 +352,7 @@ bb::Result DODroid::stepHead() {
         if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
         else nod += params_.faNeckSpeedSP*speedSP;
       }
-      nod += lean_;
+      nod += lean_ - pitchAtRest_;
 
       float neck = nod + params_.faNeckIMUPitch*p;
       neck = constrain(neck, -params_.neckRange, params_.neckRange);
