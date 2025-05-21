@@ -8,11 +8,12 @@ DOSound DOSound::sound;
 #define DOSOUND_REPEATS 1
 #define DOSOUND_DELAY_US 100
 
-DOSound::DOSound() {
+DOSound::DOSound(uint8_t volume) {
   available_ = false;
   dumbMode_ = false;
   fileCount_ = -1;
   ser_ = nullptr;
+  volume_ = volume;
 }
 
 void DOSound::setSerial(Uart *ser) {
@@ -34,7 +35,7 @@ bool DOSound::begin() {
       delay(1000);
     }
     for(int i=0; i<DOSOUND_REPEATS; i++) {
-      dfp_.volume(10);
+      dfp_.volume(volume_);
       delayMicroseconds(DOSOUND_DELAY_US);
     }
     available_ = true;
@@ -149,10 +150,12 @@ bool DOSound::playSystemSound(int snd) {
 
 bool DOSound::setVolume(uint8_t vol) {
   if(!available_) return false;
+  if(vol == volume_) return false;
   for(int i=0; i<DOSOUND_REPEATS; i++) {
     dfp_.volume(vol);
     delayMicroseconds(DOSOUND_DELAY_US);
   }
+  volume_ = vol;
   return true;
 }
 
@@ -190,8 +193,9 @@ bool DOSound::checkSDCard() {
       dumbMode_ = false;
     }
 
-    bb::printf("Playing initial system sound.\n");
-    playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY, true);
+    bb::printf("Playing initial system sound %d.\n", SystemSounds::SOUND_SYSTEM_READY);
+    dfp_.playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY);
+    delay(1000);
     bb::printf("Done.\n");
     return true;
   } else {

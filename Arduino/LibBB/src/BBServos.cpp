@@ -394,7 +394,6 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
       if(offs > maxoffs) maxoffs = offs;
     }
   } else {
-    bb::printf("Setting goal: %d\n", s->min + (s->max - s->min)/2);
     setGoal(id, s->min + (s->max - s->min)/2, VALUE_RAW);
     maxoffs = abs((int)s->present - (int)s->goal);
   }      
@@ -403,8 +402,6 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
 
   // how many ms should it take to reach the goal?
   float timeToReachGoalMS = maxoffs / ((vel * 4096.0) / 60000);
-
-  Console::console.printfBroadcast("Time to reach the goal: %f\n", timeToReachGoalMS);
 
   int timeRemaining = (int)(2*timeToReachGoalMS);
   bool allReachedGoal = false;
@@ -526,7 +523,6 @@ bool bb::Servos::setRange(uint8_t id, float min, float max, ValueType t) {
     s->min = computeRawValue(max, t);
   }
 
-  bb::printf("Min: %d max: %d\n", s->min, s->max);
   setGoal(id, constrain(s->goal, s->min, s->max), VALUE_RAW);
 
   return true;

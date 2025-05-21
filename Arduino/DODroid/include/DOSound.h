@@ -12,7 +12,7 @@ class DOSound {
 public:
   static DOSound sound;
 
-  DOSound();
+  DOSound(uint8_t volume=10);
   void setSerial(Uart *ser);
   bool begin();
   bool available() { return available_; }
@@ -37,6 +37,7 @@ private:
     unsigned int count;
     unsigned int next;
   };
+  uint8_t volume_;
 
   std::map<unsigned int, FolderContents> folders_;
   int fileCount_;

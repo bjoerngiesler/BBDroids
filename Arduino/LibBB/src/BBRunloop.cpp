@@ -51,9 +51,7 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		for(auto& s: subsys) {
 			unsigned long us = micros();
 			if(s->isStarted() && s->operationStatus() == RES_OK) {
-				//Console::console.printfBroadcast("Calling step() in %s...", s->name());
 				s->step();
-				//¨Console::console.printfBroadcast("done.\n");
 			} else {
 				s->stepIfNotStarted();
 			}
@@ -76,12 +74,14 @@ bb::Result bb::Runloop::start(ConsoleStream* stream) {
 		if(looptime <= cycleTime_) {
 			delayMicroseconds(cycleTime_-looptime);
 		} else if(excuseOverrun_ == false && suppressOverrun_ == false) {
-			Console::console.printfBroadcast("%d/%dus spent in loop: ", looptime, cycleTime_);
+			String msg;
+			char buf[255];
+			snprintf(buf, 255, "%ld/%ldus spent in loop: ", looptime, cycleTime_);
+			msg = buf;
 			for(auto& t: timingInfo) {
-				Console::console.printfBroadcast(t.c_str());
-				Console::console.printfBroadcast(" ");
+				msg = msg + t.c_str() + " ";
 			}
-			Console::console.printfBroadcast("\n");
+			LOG(LOG_WARN, "%s\n", msg.c_str());
 		}
 
 		excuseOverrun_ = false;

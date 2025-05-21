@@ -34,8 +34,8 @@ public:
 	static const unsigned int LOG_ERROR = 4;
 	static const unsigned int LOG_FATAL = 5;
 
-#define LOGS(stream, level, args...) if(level>=loglevel_) { bb::printf(stream, "%s(%d):", name_, level); bb::printf(stream, args); }
-#define LOG(level, args...) if(level>=loglevel_) { bb::printf("%s(%d):", name_, level); bb::printf(args); }
+#define LOGS(stream, level, args...) if(level>=loglevel_) { bb::printf(stream, "%s(%d): ", name_, level); bb::printf(stream, args); }
+#define LOG(level, args...) if(level>=loglevel_) { bb::printf("%s(%d): ", name_, level); bb::printf(args); }
 
 	virtual const char* name() { return name_; }
 	virtual const char* description() { return description_; }

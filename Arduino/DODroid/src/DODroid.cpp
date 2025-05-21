@@ -29,7 +29,6 @@ static void configureTimers() {
 static void customAnalogWrite(uint8_t pin, uint8_t dutycycle) {
   SAMD_PWM* pwm = pwms[pin];
   if(pwm == nullptr) {
-    bb::printf("NULL for pwm pin %d\n", pin);
     return;
   }
   float f = map(dutycycle, 0, 255, minPwmFreq, maxPwmFreq);
@@ -333,7 +332,7 @@ bb::Result DODroid::stepHead() {
   imu_.getAccelMeasurement(ax, ay, az);
   imu_.getGyroMeasurement(dp, dr, dh);
 
-  //Console::console.printfBroadcast("R:%f P:%f H:%f AX:%f AY:%f AZ:%f RAX:%f RAY: %f RAZ: %f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, rax, ray, raz, dr, dp, dh);
+  LOG(LOG_DEBUG, "R:%f P:%f H:%f AX:%f AY:%f AZ:%f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, dr, dp, dh);
 
   float speed = (leftEncoder_.presentSpeed() + rightEncoder_.presentSpeed())/2;
   float speedSP = velOutput_.goalVelocity();
@@ -352,7 +351,7 @@ bb::Result DODroid::stepHead() {
         if(speedSP < 0) nod += params_.faNeckSpeedSP*speedSP/2;
         else nod += params_.faNeckSpeedSP*speedSP;
       }
-      nod += lean_ - pitchAtRest_;
+      nod += lean_ + pitchAtRest_;
 
       float neck = nod + params_.faNeckIMUPitch*p;
       neck = constrain(neck, -params_.neckRange, params_.neckRange);
@@ -413,7 +412,7 @@ bb::Result DODroid::stepHead() {
 bb::Result DODroid::stepDrive() {
   unsigned long timeSinceLastPrimary = WRAPPEDDIFF(millis(), msLastPrimaryCtrlPacket_, ULONG_MAX);
   if(timeSinceLastPrimary > 500 && driveMode_ != DRIVE_OFF && driveSafety_ == true) {
-    bb::printf("No control packet from primary in %ldms. Switching drive off.\n", timeSinceLastPrimary);
+    LOG(LOG_INFO, "No control packet from primary in %ldms. Switching drive off.\n", timeSinceLastPrimary);
     switchDrive(DRIVE_OFF);
     DOSound::sound.playSystemSound(SystemSounds::DISCONNECTED);
   }
@@ -459,27 +458,26 @@ void DODroid::switchDrive(DriveMode mode) {
   posControllerZero_ = posController_.present();
 
   driveMode_ = mode;
-  bb::printf("Drive mode: ");
   switch(driveMode_) {
     case DRIVE_OFF: 
       setLED(LED_DRIVE, OFF);
-      bb::printf("off\n"); 
+      LOG(LOG_INFO, "Switched drive mode to off.\n");
       break;
     
     case DRIVE_VEL: 
       setLED(LED_DRIVE, GREEN);
-      bb::printf("vel\n"); 
+      LOG(LOG_INFO, "Switched drive mode to velocity.\n");
       break;
 
     case DRIVE_POS: 
       setLED(LED_DRIVE, YELLOW);
-      bb::printf("pos\n"); 
+      LOG(LOG_INFO, "Switched drive mode to position.\n");
       break;
 
     case DRIVE_AUTO_POS:
     default: 
       setLED(LED_DRIVE, BLUE);
-      bb::printf("auto position\n"); 
+      LOG(LOG_INFO, "Switched drive mode to auto_position.\n");
       break;
   }
 }
@@ -542,13 +540,13 @@ void DODroid::printExtendedStatus(ConsoleStream *stream) {
 
 Result DODroid::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, ConfigPacket& packet) {
   if(source == PACKET_SOURCE_LEFT_REMOTE && packet.type == ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID) {
-    Console::console.printfBroadcast("setting left remote id to 0x%lx:%lx.\n", packet.cfgPayload.address.addrHi, packet.cfgPayload.address.addrLo);
+    LOG(LOG_INFO, "Setting left remote id to 0x%lx:%lx.\n", packet.cfgPayload.address.addrHi, packet.cfgPayload.address.addrLo);
     params_.leftRemoteAddress = packet.cfgPayload.address;
     ConfigStorage::storage.writeBlock(paramsHandle_);
     ConfigStorage::storage.commit();
     return RES_OK;
   }
-  Console::console.printfBroadcast("Error - packet of type %d from source %d\n", packet.type, source);
+  LOG(LOG_ERROR, "Error - packet of type %d from source %d\n", packet.type, source);
   return RES_SUBSYS_COMM_ERROR;
 }
 
@@ -571,8 +569,8 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
     if(seqnum == lastLeftSeqnum_) return RES_OK; // duplicate
     if(WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8) != 1) {
-      Console::console.printfBroadcast("Left control packet: seqnum %d, last %d, lost %d packets!\n", 
-                                       seqnum, lastLeftSeqnum_, WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8)-1);
+      LOG(LOG_WARN, "Left control packet: seqnum %d, last %d, lost %d packets!\n", 
+                    seqnum, lastLeftSeqnum_, WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8)-1);
     }
     lastLeftSeqnum_ = seqnum;
     numLeftCtrlPackets_++;
@@ -580,14 +578,14 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
   } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
     if(seqnum == lastRightSeqnum_) return RES_OK; // duplicate
     if(WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8) != 1) {
-      Console::console.printfBroadcast("Right control packet: seqnum %d, last %d, lost %d packets!\n", 
-                                       seqnum, lastRightSeqnum_, WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8)-1);
+      LOG(LOG_WARN, "Right control packet: seqnum %d, last %d, lost %d packets!\n", 
+                    seqnum, lastRightSeqnum_, WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8)-1);
     }
     lastRightSeqnum_ = seqnum;
     numRightCtrlPackets_++;
     msLastRightCtrlPacket_ = millis();
   } else {
-    Console::console.printfBroadcast("Control packet from unknown source %d\n", source);
+    LOG(LOG_ERROR, "Control packet from unknown source %d\n", source);
     return RES_SUBSYS_COMM_ERROR;
   }
 
@@ -658,7 +656,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       setLED(LED_DRIVE, OFF);
     }
 
-    DOSound::sound.setVolume(int(30.0 * packet.getAxis(8)));
+    DOSound::sound.setVolume(int(30.0 * packet.getAxis(8, bb::ControlPacket::UNIT_UNITY)));
     lastPrimaryCtrlPacket_ = packet;
   } else { // secondary remote
     // Joystick button switches drive mode
@@ -763,6 +761,15 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
   if(retval != RES_OK) return retval;
 
   setControlParameters();
+  bb::Servos::servos.setOffset(SERVO_NECK, params_.neckOffset);
+  bb::Servos::servos.setOffset(SERVO_HEAD_PITCH, params_.headPitchOffset);
+  bb::Servos::servos.setOffset(SERVO_HEAD_HEADING, params_.headHeadingOffset);
+  bb::Servos::servos.setOffset(SERVO_HEAD_ROLL, params_.headRollOffset);
+
+  bb::Servos::servos.setRange(SERVO_NECK, 180-params_.neckRange, 180+params_.neckRange);
+  bb::Servos::servos.setRange(SERVO_HEAD_PITCH, 180-params_.headPitchRange, 180+params_.headPitchRange);
+  bb::Servos::servos.setRange(SERVO_HEAD_HEADING, 180-params_.headHeadingRange, 180+params_.headHeadingRange);
+  bb::Servos::servos.setRange(SERVO_HEAD_ROLL, 180-params_.headRollRange, 180+params_.headRollRange);
 
   return RES_OK;
 }
@@ -838,7 +845,7 @@ Result DODroid::fillAndSendStatePacket() {
     packet.payload.state.roll = rint((roll*1024)/360.0f);
     packet.payload.state.heading = rint((heading*1024.0f)/360.0f);
   } else {
-    bb::printf("IMU not available\n");
+    LOG(LOG_ERROR, "IMU not available\n");
   }
 
   // Speed in mm/s

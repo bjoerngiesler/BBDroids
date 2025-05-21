@@ -8,25 +8,23 @@ Result DODroid::selfTest(ConsoleStream *stream) {
 
   Runloop::runloop.excuseOverrun();
 
+  LOG(LOG_INFO, "D-O Self Test starting.\n");
   DOSound::sound.playSystemSound(SystemSounds::SELFTEST_STARTING_PLEASE_STAND_CLEAR);
   delay(2000);
-
-  Console::console.printfBroadcast("D-O Self Test\n=============\n");
   
   // Check battery
   DOSound::sound.playSystemSound(SystemSounds::POWER);
   if(!DOBattStatus::batt.available()) {
-    Console::console.printfBroadcast("Critical error: Battery monitor not available!\n");
+    LOG(LOG_FATAL, "Fatal: Battery monitor not available!\n");
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
   DOBattStatus::batt.updateVoltage();
   DOBattStatus::batt.updateCurrent();
-  Console::console.printfBroadcast("Battery OK. Voltage: %.2fV, current draw: %.2fmA\n", DOBattStatus::batt.voltage(), DOBattStatus::batt.current());
+  LOG(LOG_INFO, "Battery OK. Voltage: %.2fV, current draw: %.2fmA.\n", DOBattStatus::batt.voltage(), DOBattStatus::batt.current());
   if(DOBattStatus::batt.voltage() < 12.0) {
     DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
-    // FIXME -- Temporarily disabling low-voltage checks
-    //return RES_DROID_VOLTAGE_TOO_LOW;
+    return RES_DROID_VOLTAGE_TOO_LOW;
   } else if(DOBattStatus::batt.voltage() > 17.0) {
     DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_HIGH);
     return RES_DROID_VOLTAGE_TOO_HIGH;
@@ -47,7 +45,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   Wire.beginTransmission(AERIAL_ADDR);
   uint8_t antErr = Wire.endTransmission();
   if(antErr != 0) {
-    Console::console.printfBroadcast("Aerial error: 0x%x\n", antErr);
+    LOG(LOG_WARN, "Aerial server not found (error: 0x%x).\n", antErr);
   } else {
     uint8_t step=1, d=5;
     uint8_t min = 30, max = 150, mid = 90;
@@ -69,12 +67,13 @@ Result DODroid::selfTest(ConsoleStream *stream) {
     }
     delay(10*d);
     setAerials(mid, mid, mid);
+    LOG(LOG_INFO, "Aerials OK.\n");
   }
 
   // Check IMU
   DOSound::sound.playSystemSound(SystemSounds::IMU);
   if(imu_.available() == false) {
-    bb::printf("Critical error: IMU not available!\n");
+    LOG(LOG_FATAL, "Fatal: IMU not available!\n");
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
@@ -85,11 +84,11 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   }
   imu_.getFilteredPRH(p, r, h);
   if(fabs(p) > 5 || fabs(r) > 5) {
-    bb::printf("Critical error: Droid not upright (p %f, r %f)!\n", p, r);
+    LOG(LOG_FATAL, "Fatal: Droid not upright (pitch %.2f, roll %.2f)!\n", p, r);
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
-  bb::printf("IMU OK. Pitch %.2f, Roll %.2f\n", p, r);
+  LOG(LOG_INFO, "IMU OK. Pitch %.2f, Roll %.2f.\n", p, r);
 
   DOSound::sound.playSystemSound(SystemSounds::CALIBRATING);
   imu_.calibrate(stream);
@@ -100,7 +99,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   imu_.getFilteredPRH(p, r, h);
   pitchAtRest_ = p;
   balanceController_.setGoal(-pitchAtRest_);
-  bb::printf("IMU calibrated. Pitch angle at rest: %f\n", pitchAtRest_);
+  LOG(LOG_INFO,"IMU calibrated. Pitch angle at rest: %.2f.\n", pitchAtRest_);
   DOSound::sound.playSystemSound(SystemSounds::OK);
 
 
@@ -153,7 +152,6 @@ Result DODroid::selfTest(ConsoleStream *stream) {
     break;
   case MOTOR_ENC_DISCONNECTED:
     DOSound::sound.playSystemSound(SystemSounds::ENCODER_DISCONNECTED);
-    delay(1000);
     break;
   case MOTOR_REVERSED:
     DOSound::sound.playSystemSound(SystemSounds::REVERSED);
@@ -181,7 +179,7 @@ Result DODroid::servoTest(ConsoleStream *stream) {
   // Check servos
   servosOK_ = false;
   if(bb::Servos::servos.isStarted() == false) {
-    Console::console.printfBroadcast("Critical error: Servo subsystem not started!\n");
+    LOG(LOG_FATAL, "Fatal: Servo subsystem not started!\n");
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
@@ -196,43 +194,52 @@ Result DODroid::servoTest(ConsoleStream *stream) {
   bb::Servos::servos.setRange(SERVO_HEAD_ROLL, 180-params_.headRollRange, 180+params_.headRollRange);
 
   if(bb::Servos::servos.hasServoWithID(SERVO_NECK) == false) {
-    Console::console.printfBroadcast("Critical error: Neck servo missing!\n");
+    LOG(LOG_FATAL, "Neck servo missing!\n");
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  } else if(bb::Servos::servos.home(SERVO_NECK, 5.0, 95, stream) != RES_OK) {
-    Console::console.printfBroadcast("Homing servos failed!\n");
-    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  } else {
+    if(bb::Servos::servos.home(SERVO_NECK, 5.0, 95, stream) != RES_OK) {
+      LOG(LOG_FATAL, "Homing neck servo failed!\n");
+      return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    }
+    LOG(LOG_INFO, "Neck servo homed OK.\n");
   }
 
   bb::Servos::servos.setOffset(SERVO_HEAD_PITCH, params_.headPitchOffset);
   if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_PITCH) == false) {
-    Console::console.printfBroadcast("Degraded: Head pitch servo missing.\n");
-  } else if(bb::Servos::servos.home(SERVO_HEAD_PITCH, 5.0, 50, stream) != RES_OK) {
-    Console::console.printfBroadcast("Homing servos failed!\n");
-    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    LOG(LOG_WARN, "Degraded: Head pitch servo not found.\n");
   } else {
+    if(bb::Servos::servos.home(SERVO_HEAD_PITCH, 5.0, 50, stream) != RES_OK) {
+      LOG(LOG_FATAL, "Homing head pitch servo failed!\n");
+      return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    }
+    LOG(LOG_INFO, "Head pitch servo homed OK.\n");
     headIsOn_ = true;
   }
 
   if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_HEADING) == false) {
-    Console::console.printfBroadcast("Degraded: Head heading servo missing.\n");
-  } else if(bb::Servos::servos.home(SERVO_HEAD_HEADING, 5.0, 50, stream) != RES_OK) {
-    Console::console.printfBroadcast("Homing servos failed!\n");
-    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    LOG(LOG_WARN, "Degraded: Head heading servo not found.\n");
   } else {
+    if(bb::Servos::servos.home(SERVO_HEAD_HEADING, 5.0, 50, stream) != RES_OK) {
+      LOG(LOG_FATAL, "Homing head heading servo failed!\n");
+      return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    }
+    LOG(LOG_INFO, "Head heading servo homed OK.\n");
     headIsOn_ = true;
   }
 
   if(bb::Servos::servos.hasServoWithID(SERVO_HEAD_ROLL) == false) {
-    Console::console.printfBroadcast("Degraded: Head roll servo missing.\n");
-  } else if(bb::Servos::servos.home(SERVO_HEAD_ROLL, 5.0, 50, stream) != RES_OK) {
-    Console::console.printfBroadcast("Homing servos failed!\n");
-    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    LOG(LOG_WARN, "Degraded: Head roll servo not found.\n");
   } else {
+    if(bb::Servos::servos.home(SERVO_HEAD_ROLL, 5.0, 50, stream) != RES_OK) {
+      LOG(LOG_FATAL, "Homing head roll servo failed!\n");
+      return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    }
+    LOG(LOG_INFO, "Head heading roll homed OK.\n");
     headIsOn_ = true;
   }
 
   servosOK_ = true;
-  Console::console.printfBroadcast("Servos OK.\n");
+  LOG(LOG_INFO, "Servos OK.\n");
   return RES_OK;
 }
 
@@ -293,27 +300,27 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
     }
 
     if(fabs(distance) > ST_ABORT_DISTANCE) {
-      LOG(LOG_INFO, "Distance criterion triggered (fabs(%f) > %f)\n", distance, ST_ABORT_DISTANCE);
+      LOG(LOG_DEBUG, "Distance criterion triggered (fabs(%f) > %f)\n", distance, ST_ABORT_DISTANCE);
       break;
     } 
     
     if(fabs(hdiffmax) > ST_ABORT_HEADING_CHANGE) {
-      LOG(LOG_INFO, "Heading criterion triggered (fabs(%f) > %f)\n", hdiffmax, ST_ABORT_HEADING_CHANGE);
+      LOG(LOG_DEBUG, "Heading criterion triggered (fabs(%f) > %f)\n", hdiffmax, ST_ABORT_HEADING_CHANGE);
       break;
     }
 
     if(fabs(axmax) > ST_ABORT_ACCEL) {
-      LOG(LOG_INFO, "X max accel criterion triggered (fabs(%f) > %f)\n", fabs(axmax), ST_ABORT_ACCEL);
+      LOG(LOG_DEBUG, "X max accel criterion triggered (fabs(%f) > %f)\n", fabs(axmax), ST_ABORT_ACCEL);
       break;
     }
 
     if(fabs(aymax) > ST_ABORT_ACCEL) {
-      LOG(LOG_INFO, "Y max accel criterion triggered (fabs(%f) > %f)\n", fabs(aymax), ST_ABORT_ACCEL);
+      LOG(LOG_DEBUG, "Y max accel criterion triggered (fabs(%f) > %f)\n", fabs(aymax), ST_ABORT_ACCEL);
       break;
     }
 
     if(blockedcount > 10) {
-      LOG(LOG_INFO, "Motor load criterion triggered %d times (%f > %f+%f)\n", blockedcount, mA, mAAtRest, ST_ABORT_MILLIAMPS);
+      LOG(LOG_WARN, "Motor load criterion triggered %d times (%f > %f+%f)\n", blockedcount, mA, mAAtRest, ST_ABORT_MILLIAMPS);
       break;
     }
 
@@ -362,33 +369,33 @@ DODroid::MotorStatus DODroid::singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc
 
   // Not blocked, accel axis is OK, enough distance driven
 
-  Console::console.printfBroadcast("Max hdiff: %f\n", hdiffmax);
+  LOG(LOG_DEBUG, "Max hdiff: %f\n", hdiffmax);
 
   // Not enough heading change observed? We're likely sitting in the station.
   if(fabs(hdiffmax) < ST_MIN_HEADING_CHANGE) {
-    Console::console.printfBroadcast("Heading change %f too small, we're likely in the station, can't distinguish if encoder and motor are both reversed!\n",
+    LOG(LOG_WARN,"Heading change %f too small, we're likely in the station, can't distinguish if encoder and motor are both reversed!\n",
                                      hdiffmax);
     if((reverse && distance >= 0) ||
        (!reverse && distance <= 0)) {
-      Console::console.printfBroadcast("%s, motor and encoder direction disagree. Encoder or motor likely reversed.\n",
+      LOG(LOG_WARN, "%s, motor and encoder direction disagree. Encoder or motor likely reversed.\n",
                                         reverse ? "Reverse" : "Forward");
       return MOTOR_ENC_REVERSED;
     }
   } else if(hdiffmax > 0) { // turned in the wrong direction
     if((reverse && distance >= 0) ||
        (!reverse && distance <= 0)) {
-      Console::console.printfBroadcast("%s, turning in wrong direction, distance %f in wrong direction. Motor likely reversed.\n",
+      LOG(LOG_WARN, "%s, turning in wrong direction, distance %f in wrong direction. Motor likely reversed.\n",
                                        reverse ? "Reverse" : "Forward", distance);
       return MOTOR_REVERSED;
     } else {
-      Console::console.printfBroadcast("%s, turning in wrong direction, distance %f in right direction. Motor and encoder likely reversed.\n",
+      LOG(LOG_WARN, "%s, turning in wrong direction, distance %f in right direction. Motor and encoder likely reversed.\n",
                                        reverse ? "Reverse" : "Forward", distance);
       return MOTOR_BOTH_REVERSED;
     }
   } else { // turned in the right direction
     if((reverse && distance >= 0) ||
        (!reverse && distance <= 0)) {
-      Console::console.printfBroadcast("%s, turning in right direction, distance %f in wrong direction. Encoder likely reversed.\n",
+      LOG(LOG_WARN, "%s, turning in right direction, distance %f in wrong direction. Encoder likely reversed.\n",
                                        reverse ? "Reverse" : "Forward", distance);
       return MOTOR_ENC_REVERSED;
     }
