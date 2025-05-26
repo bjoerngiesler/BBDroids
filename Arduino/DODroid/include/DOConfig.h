@@ -58,7 +58,7 @@ struct DOParams {
     // Be aware of the units!!! E.g. target unit for servo free animation is always degrees, but input may be something else.
     // Example - faNeckSpeed has input unit of mm/s, going up to maxSpeed, so is probably much below 1.
     float faNeckIMUAccel     = 0;     // Move neck by acceleration from the IMU
-    float faNeckIMUPitch     = .8;
+    float faNeckIMUPitch     = .7;
     float faNeckSPAccel      = -0.005; // Move neck by acceleration from speed setpoint
     float faNeckSpeed        = -0.01;  // Move neck by absolute speed over ground
     float faNeckSpeedSP      = -0.04;  // Move neck by speed *setpoint* over ground. 
