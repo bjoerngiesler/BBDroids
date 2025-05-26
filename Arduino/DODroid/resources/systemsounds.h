@@ -27,4 +27,5 @@ namespace SystemSounds {
   static const uint8_t VOLTAGE_TOO_HIGH = 27;
   static const uint8_t VOLTAGE_TOO_LOW = 28;
   static const uint8_t CURRENT_TOO_HIGH = 29;
+  static const uint8_t AERIALS = 30;
 };

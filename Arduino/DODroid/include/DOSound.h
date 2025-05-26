@@ -12,7 +12,7 @@ class DOSound {
 public:
   static DOSound sound;
 
-  DOSound(uint8_t volume=10);
+  DOSound(uint8_t volume=10, bool debug=false);
   void setSerial(Uart *ser);
   bool begin();
   bool available() { return available_; }
@@ -32,12 +32,13 @@ public:
 private:
   DFPlayerMini_Fast dfp_;
   bool available_;
-  bool dumbMode_;
+
   struct FolderContents {
     unsigned int count;
     unsigned int next;
   };
   uint8_t volume_;
+  bool debug_, dumbMode_;
 
   std::map<unsigned int, FolderContents> folders_;
   int fileCount_;

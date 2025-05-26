@@ -68,7 +68,7 @@ DODroid::DODroid():
   digitalWrite(PULL_DOWN_20, LOW);
 
   statusPixels_.begin();
-  statusPixels_.setBrightness(10);
+  statusPixels_.setBrightness(2);
   statusPixels_.show();
 
   name_ = "d-o";
@@ -130,6 +130,7 @@ Result DODroid::initialize() {
   addParameter("aerial_offset", "Offset for aerials", params_.aerialOffset, -INT_MAX, INT_MAX);
   addParameter("aerial_anim", "Animation angle for aerials", params_.aerialAnim, -INT_MAX, INT_MAX);
 
+  addParameter("fa_neck_imu_pitch", "Free Anim - neck on IMU pitch", params_.faNeckIMUPitch, -INT_MAX, INT_MAX);
   addParameter("fa_neck_imu_accel", "Free Anim - neck on IMU accel", params_.faNeckIMUAccel, -INT_MAX, INT_MAX);
   addParameter("fa_neck_sp_accel", "Free Anim - neck on accel setpoint", params_.faNeckSPAccel, -INT_MAX, INT_MAX);
   addParameter("fa_neck_speed", "Free Anim - neck on wheel speed", params_.faNeckSpeed, -INT_MAX, INT_MAX);
@@ -180,9 +181,9 @@ Result DODroid::start(ConsoleStream* stream) {
   headIsOn_ = false;
   pitchAtRest_ = 0;
 
+  DOSound::sound.begin();
   imu_.begin();
   DOBattStatus::batt.begin();
-  DOSound::sound.begin();
 
   //operationStatus_ = RES_OK;
   operationStatus_ = selfTest();
@@ -555,14 +556,19 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     unsigned long ms = millis();
     if(ms - msLastLeftCtrlPacket_ < 100) {
       if(ms - msLastRightCtrlPacket_ < 100) {
+        // both coming in - white
         setLED(LED_COMM, WHITE);
       } else {
+        // Only left coming in - blue
         setLED(LED_COMM, BLUE);
       }
-    } else setLED(LED_COMM, GREEN);
+    } else {
+      // Only right coming in - green
+      setLED(LED_COMM, GREEN);
+    }
   
     commLEDOn_ = true;
-    //Runloop::runloop.scheduleTimedCallback(100, [=]{ setLED(LED_COMM, OFF); commLEDOn_ = false; });
+    Runloop::runloop.scheduleTimedCallback(100, [=]{ setLED(LED_COMM, OFF); commLEDOn_ = false; });
   }
 
   // Check for duplicates and lost packets

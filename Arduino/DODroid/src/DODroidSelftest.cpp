@@ -42,10 +42,12 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   }
 
   // Check Aerials
+  DOSound::sound.playSystemSound(SystemSounds::AERIALS);
   Wire.beginTransmission(AERIAL_ADDR);
   uint8_t antErr = Wire.endTransmission();
   if(antErr != 0) {
     LOG(LOG_WARN, "Aerial server not found (error: 0x%x).\n", antErr);
+    DOSound::sound.playSystemSound(SystemSounds::FAILURE);
   } else {
     uint8_t step=1, d=5;
     uint8_t min = 30, max = 150, mid = 90;
@@ -68,6 +70,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
     delay(10*d);
     setAerials(mid, mid, mid);
     LOG(LOG_INFO, "Aerials OK.\n");
+    DOSound::sound.playSystemSound(SystemSounds::OK);
   }
 
   // Check IMU

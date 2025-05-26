@@ -27,3 +27,4 @@
 027 Voltage too high
 028 Voltage too low
 029 Current too high
+030 Aerials

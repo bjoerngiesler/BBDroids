@@ -8,12 +8,13 @@ DOSound DOSound::sound;
 #define DOSOUND_REPEATS 1
 #define DOSOUND_DELAY_US 100
 
-DOSound::DOSound(uint8_t volume) {
+DOSound::DOSound(uint8_t volume, bool debug) {
   available_ = false;
   dumbMode_ = false;
   fileCount_ = -1;
   ser_ = nullptr;
   volume_ = volume;
+  debug_ = debug;
 }
 
 void DOSound::setSerial(Uart *ser) {
@@ -29,7 +30,7 @@ bool DOSound::begin() {
 
   bb::printf("Setting up sound... ");
   ser_->begin(9600);
-  if(dfp_.begin(*ser_)) {
+  if(dfp_.begin(*ser_, debug_)) {
     for(int i=0; i<3; i++) {
       if(checkSDCard() == true) break;
       delay(1000);
@@ -52,11 +53,6 @@ bool DOSound::playSound(unsigned int fileNumber) {
     return false;
   }
 
-  if(dumbMode_ == false && sdCardInserted() == false) {
-    bb::printf("SD card not inserted!\n");
-    return false;
-  } 
-
   for(int i=0; i<DOSOUND_REPEATS; i++) {
     dfp_.play(fileNumber);
     delayMicroseconds(DOSOUND_DELAY_US);
@@ -69,11 +65,6 @@ bool DOSound::playFolder(unsigned int folder, unsigned int filenumber, bool over
     bb::printf("Sound system not available!\n");
     if(override == false) return false;
   }
-
-  if(dumbMode_ == false && sdCardInserted() == false) {
-    bb::printf("SD card not inserted!\n");
-    if(override == false) return false;
-  } 
 
   for(int i=0; i<DOSOUND_REPEATS; i++) {
     dfp_.playFolder(int(folder), filenumber);
@@ -160,7 +151,10 @@ bool DOSound::setVolume(uint8_t vol) {
 }
 
 bool DOSound::checkSDCard() {
-  if(dumbMode_) return false;
+  if(dumbMode_) {
+    bb::printf("Dumb mode, not checking SD card\n");
+    return false;
+  }
 
   int fc = -1;
   for(int i=0; i<DOSOUND_REPEATS; i++) {
@@ -169,11 +163,13 @@ bool DOSound::checkSDCard() {
       fc = fc_;
       break;
     }
+    dfp_.printError();
     delayMicroseconds(DOSOUND_DELAY_US);
   }
 
   if(fileCount_ == -1) {
     if(fc == -1) {
+      bb::printf("numSdTracks() returns -1!\n");
       return false; // no change
     }
     fileCount_ = fc;
