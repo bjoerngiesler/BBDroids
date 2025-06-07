@@ -623,9 +623,20 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     }
 
     // Button 0, 1, 2 play different sounds
-    if(packet.button0 && !lastPrimaryCtrlPacket_.button0) DOSound::sound.playFolderNext(2);
-    else if(packet.button1 && !lastPrimaryCtrlPacket_.button1) DOSound::sound.playFolderNext(3);
-    else if(packet.button2 && !lastPrimaryCtrlPacket_.button2) DOSound::sound.playFolderNext(4);
+    if(packet.button0 && !lastPrimaryCtrlPacket_.button0) {
+      LOG(LOG_INFO, "Button 0 pressed on primary remote. Playing next sound in folder 2");
+      DOSound::sound.playFolderNext(2);
+    }
+    
+    if(packet.button1 && !lastPrimaryCtrlPacket_.button1) {
+      LOG(LOG_INFO, "Button 1 pressed on primary remote. Playing next sound in folder 3");
+      DOSound::sound.playFolderNext(3);
+    } 
+    
+    if(packet.button2 && !lastPrimaryCtrlPacket_.button2) {
+      LOG(LOG_INFO, "Button 2 pressed on primary remote. Playing next sound in folder 4");
+      DOSound::sound.playFolderNext(4);
+    }
 
     // If drive system is on, joystick controls rotation and speed
     if(driveMode_ != DRIVE_OFF) {
@@ -680,9 +691,18 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       balanceController_.setGoal(params_.leanHeadToBody*lean_-pitchAtRest_);
     }
 
-    if(packet.button0 && !lastSecondaryCtrlPacket_.button0) DOSound::sound.playFolderNext(5);
-    else if(packet.button1 && !lastSecondaryCtrlPacket_.button1) DOSound::sound.playFolderNext(6);
-    else if(packet.button2 && !lastSecondaryCtrlPacket_.button2) DOSound::sound.playFolderNext(7);
+    if(packet.button0 && !lastSecondaryCtrlPacket_.button0) {
+      LOG(LOG_INFO, "Button 0 pressed on secondary remote. Playing next sound in folder 5");
+      DOSound::sound.playFolderNext(5);
+    }
+    if(packet.button1 && !lastSecondaryCtrlPacket_.button1) {
+      LOG(LOG_INFO, "Button 1 pressed on secondary remote. Playing next sound in folder 6");
+      DOSound::sound.playFolderNext(6);
+    }
+    if(packet.button2 && !lastSecondaryCtrlPacket_.button2) {
+      LOG(LOG_INFO, "Button 2 pressed on secondary remote. Playing next sound in folder 7");
+      DOSound::sound.playFolderNext(7);
+    }
 
     lastSecondaryCtrlPacket_ = packet;
   }
