@@ -665,7 +665,7 @@ void RRemote::printExtendedStatus(ConsoleStream* stream) {
     stream->printf("Buttons: Error\n");
   }
 
-  stream->printf("Potentiometer 1: %.1f\nPotentiometer 2: %.1f\n", RInput::input.pot1, RInput::input.pot2);
+  stream->printf("Potentiometer 1: %d %.1f\nPotentiometer 2: %d %.1f\n", RInput::input.pot1Raw, RInput::input.pot1, RInput::input.pot2Raw, RInput::input.pot2);
   stream->printf("Battery: %.1f\n", RInput::input.battery);
 }
 

@@ -274,8 +274,10 @@ void RInput::update() {
   if(isLeftRemote) {
     processEncoder();
   } else {
-    pot1 = (float)((4095-analogRead(pins.P_A_POT1)) / 4096.0f); 
-    pot2 = (float)((4095-analogRead(pins.P_A_POT2)) / 4096.0f);
+    pot1Raw = analogRead(pins.P_A_POT1);
+    pot1 = (float)(4095-pot1Raw) / 4096.0f; 
+    pot2Raw = analogRead(pins.P_A_POT2);
+    pot2 = (float)(4095-pot2Raw / 4096.0f);
   }
 
   if(imu_.available()) {

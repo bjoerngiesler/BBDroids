@@ -84,6 +84,7 @@ public:
   void testMatrix();
 
   float pot1, pot2; // range: 0 .. 1.0
+  uint16_t pot1Raw, pot2Raw;
   float battery;    // range: 0 .. 1.0
   float joyH, joyV; // range: -1.0 .. 1.0
   uint16_t joyRawH, joyRawV, battRaw;
