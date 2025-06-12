@@ -665,7 +665,7 @@ void RRemote::printExtendedStatus(ConsoleStream* stream) {
     stream->printf("Buttons: Error\n");
   }
 
-  stream->printf("Potentiometer 1: %d %.1f\nPotentiometer 2: %d %.1f\n", RInput::input.pot1Raw, RInput::input.pot1, RInput::input.pot2Raw, RInput::input.pot2);
+  stream->printf("Potentiometer 1: %d %.2f\nPotentiometer 2: %d %.2f\n", RInput::input.pot1Raw, RInput::input.pot1, RInput::input.pot2Raw, RInput::input.pot2);
   stream->printf("Battery: %.1f\n", RInput::input.battery);
 }
 
@@ -679,9 +679,6 @@ void RRemote::printExtendedStatusLine(ConsoleStream *stream) {
   RInput::input.imu().getAccelMeasurement(rax, ray, raz);
   RInput::input.imu().getGravCorrectedAccel(ax, ay, az);
 
-#if 0
-  snprintf(buf, bufsize, "S%ld AX%f AY%f AZ%f\n", seqnum_, ax, ay, az);
-#else
   snprintf(buf, bufsize, "S%ld H%d [%d..%d..%d] %f V%d [%d..%d..%d] %f P%.1f R%.1f H%.1f AX%.2f AY%.2f AZ%.2f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c",
     seqnum_,
     RInput::input.joyRawH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max, RInput::input.joyH,
@@ -698,11 +695,10 @@ void RRemote::printExtendedStatusLine(ConsoleStream *stream) {
     RInput::input.buttons[RInput::BUTTON_CONFIRM] ? '_' : 'X',
     RInput::input.buttons[RInput::BUTTON_LEFT] ? '_' : 'X',
     RInput::input.buttons[RInput::BUTTON_RIGHT] ? '_' : 'X');
-#endif
   if(stream)
     stream->printf("%s\n", buf);
   else 
-    Console::console.printfBroadcast("%s\n", buf);
+     bb::printf("%s\n", buf);
 }
 
 void RRemote::runTestsuite() {
