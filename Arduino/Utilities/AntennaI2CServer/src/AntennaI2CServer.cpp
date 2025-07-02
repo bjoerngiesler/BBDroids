@@ -10,8 +10,7 @@
 Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
 StripSegment s1(strip, 0, 16), s2(strip, 33, 17), s3(strip, 34, 50);
 
-StripSegment::Segment lefteye(.6, 0.5, 0, 255, 255, 255, 1.0);
-StripSegment::Segment righteye(.6, 0.5, 0, 255, 255, 255, 1.0);
+StripSegment::Segment eyes[2] = { StripSegment::Segment(.6, 0.5, 0, 255, 255, 255, 1.0), StripSegment::Segment(.6, 0.5, 0, 255, 255, 255, 1.0) };
 std::deque<StripSegment::Segment> statusSegments;
 
 using namespace antenna;
@@ -19,7 +18,10 @@ using namespace antenna;
 static Parameters parameters;
 static uint8_t *parametersPtr = (uint8_t*)&parameters;
 static uint8_t lastAddress = 0;
-static uint8_t lastControl;
+static uint8_t lastControl = 0;
+static uint8_t autoblink = 0;
+static uint8_t blinkDuration = 0;
+static unsigned long nextBlink;
 
 int servoPins[3] = {35, 36, 37};
 Servo servo;
@@ -50,10 +52,43 @@ void updateServos(bool hard) {
 }
 
 void updateEyes() {
+  for(int i=0; i<2; i++) {
+    switch(parameters.eyes[i] & EYE_COLOR_MASK) {
+    case EYE_COLOR_OFF: 
+      eyes[i].setColor(0, 0, 0, 0);
+      break;
+    case EYE_COLOR_WHITE:
+      eyes[i].setColor(255, 255, 255, 1.0);
+      break;
+    case EYE_COLOR_RED:
+      eyes[i].setColor(255, 0, 0, 1.0);
+      break;
+    case EYE_COLOR_BLUE:
+      eyes[i].setColor(0, 0, 255, 1.0);
+      break;
+    }
+
+    float width = ((parameters.eyes[i] & EYE_SIZE_MASK) >> EYE_SIZE_SHIFT) / 31.0f;
+    float pos = parameters.eyePos[i] / 255.0f;
+    eyes[i].moveTo(pos);
+    
+    if(millis() > nextBlink && autoblink != 0 && blinkDuration > 0) {
+      width = 0.03;
+      blinkDuration--;
+    }
+
+    eyes[i].setWidth(width);
+  }
+  if(millis() > nextBlink && autoblink != 0 && blinkDuration == 0) {
+    nextBlink = millis() + 2000*autoblink + random(4000);
+    blinkDuration = 8;
+  }
 }
 
 void updateControl() {
-  // remove all non-visible items
+  // Handle status display
+
+  // Move all segments. Also remove all non-visible segments.
   uint8_t i = 0;
   while(i < statusSegments.size()) {
     statusSegments[i].step();
@@ -64,51 +99,63 @@ void updateControl() {
     else i++;
   }
 
-  if(parameters.control == lastControl) return;
-
-  // remove all bouncing items
-  i=0;
-  while(i < statusSegments.size()) {
-    if(statusSegments[i].bounce() != StripSegment::Segment::BOUNCE_OFF) {
-      statusSegments[i].setBounce(StripSegment::Segment::BOUNCE_OFF);
+  if((parameters.control & CONTROL_STRIP_MASK) != (lastControl & CONTROL_STRIP_MASK)) {
+    i=0;
+    while(i < statusSegments.size()) {
+      if(statusSegments[i].bounce() != StripSegment::Segment::BOUNCE_OFF) {
+        statusSegments[i].setBounce(StripSegment::Segment::BOUNCE_OFF);
+      }
+      else i++;
     }
-    else i++;
+
+    lastControl = parameters.control;
+    StripSegment::Segment status(1.1, 0.2, -0.5, 255, 255, 255, 1.0);
+    status.setBounce(status.BOUNCE_OFF);
+    switch(parameters.control & CONTROL_STRIP_MASK) {
+    case CONTROL_STRIP_OFF:
+      status.setColor(0, 0, 0);
+      break;
+    case CONTROL_STRIP_SELFTEST:
+      status.setColor(255, 255, 255);
+      status.setBounce(status.BOUNCE_CONTACT);
+      break;
+    case CONTROL_STRIP_OK:
+      status.setColor(0, 255, 0);
+      break;
+    case CONTROL_STRIP_DEGRADED:
+      status.setColor(255, 255, 0);
+      break;
+    case CONTROL_STRIP_VEL:
+      status.setColor(0, 255, 0);
+      break;
+    case CONTROL_STRIP_AUTO_POS:
+      status.setColor(0, 0, 255);
+      break;
+    case CONTROL_STRIP_MAN_POS:
+      status.setColor(255, 255, 0);
+      break;
+    case CONTROL_STRIP_ERROR:
+    default:
+      status.setColor(255, 0, 0);
+      status.setBounce(status.BOUNCE_CONTACT);
+      break;
+    }
+
+    statusSegments.push_back(status);
+  }
+
+  // Handle autoblink
+  if((lastControl & CONTROL_AUTOBLINK_MASK) != (parameters.control & CONTROL_AUTOBLINK_MASK)) {
+    autoblink = (parameters.control & CONTROL_AUTOBLINK_MASK) >> CONTROL_AUTOBLINK_SHIFT;
+  }
+
+  // Handle brightness
+  if((lastControl & CONTROL_BRIGHTNESS_MASK) != (parameters.control & CONTROL_BRIGHTNESS_MASK)) {
+    uint8_t brightness = map((parameters.control & CONTROL_BRIGHTNESS_MASK) >> CONTROL_BRIGHTNESS_SHIFT, 0x0, 0x7, 0, 255);
+    strip.setBrightness(brightness);
   }
 
   lastControl = parameters.control;
-  StripSegment::Segment status(1.1, 0.2, -0.5, 255, 255, 255, 1.0);
-  status.setBounce(status.BOUNCE_OFF);
-  switch(parameters.control & CONTROL_STRIP_MASK) {
-  case CONTROL_STRIP_OFF:
-    status.setColor(0, 0, 0);
-    break;
-  case CONTROL_STRIP_SELFTEST:
-    status.setColor(255, 255, 255);
-    status.setBounce(status.BOUNCE_CONTACT);
-    break;
-  case CONTROL_STRIP_OK:
-    status.setColor(0, 255, 0);
-    break;
-  case CONTROL_STRIP_DEGRADED:
-    status.setColor(255, 255, 0);
-    break;
-  case CONTROL_STRIP_VEL:
-    status.setColor(0, 255, 0);
-    break;
-  case CONTROL_STRIP_AUTO_POS:
-    status.setColor(0, 0, 255);
-    break;
-  case CONTROL_STRIP_MAN_POS:
-    status.setColor(255, 255, 0);
-    break;
-  case CONTROL_STRIP_ERROR:
-  default:
-    status.setColor(255, 0, 0);
-    status.setBounce(status.BOUNCE_CONTACT);
-    break;
-  }
-
-  statusSegments.push_back(status);
 }
 
 void receiveEvent(int howmany) {
@@ -178,12 +225,12 @@ std::vector<String> split(const String& str) {
         end++;
         if(end == str.length()) {
           String substr = str.substring(start, end);
-		  substr.trim();
+		      substr.trim();
           if(substr.length()) words.push_back(substr);
         }
       } else if(end >= start) {
         String substr = str.substring(start, end);
-		substr.trim();
+		    substr.trim();
         if(substr.length()) words.push_back(substr);
         start = end+1;
         end = end+1;
@@ -200,20 +247,24 @@ void handleCommand(const std::vector<String>& words) {
   if(words[0] == "help") {
     if(words.size() > 1) Serial.printf("Invalid number of arguments\n");
     Serial.printf("Commands\n");
-    Serial.printf("    help              -- print this help text\n");
-    Serial.printf("    servo [1|2|3] VAL -- set servo 1, 2, 3, or all to VAL\n");
-    Serial.printf("    eye [l|r|b] VAL   -- set left eye, right eye, or both to VAL\n");
-    Serial.printf("    control VAL       -- set control to VAL\n");
+    Serial.printf("    help                 -- print this help text\n");
+    Serial.printf("    servo [1|2|3] VAL    -- set servo 1, 2, 3, or all to VAL\n");
+    Serial.printf("    eye_col [l|r|b] VAL  -- set left, right, or both eye colors to VAL (0..3)\n");
+    Serial.printf("    eye_size [l|r|b] VAL -- set left, right, or both eye sizes to VAL (0..31)\n");
+    Serial.printf("    eye_pos [l|r|b] VAL  -- set left eye, right eye, or both to VAL (0..255)\n");
+    Serial.printf("    status VAL           -- set status to VAL (0..7)\n");
+    Serial.printf("    autoblink VAL        -- set autoblink to VAL (0=off..3=most frequent)\n");
+    Serial.printf("    brightness VAL       -- set brightness to VAL (0=off..7)\n");
     return;
   }
 
-  if(words[0] == "eye") {
+  if(words[0] == "eye_col") {
     bool left=false, right=false;
-    uint8_t eyeval;
+    uint8_t val;
     if(words.size() == 2) {
       left = true;
       right = true;
-      eyeval = words[1].toInt();
+      val = words[1].toInt();
     } else if(words.size() == 3) {
       if(words[1] == "l" || words[1] == "left") left = true;
       else if(words[1] == "r" || words[1] == "right") right = true;
@@ -222,17 +273,70 @@ void handleCommand(const std::vector<String>& words) {
         Serial.printf("Unknown value \"%s\" for eye index\n", words[1].c_str());
         return;
       }
-      eyeval = words[2].toInt();
+      val = words[2].toInt();
     } else {
       Serial.printf("Wrong number of arguments to \"%s\"\n", words[0].c_str());
     }
     if(left) {
-      Serial.printf("Setting left eye to %d\n", eyeval);
-      parameters.eyes[0] = eyeval;
+      parameters.eyes[0] = (parameters.eyes[0] & ~EYE_COLOR_MASK) | (val << EYE_COLOR_SHIFT);
     }
     if(right) {
-      Serial.printf("Setting right eye to %d\n", eyeval);
-      parameters.eyes[1] = eyeval;
+      parameters.eyes[1] = (parameters.eyes[1] & ~EYE_COLOR_MASK) | (val << EYE_COLOR_SHIFT);
+    }
+    return;
+  }
+
+  if(words[0] == "eye_size") {
+    bool left=false, right=false;
+    uint8_t val;
+    if(words.size() == 2) {
+      left = true;
+      right = true;
+      val = words[1].toInt();
+    } else if(words.size() == 3) {
+      if(words[1] == "l" || words[1] == "left") left = true;
+      else if(words[1] == "r" || words[1] == "right") right = true;
+      else if(words[1] == "b" || words[1] == "both") left = right = true;
+      else {
+        Serial.printf("Unknown value \"%s\" for eye index\n", words[1].c_str());
+        return;
+      }
+      val = words[2].toInt();
+    } else {
+      Serial.printf("Wrong number of arguments to \"%s\"\n", words[0].c_str());
+    }
+    if(left) {
+      parameters.eyes[0] = (parameters.eyes[0] & ~EYE_SIZE_MASK) | (val << EYE_SIZE_SHIFT);
+    }
+    if(right) {
+      parameters.eyes[1] = (parameters.eyes[0] & ~EYE_SIZE_MASK) | (val << EYE_SIZE_SHIFT);
+    }
+    return;
+  }
+  if(words[0] == "eye_pos") {
+    bool left=false, right=false;
+    uint8_t val;
+    if(words.size() == 2) {
+      left = true;
+      right = true;
+      val = words[1].toInt();
+    } else if(words.size() == 3) {
+      if(words[1] == "l" || words[1] == "left") left = true;
+      else if(words[1] == "r" || words[1] == "right") right = true;
+      else if(words[1] == "b" || words[1] == "both") left = right = true;
+      else {
+        Serial.printf("Unknown value \"%s\" for eye index\n", words[1].c_str());
+        return;
+      }
+      val = words[2].toInt();
+    } else {
+      Serial.printf("Wrong number of arguments to \"%s\"\n", words[0].c_str());
+    }
+    if(left) {
+      parameters.eyePos[0] = val;
+    }
+    if(right) {
+      parameters.eyePos[1] = val;
     }
     return;
   }
@@ -262,12 +366,33 @@ void handleCommand(const std::vector<String>& words) {
     return;
   }
 
-  if(words[0] == "control") {
+  if(words[0] == "status") {
     if(words.size() != 2) {
       Serial.printf("Wrong number of arguments to \"%s\"\n", words[0].c_str());
       return;
     }
-    parameters.control = words[1].toInt();
+    uint8_t val = words[1].toInt();
+    parameters.control = (parameters.control & ~CONTROL_STRIP_MASK) | (val << CONTROL_STRIP_SHIFT);
+    return;
+  }
+
+  if(words[0] == "autoblink") {
+    if(words.size() != 2) {
+      Serial.printf("Wrong number of arguments to \"%s\"\n", words[0].c_str());
+      return;
+    }
+    uint8_t val = words[1].toInt();
+    parameters.control = (parameters.control & ~CONTROL_AUTOBLINK_MASK) | (val << CONTROL_AUTOBLINK_SHIFT);
+    return;
+  }
+
+  if(words[0] == "brightness") {
+    if(words.size() != 2) {
+      Serial.printf("Wrong number of arguments to \"%s\"\n", words[0].c_str());
+      return;
+    }
+    uint8_t val = words[1].toInt();
+    parameters.control = (parameters.control & ~CONTROL_BRIGHTNESS_MASK) | (val << CONTROL_BRIGHTNESS_SHIFT);
     return;
   }
 
@@ -292,10 +417,10 @@ void loop() {
   updateControl();
 
   s1.clear(); s2.clear(); s3.clear();
-  s1.drawSegment(lefteye);
-  s3.drawSegment(righteye);
+  s1.drawSegment(eyes[0]);
+  s3.drawSegment(eyes[1]);
   for(auto& s: statusSegments) s2.drawSegment(s);
   strip.show();
 
-  delay(40);
+  delay(5);
 }
