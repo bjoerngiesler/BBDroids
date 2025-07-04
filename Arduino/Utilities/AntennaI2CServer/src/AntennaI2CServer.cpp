@@ -7,24 +7,31 @@
 #include "Config.h"
 #include "AntennaI2CServer.h"
 
-Adafruit_NeoPixel strip(LED_COUNT, LED_PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip(LED_COUNT, LED_PIN);
 StripSegment s1(strip, 0, 16), s2(strip, 33, 17), s3(strip, 34, 50);
+Adafruit_NeoPixel pixel(1, PIN_NEOPIXEL);
 
 StripSegment::Segment eyes[2] = { StripSegment::Segment(.6, 0.5, 0, 255, 255, 255, 1.0), StripSegment::Segment(.6, 0.5, 0, 255, 255, 255, 1.0) };
 std::deque<StripSegment::Segment> statusSegments;
 
 using namespace antenna;
 
-static Parameters parameters;
+static volatile Parameters parameters;
 static uint8_t *parametersPtr = (uint8_t*)&parameters;
-static uint8_t lastAddress = 0;
+static volatile uint8_t lastAddress = 0;
+
 static uint8_t lastControl = 0;
 static uint8_t autoblink = 0;
 static uint8_t blinkDuration = 0;
 static unsigned long nextBlink;
 
-int servoPins[3] = {35, 36, 37};
+static uint8_t numTransmissions = 0;
+static unsigned long lastTransmissionTime = 0;
+static bool lastTransmissionError = false;
+static bool debug = false;
+
 Servo servo;
+int servoPins[3] = {SERVO_PIN_1, SERVO_PIN_1, SERVO_PIN_1};
 int servoCurrents[3] = {SERVO_CENTER, SERVO_CENTER, SERVO_CENTER};
 uint8_t servoSpeed = 1;
 uint8_t cur_reg = 0;
@@ -93,7 +100,9 @@ void updateControl() {
   while(i < statusSegments.size()) {
     statusSegments[i].step();
     if(statusSegments[i].visible() == false) {
-      Serial.printf("Removing segment %d because it is invisible\n", i);
+      if(debug == true) {
+        Serial.printf("Removing segment %d because it is invisible\n", i);
+      }
       statusSegments.pop_front();
     }
     else i++;
@@ -159,36 +168,63 @@ void updateControl() {
 }
 
 void receiveEvent(int howmany) {
-  if(howmany > sizeof(parameters)+1) {
-    Serial.printf("Receive event: Too many bytes (%d, max %d)\n", howmany, sizeof(parameters)+1);
+  numTransmissions++;
+  lastTransmissionTime = millis();
+
+  uint8_t addr = WIRE.read();
+  if(addr >= sizeof(parameters)) {
+    if(debug == true) {
+      Serial.printf("Error: Requested register %d (max %d)\n", addr, sizeof(parameters)-1);
+    }
+    lastTransmissionError = true;
+    while(WIRE.available()) WIRE.read();
     return;
   }
 
-  lastAddress = WIRE.read();
-  for(uint8_t i=lastAddress; i<lastAddress+howmany-1; i++) {
-    parametersPtr[i] = WIRE.read();
+  lastAddress = addr;
+  while(WIRE.available() && addr < sizeof(parameters)) {
+    parametersPtr[addr++] = WIRE.read();
   }
+  if(WIRE.available()) {
+    if(debug == true) {
+      Serial.printf("Error: Sent more bytes than the structure will hold (from address %d, howmany says %d, structure holds %d)\n", 
+                    lastAddress, howmany, sizeof(parameters));
+    }
+    lastTransmissionError = true;
+    while(WIRE.available()) WIRE.read();
+  }
+
+  lastTransmissionError = false;
 }
 
 void requestEvent() {
-  WIRE.write(parametersPtr[lastAddress]);
+  numTransmissions++;
+  if(debug == true) {
+    Serial.printf("Writing %d bytes from address %d\n", lastAddress, sizeof(parameters)-lastAddress);
+  }
+  WIRE.write(&parametersPtr[lastAddress], sizeof(parameters)-lastAddress);
 }
 
 void setup() {
+  Serial.begin(115200);
+  Serial.printf("Antenna Servos I2C Slave\n");
+  Serial.printf("2024 by Bjoern Giesler\n");
+  Serial.printf("Listening on 0x%x\n", I2C_ADDRESS);
+  Serial.printf("Listening to i2c...\n");
+{}
+  updateServos(false);
+  
+  WIRE.onReceive(receiveEvent);
+  WIRE.onRequest(requestEvent);
+  WIRE.begin((uint8_t)I2C_ADDRESS, SDA1, SCL1, 1000000);
+
   strip.begin();
   strip.show();
   strip.setBrightness(50);
 
-  Serial.begin(115200);
-  Serial.println("Antenna Servos I2C Slave");
-  Serial.println("2024 by Bjoern Giesler");
-  Serial.println(String("Listening on 0x") + String(I2C_ADDRESS, HEX));
-  Serial.println("Listening to i2c...");
-
-  updateServos(true);
-  WIRE.onReceive(receiveEvent);
-  WIRE.onRequest(requestEvent);
-  WIRE.begin(I2C_ADDRESS, SDA, SCL, 1000000);
+  pixel.begin();
+  pixel.setPixelColor(0, 255, 255, 255);
+  pixel.show();
 }
 
 std::vector<String> split(const String& str) {
@@ -246,6 +282,10 @@ void handleCommand(const std::vector<String>& words) {
 
   if(words[0] == "help") {
     if(words.size() > 1) Serial.printf("Invalid number of arguments\n");
+    Serial.printf("Parameter block: ");
+    for(int i=0; i<sizeof(parameters); i++) Serial.printf("%x ", parametersPtr[i]);
+    Serial.printf("\n");
+    Serial.printf("Last address: %d\n", lastAddress);
     Serial.printf("Commands\n");
     Serial.printf("    help                 -- print this help text\n");
     Serial.printf("    servo [1|2|3] VAL    -- set servo 1, 2, 3, or all to VAL\n");
@@ -255,6 +295,7 @@ void handleCommand(const std::vector<String>& words) {
     Serial.printf("    status VAL           -- set status to VAL (0..7)\n");
     Serial.printf("    autoblink VAL        -- set autoblink to VAL (0=off..3=most frequent)\n");
     Serial.printf("    brightness VAL       -- set brightness to VAL (0=off..7)\n");
+    Serial.printf("    debug {true,false}   -- enable or disable debug output\n");
     return;
   }
 
@@ -396,6 +437,21 @@ void handleCommand(const std::vector<String>& words) {
     return;
   }
 
+  if(words[0] == "debug") {
+    if(words.size() != 2) {
+      Serial.printf("Wrong number of arguments to \"%s\"\n", words[0].c_str());
+      return;
+    }
+    if(words[1] == "true") {
+      debug = true;
+    } else if(words[1] == "false") {
+      debug = false;
+    } else {
+      Serial.printf("Only \"true\" or \"false\" allowed as argument to \"%s\"\n", words[0].c_str());
+    }
+    return;
+  }
+
   Serial.printf("Unknown command \"%s\"\n", words[0].c_str());
 }
 
@@ -422,5 +478,16 @@ void loop() {
   for(auto& s: statusSegments) s2.drawSegment(s);
   strip.show();
 
-  delay(5);
+  if(millis() - lastTransmissionTime < 500) {
+    if(lastTransmissionError) {
+      pixel.setPixelColor(0, numTransmissions, 0, 0);
+    } else {
+      pixel.setPixelColor(0, numTransmissions, numTransmissions, numTransmissions);
+    }
+  } else {
+    pixel.setPixelColor(0, 0, 0, 0);
+  }
+  pixel.show();
+
+  delay(10);
 }

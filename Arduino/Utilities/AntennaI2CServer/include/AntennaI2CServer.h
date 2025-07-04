@@ -43,7 +43,7 @@ static const uint8_t CONTROL_STRIP_MAN_POS   = (6 << CONTROL_STRIP_SHIFT); // sl
 static const uint8_t CONTROL_STRIP_ERROR     = (7 << CONTROL_STRIP_SHIFT); // bounce
 
 
-struct Parameters {
+struct __attribute__((packed)) Parameters {
   uint8_t servoSetpoints[3] = {SERVO_CENTER, SERVO_CENTER, SERVO_CENTER};
   uint8_t eyes[2] = {0, 0};
   uint8_t eyePos[2] = {0, 0};
