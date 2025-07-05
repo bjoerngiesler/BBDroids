@@ -84,6 +84,7 @@ bb::Result bb::WifiServer::initialize(const String& ssid, const String& wpakey, 
 	setOTANameAndPassword(ssid, wpakey);
 
 	operationStatus_ = RES_SUBSYS_NOT_STARTED;
+	description_ = "Wifi comm module";
 	return Subsystem::initialize();
 }
 
@@ -336,7 +337,7 @@ unsigned int bb::WifiServer::readDataIfAvailable(uint8_t *buf, unsigned int maxs
 	}
 }
 
-void bb::WifiServer::printStatus(ConsoleStream *stream) {
+void bb::WifiServer::printExtendedStatus(ConsoleStream *stream) {
 	if(stream == NULL) return;
 
 	if(WiFi.status() == WL_NO_MODULE) {
