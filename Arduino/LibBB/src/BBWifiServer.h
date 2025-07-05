@@ -43,7 +43,7 @@ public:
 	virtual Result step();
 	virtual Result operationStatus();
 
-	virtual void printStatus(ConsoleStream *stream);
+	virtual void printExtendedStatus(ConsoleStream *stream);
 
 	virtual Result setParameterValue(const String& name, const String& value);
 
