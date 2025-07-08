@@ -6,9 +6,13 @@
 #include <map>
 #include "../resources/systemsounds.h"
 
+#include "DOHeadInterface.h"
+
 DODroid DODroid::droid;
 DOParams DODroid::params_;
 bb::ConfigStorage::HANDLE DODroid::paramsHandle_;
+static head::Parameters headParameters_;
+static int eyesOffset_ = 0;
 
 static float minPwmFreq = 200.0f;
 static float maxPwmFreq = 500.0f;
@@ -207,6 +211,7 @@ Result DODroid::start(ConsoleStream* stream) {
     }
   } else if(operationStatus_ != RES_OK) {
     setLED(LED_STATUS, RED);
+    setControlStrip(head::CONTROL_STRIP_ERROR, true);
     return operationStatus_;
   }
 
@@ -217,6 +222,8 @@ Result DODroid::start(ConsoleStream* stream) {
   started_ = true;
   operationStatus_ = RES_OK;
   setLED(LED_STATUS, GREEN);
+  setEyes(head::EYE_COLOR_WHITE, 10, 150, head::EYE_COLOR_WHITE, 10, 150);
+  updateHead();
   return operationStatus_;
 }
 
@@ -266,7 +273,11 @@ Result DODroid::step() {
     if((seqnum % 4) == 0) {
       fillAndSendStatePacket();
     }
-    LOG(LOG_FATAL, "IMU or battery missing - critical error\n");
+    if(!imu_.available())
+      LOG(LOG_FATAL, "IMU missing - critical error\n");
+    if(!DOBattStatus::batt.available()) 
+      LOG(LOG_FATAL, "Battery missing - critical error\n");
+    
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
@@ -369,16 +380,6 @@ bb::Result DODroid::stepHead() {
     }
   }
   
-  if(aerialsOK_) {
-    float aer = 90 + params_.aerialOffset + speedSP*params_.faAerialSpeedSP;
-
-    aer = constrain(aer, 0, 180);
-    //LOG(LOG_INFO, "Setting aerials to %f %f %f\n", aer+remoteAerial1_, aer+remoteAerial2_, aer+remoteAerial3_);
-    setAerials(constrain(aer + remoteAerial1_, 0, 180), 
-               constrain(aer + remoteAerial2_, 0, 180),
-               constrain(aer + remoteAerial3_, 0, 180));
-  }
-
   if(lastPrimaryCtrlPacket_.button3 == false && (float(millis())/1000.0f > annealTime_ + params_.faHeadAnnealDelay)) {
     if(remoteP_ > 0.5) {
       remoteP_ -= annealP_;
@@ -405,6 +406,25 @@ bb::Result DODroid::stepHead() {
     } else remoteR_ = 0;
   } else if(lastPrimaryCtrlPacket_.button3 == true){
     annealTime_ = float(millis()) / 1000.0f;
+  }
+
+  if(aerialsOK_) {
+    float aer = 90 + params_.aerialOffset + speedSP*params_.faAerialSpeedSP;
+
+    aer = constrain(aer, 0, 180);
+    //LOG(LOG_INFO, "Setting aerials to %f %f %f\n", aer+remoteAerial1_, aer+remoteAerial2_, aer+remoteAerial3_);
+    setAerials(constrain(aer + remoteAerial1_, 0, 180), 
+               constrain(aer + remoteAerial2_, 0, 180),
+               constrain(aer + remoteAerial3_, 0, 180));
+
+    int eyePosInt = 150 + uint8_t(100.0*(speed / params_.maxSpeed)) + eyesOffset_;
+    if(speed<0) eyePosInt = 150 + eyesOffset_;
+
+    uint8_t eyePos = constrain(eyePosInt, 0, 255);
+    uint8_t eyeSize = 10 - uint8_t(8.0*(speed / params_.maxSpeed));
+    setEyes(head::EYE_COLOR_WHITE, eyeSize, eyePos, head::EYE_COLOR_WHITE, eyeSize, eyePos);
+
+    updateHead();
   }
   
   return RES_OK;
@@ -462,22 +482,26 @@ void DODroid::switchDrive(DriveMode mode) {
   switch(driveMode_) {
     case DRIVE_OFF: 
       setLED(LED_DRIVE, OFF);
+      setControlStrip(head::CONTROL_STRIP_OFF, true);
       LOG(LOG_INFO, "Switched drive mode to off.\n");
       break;
     
     case DRIVE_VEL: 
       setLED(LED_DRIVE, GREEN);
+      setControlStrip(head::CONTROL_STRIP_VEL, true);
       LOG(LOG_INFO, "Switched drive mode to velocity.\n");
       break;
 
     case DRIVE_POS: 
       setLED(LED_DRIVE, YELLOW);
+      setControlStrip(head::CONTROL_STRIP_MAN_POS, true);
       LOG(LOG_INFO, "Switched drive mode to position.\n");
       break;
 
     case DRIVE_AUTO_POS:
     default: 
       setLED(LED_DRIVE, BLUE);
+      setControlStrip(head::CONTROL_STRIP_AUTO_POS, true);
       LOG(LOG_INFO, "Switched drive mode to auto_position.\n");
       break;
   }
@@ -674,6 +698,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     }
 
     DOSound::sound.setVolume(int(30.0 * packet.getAxis(8, bb::ControlPacket::UNIT_UNITY)));
+    eyesOffset_ = int(75.0 * packet.getAxis(9, bb::ControlPacket::UNIT_UNITY_CENTERED));
     lastPrimaryCtrlPacket_ = packet;
   } else { // secondary remote
     // Joystick button switches drive mode
@@ -955,24 +980,52 @@ Result DODroid::fillAndSendStatePacket() {
   return RES_OK;
 }
 
-
-bool DODroid::setAerials(uint8_t a1, uint8_t a2, uint8_t a3) {
+bool DODroid::setAerials(uint8_t a1, uint8_t a2, uint8_t a3, bool update) {
   //if(aerialsOK_ == false) return false;
+  headParameters_.servoSetpoints[0] = a1;
+  headParameters_.servoSetpoints[1] = a2;
+  headParameters_.servoSetpoints[2] = a3;
+  if(update) return updateHead();
+  return true;
+}
 
-  int retval;
-  uint8_t aerials[3] = {a1, a2, a3};
+bool DODroid::setEyes(uint8_t lCol, uint8_t lSize, uint8_t lPos, uint8_t rCol, uint8_t rSize, uint8_t rPos, bool update) {
+  headParameters_.eyes[0] = lCol | lSize;
+  headParameters_.eyes[1] = rCol | rSize;
+  headParameters_.eyePos[0] = lPos;
+  headParameters_.eyePos[1] = rPos;
+  if(update) return updateHead();
+  return true;
+}
+
+bool DODroid::setControlStrip(uint8_t strip, bool update) {
+  headParameters_.control = strip | 1 << head::CONTROL_AUTOBLINK_SHIFT | 4;
+  if(update) return updateHead();
+  return true;
+}
+
+bool DODroid::updateHead() {
+  if(!aerialsOK_) return false;
+
   Wire.beginTransmission(AERIAL_ADDR);
-  Wire.write(aerials, sizeof(aerials));
-  retval = Wire.endTransmission();
+  Wire.write(0);
+  Wire.write((uint8_t*)(&headParameters_), sizeof(headParameters_));
+  int retval = Wire.endTransmission();
   if(retval == 0) return true;
-  LOG(LOG_ERROR, "Error %d moving aerials\n", retval);
+  LOG(LOG_ERROR, "Error %d setting control strip\n", retval);
   return false;
 }
+
 
 bool DODroid::getAerials(uint8_t& a1, uint8_t& a2, uint8_t& a3) {
   if(aerialsOK_ == false) return false;
   int timeout;
-  Wire.requestFrom(0x17, 3);
+
+  Wire.beginTransmission(AERIAL_ADDR);
+  Wire.write(0);
+  Wire.endTransmission();
+
+  Wire.requestFrom(AERIAL_ADDR, 3);
 
   for(timeout=100; timeout>0 && !Wire.available(); timeout--);
   if(timeout < 0) return false;

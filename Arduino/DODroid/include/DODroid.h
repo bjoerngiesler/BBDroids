@@ -79,8 +79,13 @@ public:
   MotorStatus singleMotorTest(bb::DCMotor& mot, bb::Encoder& enc, bool reverse, ConsoleStream *stream = NULL);
 
   bool aerialsOK() { return aerialsOK_; }
-  bool setAerials(uint8_t a1, uint8_t a2, uint8_t a3);
+  bool setAerials(uint8_t a1, uint8_t a2, uint8_t a3, bool update=false);
   bool getAerials(uint8_t& a1, uint8_t& a2, uint8_t& a3);
+
+  bool setEyes(uint8_t lCol, uint8_t lSize, uint8_t lPos, uint8_t rCol, uint8_t rSize, uint8_t rPos, bool update=false);
+  bool setControlStrip(uint8_t strip, bool update=false);
+
+  bool updateHead();
 
   enum WhichLED {
     LED_STATUS = 0,

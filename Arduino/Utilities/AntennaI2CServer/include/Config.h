@@ -12,8 +12,8 @@ static const uint8_t SERVO_CENTER = (SERVO_MAX-SERVO_MIN)/2 + SERVO_MIN;
 static const uint8_t LED_PIN = 16;
 static const uint8_t LED_COUNT = (3*17);
 
-static const uint8_t SERVO_PIN_1 = 35;
-static const uint8_t SERVO_PIN_2 = 36;
-static const uint8_t SERVO_PIN_3 = 37;
+static const uint8_t SERVO_PIN_1 = 36;
+static const uint8_t SERVO_PIN_2 = 37;
+static const uint8_t SERVO_PIN_3 = 35;
 
 #endif // DEFINES_H

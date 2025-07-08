@@ -2,6 +2,7 @@
 #include "DOBattStatus.h"
 #include "DOSound.h"
 #include "../resources/systemsounds.h"
+#include "DOHeadInterface.h"
 
 Result DODroid::selfTest(ConsoleStream *stream) {
   Result res;
@@ -10,13 +11,28 @@ Result DODroid::selfTest(ConsoleStream *stream) {
 
   LOG(LOG_INFO, "D-O Self Test starting.\n");
   DOSound::sound.playSystemSound(SystemSounds::SELFTEST_STARTING_PLEASE_STAND_CLEAR);
+
+  Wire.beginTransmission(AERIAL_ADDR);
+  uint8_t antErr = Wire.endTransmission();
+  if(antErr != 0) {
+    LOG(LOG_WARN, "Aerial server not found (error: 0x%x).\n", antErr);
+    aerialsOK_ = false;
+  } else {
+    aerialsOK_ = true;
+  }
+
+  setControlStrip(head::CONTROL_STRIP_OFF);
+  updateHead();
   delay(2000);
+  setControlStrip(head::CONTROL_STRIP_SELFTEST);
+  updateHead();
   
   // Check battery
   DOSound::sound.playSystemSound(SystemSounds::POWER);
   if(!DOBattStatus::batt.available()) {
     LOG(LOG_FATAL, "Fatal: Battery monitor not available!\n");
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    setControlStrip(head::CONTROL_STRIP_ERROR, true);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
   DOBattStatus::batt.updateVoltage();
@@ -24,9 +40,11 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   LOG(LOG_INFO, "Battery OK. Voltage: %.2fV, current draw: %.2fmA.\n", DOBattStatus::batt.voltage(), DOBattStatus::batt.current());
   if(DOBattStatus::batt.voltage() < 12.0) {
     DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
+    setControlStrip(head::CONTROL_STRIP_ERROR, true);
     return RES_DROID_VOLTAGE_TOO_LOW;
   } else if(DOBattStatus::batt.voltage() > 17.0) {
     DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_HIGH);
+    setControlStrip(head::CONTROL_STRIP_ERROR, true);
     return RES_DROID_VOLTAGE_TOO_HIGH;
   }
   DOSound::sound.playSystemSound(SystemSounds::OK);
@@ -36,6 +54,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   res = servoTest(stream);
   if(res != RES_OK) {
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    setControlStrip(head::CONTROL_STRIP_ERROR, true);
     return res;
   } else {
     DOSound::sound.playSystemSound(SystemSounds::OK);
@@ -43,32 +62,28 @@ Result DODroid::selfTest(ConsoleStream *stream) {
 
   // Check Aerials
   DOSound::sound.playSystemSound(SystemSounds::AERIALS);
-  Wire.beginTransmission(AERIAL_ADDR);
-  uint8_t antErr = Wire.endTransmission();
-  if(antErr != 0) {
-    LOG(LOG_WARN, "Aerial server not found (error: 0x%x).\n", antErr);
+  if(aerialsOK_ == false) {
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
   } else {
     uint8_t step=1, d=5;
     uint8_t min = 30, max = 150, mid = 90;
-    aerialsOK_ = true;
     uint8_t val = mid;
     for(; val < max; val+=step) {
-      setAerials(val, val, val);
+      setAerials(val, val, val, true);
       delay(d);
     }
     delay(10*d);
     for(; val > min; val-=step) {
-      setAerials(val, val, val);
+      setAerials(val, val, val, true);
       delay(d);
     }
     delay(10*d);
     for(; val < mid; val+=step) {
-      setAerials(val, val, val);
+      setAerials(val, val, val, true);
       delay(d);
     }
     delay(10*d);
-    setAerials(mid, mid, mid);
+    setAerials(mid, mid, mid, true);
     LOG(LOG_INFO, "Aerials OK.\n");
     DOSound::sound.playSystemSound(SystemSounds::OK);
   }
@@ -78,6 +93,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
   if(imu_.available() == false) {
     LOG(LOG_FATAL, "Fatal: IMU not available!\n");
     DOSound::sound.playSystemSound(SystemSounds::FAILURE);
+    setControlStrip(head::CONTROL_STRIP_ERROR, true);
     return bb::RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
@@ -175,6 +191,7 @@ Result DODroid::selfTest(ConsoleStream *stream) {
     break;
   }
 
+  setControlStrip(head::CONTROL_STRIP_OFF, true);
   return RES_OK;
 }
 
