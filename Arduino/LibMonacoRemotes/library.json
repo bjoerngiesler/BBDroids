@@ -1,0 +1,19 @@
+{
+  "name": "LibMonacoRemotes",
+  "version": "0.0.1",
+  "keywords": "BB8, droid, utility",
+  "description": "Bavarian R2 Builders Remote Code",
+  "repository":
+  {
+    "type": "git",
+    "url": "https://github.com/bjoerngiesler/Droids"
+  },
+  "frameworks": "arduino",
+  "platforms":
+  [
+    "avr",
+    "mbed_nano",
+    "atmelsam",
+    "esp32"
+  ]
+}
