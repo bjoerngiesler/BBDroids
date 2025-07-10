@@ -31,7 +31,7 @@ static bool lastTransmissionError = false;
 static bool debug = false;
 
 Servo servo;
-int servoPins[3] = {SERVO_PIN_1, SERVO_PIN_1, SERVO_PIN_1};
+int servoPins[3] = {SERVO_PIN_1, SERVO_PIN_2, SERVO_PIN_3};
 int servoCurrents[3] = {SERVO_CENTER, SERVO_CENTER, SERVO_CENTER};
 uint8_t servoSpeed = 1;
 uint8_t cur_reg = 0;
@@ -211,7 +211,6 @@ void setup() {
   Serial.printf("2024 by Bjoern Giesler\n");
   Serial.printf("Listening on 0x%x\n", I2C_ADDRESS);
   Serial.printf("Listening to i2c...\n");
-{}
   updateServos(false);
   
   WIRE.onReceive(receiveEvent);
@@ -221,6 +220,10 @@ void setup() {
   strip.begin();
   strip.show();
   strip.setBrightness(50);
+  StripSegment::Segment status(1.1, 0.2, -0.5, 255, 255, 255, 1.0);
+  status.setColor(255, 255, 255);
+  status.setBounce(status.BOUNCE_OFF);
+  statusSegments.push_back(status);
 
   pixel.begin();
   pixel.setPixelColor(0, 255, 255, 255);
@@ -390,9 +393,9 @@ void handleCommand(const std::vector<String>& words) {
       servoval = words[1].toInt();
       if(servoval > 180) servoval = 180;
     } else if(words.size() == 3) {
-      if(words[1] == "1") set[1] = true;
-      else if(words[1] == "2") set[2] = true;
-      else if(words[1] == "3") set[3] = true;
+      if(words[1] == "1") set[0] = true;
+      else if(words[1] == "2") set[1] = true;
+      else if(words[1] == "3") set[2] = true;
       else {
         Serial.printf("Unknown value \"%s\" for servo index\n", words[1].c_str());
         return;
