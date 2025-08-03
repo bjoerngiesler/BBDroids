@@ -6,8 +6,8 @@
 
 std::vector<int> standardBaudRates = {9600, 19200, 28800, 38400, 57600, 76800, 115200};
 
-const uint8_t P_PASSTHROUGH_RX = 1;
-const uint8_t P_PASSTHROUGH_TX = 0;
+const uint8_t P_PASSTHROUGH_RX = 13;
+const uint8_t P_PASSTHROUGH_TX = 14;
 Uart passthroughSerial(&sercom3, P_PASSTHROUGH_RX, P_PASSTHROUGH_TX, SERCOM_RX_PAD_1, UART_TX_PAD_0);
 
 void SERCOM3_Handler() {

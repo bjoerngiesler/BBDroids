@@ -27,13 +27,13 @@ struct DOParams {
 
     float motorDeadband     = 10.0;
 
-    float wheelKp           = 0.06;
+    float wheelKp           = 0.075;
     float wheelKi           = 0.8;
     float wheelKd           = 0.0;
 
-    float balKp             = 20;
+    float balKp             = 15;
     float balKi             = 0;
-    float balKd             = 0;
+    float balKd             = 1;
 
     float autoPosKp             = 6;
     float autoPosKi             = 0.2;
@@ -44,13 +44,13 @@ struct DOParams {
     float posKd             = 0;
 
     float maxSpeed          = 1000;
-    float accel             = 2500;
+    float accel             = 1200;
 
     float aerialOffset     = 0;
     float aerialAnim       = -45;
 
     float speedAxisGain     = 1.0;
-    float rotAxisGain       = 0.4;
+    float rotAxisGain       = 0.3;
 
     float leanHeadToBody    = 0.0;
 

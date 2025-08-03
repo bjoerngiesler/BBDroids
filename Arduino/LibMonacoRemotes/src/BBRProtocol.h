@@ -15,6 +15,8 @@ namespace rmt {
 // Abstract protocol superclass
 class Protocol {
 public:
+    virtual bool init() = 0;
+
     virtual uint8_t numTransmitterTypes() = 0;
     virtual uint8_t numChannels(uint8_t transmitterType) = 0;
     virtual uint8_t bitDepthForChannel(uint8_t transmitterType, uint8_t channel) = 0;

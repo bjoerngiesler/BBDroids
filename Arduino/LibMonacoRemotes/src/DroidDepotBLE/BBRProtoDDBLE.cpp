@@ -10,6 +10,10 @@ DroidDepotBLEProtocol::DroidDepotBLEProtocol() {
     pRemoteCharacteristic_ = nullptr;
 }
 
+bool DroidDepotBLEProtocol::init() {
+    BLEDevice::init("");
+    return true;
+}
 
 uint8_t DroidDepotBLEProtocol::numTransmitterTypes() { return 1; }
 uint8_t DroidDepotBLEProtocol::numChannels(uint8_t transmitterType) { return 5; }
@@ -20,24 +24,25 @@ Transmitter* DroidDepotBLEProtocol::createTransmitter(uint8_t transmitterType) {
 }
 
 void DroidDepotBLEProtocol::onResult(BLEAdvertisedDevice advertisedDevice) {
-    Serial.printf("Found node %s \n", advertisedDevice.toString().c_str());
 //      if(advertisedDevice.haveServiceUUID() && advertisedDevice.isAdvertisingService(SERVICE_UUID)) {
     if(advertisedDevice.getName() == "DROID") {
-        Serial.printf("Found droid!\n");
         BLEDevice::getScan()->stop();
 
         esp_bd_addr_t* addr = advertisedDevice.getAddress().getNative();
+        Serial.printf("Found node %s\n", advertisedDevice.toString().c_str());
+        Serial.printf("Address type 0x%x\n", advertisedDevice.getAddressType());
 
         NodeDescription descr;
         descr.addr.fromMACAddress(*addr);
         descr.name = advertisedDevice.getName();
+        descr.type = NODE_RECEIVER;
         discoveredNodes_.push_back(descr);
     }
 }
 
 Result DroidDepotBLEProtocol::discoverNodes() {
     discoveredNodes_.clear();
-    pBLEScan_ = BLEDevice::getScan(); //create new scan
+    if(pBLEScan_ == nullptr) pBLEScan_ = BLEDevice::getScan(); //create new scan
     pBLEScan_->setAdvertisedDeviceCallbacks(this);
     pBLEScan_->setActiveScan(true); //active scan uses more power, but get results faster
     pBLEScan_->setInterval(100);

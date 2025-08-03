@@ -13,6 +13,7 @@ namespace rmt {
 class DroidDepotBLEProtocol: public Protocol, public BLEAdvertisedDeviceCallbacks {
 public:
     DroidDepotBLEProtocol();
+    virtual bool init();
     virtual uint8_t numTransmitterTypes();
     virtual uint8_t numChannels(uint8_t transmitterType);
     virtual uint8_t bitDepthForChannel(uint8_t transmitterType, uint8_t channel);

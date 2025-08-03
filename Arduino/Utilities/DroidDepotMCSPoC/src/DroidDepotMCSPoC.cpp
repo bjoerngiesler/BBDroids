@@ -130,7 +130,7 @@ void setup() {
   if(mcp.begin_I2C(MCP_ADDR) == false) {
     while(true) Serial.printf("MCP init failed\n");
   }
-  
+  x
   for (uint8_t i = 0; i < 8; i++) {
     mcp.pinMode(i, INPUT_PULLUP);
     buttons[i] = false;
@@ -185,15 +185,15 @@ void loopControl() {
   uint8_t mot2DirByte;
   uint8_t mot2PowerByte;
   if(tempButtons[BUTTON_PIN_3] == true && tempButtons[BUTTON_PIN_4] == false) {
-    mot2DirByte = 0x80 | 3;
-    mot2PowerByte = 0xff;
+    mot2DirByte = 0x80 | 2;
+    mot2PowerByte = 0xa0;
     Serial.printf("Mot 2 Dir: 0x%x Power: 0x%x\n", mot2DirByte, mot2PowerByte);
   } else if(tempButtons[BUTTON_PIN_3] == false && tempButtons[BUTTON_PIN_4] == true) {
-    mot2DirByte = 0x00 | 3;
-    mot2PowerByte = 0xff;
+    mot2DirByte = 0x00 | 2;
+    mot2PowerByte = 0xa0;
     Serial.printf("Mot 2 Dir: 0x%x Power: 0x%x\n", mot2DirByte, mot2PowerByte);
   } else {
-    mot2DirByte = 0x00 | 3;
+    mot2DirByte = 0x00 | 2;
     mot2PowerByte = 0;
   }
 

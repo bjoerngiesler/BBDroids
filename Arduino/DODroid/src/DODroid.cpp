@@ -667,10 +667,10 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       float rot = packet.getAxis(0);
       float vel = packet.getAxis(1);
 
-      // Joystick at zero for >500ms and in velocity control mode? 
+      // Joystick at zero for >1000ms and in velocity control mode? 
       // ==> Switch to auto position control mode
       if(EPSILON(vel) && EPSILON(rot) && params_.autoPosControl == true) { 
-        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && 
+        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 1000 && 
            driveMode_ == DRIVE_VEL) {
           switchDrive(DRIVE_AUTO_POS);
         }
