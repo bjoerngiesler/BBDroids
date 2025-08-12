@@ -2,12 +2,14 @@
 #define BB8_H
 
 #include <LibBB.h>
+#include "BB8Config.h"
 
 using namespace bb;
 
 class BB8: public Subsystem, public PacketReceiver {
 public:
   static BB8 bb8;
+  static BB8Params params_;
 
   typedef enum {
     MODE_OFF,
@@ -24,6 +26,7 @@ public:
 	virtual Result start(ConsoleStream *stream = NULL);
   virtual Result stop(ConsoleStream *stream = NULL);
 	virtual Result step();
+  virtual Result stepIfNotStarted();
   virtual Result stepDriveMotor();
   virtual Result stepRollMotor();
   virtual Result stepDome();
@@ -34,7 +37,8 @@ public:
 
   virtual void printStatus(ConsoleStream *stream);
 
-  virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
+  //virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
+  virtual Result incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet);
 
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
   virtual Result fillAndSendStatePacket();
@@ -45,16 +49,7 @@ public:
 
 protected:
   void setControlParameters();
-
-  typedef struct {
-    float driveSpeedKp, driveSpeedKi, driveSpeedKd;
-    float balKp, balKi, balKd;
-    float rollKp, rollKi, rollKd;
-    float rollServoKp, rollServoKi, rollServoKd;
-    float rollServoVel;
-  } BB8Params;
-
-  static BB8Params params_;
+  void setServoParameters();
 
   float driveSpeedGoal_, bodyRollGoal_, domePitchGoal_, domeRollGoal_;
   bool pwmControl_;
@@ -81,8 +76,8 @@ protected:
 
   bb::DCMotor driveMotor_, yawMotor_;
   bb::Encoder driveEncoder_;
-  bb::ServoControlOutput rollOutput_;
   bb::IMUControlInput balanceInput_, rollInput_;
+  bb::ServoControlOutput rollOutput_;
   bb::PIDController driveController_, balanceController_, rollController_;
 
   bool servosOK_;
