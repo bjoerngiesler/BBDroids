@@ -23,8 +23,16 @@ class Servos: public Subsystem {
 public:
   typedef enum {
     VALUE_DEGREE,
-    VALUE_RAW
+    VALUE_RAW,
   } ValueType;
+  static const ValueType VALUE_COOKED = VALUE_DEGREE;
+
+  enum ControlMode {
+    CONTROL_POSITION = 0,
+    CONTROL_VELOCITY = 1,
+    CONTROL_CURRENT  = 2,
+    CONTROL_UNKNOWN  = 255
+  };
 
   static Servos servos;
 
@@ -52,18 +60,24 @@ public:
   bool setInverted(uint8_t id, bool inverted);
   bool inverted(uint8_t id);
   
-  bool setGoal(uint8_t id, float goal, ValueType t=VALUE_DEGREE);
+  bool setControlMode(uint8_t id, ControlMode mode);
+  ControlMode controlMode(uint8_t id);
+
+  bool setGoalPos(uint8_t id, float goal, ValueType t=VALUE_DEGREE);
   bool setProfileVelocity(uint8_t id, float vel, ValueType t=VALUE_DEGREE); // in this case deg/s, while raw value is in rev/min
   bool setProfileAcceleration(uint8_t id, uint32_t val);
-  float goal(uint8_t id, ValueType t=VALUE_DEGREE);
-  float present(uint8_t id, ValueType t=VALUE_DEGREE);
+  float goalPos(uint8_t id, ValueType t=VALUE_DEGREE);
+  float presentPos(uint8_t id, ValueType t=VALUE_DEGREE);
+
+  bool setGoalVel(uint8_t id, float vel, ValueType t=VALUE_DEGREE);
+  float goalVel(uint8_t id, ValueType t=VALUE_DEGREE);
+  bool setGoalCur(uint8_t id, float cur, ValueType t=VALUE_COOKED);
+  float goalCur(uint8_t id, ValueType t=VALUE_COOKED);
+
   float load(uint8_t id);
   uint8_t errorStatus(uint8_t id);
   bool loadShutdownEnabled(uint8_t id);
   void setLoadShutdownEnabled(uint8_t id, bool yesno);
-
-  // call this with 0 to switch compliant mode off
-  bool setCompliantMode(uint8_t id, uint8_t maxCurrentPercent);
 
   bool setPIDValues(uint8_t id, uint16_t kp, uint16_t ki, uint16_t kd);
   
@@ -80,9 +94,12 @@ protected:
 
   struct Servo {
     uint8_t id;
-    uint32_t goal;
+    ControlMode mode;
+    uint32_t goalPos;
     uint32_t profileVel;
-    uint32_t present;
+    uint32_t presentPos;
+    int32_t goalVel;
+    int16_t goalCur;
     int16_t load;
     uint32_t min, max;
     int16_t offset;
@@ -93,7 +110,7 @@ protected:
   Servo *servoWithID(uint8_t id);
 
   std::vector<uint8_t> requiredIds_;
-  DYNAMIXEL::ControlTableItemInfo_t ctrlPresentPos_, ctrlGoalPos_, ctrlProfileVel_, ctrlPresentLoad_;
+  DYNAMIXEL::ControlTableItemInfo_t ctrlPresentPos_, ctrlGoalPos_, ctrlProfileVel_, ctrlPresentLoad_, ctrlGoalVel_, ctrlGoalCur_;
   static const uint16_t userPktBufCap = 128;
   uint8_t userPktBufPresent[userPktBufCap], userPktBufLoad[userPktBufCap];
   bool torqueOffOnStop_;
@@ -106,10 +123,10 @@ protected:
   } __attribute((packed)) srDataLoad_t;
   typedef struct {
     int32_t goalPos;
-  } __attribute((packed)) swDataGoal_t;
+  } __attribute((packed)) swDataGoalPos_t;
   typedef struct {
-    int32_t profileVel;
-  } __attribute((packed)) swDataVel_t;
+    int32_t prfVel;
+  } __attribute((packed)) swDataPrfVel_t;
 
   DYNAMIXEL::InfoSyncReadInst_t srPresentInfos;
   DYNAMIXEL::XELInfoSyncRead_t *infoXelsSrPresent;
@@ -117,11 +134,17 @@ protected:
   DYNAMIXEL::InfoSyncReadInst_t srLoadInfos;
   DYNAMIXEL::XELInfoSyncRead_t *infoXelsSrLoad;
 
-  DYNAMIXEL::InfoSyncWriteInst_t swGoalInfos;
-  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSwGoal;
+  DYNAMIXEL::InfoSyncWriteInst_t swGoalPosInfos;
+  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSwGoalPos;
 
-  DYNAMIXEL::InfoSyncWriteInst_t swVelInfos;
-  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSwVel;
+  DYNAMIXEL::InfoSyncWriteInst_t swPrfVelInfos;
+  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSwPrfVel;
+
+  DYNAMIXEL::InfoSyncWriteInst_t swGoalVelInfos;
+  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSwGoalVel;
+
+  DYNAMIXEL::InfoSyncWriteInst_t swGoalCurInfos;
+  DYNAMIXEL::XELInfoSyncWrite_t *infoXelsSwGoalCur;
 
   void setupSyncBuffers();
   void teardownSyncBuffers();

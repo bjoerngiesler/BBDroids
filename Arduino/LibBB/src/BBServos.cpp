@@ -22,12 +22,14 @@ static const StrToCtrlTable strToCtrlTable_[] = {
   {"profile_acc", ControlTableItem::PROFILE_ACCELERATION},
   {"profile_vel", ControlTableItem::PROFILE_VELOCITY},
   {"operating_mode", ControlTableItem::OPERATING_MODE},
+  {"goal_velocity", ControlTableItem::GOAL_VELOCITY},
+  {"goal_current", ControlTableItem::GOAL_CURRENT},
   {"pos_p_gain", ControlTableItem::POSITION_P_GAIN},
   {"pos_i_gain", ControlTableItem::POSITION_I_GAIN},
   {"pos_d_gain", ControlTableItem::POSITION_D_GAIN}
 };
 
-static const int strToCtrlTableLen_ = 8;
+static const int strToCtrlTableLen_ = 10;
 
 bb::ServoControlOutput::ServoControlOutput(uint8_t sn, float offset) {
   sn_ = sn;
@@ -35,19 +37,33 @@ bb::ServoControlOutput::ServoControlOutput(uint8_t sn, float offset) {
 }
 
 bb::Result bb::ServoControlOutput::set(float value) {
-  if(Servos::servos.setGoal(sn_, value+offset_) == true) return RES_OK;
+  switch(Servos::servos.controlMode(sn_)) {
+  case Servos::CONTROL_POSITION:
+    if(Servos::servos.setGoalPos(sn_, value+offset_) == true) return RES_OK;
+    break;
+  case Servos::CONTROL_VELOCITY:
+    if(Servos::servos.setGoalVel(sn_, value+offset_) == true) return RES_OK;
+    break;
+  case Servos::CONTROL_CURRENT:
+    if(Servos::servos.setGoalCur(sn_, value+offset_) == true) return RES_OK;
+    break;
+  default:
+    break;
+  }
   return RES_CMD_FAILURE;
 }
 
 float bb::ServoControlOutput::present() {
-  return Servos::servos.present(sn_)-offset_;
+  return Servos::servos.presentPos(sn_)-offset_;
 }
 
 bb::Servos::Servos() {
   infoXelsSrPresent = NULL;
   infoXelsSrLoad = NULL;
-  infoXelsSwGoal = NULL;
-  infoXelsSwVel = NULL;
+  infoXelsSwGoalPos = NULL;
+  infoXelsSwGoalVel = NULL;
+  infoXelsSwGoalCur = NULL;
+  infoXelsSwPrfVel = NULL;
 }
 
 Result bb::Servos::initialize() {
@@ -56,9 +72,10 @@ Result bb::Servos::initialize() {
   help_ = "Dynamixel Subsystem\r\n"
           "Available commands:\r\n"
           "\ttorque <servo>|all on|off           Switch torque.\r\n"
-          "\tmove <servo>|all <angle>            <angle>: deg [-180.0..180.0].\r\n"
-          "\tset_vel <servo>|all <val>           <val> in deg/s; 0 is infinite speed.\r\n"
-          "\tset_goal_current <servo> <val>      <val> in percent; 0 is switch to position control mode.\r\n"
+          "\tmove <servo>|all <angle>            <angle>: deg [-180.0..180.0]. Switches servo to pos ctrl mode.\r\n"
+          "\tset_prf_vel <servo>|all <val>       <val> in deg/s; 0 is infinite speed.\r\n"
+          "\tset_goal_cur <servo> <val>          <val> in mA [-3000..3000]. Switches servo to current ctrl mode.\r\n"
+          "\tset_goal_vel <servo> <val>          <val> in deg/s. Switches servo to velocity ctrl mode.\r\n"
           "\thome                                Home all servos, slowly.\r\n"
           "\tinfo <servo>                        Get info on <servo>.\r\n"
           "\t<ctrltableitem> <servo> [<value>]   Get or set, options: vel_limit, current_limit, profile_acc, profile_vel, operating_mode, pos_p_gain, pos_i_gain, pos_d_gain.\r\n"
@@ -68,6 +85,7 @@ Result bb::Servos::initialize() {
   ctrlPresentLoad_.addr = 0;
   ctrlGoalPos_.addr = 0;
   ctrlProfileVel_.addr = 0;
+  ctrlGoalVel_.addr = 0;
   torqueOffOnStop_ = true;
   return Subsystem::initialize();
 }
@@ -100,9 +118,12 @@ Result bb::Servos::start(ConsoleStream* stream) {
 
       Servo servo;
       servo.id = id;
-      servo.goal = dxl_.getPresentPosition(id);
+      servo.mode = CONTROL_POSITION;
+      servo.goalPos = dxl_.getPresentPosition(id);
       servo.profileVel = dxl_.readControlTableItem(ControlTableItem::PROFILE_VELOCITY, id);
-      servo.present = dxl_.getPresentPosition(id); 
+      servo.presentPos = dxl_.getPresentPosition(id); 
+      servo.goalVel = 0;
+      servo.goalCur = 0;
       servo.load = dxl_.readControlTableItem(ControlTableItem::PRESENT_LOAD, id);
       servo.min = dxl_.readControlTableItem(ControlTableItem::MIN_POSITION_LIMIT, id);
       servo.max = dxl_.readControlTableItem(ControlTableItem::MAX_POSITION_LIMIT, id);
@@ -112,6 +133,8 @@ Result bb::Servos::start(ConsoleStream* stream) {
       if (ctrlPresentPos_.addr == 0) {
         ctrlPresentPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
         ctrlGoalPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
+        ctrlGoalVel_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_VELOCITY);
+        ctrlGoalCur_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_CURRENT);
         ctrlProfileVel_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
         // PRESENT_LOAD and PRESENT_CURRENT have the same addresses but different names (and units - 0.1% vs mA). Robotis, why do you do this to us?
         ctrlPresentLoad_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
@@ -125,6 +148,16 @@ Result bb::Servos::start(ConsoleStream* stream) {
         }
         item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
         if (item.addr != ctrlGoalPos_.addr || item.addr_length != ctrlGoalPos_.addr_length) {
+          if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
+        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_VELOCITY);
+        if (item.addr != ctrlGoalVel_.addr || item.addr_length != ctrlGoalVel_.addr_length) {
+          if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
+          return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
+        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_CURRENT);
+        if (item.addr != ctrlGoalCur_.addr || item.addr_length != ctrlGoalCur_.addr_length) {
           if (stream) stream->printf("Servos use differing control tables, that is not supported currently!\n");
           return RES_SUBSYS_HW_DEPENDENCY_MISSING;
         }
@@ -254,11 +287,12 @@ Result bb::Servos::handleConsoleCommand(const std::vector<String>& words, Consol
     unsigned int id = words[1] == "all" ? ID_ALL : words[1].toInt();
     float angle = words[2].toFloat();
     if(angle < 0 || angle > 360.0) return RES_CMD_INVALID_ARGUMENT;
-    if(setGoal(id, angle)) return RES_OK;
+    if(controlMode(id) != CONTROL_POSITION) setControlMode(id, CONTROL_POSITION);
+    if(setGoalPos(id, angle)) return RES_OK;
     return RES_CMD_INVALID_ARGUMENT;
   }
 
-  else if (words[0] == "set_vel") {
+  else if (words[0] == "set_prf_vel") {
     if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
     unsigned int id = words[1] == "all" ? ID_ALL : words[1].toInt();
     float vel = words[2].toFloat();
@@ -267,12 +301,23 @@ Result bb::Servos::handleConsoleCommand(const std::vector<String>& words, Consol
     return RES_CMD_INVALID_ARGUMENT;
   }
 
-  else if (words[0] == "set_goal_current") {
+  else if (words[0] == "set_goal_cur") {
     if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
     unsigned int id = words[1] == "all" ? ID_ALL : words[1].toInt();
     int current = words[2].toInt();
-    if(current < 0 || current > 100) return RES_CMD_INVALID_ARGUMENT;
-    if(setCompliantMode(id, current)) return RES_OK;
+    if(current < -3000 || current > 3000) return RES_CMD_INVALID_ARGUMENT;
+    if(controlMode(id) != CONTROL_CURRENT) setControlMode(id, CONTROL_CURRENT);
+    if(setGoalCur(id, current, VALUE_COOKED)) return RES_OK;
+    return RES_CMD_INVALID_ARGUMENT;
+  }
+
+  else if (words[0] == "set_goal_vel") {
+    if (words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
+    unsigned int id = words[1] == "all" ? ID_ALL : words[1].toInt();
+    int vel = words[2].toInt();
+    if(vel < -300 || vel > 300) return RES_CMD_INVALID_ARGUMENT;
+    if(controlMode(id) != CONTROL_VELOCITY) setControlMode(id, CONTROL_VELOCITY);
+    if(setGoalVel(id, vel)) return RES_OK;
     return RES_CMD_INVALID_ARGUMENT;
   }
 
@@ -388,14 +433,14 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
   // set goal. Can't do this in one with profile velocity setting.
   if(id == ID_ALL) {
     for(auto& s: servos_) {
-      setGoal(s.id, s.min + (s.max - s.min)/2, VALUE_RAW); // FIXME Maybe home pos is not in the middle?
-      int offs = (int)s.present - (int)s.goal;
+      setGoalPos(s.id, s.min + (s.max - s.min)/2, VALUE_RAW); // FIXME Maybe home pos is not in the middle?
+      int offs = (int)s.presentPos - (int)s.goalPos;
       if(offs < 0) offs = -offs;
       if(offs > maxoffs) maxoffs = offs;
     }
   } else {
-    setGoal(id, s->min + (s->max - s->min)/2, VALUE_RAW);
-    maxoffs = abs((int)s->present - (int)s->goal);
+    setGoalPos(id, s->min + (s->max - s->min)/2, VALUE_RAW);
+    maxoffs = abs((int)s->presentPos - (int)s->goalPos);
   }      
   res = syncWriteInfo();
   if(res != RES_OK) return res;
@@ -410,7 +455,7 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
     allReachedGoal = true;
     if(id == ID_ALL) {
       for(auto& s: servos_) {
-        int diff = abs((int)s.present - (int)s.goal);
+        int diff = abs((int)s.presentPos - (int)s.goalPos);
         // Console::console.printfBroadcast("%d Servo %d: Pos %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s.id, s.present, s.goal, diff, s.load, rawVel);
         if(diff > 10) allReachedGoal = false;
         if(abs(s.load) > maxLoad) {
@@ -421,7 +466,7 @@ Result bb::Servos::home(uint8_t id, float vel, unsigned int maxLoadPercent, Cons
         }
       }
     } else {
-      int diff = abs((int)s->present - (int)s->goal);
+      int diff = abs((int)s->presentPos - (int)s->goalPos);
       // Console::console.printfBroadcast("%d Servo %d: Pos %d Offs %d Goal %d Diff %d Load %d vel %d\n", timeRemaining, s->id, s->present, s->offset, s->goal, diff, s->load, rawVel);
       if(diff > 10) allReachedGoal = false;
       if(ABS(s->load) > maxLoad) {
@@ -484,7 +529,14 @@ void bb::Servos::printStatus(ConsoleStream* stream, int id) {
 
   stream->printf("Servo #%d: ", id);
   if (dxl_.ping(id)) {
-    stream->printf("model #%d, present: %.1f° (%d), goal: %.1f° (%d), load: %.1f (%d), ", dxl_.getModelNumber(id), present(id), s->present, goal(id), s->goal, load(id), s->load);
+    stream->printf("model #%d, present pos: %.1f° (%d), goal pos: %.1f° (%d), goal vel: %.1f°/s (%d), goal cur: %.1fmA (%d), load: %.1f (%d), ", 
+      dxl_.getModelNumber(id), presentPos(id), s->presentPos, goalPos(id), s->goalPos, goalVel(id), s->goalVel, goalCur(id), s->goalCur, load(id), s->load);
+    switch(controlMode(id)) {
+    case CONTROL_POSITION: stream->printf("pos ctrl mode, "); break;
+    case CONTROL_VELOCITY: stream->printf("vel ctrl mode, "); break;
+    case CONTROL_CURRENT: stream->printf("cur ctrl mode, "); break;
+    default: stream->printf("unknonw ctrl mode, "); break;
+    }
     
     stream->printf("range: [%d..%d], offset: %d, invert: %d, ", s->min, s->max, s->offset, dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1);
 
@@ -523,7 +575,7 @@ bool bb::Servos::setRange(uint8_t id, float min, float max, ValueType t) {
     s->min = computeRawValue(max, t);
   }
 
-  setGoal(id, constrain(s->goal, s->min, s->max), VALUE_RAW);
+  setGoalPos(id, constrain(s->goalPos, s->min, s->max), VALUE_RAW);
 
   return true;
 }
@@ -553,24 +605,143 @@ bool bb::Servos::inverted(uint8_t id) {
   return dxl_.readControlTableItem(ControlTableItem::DRIVE_MODE, id) & 0x1;
 }
 
-bool bb::Servos::setGoal(uint8_t id, float goal, ValueType t) {
-  if (isnan(goal)) return false;
+bool bb::Servos::setControlMode(uint8_t id, ControlMode mode) {
+  Servo *s = servoWithID(id);
+  if(s == nullptr) return false;
+  if(s->mode == mode) return true;
+
+  int32_t op;
+
+  switch(mode) {
+  case CONTROL_POSITION: op = OP_POSITION; break;
+  case CONTROL_VELOCITY: op = OP_VELOCITY; break;
+  case CONTROL_CURRENT: op = OP_CURRENT; break;
+  default:
+    bb::printf("Can't switch to control mode %d\n", mode);
+  }
+
+  bool torque = dxl_.getTorqueEnableStat(s->id);
+  if(torque) bb::printf("Need to switch torque off\n");
+  else bb::printf("No need to switch torque\n");
+
+  if(torque) dxl_.torqueOff(s->id);
+  dxl_.writeControlTableItem(ControlTableItem::OPERATING_MODE, id, op);
+  if(dxl_.readControlTableItem(ControlTableItem::OPERATING_MODE, id) == op) {
+    bb::printf("Successfully changed operating mode to %d\n", op);
+    s->mode = mode;
+    if(torque) dxl_.torqueOn(s->id);
+    return true;
+  }
+  bb::printf("Error changing operating mode to %d\n", op);
+  return false;
+}
+  
+bb::Servos::ControlMode bb::Servos::controlMode(uint8_t id) {
+  Servo *s = servoWithID(id);
+  if(s == nullptr) return CONTROL_UNKNOWN; // no such servo
+
+  uint8_t op = dxl_.readControlTableItem(ControlTableItem::OPERATING_MODE, id);
+  switch(s->mode) {
+  case CONTROL_POSITION:
+    if(op == OP_POSITION) return CONTROL_POSITION;
+    break;
+  case CONTROL_VELOCITY:
+    if(op == OP_VELOCITY) return CONTROL_VELOCITY;
+    break;
+  case CONTROL_CURRENT:
+    if(op == OP_CURRENT) return CONTROL_CURRENT;
+    break;
+  case CONTROL_UNKNOWN:
+  default:
+    return CONTROL_UNKNOWN;
+    break;
+  }
+  bb::printf("Control mode of servo (%d) and our entry (%d) disagree!\n", op, s->mode);
+  return CONTROL_UNKNOWN;
+}
+
+
+bool bb::Servos::setGoalPos(uint8_t id, float goalPos, ValueType t) {
+  if (isnan(goalPos)) return false;
 
   if (id == ID_ALL) {
     for (auto& s : servos_) {
-      if (setGoal(s.id, goal, t) != true) return false;
+      if (setGoalPos(s.id, goalPos, t) != true) return false;
     }
     return true;
   }
 
   Servo *s = servoWithID(id);
   if (s == NULL) return false;
-  uint32_t g = computeRawValue(goal, t);
-  s->goal = constrain(g, s->min, s->max) + s->offset; // FIXME - s->offset can be negative, is this safe?
+  uint32_t g = computeRawValue(goalPos, t);
+  s->goalPos = constrain(g, s->min, s->max) + s->offset; // FIXME - s->offset can be negative, is this safe?
   //if(s->id == 4) Console::console.printfBroadcast("Goal: %d Min: %d Max: %d Final: %d\n", g, s->min, s->max, s->goal);
-  swGoalInfos.is_info_changed = true;
+  swGoalPosInfos.is_info_changed = true;
 
   return true;
+}
+
+bool bb::Servos::setGoalVel(uint8_t id, float goalVel, ValueType t) {
+  if (isnan(goalVel)) return false;
+
+  if (id == ID_ALL) {
+    for (auto& s : servos_) {
+      if (setGoalVel(s.id, goalVel, t) != true) return false;
+    }
+    return true;
+  }
+
+  Servo *s = servoWithID(id);
+  if (s == NULL) return false;
+  int32_t g;
+  if(t == VALUE_RAW) g = int32_t(goalVel);
+  else { // goal vel is deg/s, convert to units of 0.229rev/min
+    g = int32_t(goalVel/(6*0.229));
+  }
+  s->goalVel = g;
+  bb::printf("Goal vel: %d\n", s->goalVel);
+  swGoalVelInfos.is_info_changed = true;
+
+  return true;
+}
+
+float bb::Servos::goalVel(uint8_t id, ValueType t) {
+  Servo *s = servoWithID(id);
+  if(s == NULL) return 0;
+  if(t == VALUE_RAW) return s->goalVel;
+  float g = s->goalVel;
+  return (g*(6.0*0.229));
+}
+
+bool bb::Servos::setGoalCur(uint8_t id, float goalCur, ValueType t) {
+  if (isnan(goalCur)) return false;
+
+  if (id == ID_ALL) {
+    for (auto& s : servos_) {
+      if (setGoalCur(s.id, goalCur, t) != true) return false;
+    }
+    return true;
+  }
+
+  Servo *s = servoWithID(id);
+  if (s == NULL) return false;
+  int32_t g;
+  if(t == VALUE_RAW) g = int16_t(goalCur);
+  else { // goal cur is mA, convert to units of 2.69mA
+    g = int16_t(goalCur/2.69);
+  }
+  s->goalCur = g;
+  swGoalCurInfos.is_info_changed = true;
+
+  return true;
+}
+
+float bb::Servos::goalCur(uint8_t id, ValueType t) {
+  Servo *s = servoWithID(id);
+  if(s == NULL) return 0;
+  if(t == VALUE_RAW) return s->goalCur;
+  float g = s->goalCur;
+  return g*2.69;
 }
 
 bool bb::Servos::setProfileVelocity(uint8_t id, float vel, ValueType t) {
@@ -591,7 +762,7 @@ bool bb::Servos::setProfileVelocity(uint8_t id, float vel, ValueType t) {
   }
 
   s->profileVel = v;
-  swVelInfos.is_info_changed = true;
+  swPrfVelInfos.is_info_changed = true;
 
   return true;
 }
@@ -620,21 +791,21 @@ bool bb::Servos::setProfileAcceleration(uint8_t id, uint32_t val) {
   return true;
 }
 
-float bb::Servos::goal(uint8_t id, ValueType t) {
+float bb::Servos::goalPos(uint8_t id, ValueType t) {
   Servo *s = servoWithID(id);
   if (s == NULL) return 0.0f;
 
   if (t == VALUE_DEGREE)
-    return 360.0 * (s->goal / 4096.0);
+    return 360.0 * (s->goalPos / 4096.0);
   else
-    return s->goal;
+    return s->goalPos;
 }
 
-float bb::Servos::present(uint8_t id, ValueType t) {
+float bb::Servos::presentPos(uint8_t id, ValueType t) {
   Servo *s = servoWithID(id);
   if (s == NULL) return 0.0f;
-  if (t == VALUE_DEGREE) return (s->present / 4096.0) * 360.0;
-  else return s->present;
+  if (t == VALUE_DEGREE) return (s->presentPos / 4096.0) * 360.0;
+  else return s->presentPos;
 }
 
 float bb::Servos::load(uint8_t id) {
@@ -660,36 +831,6 @@ void bb::Servos::setLoadShutdownEnabled(uint8_t id, bool yesno) {
   dxl_.writeControlTableItem(ControlTableItem::SHUTDOWN, id, shutdown);
 }
 
-bool bb::Servos::setCompliantMode(uint8_t id, uint8_t maxCurrentPercent) {
-  bool res;
-  bool torque = dxl_.getTorqueEnableStat(id);
-  if(torque) {
-    dxl_.torqueOff(id);
-  }
-  
-  if(maxCurrentPercent>100) maxCurrentPercent = 100;
-  
-  if(maxCurrentPercent == 0) {
-    res = dxl_.writeControlTableItem(ControlTableItem::OPERATING_MODE, id, OP_POSITION);
-    if(res == true) {
-      dxl_.setGoalCurrent(id, 100, UNIT_PERCENT);
-      dxl_.writeControlTableItem(ControlTableItem::CURRENT_LIMIT, id, 1193);
-    }
-  } else {
-    res = dxl_.writeControlTableItem(ControlTableItem::OPERATING_MODE, id, OP_CURRENT_BASED_POSITION);
-    if(res == true) {
-      Console::console.printfBroadcast("Setting %d\% as goal current\n", maxCurrentPercent);
-      dxl_.setGoalCurrent(id, maxCurrentPercent, UNIT_PERCENT);
-      dxl_.writeControlTableItem(ControlTableItem::CURRENT_LIMIT, id, (1193*maxCurrentPercent)/100);
-      Console::console.printfBroadcast("Goal current now: %d\n", dxl_.readControlTableItem(ControlTableItem::GOAL_CURRENT, id));
-    }
-  }
-  if(torque)
-    dxl_.torqueOn(id);
-
-  return res;
-}
-
 bool bb::Servos::setPIDValues(uint8_t id, uint16_t kp, uint16_t ki, uint16_t kd) {
   dxl_.writeControlTableItem(ControlTableItem::P_GAIN, id, kp);
   dxl_.writeControlTableItem(ControlTableItem::I_GAIN, id, ki);
@@ -709,8 +850,13 @@ void bb::Servos::setupSyncBuffers() {
   unsigned int i;
 
   if (!servos_.size()) return;
-  if (infoXelsSrPresent != NULL || infoXelsSrLoad != NULL || infoXelsSwGoal != NULL || infoXelsSwVel != NULL) return;
+  if (infoXelsSrPresent != NULL || infoXelsSrLoad != NULL || infoXelsSwGoalPos != NULL || infoXelsSwPrfVel != NULL ||
+      infoXelsSwGoalVel != NULL || infoXelsSwGoalCur != NULL) {
+    bb::printf("Error - servo buffers already set up\n");
+    return;
+  }
 
+  // Sync buffer for reading present position
   srPresentInfos.packet.p_buf = userPktBufPresent;
   srPresentInfos.packet.buf_capacity = userPktBufCap;
   srPresentInfos.packet.is_completed = false;
@@ -721,12 +867,13 @@ void bb::Servos::setupSyncBuffers() {
   i = 0;
   for (auto& s : servos_) {
     infoXelsSrPresent[i].id = s.id;
-    infoXelsSrPresent[i].p_recv_buf = (uint8_t*)&(s.present);
+    infoXelsSrPresent[i].p_recv_buf = (uint8_t*)&(s.presentPos);
     i++;
   }
   srPresentInfos.xel_count = servos_.size();
   srPresentInfos.is_info_changed = true;
 
+  // Sync buffer for reading present load
   srLoadInfos.packet.p_buf = userPktBufLoad;
   srLoadInfos.packet.buf_capacity = userPktBufCap;
   srLoadInfos.packet.is_completed = false;
@@ -743,35 +890,69 @@ void bb::Servos::setupSyncBuffers() {
   srLoadInfos.xel_count = servos_.size();
   srLoadInfos.is_info_changed = true;
 
-  swGoalInfos.packet.p_buf = NULL;
-  swGoalInfos.packet.is_completed = false;
-  swGoalInfos.addr = ctrlGoalPos_.addr;
-  swGoalInfos.addr_length = ctrlGoalPos_.addr_length;
-  infoXelsSwGoal = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
-  swGoalInfos.p_xels = infoXelsSwGoal;
+  // Sync buffer for writing goal position
+  swGoalPosInfos.packet.p_buf = NULL;
+  swGoalPosInfos.packet.is_completed = false;
+  swGoalPosInfos.addr = ctrlGoalPos_.addr;
+  swGoalPosInfos.addr_length = ctrlGoalPos_.addr_length;
+  infoXelsSwGoalPos = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
+  swGoalPosInfos.p_xels = infoXelsSwGoalPos;
   i = 0;
   for (auto& s : servos_) {
-    infoXelsSwGoal[i].id = s.id;
-    infoXelsSwGoal[i].p_data = (uint8_t*)&(s.goal);
+    infoXelsSwGoalPos[i].id = s.id;
+    infoXelsSwGoalPos[i].p_data = (uint8_t*)&(s.goalPos);
     i++;
   }
-  swGoalInfos.xel_count = servos_.size();
-  swGoalInfos.is_info_changed = true;
+  swGoalPosInfos.xel_count = servos_.size();
+  swGoalPosInfos.is_info_changed = true;
 
-  swVelInfos.packet.p_buf = NULL;
-  swVelInfos.packet.is_completed = false;
-  swVelInfos.addr = ctrlProfileVel_.addr;
-  swVelInfos.addr_length = ctrlProfileVel_.addr_length;
-  infoXelsSwVel = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
-  swVelInfos.p_xels = infoXelsSwVel;
+  // Sync buffer for writing goal velocity
+  swGoalVelInfos.packet.p_buf = NULL;
+  swGoalVelInfos.packet.is_completed = false;
+  swGoalVelInfos.addr = ctrlGoalVel_.addr;
+  swGoalVelInfos.addr_length = ctrlGoalVel_.addr_length;
+  infoXelsSwGoalVel = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
+  swGoalVelInfos.p_xels = infoXelsSwGoalVel;
   i = 0;
   for (auto& s : servos_) {
-    infoXelsSwVel[i].id = s.id;
-    infoXelsSwVel[i].p_data = (uint8_t*)&(s.profileVel);
+    infoXelsSwGoalVel[i].id = s.id;
+    infoXelsSwGoalVel[i].p_data = (uint8_t*)&(s.goalVel);
     i++;
   }
-  swVelInfos.xel_count = servos_.size();
-  swVelInfos.is_info_changed = true;
+  swGoalVelInfos.xel_count = servos_.size();
+  swGoalVelInfos.is_info_changed = true;
+
+  // Sync buffer for writing goal current
+  swGoalCurInfos.packet.p_buf = NULL;
+  swGoalCurInfos.packet.is_completed = false;
+  swGoalCurInfos.addr = ctrlGoalCur_.addr;
+  swGoalCurInfos.addr_length = ctrlGoalCur_.addr_length;
+  infoXelsSwGoalCur = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
+  swGoalCurInfos.p_xels = infoXelsSwGoalCur;
+  i = 0;
+  for (auto& s : servos_) {
+    infoXelsSwGoalCur[i].id = s.id;
+    infoXelsSwGoalCur[i].p_data = (uint8_t*)&(s.goalCur);
+    i++;
+  }
+  swGoalCurInfos.xel_count = servos_.size();
+  swGoalCurInfos.is_info_changed = true;
+
+  // Sync buffer for writing profile velocity -- not sure if needed?
+  swPrfVelInfos.packet.p_buf = NULL;
+  swPrfVelInfos.packet.is_completed = false;
+  swPrfVelInfos.addr = ctrlProfileVel_.addr;
+  swPrfVelInfos.addr_length = ctrlProfileVel_.addr_length;
+  infoXelsSwPrfVel = new DYNAMIXEL::XELInfoSyncWrite_t[servos_.size()];
+  swPrfVelInfos.p_xels = infoXelsSwPrfVel;
+  i = 0;
+  for (auto& s : servos_) {
+    infoXelsSwPrfVel[i].id = s.id;
+    infoXelsSwPrfVel[i].p_data = (uint8_t*)&(s.profileVel);
+    i++;
+  }
+  swPrfVelInfos.xel_count = servos_.size();
+  swPrfVelInfos.is_info_changed = true;
 }
 
 void bb::Servos::teardownSyncBuffers() {
@@ -779,18 +960,18 @@ void bb::Servos::teardownSyncBuffers() {
   infoXelsSrPresent = NULL;
   delete infoXelsSrLoad;
   infoXelsSrLoad = NULL;
-  delete infoXelsSwGoal;
-  infoXelsSwGoal = NULL;
-  delete infoXelsSwVel;
-  infoXelsSwVel = NULL;
+  delete infoXelsSwGoalPos;
+  infoXelsSwGoalPos = NULL;
+  delete infoXelsSwPrfVel;
+  infoXelsSwPrfVel = NULL;
   srPresentInfos.p_xels = NULL;
   srPresentInfos.xel_count = 0;
   srLoadInfos.p_xels = NULL;
   srLoadInfos.xel_count = 0;
-  swGoalInfos.p_xels = NULL;
-  swGoalInfos.xel_count = 0;
-  swVelInfos.p_xels = NULL;
-  swVelInfos.xel_count = 0;
+  swGoalPosInfos.p_xels = NULL;
+  swGoalPosInfos.xel_count = 0;
+  swPrfVelInfos.p_xels = NULL;
+  swPrfVelInfos.xel_count = 0;
 }
 
 Result bb::Servos::syncReadInfo(ConsoleStream *stream) {
@@ -814,16 +995,36 @@ Result bb::Servos::syncReadInfo(ConsoleStream *stream) {
 }
 
 Result bb::Servos::syncWriteInfo(ConsoleStream* stream) {
-  if(dxl_.syncWrite(&swVelInfos) == false) {
+  if(dxl_.syncWrite(&swPrfVelInfos) == false) {
     if(stream) stream->printf("servo: Sending servo profile velocity failed!\n");
     else Console::console.printfBroadcast("servo: Sending servo profile velocity failed!\n");
     return RES_SUBSYS_COMM_ERROR;
   }
 
-  if(dxl_.syncWrite(&swGoalInfos) == false) {
-    if(stream) stream->printf("servo: Sending servo position goal failed!\n");
-    else Console::console.printfBroadcast("servo: Sending servo position goal failed!\n");
-    return RES_SUBSYS_COMM_ERROR;
+  if(swGoalPosInfos.is_info_changed == true) {
+    if(dxl_.syncWrite(&swGoalPosInfos) == false) {
+      if(stream) stream->printf("servo: Sending servo position goal failed!\n");
+      else Console::console.printfBroadcast("servo: Sending servo position goal failed!\n");
+      return RES_SUBSYS_COMM_ERROR;
+    }
+  }
+
+  if(swGoalVelInfos.is_info_changed == true) {
+    if(dxl_.syncWrite(&swGoalVelInfos) == false) {
+      if(stream) stream->printf("servo: Sending servo velocity goal failed!\n");
+      else Console::console.printfBroadcast("servo: Sending servo velocity goal failed!\n");
+      return RES_SUBSYS_COMM_ERROR;
+    }
+    bb::printf("Successfully sent goal vel infos\n");
+  }
+
+  if(swGoalCurInfos.is_info_changed == true) {
+    if(dxl_.syncWrite(&swGoalCurInfos) == false) {
+      if(stream) stream->printf("servo: Sending servo current goal failed!\n");
+      else Console::console.printfBroadcast("servo: Sending servo current goal failed!\n");
+      return RES_SUBSYS_COMM_ERROR;
+    }
+    bb::printf("Successfully sent goal current infos\n");
   }
 
   return RES_OK;
