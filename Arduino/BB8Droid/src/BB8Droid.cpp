@@ -1,6 +1,5 @@
 #include "BB8Droid.h"
 #include "BB8Config.h"
-#include "BB8StatusPixels.h"
 #include "BB8BattStatus.h"
 #include "BB8Sound.h"
 
@@ -150,7 +149,6 @@ Result BB8::step() {
   imu_.update();
 
   driveEncoder_.update();
-  BB8StatusPixels::statusPixels.update();
 
   stepcount++;
   if (stepcount == 1 && BB8BattStatus::batt.available(BB8BattStatus::BATT_1)) BB8BattStatus::batt.updateVoltage(BB8BattStatus::BATT_1);
@@ -642,7 +640,8 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
     g = words[3].toInt();
     b = words[4].toInt();
 
-    BB8StatusPixels::statusPixels.setPixel(p, r, g, b);
+    setLED(WhichLED(p), r, g, b);
+
     return RES_OK;
   }
 

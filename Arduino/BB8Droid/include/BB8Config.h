@@ -14,11 +14,6 @@ static const float BODY_CIRCUMFERENCE            = 2*M_PI*253.0;
 static const float DRIVE_MOTOR_TICKS_PER_TURN    = 4776.384;
 static const float DRIVE_MOTOR_MAX_SPEED_MM_PER_S = 2000.0;
 
-// Network config
-static const uint16_t COMMAND_UDP_PORT = 2000; // BB8 listens on this port for commands (see BB8Packet.h for command structure)
-static const uint16_t STATE_UDP_PORT   = 2001; // BB8 sends running state on this port
-static const uint16_t REPLY_UDP_PORT   = 2002; // This port is used to reply to special commands
-
 struct BB8Params {
   // Motion Limits
   float bodyRollRange     = 80.0; // in the station don't go beyond 80, in the droid 90 is OK
@@ -110,23 +105,10 @@ static const uint8_t P_DYNAMIXEL_TX    = 14;
 static const uint8_t BATT1_STATUS_ADDR   = 0x40;
 static const uint8_t BATT2_STATUS_ADDR   = 0x41;
 
-static const uint8_t STATUSPIXEL_OVERALL = 0;
-static const uint8_t STATUSPIXEL_REMOTE  = 1;
-static const uint8_t STATUSPIXEL_MOTORS  = 2;
-
 static const uint8_t BALL1_NEOPIXEL_COUNT = 10;
 static const uint8_t BALL2_NEOPIXEL_COUNT = 10;
 
-const long unsigned int DYNAMIXEL_BPS = 57600;
-
-typedef enum {
-  PLOT_NONE,
-  PLOT_ROLL_CONTROLLER,
-  PLOT_BODY_IMU
-} PlotMode;
-
-extern PlotMode plotMode;
-
+// I2C Peripherals
 static const uint8_t IMU_ADDR           = 0x6a;
 
 

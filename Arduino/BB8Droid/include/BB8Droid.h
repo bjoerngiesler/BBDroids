@@ -39,7 +39,6 @@ public:
 
   virtual void printStatus(ConsoleStream *stream);
 
-  //virtual Result incomingControlPacket(uint16_t station, PacketSource source, uint8_t rssi, const ControlPacket& packet);
   virtual Result incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet);
 
   virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
@@ -55,6 +54,7 @@ public:
     LED_COMM   = 1,
     LED_DRIVE  = 2
   };
+  
   enum WhatColor {
     OFF    = 0,
     RED    = 1,

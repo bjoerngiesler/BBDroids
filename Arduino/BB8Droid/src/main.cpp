@@ -2,7 +2,6 @@
 #include "BB8Droid.h"
 #include "BB8Config.h"
 #include "BB8WifiSecrets.h"
-#include "BB8StatusPixels.h"
 #include "BB8Sound.h"
 #include <math.h>
 #include <limits.h>
