@@ -9,9 +9,10 @@ static const bb::DroidType DROID_TYPE = bb::DroidType::DROID_BB8;
 static const char*         DROID_NAME = "Generic BB-8";
 static const uint8_t       BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 2 - Micke, 3 - Brad
 static const uint8_t       DROID_ID = 0;
-static const float BODY_CIRCUMFERENCE            = 2*M_PI*253.0; // bb8 motor pwm 0
+
+static const float BODY_CIRCUMFERENCE            = 2*M_PI*253.0;
 static const float DRIVE_MOTOR_TICKS_PER_TURN    = 4776.384;
-static const float DRIVE_MOTOR_MAX_SPEED_M_PER_S = 2.0;
+static const float DRIVE_MOTOR_MAX_SPEED_MM_PER_S = 2000.0;
 
 // Network config
 static const uint16_t COMMAND_UDP_PORT = 2000; // BB8 listens on this port for commands (see BB8Packet.h for command structure)
@@ -22,11 +23,11 @@ struct BB8Params {
   // Motion Limits
   float bodyRollRange     = 80.0; // in the station don't go beyond 80, in the droid 90 is OK
   float bodyRollOffset    = 0;
-  float domePitchRange    = 30.0;
+  float domePitchRange    = 45.0;
   float domePitchOffset   = 0.0;
   float domeHeadingRange  = 90.0;
   float domeHeadingOffset = 0.0;
-  float domeRollRange     = 30.0;
+  float domeRollRange     = 45.0;
   float domeRollOffset    = 0.0;
 
   // PID controller parameters
@@ -36,25 +37,26 @@ struct BB8Params {
   float balKp              = 25;
   float balKi              = 0;
   float balKd              = 0.2;
-  float rollKp             = 0;
-  float rollKi             = 0;
-  float rollKd             = 0;
+  float rollKp             = 13; // carpet: 15
+  float rollKi             = 1; // carpet: 15
+  float rollKd             = 0; // carpet: 0
   float rollServoVel       = 100.0;
-  float rollServoAccel     = 100.0;
+  float rollServoAccel     = 0; // 100.0;
 
-  float driveSpeedIMax     = 10.0f;     // not used yet
   float driveSpeedDeadband = 0.01f; // not used yet
-  float driveSpeedIAbort   = 1000.0f; // not used yet
-  float driveSpeedMax      = 400.0f;
+  float driveSpeedMax      = DRIVE_MOTOR_MAX_SPEED_MM_PER_S;
 
-  float rollIMax            = 20;
+  float rollIMax            = 50;
   float rollTorquePercent   = 90;
   float domeMaxVel          = 130; // degrees per second
 
-  bool domeHeadingServoReverse = false;
-  bool domeRollServoReverse    = false;
+  bool domeHeadingServoReverse = true;
+  bool domeRollServoReverse    = true;
   bool domePitchServoReverse   = false;
   bool bodyRollServoReverse    = true;
+
+  float faDomeAnnealTime   = .5;     // Time it takes for all head axes ot return to 0 after control has been relinquished.
+  float faDomeAnnealDelay  = .3;     // Delay before we anneal the head position if button is released
 };
 
 static const int DOME_HEADING_SERVO  = 1;
@@ -79,35 +81,6 @@ static const uint8_t SOUND_MAINLOOP       = 255;
 //#define SERIALTX_MODE_SPEKTRUM
 #define SERIALTX_MODE_XBEE
 
-#if 0
-// Left side pins
-static const uint8_t P_DRIVE_EN          = 15; // A0
-static const uint8_t P_DRIVE_A           = 16; // A1
-static const uint8_t P_DRIVE_B           = 17; // A2
-static const uint8_t P_DRIVE_PWM         = 18; // A3
-static const uint8_t P_YAW_PWM       = 19; // A4
-static const uint8_t P_YAW_EN        = 20; // A5
-static const uint8_t P_DYNAMIXEL_RTS   = 21; // A6
-static const uint8_t P_SERIALTX_TX     = 0;  // OK
-static const uint8_t P_SERIALTX_RX     = 1;  // OK
-static const uint8_t P_YAW_A         = 2;
-static const uint8_t P_YAW_B         = 3;
-static const uint8_t P_STATUS_NEOPIXEL = 4;
-static const uint8_t P_BALL1_NEOPIXEL  = 5;
-
-// Right side pins
-static const uint8_t P_DRIVEENC_B      = 6;   // OK
-static const uint8_t P_DRIVEENC_A      = 7;   // OK
-static const uint8_t P_DFPLAYER_TX     = 8;   // OK
-static const uint8_t P_DFPLAYER_RX     = 9;   // OK
-static const uint8_t P_BALL2_NEOPIXEL  = 10;
-static const uint8_t P_I2C_SDA         = 11;  // OK
-static const uint8_t P_I2C_SCL         = 12;  // OK
-static const uint8_t P_DYNAMIXEL_RX    = 13;
-static const uint8_t P_DYNAMIXEL_TX    = 14;
-#endif
-
-#if 1
 // Left side pins
 static const uint8_t P_YAW_EN          = 15; // A0
 static const uint8_t P_YAW_A           = 16; // A1
@@ -133,10 +106,7 @@ static const uint8_t P_I2C_SDA         = 11;  // OK
 static const uint8_t P_I2C_SCL         = 12;  // OK
 static const uint8_t P_DYNAMIXEL_RX    = 13;
 static const uint8_t P_DYNAMIXEL_TX    = 14;
-#endif
 
-//static const uint8_t DOME_IMU_ADDR     = 0x18;
-//static const uint8_t BODY_IMU_ADDR     = 0x19;
 static const uint8_t BATT1_STATUS_ADDR   = 0x40;
 static const uint8_t BATT2_STATUS_ADDR   = 0x41;
 
@@ -148,12 +118,6 @@ static const uint8_t BALL1_NEOPIXEL_COUNT = 10;
 static const uint8_t BALL2_NEOPIXEL_COUNT = 10;
 
 const long unsigned int DYNAMIXEL_BPS = 57600;
-
-typedef struct {
-  float min, max, offset, speed;
-} ServoLimits;
-
-extern ServoLimits servolimits[];
 
 typedef enum {
   PLOT_NONE,

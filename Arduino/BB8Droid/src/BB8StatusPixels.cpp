@@ -96,7 +96,7 @@ void BB8StatusPixels::update() {
       overrides_.erase(pair.first);
     }
 
-    int numStarted = 0;
+    unsigned int numStarted = 0;
     for(auto subsys: pair.second) {
       if(subsys->isStarted()) numStarted++;
     }

@@ -9,13 +9,6 @@
 BB8 BB8::bb8;
 BB8Params BB8::params_;
 
-ServoLimits servolimits[] = {
-  { 0.0f, 360.0f, 0.0f, 60.0 },
-  { 120.0f, 240.0f, 0.0f, 60.0 },
-  { 120.0f, 240.0f, 0.0f, 60.0 },
-  { 160.0f, 200.0f, 0.0f, 80.0 }
-};
-
 BB8::BB8(): 
     imu_(IMU_ADDR),
     driveMotor_(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM, P_DRIVE_EN),
@@ -23,10 +16,12 @@ BB8::BB8():
     driveEncoder_(P_DRIVEENC_A, P_DRIVEENC_B, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
     balanceInput_(imu_, IMUControlInput::IMU_PITCH),
     rollInput_(imu_, IMUControlInput::IMU_ROLL, true),
-    rollOutput_(BODY_ROLL_SERVO),
+    rollOutput_(BODY_ROLL_SERVO, 0, Servos::CONTROL_CURRENT),
     driveController_(driveEncoder_, driveMotor_),
     balanceController_(balanceInput_, driveController_),
-    rollController_(rollInput_, rollOutput_) {
+    rollController_(rollInput_, rollOutput_),
+    statusPixels_(3, P_STATUS_NEOPIXEL, NEO_GRB+NEO_KHZ800)
+{
   name_ = "bb8";
   description_ = "BB8 Main System";
   help_ = "BB8 Main System\r\n"
@@ -40,6 +35,16 @@ BB8::BB8():
           "        set_pixel <num> <r> <g> <b>     Set Neopixel <num> (1-3) to rgb color";
   started_ = false;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
+
+  statusPixels_.begin();
+  statusPixels_.setBrightness(2);
+  statusPixels_.show();
+
+  setLED(LED_STATUS, WHITE);
+  setLED(LED_COMM, OFF);
+  setLED(LED_DRIVE, OFF);
+  commLEDOn_ = false;
+  msLastLeftCtrlPacket_ = msLastRightCtrlPacket_ = msLastPrimaryCtrlPacket_ = 0;
 }
 
 Result BB8::initialize() {
@@ -64,9 +69,7 @@ Result BB8::initialize() {
   addParameter("roll_servo_vel", "Velocity for roll servo", params_.rollServoVel);
   addParameter("roll_servo_accel", "Acceleration for roll servo", params_.rollServoAccel);
 
-  addParameter("drive_speed_imax", "Max integral error for drive speed controller", params_.driveSpeedIMax);
   addParameter("drive_speed_deadband", "Deadband for drive speed controller", params_.driveSpeedDeadband);
-  addParameter("drive_speed_iabort", "Drive speed controller aborts if integral error exceeds this", params_.driveSpeedIAbort);
   addParameter("drive_speed_max", "Max speed for drive controller", params_.driveSpeedMax);
 
   addParameter("roll_imax", "Max integral error for roll controller", params_.rollIMax);
@@ -84,7 +87,7 @@ Result BB8::initialize() {
   balanceController_.setRamp(100);
   //balanceController_.setDebug(true);
   rollController_.setAutoUpdate(false);
-  rollController_.setControlOffset(180.0);
+  //rollController_.setControlOffset(180.0);
   rollController_.setGoal(0.0);
   rollController_.setRamp(30);
   //rollController_.setDebug(true);
@@ -124,7 +127,9 @@ Result BB8::start(ConsoleStream *stream) {
   }
 
   setControlParameters();
+  annealH_ = annealP_ = annealR_ = 0;
 
+  bb::Servos::servos.setControlMode(BODY_ROLL_SERVO, bb::Servos::CONTROL_CURRENT);
   bb::Servos::servos.switchTorque(bb::Servos::ID_ALL, true);
 
   return RES_OK;
@@ -216,6 +221,51 @@ Result BB8::stepRollMotor() {
 }
 
 Result BB8::stepDome() {
+  float p, r, h, dr, dp, dh, ax, ay, az;
+  imu_.getFilteredPRH(p, r, h);
+  imu_.getAccelMeasurement(ax, ay, az);
+  imu_.getGyroMeasurement(dp, dr, dh);
+
+  LOG(LOG_DEBUG, "R:%f P:%f H:%f AX:%f AY:%f AZ:%f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, dr, dp, dh);
+
+  if(servosOK_) {
+    float domePitch = remoteP_;
+    if(params_.domePitchServoReverse) bb::Servos::servos.setGoalPos(DOME_PITCH_SERVO, 180 - remoteP_);
+    else bb::Servos::servos.setGoalPos(DOME_PITCH_SERVO, 180 + remoteP_);
+    if(params_.domeHeadingServoReverse) bb::Servos::servos.setGoalPos(DOME_HEADING_SERVO, 180.0 - remoteH_);
+    else bb::Servos::servos.setGoalPos(DOME_HEADING_SERVO, 180.0 + remoteH_);
+    if(params_.domeRollServoReverse) bb::Servos::servos.setGoalPos(DOME_ROLL_SERVO, 180.0 - remoteR_);
+    else bb::Servos::servos.setGoalPos(DOME_ROLL_SERVO, 180.0 + remoteR_);
+  }
+  
+  if(lastPrimaryCtrlPacket_.button3 == false && (float(millis())/1000.0f > annealTime_ + params_.faDomeAnnealDelay)) {
+    if(remoteP_ > 0.5) {
+      remoteP_ -= annealP_;
+      if(remoteP_ < 0) remoteP_ = 0;
+    } else if(remoteP_ < -0.5) {
+      remoteP_ += annealP_;
+      if(remoteP_ > 0) remoteP_ = 0;
+    } else remoteP_ = 0;
+
+    if(remoteH_ > 0.5) {
+      remoteH_ -= annealH_;
+      if(remoteH_ < 0) remoteH_ = 0;
+    } else if(remoteH_ < -0.5) {
+      remoteH_ += annealH_;
+      if(remoteH_ > 0) remoteH_ = 0;
+    } else remoteH_ = 0;
+
+    if(remoteR_ > 0.5) {
+      remoteR_ -= annealR_;
+      if(remoteR_ < 0) remoteR_ = 0;
+    } else if(remoteR_ < -0.5) {
+      remoteR_ += annealR_;
+      if(remoteR_ > 0) remoteR_ = 0;
+    } else remoteR_ = 0;
+  } else if(lastPrimaryCtrlPacket_.button3 == true){
+    annealTime_ = float(millis()) / 1000.0f;
+  }
+
   return RES_OK;
 }
 
@@ -246,9 +296,12 @@ Result BB8::setParameterValue(const String& name, const String& stringVal) {
 }
 
 void BB8::setControlParameters() {
+  driveEncoder_.setMillimetersPerTick(BODY_CIRCUMFERENCE / DRIVE_MOTOR_TICKS_PER_TURN);
+  driveEncoder_.setMode(bb::Encoder::INPUT_SPEED);
+  driveEncoder_.setUnit(bb::Encoder::UNIT_MILLIMETERS);
+
   driveController_.setControlParameters(params_.driveSpeedKp, params_.driveSpeedKi, params_.driveSpeedKd);
-  driveController_.setIBounds(-params_.driveSpeedIMax, params_.driveSpeedIMax);
-  driveController_.setGoal(0);
+  driveController_.setIBounds(-255, 255);
   driveController_.reset();
 
   balanceController_.setControlParameters(params_.balKp, params_.balKi, params_.balKd);
@@ -260,9 +313,12 @@ void BB8::setControlParameters() {
 }
 
 void BB8::setServoParameters() {
+#if 0
   bb::Servos::servos.setOffset(BODY_ROLL_SERVO, params_.bodyRollOffset);
   bb::Servos::servos.setRange(BODY_ROLL_SERVO, 180-params_.bodyRollRange, 180+params_.bodyRollRange);
   bb::Servos::servos.setProfileVelocity(BODY_ROLL_SERVO, params_.rollServoVel);
+#endif
+
   bb::Servos::servos.setProfileAcceleration(BODY_ROLL_SERVO, params_.rollServoAccel);
   bb::Servos::servos.setLoadShutdownEnabled(BODY_ROLL_SERVO, true);
 
@@ -331,10 +387,12 @@ Result BB8::servoTest(ConsoleStream *stream) {
   setServoParameters();
   bb::Servos::servos.switchTorque(Servos::ID_ALL, true);
 
+#if 0
   if(bb::Servos::servos.home(BODY_ROLL_SERVO, 5.0, 95, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing body roll servo failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   } 
+#endif
   
   rollController_.setGoal(0.0);
 
@@ -393,74 +451,67 @@ void BB8::printStatus(ConsoleStream *stream) {
 }
 
 Result BB8::incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet) {
-#if defined(USE_ROLL_CONTROLLER)
-  float bodyRollInput = packet.getAxis(0) * 25.0;
-  //bb::printf("Body roll: %f\n", bodyRollInput);
-  rollController_.setGoal(bodyRollInput);
-  return RES_OK;
-#else
-  float bodyRollInput = packet.getAxis(0) * BODY_ROLL_RANGE;
-  Servos::servos.setProfileVelocity(BODY_ROLL_SERVO, 100);
-  Servos::servos.setGoal(BODY_ROLL_SERVO, 180+bodyRollInput);
-  return RES_OK;
-#endif
-
-  float velInput = packet.getAxis(1);
-  float domeRollInput = packet.getAxis(2);
-  float domePitchInput = packet.getAxis(3);
-  float domeHeadingInput = packet.getAxis(4);
-  
-  if(packet.button1) {
-    float vel = params_.driveSpeedMax * velInput;  // magic
-    driveEncoder_.setMode(bb::Encoder::INPUT_SPEED);
-    //Console::console.printfBroadcast("Setting velocity to %f\n", vel);
-    balanceController_.setControlOffset(-vel);
-    
-    float roll = bodyRollInput * 20.0;
-    Console::console.printfBroadcast("Setting body roll goal to %f\n", roll);
-    rollController_.setGoal(roll);    
-    //rollController_.setControlOffset(roll+180.0);
-  } 
-  else {
-    driveEncoder_.setMode(bb::Encoder::INPUT_SPEED);
-    driveController_.setGoal(0.0f);
-    rollController_.setGoal(0.0);
-    //rollController_.setControlOffset(180.0);
-  }
-
-  float r, p, h;
-  imu_.getFilteredPRH(p, r, h);
-  static float domeRollZero = 0, domePitchZero = 0, domeHeadingZero = 0;
-
-  if(packet.button2) {
-    if(!lastPacket_.button2) { // fresh press - use current values as zero
-      domeRollZero = domeRollInput;
-      domePitchZero = domePitchInput;
-      domeHeadingZero = domeHeadingInput;
+  if(commLEDOn_ == false) {
+    unsigned long ms = millis();
+    if(ms - msLastLeftCtrlPacket_ < 100) {
+      if(ms - msLastRightCtrlPacket_ < 100) {
+        // both coming in - white
+        setLED(LED_COMM, WHITE);
+      } else {
+        // Only left coming in - blue
+        setLED(LED_COMM, BLUE);
+      }
+    } else {
+      // Only right coming in - green
+      setLED(LED_COMM, GREEN);
     }
-    domeRollInput -= domeRollZero;
-    domePitchInput -= domePitchZero;
-    domeHeadingInput -= domeHeadingZero;
-
-    
-    if(params_.domeRollServoReverse) domeRollInput = 180.0 - ((domeRollInput*30.0)*4 - 2*(bb::Servos::servos.present(BODY_ROLL_SERVO)-180.0));
-    else domeRollInput = 180.0 + ((domeRollInput*30.0)*4 - 2*(bb::Servos::servos.present(BODY_ROLL_SERVO)-180.0));
-    if(params_.domePitchServoReverse) domePitchInput = 180.0 - ((domePitchInput*30.0)*4);
-    else domePitchInput = 180.0 + ((domePitchInput*30.0)*4);
-    if(params_.domeHeadingServoReverse) domeHeadingInput = 180.0 - ((domeHeadingInput*30.0)*4);
-    else domeHeadingInput = 180.0 + ((domeHeadingInput*30.0)*4);
-      
-    bb::Servos::servos.setGoal(DOME_ROLL_SERVO, domeRollInput);
-    bb::Servos::servos.setGoal(DOME_PITCH_SERVO, domePitchInput);
-    bb::Servos::servos.setGoal(DOME_HEADING_SERVO, domeHeadingInput);
-  } else {
-    bb::Servos::servos.setGoal(DOME_ROLL_SERVO, 180.0);
-    bb::Servos::servos.setGoal(DOME_PITCH_SERVO, 180.0);
-    bb::Servos::servos.setGoal(DOME_HEADING_SERVO, 180.0);
+  
+    commLEDOn_ = true;
+    Runloop::runloop.scheduleTimedCallback(100, [=]{ setLED(LED_COMM, OFF); commLEDOn_ = false; });
   }
 
-  packetTimeout_ = 3;
-  lastPacket_ = packet;
+  // Check for duplicates and lost packets
+  if(source == PACKET_SOURCE_LEFT_REMOTE) {
+    if(seqnum == lastLeftSeqnum_) return RES_OK; // duplicate
+    if(WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8) != 1) {
+      LOG(LOG_WARN, "Left control packet: seqnum %d, last %d, lost %d packets!\n", 
+                    seqnum, lastLeftSeqnum_, WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8)-1);
+    }
+    lastLeftSeqnum_ = seqnum;
+    numLeftCtrlPackets_++;
+    msLastLeftCtrlPacket_ = millis();
+  } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
+    if(seqnum == lastRightSeqnum_) return RES_OK; // duplicate
+    if(WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8) != 1) {
+      LOG(LOG_WARN, "Right control packet: seqnum %d, last %d, lost %d packets!\n", 
+                    seqnum, lastRightSeqnum_, WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8)-1);
+    }
+    lastRightSeqnum_ = seqnum;
+    numRightCtrlPackets_++;
+    msLastRightCtrlPacket_ = millis();
+  } else {
+    LOG(LOG_ERROR, "Control packet from unknown source %d\n", source);
+    return RES_SUBSYS_COMM_ERROR;
+  }
+
+  if(packet.primary == true) {
+    float bodyRollInput = packet.getAxis(0) * 25.0;
+    float velInput = packet.getAxis(1) * params_.driveSpeedMax;
+
+    rollController_.setGoal(bodyRollInput);
+    balanceController_.setControlOffset(-velInput);
+
+    if(packet.button3) {
+      remoteR_ = packet.getAxis(2, ControlPacket::UNIT_DEGREES_CENTERED);
+      remoteP_ = packet.getAxis(3, ControlPacket::UNIT_DEGREES_CENTERED);
+      remoteH_ = packet.getAxis(4, ControlPacket::UNIT_DEGREES_CENTERED);
+      annealR_ = fabs(remoteR_ / (params_.faDomeAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
+      annealP_ = fabs(remoteP_ / (params_.faDomeAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
+      annealH_ = fabs(remoteH_ / (params_.faDomeAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
+    }
+
+    lastPrimaryCtrlPacket_ = packet;
+  }
 
   return RES_OK;
 }
@@ -621,4 +672,27 @@ void BB8::printCurrentSystemStatus(ConsoleStream *stream) {
 
   if (stream != NULL) stream->printf("%s\n", str.c_str());
   else Console::console.printfBroadcast("%s\n", str.c_str());
+}
+
+Result BB8::setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b) {
+  statusPixels_.setPixelColor(int(which), r, g, b);
+  statusPixels_.show();
+  return RES_OK;
+}
+
+Result BB8::setLED(WhichLED which, WhatColor color) {
+  switch(color) {
+    case RED: return setLED(which, 255, 0, 0); break;
+    case GREEN: return setLED(which, 0, 255, 0); break;
+    case BLUE: return setLED(which, 0, 0, 255); break;
+    case YELLOW: return setLED(which, 255, 255, 0); break;
+    case WHITE: return setLED(which, 255, 255, 255); break;
+    case OFF: default: return setLED(which, 0, 0, 0); break;
+  }
+  return RES_COMMON_NOT_IN_LIST;
+}
+
+void BB8::setLEDBrightness(uint8_t brightness) {
+  statusPixels_.setBrightness(brightness);
+  statusPixels_.show();
 }

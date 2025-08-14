@@ -2,6 +2,8 @@
 #define BB8_H
 
 #include <LibBB.h>
+#include <Adafruit_NeoPixel.h>
+
 #include "BB8Config.h"
 
 using namespace bb;
@@ -47,6 +49,25 @@ public:
 
   void printCurrentSystemStatus(ConsoleStream *stream = NULL);
 
+
+  enum WhichLED {
+    LED_STATUS = 0,
+    LED_COMM   = 1,
+    LED_DRIVE  = 2
+  };
+  enum WhatColor {
+    OFF    = 0,
+    RED    = 1,
+    GREEN  = 2,
+    BLUE   = 3,
+    YELLOW = 4,
+    WHITE  = 5
+  };
+  Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b);
+  Result setLED(WhichLED which, WhatColor color);
+  void setLEDBrightness(uint8_t brightness);
+
+
 protected:
   void setControlParameters();
   void setServoParameters();
@@ -57,6 +78,13 @@ protected:
   ConfigStorage::HANDLE paramsHandle_;
   bb::ControlPacket lastPacket_;
   int packetTimeout_;
+
+  int numLeftCtrlPackets_, numRightCtrlPackets_;
+  uint8_t lastLeftSeqnum_, lastRightSeqnum_;
+  unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_, msLastPrimaryCtrlPacket_;
+  bb::ControlPacket lastPrimaryCtrlPacket_, lastSecondaryCtrlPacket_;
+
+
   size_t packetsReceived_, packetsMissed_;
   bool runningStatus_;
 
@@ -79,6 +107,13 @@ protected:
   bb::IMUControlInput balanceInput_, rollInput_;
   bb::ServoControlOutput rollOutput_;
   bb::PIDController driveController_, balanceController_, rollController_;
+
+  float remoteP_, remoteH_, remoteR_;
+  float annealP_, annealH_, annealR_, annealTime_;
+
+  Adafruit_NeoPixel statusPixels_;
+  bool commLEDOn_;
+
 
   bool servosOK_;
 };
