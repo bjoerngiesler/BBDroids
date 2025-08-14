@@ -336,7 +336,7 @@ unsigned int bb::WifiServer::readDataIfAvailable(uint8_t *buf, unsigned int maxs
 	}
 }
 
-void bb::WifiServer::printStatus(ConsoleStream *stream) {
+void bb::WifiServer::printExtendedStatus(ConsoleStream *stream) {
 	if(stream == NULL) return;
 
 	if(WiFi.status() == WL_NO_MODULE) {

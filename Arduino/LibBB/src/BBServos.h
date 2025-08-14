@@ -8,17 +8,6 @@
 
 namespace bb {
 
-class ServoControlOutput: public bb::ControlOutput {
-public:
-  ServoControlOutput(uint8_t servoNum, float offset=0.0f);
-  float present();
-  bb::Result set(float value);
-
-protected:
-  uint8_t sn_;
-  float offset_;
-};
-
 class Servos: public Subsystem {
 public:
   typedef enum {
@@ -115,6 +104,8 @@ protected:
   uint8_t userPktBufPresent[userPktBufCap], userPktBufLoad[userPktBufCap];
   bool torqueOffOnStop_;
 
+  bool getControlTableItemInfo(uint16_t model, uint8_t item, DYNAMIXEL::ControlTableItemInfo_t& info);
+
   typedef struct {
     int32_t presentPos;
   } __attribute((packed)) srDataPresent_t;
@@ -150,6 +141,18 @@ protected:
   void teardownSyncBuffers();
   Result syncReadInfo(ConsoleStream *stream = NULL);
   Result syncWriteInfo(ConsoleStream *stream = NULL);
+};
+
+class ServoControlOutput: public bb::ControlOutput {
+public:
+  ServoControlOutput(uint8_t servoNum, float offset=0.0f, Servos::ControlMode mode=Servos::CONTROL_POSITION);
+  float present();
+  bb::Result set(float value);
+
+protected:
+  uint8_t sn_;
+  float offset_;
+  Servos::ControlMode mode_;
 };
 
 };
