@@ -12,6 +12,7 @@ bb::PIDController::PIDController(ControlInput& input, ControlOutput& output):
   debug_(false),
   inputScale_(1.0),
   reverse_(false),
+  inhibit_(false),
   ramp_(0.0),
   differentialFilter_(5.0, 100) {
   setControlParameters(0.0f, 0.0f, 0.0f);
@@ -84,15 +85,17 @@ void bb::PIDController::update(void) {
     lastControl_ = constrain(lastControl_, controlMin_, controlMax_);
   }
 
+  float controlOut;
   if(lastControl_ > deadbandMin_ && lastControl_ < deadbandMax_) {
-    setControlOutput(controlOffset_);
+    controlOut = controlOffset_; 
   } else if(reverse_) {
-    setControlOutput(-(lastControl_ + controlOffset_));
+    controlOut = -(lastControl_ + controlOffset_);
   } else {
-    setControlOutput(lastControl_ + controlOffset_);
+    controlOut = lastControl_ + controlOffset_;
   }
   if(debug_)
     Console::console.printfBroadcast("Control: SP: %f Cur In: %f Cur Out: %f Err: %f errI: %f errD: %f Control: %f\n", curSetpoint_, input_.present(), output_.present(), err, errI_, lastErrDFiltered_, lastControl_);
+  if(inhibit_ == false) setControlOutput(controlOut);
 }
   
 void bb::PIDController::setGoal(const float& sp) {

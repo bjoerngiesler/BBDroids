@@ -10,14 +10,15 @@ static const char*         DROID_NAME = "Generic BB-8";
 static const uint8_t       BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 2 - Micke, 3 - Brad
 static const uint8_t       DROID_ID = 0;
 
-static const float BODY_CIRCUMFERENCE            = 2*M_PI*253.0;
-static const float DRIVE_MOTOR_TICKS_PER_TURN    = 4776.384;
+static const float BODY_CIRCUMFERENCE             = 2*M_PI*253.0;
+static const float DRIVE_MOTOR_TICKS_PER_TURN     = 4776.384;
 static const float DRIVE_MOTOR_MAX_SPEED_MM_PER_S = 2000.0;
+static const float ROLL_REDUCTION                 = 80.0/22.0;
 
 struct BB8Params {
   // Motion Limits
-  float bodyRollRange     = 80.0; // in the station don't go beyond 80, in the droid 90 is OK
-  float bodyRollOffset    = 0;
+  float bodyRollRange     = 25.0; // in the station don't go beyond 25, in the droid 30 is OK
+  float bodyRollOffset    = 2;
   float domePitchRange    = 45.0;
   float domePitchOffset   = 0.0;
   float domeHeadingRange  = 90.0;
@@ -32,14 +33,20 @@ struct BB8Params {
   float balKp              = 25;
   float balKi              = 0;
   float balKd              = 0.2;
-  float rollKp             = 13; // carpet: 15
-  float rollKi             = 1; // carpet: 15
-  float rollKd             = 0; // carpet: 0
-  float rollServoVel       = 100.0;
-  float rollServoAccel     = 0; // 100.0;
+  float rollKp             = 1.05;
+  float rollKi             = 0;
+  float rollKd             = 0;
+  float rollServoVel       = 0;
+  float rollServoAccel     = 0;
+
+  bool rollDirect          = false;
+  bool rollInhibit         = false;
+  bool rollDebug           = false;
+  bool autoPosControl      = false;
 
   float driveSpeedDeadband = 0.01f; // not used yet
   float driveSpeedMax      = DRIVE_MOTOR_MAX_SPEED_MM_PER_S;
+  float rollAngleMax       = 20.0;
 
   float rollIMax            = 50;
   float rollTorquePercent   = 90;

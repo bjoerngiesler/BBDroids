@@ -66,6 +66,9 @@ public:
   void setReverse(bool yesno) { reverse_ = yesno; }
   bool reverse() { return reverse_; }
 
+  void setInhibit(bool yesno) { inhibit_ = yesno; }
+  bool inhibit() { return inhibit_; }
+
   void setRamp(float ramp) { ramp_ = ramp; }
   float ramp(void) { return ramp_; }
 
@@ -78,6 +81,7 @@ protected:
   bool autoupdate_, debug_;
   float inputScale_;
   bool reverse_;
+  bool inhibit_;
 
   float kp_, ki_, kd_;
   float lastErr_, errI_, lastErrD_, lastErrDFiltered_, lastControl_;

@@ -38,10 +38,12 @@ bb::ServoControlOutput::ServoControlOutput(uint8_t sn, float offset, Servos::Con
 }
 
 bb::Result bb::ServoControlOutput::set(float value) {
+  float p;
   switch(mode_) {
   case Servos::CONTROL_POSITION:
-    //bb::printf("Setting position to %f\n", value+offset_);
-    if(Servos::servos.setGoalPos(sn_, value+offset_) == true) return RES_OK;
+    p = value+offset_;
+    //bb::printf("Setting position to %.1f (%.1f, %.1f)\n", p, value, offset_);
+    if(Servos::servos.setGoalPos(sn_, p) == true) return RES_OK;
     break;
   case Servos::CONTROL_VELOCITY:
     //bb::printf("Setting velocity to %f\n", value+offset_);

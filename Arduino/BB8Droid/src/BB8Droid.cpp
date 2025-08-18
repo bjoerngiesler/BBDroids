@@ -2,11 +2,35 @@
 #include "BB8Config.h"
 #include "BB8BattStatus.h"
 #include "BB8Sound.h"
+#include <SAMD_PWM.h>
 
-#define USE_ROLL_CONTROLLER
 
 BB8 BB8::bb8;
 BB8Params BB8::params_;
+
+//#define ROLL_VELOCITY
+#define ROLL_POSITION
+
+static float minPwmFreq = 200.0f;
+static float maxPwmFreq = 500.0f;
+static std::map<uint8_t, SAMD_PWM*> pwms;
+
+static void configureTimers() {
+  pwms[P_DRIVE_PWM] = new SAMD_PWM(P_DRIVE_PWM, minPwmFreq, 0);
+  pwms[P_YAW_PWM] = new SAMD_PWM(P_YAW_PWM, minPwmFreq, 0);
+  pwms[P_DRIVE_PWM]->setPWM();
+  pwms[P_YAW_PWM]->setPWM();
+}
+
+static void customAnalogWrite(uint8_t pin, uint8_t dutycycle) {
+  SAMD_PWM* pwm = pwms[pin];
+  if(pwm == nullptr) {
+    return;
+  }
+  float f = map(dutycycle, 0, 255, minPwmFreq, maxPwmFreq);
+  pwm->setPWM(pin, f, map(dutycycle, 0, 255, 0.0, 100.0));
+}
+
 
 BB8::BB8(): 
     imu_(IMU_ADDR),
@@ -15,7 +39,11 @@ BB8::BB8():
     driveEncoder_(P_DRIVEENC_A, P_DRIVEENC_B, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
     balanceInput_(imu_, IMUControlInput::IMU_PITCH),
     rollInput_(imu_, IMUControlInput::IMU_ROLL, true),
-    rollOutput_(BODY_ROLL_SERVO, 0, Servos::CONTROL_CURRENT),
+#if defined(ROLL_VELOCITY)
+    rollOutput_(BODY_ROLL_SERVO, 0, Servos::CONTROL_VELOCITY),
+#elif defined(ROLL_POSITION)
+    rollOutput_(BODY_ROLL_SERVO, 0, Servos::CONTROL_POSITION),
+#endif
     driveController_(driveEncoder_, driveMotor_),
     balanceController_(balanceInput_, driveController_),
     rollController_(rollInput_, rollOutput_),
@@ -68,8 +96,13 @@ Result BB8::initialize() {
   addParameter("roll_servo_vel", "Velocity for roll servo", params_.rollServoVel);
   addParameter("roll_servo_accel", "Acceleration for roll servo", params_.rollServoAccel);
 
+  addParameter("roll_direct", "Set to true for direct roll servo control, false for PID control", params_.rollDirect);
+  addParameter("roll_inhibit", "Set to true to inhibit roll controller output (but continue updating, for debugging)", params_.rollInhibit);
+  addParameter("roll_debug", "Set to true to debug roll controller", params_.rollDebug);
+
   addParameter("drive_speed_deadband", "Deadband for drive speed controller", params_.driveSpeedDeadband);
   addParameter("drive_speed_max", "Max speed for drive controller", params_.driveSpeedMax);
+  addParameter("roll_angle_max", "Maximum roll angle settable by remote", params_.rollAngleMax);
 
   addParameter("roll_imax", "Max integral error for roll controller", params_.rollIMax);
   addParameter("roll_torque_percent", "Abort roll motion if this percentage of torque is exceeded", params_.rollTorquePercent);
@@ -80,16 +113,20 @@ Result BB8::initialize() {
   addParameter("dome_pitch_servo_reverse", "Reverse the dome pitch servo", params_.domePitchServoReverse);
   addParameter("body_roll_servo_reverse", "Reverse the body roll servo", params_.bodyRollServoReverse);
 
+  configureTimers();
+  driveMotor_.setCustomAnalogWrite(&customAnalogWrite);
+
   driveController_.setAutoUpdate(false);
   //driveController_.setDebug(true);
   balanceController_.setAutoUpdate(false);
   balanceController_.setRamp(100);
   //balanceController_.setDebug(true);
   rollController_.setAutoUpdate(false);
-  //rollController_.setControlOffset(180.0);
+#if defined(ROLL_POSITION)
+  rollController_.setControlOffset(180.0);
+#endif
   rollController_.setGoal(0.0);
-  rollController_.setRamp(30);
-  //rollController_.setDebug(true);
+  //rollController_.setRamp(30);  
 
   imu_.setRotationAroundZ(bb::IMU::ROTATE_90);
 
@@ -113,6 +150,8 @@ Result BB8::start(ConsoleStream *stream) {
 
   operationStatus_ = selfTest();
 
+  driveMode_ = DRIVE_OFF;
+
   pwmControl_ = false;
   driveMotor_.set(0.0f);
   driveEncoder_.setMillimetersPerTick(BODY_CIRCUMFERENCE / DRIVE_MOTOR_TICKS_PER_TURN);
@@ -128,7 +167,11 @@ Result BB8::start(ConsoleStream *stream) {
   setControlParameters();
   annealH_ = annealP_ = annealR_ = 0;
 
-  bb::Servos::servos.setControlMode(BODY_ROLL_SERVO, bb::Servos::CONTROL_CURRENT);
+#if defined(ROLL_VELOCITY)
+  bb::Servos::servos.setControlMode(BODY_ROLL_SERVO, bb::Servos::CONTROL_VELOCITY);
+#elif defined(ROLL_POSITION)
+  bb::Servos::servos.setControlMode(BODY_ROLL_SERVO, bb::Servos::CONTROL_POSITION);
+#endif
   bb::Servos::servos.switchTorque(bb::Servos::ID_ALL, true);
 
   return RES_OK;
@@ -205,16 +248,24 @@ bb::Result BB8::stepIfNotStarted() {
 
 
 Result BB8::stepDriveMotor() {
-  //driveMotor_.brake();
-  balanceController_.update();
-  driveController_.update();
-  //Console::console.printfBroadcast("Drive motor setpoint: %f\n", driveMotor_.present());
+  unsigned long timeSinceLastPrimary = WRAPPEDDIFF(millis(), msLastPrimaryCtrlPacket_, ULONG_MAX);
+  if(timeSinceLastPrimary > 500 && driveMode_ != DRIVE_OFF) {
+    LOG(LOG_INFO, "No control packet from primary in %ldms. Switching drive off.\n", timeSinceLastPrimary);
+    switchDrive(DRIVE_OFF);
+  }
 
+  if(driveMode_ != DRIVE_OFF) {
+    balanceController_.update();
+    driveController_.update();
+  } else {
+    driveMotor_.set(0);
+  }
   return RES_OK;
 }
 
 Result BB8::stepRollMotor() {
-  rollController_.update();
+  if(params_.rollDirect == false)
+    rollController_.update();
   return RES_OK;
 }
 
@@ -227,13 +278,9 @@ Result BB8::stepDome() {
   LOG(LOG_DEBUG, "R:%f P:%f H:%f AX:%f AY:%f AZ:%f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, dr, dp, dh);
 
   if(servosOK_) {
-    float domePitch = remoteP_;
-    if(params_.domePitchServoReverse) bb::Servos::servos.setGoalPos(DOME_PITCH_SERVO, 180 - remoteP_);
-    else bb::Servos::servos.setGoalPos(DOME_PITCH_SERVO, 180 + remoteP_);
-    if(params_.domeHeadingServoReverse) bb::Servos::servos.setGoalPos(DOME_HEADING_SERVO, 180.0 - remoteH_);
-    else bb::Servos::servos.setGoalPos(DOME_HEADING_SERVO, 180.0 + remoteH_);
-    if(params_.domeRollServoReverse) bb::Servos::servos.setGoalPos(DOME_ROLL_SERVO, 180.0 - remoteR_);
-    else bb::Servos::servos.setGoalPos(DOME_ROLL_SERVO, 180.0 + remoteR_);
+    bb::Servos::servos.setGoalPos(DOME_PITCH_SERVO, 180 + remoteP_);
+    bb::Servos::servos.setGoalPos(DOME_HEADING_SERVO, 180.0 + remoteH_);
+    bb::Servos::servos.setGoalPos(DOME_ROLL_SERVO, 180.0 + remoteR_);
   }
   
   if(lastPrimaryCtrlPacket_.button3 == false && (float(millis())/1000.0f > annealTime_ + params_.faDomeAnnealDelay)) {
@@ -305,32 +352,44 @@ void BB8::setControlParameters() {
   balanceController_.setControlParameters(params_.balKp, params_.balKi, params_.balKd);
   balanceController_.reset();
 
+  if(params_.rollDebug) rollController_.setDebug(true);
+  else rollController_.setDebug(false);
+
   rollController_.setControlParameters(params_.rollKp, params_.rollKi, params_.rollKd);
   rollController_.setIBounds(-params_.rollIMax, params_.rollIMax);
+  rollController_.setInhibit(params_.rollInhibit);
+#if defined(ROLL_VELOCITY)
+  rollController_.setControlBounds(-params_.rollServoVel, params_.rollServoVel);
+  rollController_.setRamp(params_.rollServoAccel);
+#else
+  rollController_.setControlUnbounded();
+  rollController_.setRamp(0.0);
+#endif
   rollController_.reset();
 }
 
 void BB8::setServoParameters() {
-#if 0
   bb::Servos::servos.setOffset(BODY_ROLL_SERVO, params_.bodyRollOffset);
-  bb::Servos::servos.setRange(BODY_ROLL_SERVO, 180-params_.bodyRollRange, 180+params_.bodyRollRange);
+  bb::Servos::servos.setRange(BODY_ROLL_SERVO, 180-(params_.bodyRollRange*ROLL_REDUCTION), 180+(params_.bodyRollRange*ROLL_REDUCTION));
   bb::Servos::servos.setProfileVelocity(BODY_ROLL_SERVO, params_.rollServoVel);
-#endif
-
   bb::Servos::servos.setProfileAcceleration(BODY_ROLL_SERVO, params_.rollServoAccel);
   bb::Servos::servos.setLoadShutdownEnabled(BODY_ROLL_SERVO, true);
+  bb::Servos::servos.setInverted(BODY_ROLL_SERVO, params_.bodyRollServoReverse);
 
   bb::Servos::servos.setOffset(DOME_PITCH_SERVO, params_.domePitchOffset);
   bb::Servos::servos.setRange(DOME_PITCH_SERVO, 180-params_.domePitchRange, 180+params_.domePitchRange);
   bb::Servos::servos.setProfileVelocity(DOME_PITCH_SERVO, params_.domeMaxVel);
+  bb::Servos::servos.setInverted(DOME_PITCH_SERVO, params_.domePitchServoReverse);
 
   bb::Servos::servos.setOffset(DOME_HEADING_SERVO, params_.domeHeadingOffset);
   bb::Servos::servos.setRange(DOME_HEADING_SERVO, 180-params_.domeHeadingRange, 180+params_.domeHeadingRange);
   bb::Servos::servos.setProfileVelocity(DOME_HEADING_SERVO, params_.domeMaxVel);
+  bb::Servos::servos.setInverted(DOME_HEADING_SERVO, params_.domeHeadingServoReverse);
 
   bb::Servos::servos.setOffset(DOME_ROLL_SERVO, params_.domeRollOffset);
   bb::Servos::servos.setRange(DOME_ROLL_SERVO, 180-params_.domeRollRange, 180+params_.domeRollRange);
   bb::Servos::servos.setProfileVelocity(DOME_ROLL_SERVO, params_.domeMaxVel);
+  bb::Servos::servos.setInverted(DOME_ROLL_SERVO, params_.domeRollServoReverse);
 }
 
 Result BB8::selfTest(ConsoleStream *stream) {
@@ -385,13 +444,10 @@ Result BB8::servoTest(ConsoleStream *stream) {
   setServoParameters();
   bb::Servos::servos.switchTorque(Servos::ID_ALL, true);
 
-#if 0
   if(bb::Servos::servos.home(BODY_ROLL_SERVO, 5.0, 95, stream) != RES_OK) {
     Console::console.printfBroadcast("Homing body roll servo failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-  } 
-#endif
-  
+  }   
   rollController_.setGoal(0.0);
 
   if(bb::Servos::servos.home(DOME_PITCH_SERVO, 5.0, 50, stream) != RES_OK) {
@@ -415,7 +471,7 @@ Result BB8::servoTest(ConsoleStream *stream) {
 }
 
 
-void BB8::printStatus(ConsoleStream *stream) {
+void BB8::printExtendedStatus(ConsoleStream *stream) {
   if (stream == NULL) return;
 
   stream->printf("%s (%s): ", name(), description());
@@ -447,6 +503,49 @@ void BB8::printStatus(ConsoleStream *stream) {
 
   stream->printf("\n");
 }
+
+void BB8::switchDrive(DriveMode mode) {
+  driveController_.reset();
+  driveController_.setGoal(0);
+  //autoPosController_.reset();
+  //autoPosController_.setPresentAsGoal();
+  //posController_.reset();
+  //posController_.setPresentAsGoal();
+  //posControllerZero_ = posController_.present();
+
+  driveMode_ = mode;
+  switch(driveMode_) {
+    case DRIVE_OFF: 
+      setLED(LED_DRIVE, OFF);
+      LOG(LOG_INFO, "Switched drive mode to off.\n");
+      break;
+    
+    case DRIVE_VEL: 
+      setLED(LED_DRIVE, GREEN);
+      LOG(LOG_INFO, "Switched drive mode to velocity.\n");
+      break;
+
+    case DRIVE_POS: 
+      LOG(LOG_INFO, "Position control mode not yet implemented.\n");
+#if 0
+      setLED(LED_DRIVE, YELLOW);
+      setControlStrip(head::CONTROL_STRIP_MAN_POS, true);
+      LOG(LOG_INFO, "Switched drive mode to position.\n");
+#endif
+      break;
+
+    case DRIVE_AUTO_POS:
+    default: 
+      LOG(LOG_INFO, "Position control mode not yet implemented.\n");
+#if 0
+      setLED(LED_DRIVE, BLUE);
+      setControlStrip(head::CONTROL_STRIP_AUTO_POS, true);
+      LOG(LOG_INFO, "Switched drive mode to auto_position.\n");
+#endif
+      break;
+  }
+}
+
 
 Result BB8::incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet) {
   if(commLEDOn_ == false) {
@@ -493,11 +592,39 @@ Result BB8::incomingControlPacket(const HWAddress& srcAddr, PacketSource source,
   }
 
   if(packet.primary == true) {
-    float bodyRollInput = packet.getAxis(0) * 25.0;
-    float velInput = packet.getAxis(1) * params_.driveSpeedMax;
+    msLastPrimaryCtrlPacket_ = millis();
+    
+    // Joystick button switches drive mode
+    if(packet.button4 && !lastPrimaryCtrlPacket_.button4) {
+      if(driveMode_ == DRIVE_OFF || driveMode_ == DRIVE_POS) {
+        if(params_.autoPosControl == true) {
+          switchDrive(DRIVE_AUTO_POS);
+        } else {
+          switchDrive(DRIVE_VEL);
+        }
+      } else {
+        switchDrive(DRIVE_OFF);
+      }
+    }
+  
+    float bodyRollInput = packet.getAxis(0) * params_.rollAngleMax;
+    if(params_.rollDirect) Servos::servos.setGoalPos(BODY_ROLL_SERVO, bodyRollInput * ROLL_REDUCTION + 180.0);
+    else {
+      rollController_.setGoal(bodyRollInput);
+    }
 
-    rollController_.setGoal(bodyRollInput);
-    balanceController_.setControlOffset(-velInput);
+    if(driveMode_ != DRIVE_OFF) {
+      float velInput = packet.getAxis(1);
+      if(fabs(velInput) <= params_.driveSpeedDeadband) {
+        velInput = 0;
+      } else {
+        velInput *= params_.driveSpeedMax;
+      }
+
+      balanceController_.setControlOffset(velInput);
+    } else {
+      balanceController_.setControlOffset(0);
+    }
 
     if(packet.button3) {
       remoteR_ = packet.getAxis(2, ControlPacket::UNIT_DEGREES_CENTERED);

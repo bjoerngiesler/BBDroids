@@ -37,7 +37,16 @@ public:
   Result selfTest(ConsoleStream *stream = NULL);
   Result servoTest(ConsoleStream *stream = NULL);
 
-  virtual void printStatus(ConsoleStream *stream);
+  virtual void printExtendedStatus(ConsoleStream *stream = NULL);
+
+    enum DriveMode {
+    DRIVE_OFF      = 0,
+    DRIVE_VEL      = 1,
+    DRIVE_POS      = 2,
+    DRIVE_AUTO_POS = 3
+  };
+
+  void switchDrive(DriveMode mode);
 
   virtual Result incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet);
 
@@ -54,7 +63,7 @@ public:
     LED_COMM   = 1,
     LED_DRIVE  = 2
   };
-  
+
   enum WhatColor {
     OFF    = 0,
     RED    = 1,
@@ -84,6 +93,7 @@ protected:
   unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_, msLastPrimaryCtrlPacket_;
   bb::ControlPacket lastPrimaryCtrlPacket_, lastSecondaryCtrlPacket_;
 
+  DriveMode driveMode_;
 
   size_t packetsReceived_, packetsMissed_;
   bool runningStatus_;
@@ -107,6 +117,8 @@ protected:
   bb::IMUControlInput balanceInput_, rollInput_;
   bb::ServoControlOutput rollOutput_;
   bb::PIDController driveController_, balanceController_, rollController_;
+  //bb::PIDController autoPosController_, posController_; 
+  float posControllerZero_;
 
   float remoteP_, remoteH_, remoteR_;
   float annealP_, annealH_, annealR_, annealTime_;

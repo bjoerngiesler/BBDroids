@@ -17,10 +17,10 @@ public:
   static const ValueType VALUE_COOKED = VALUE_DEGREE;
 
   enum ControlMode {
-    CONTROL_POSITION = 0,
-    CONTROL_VELOCITY = 1,
-    CONTROL_CURRENT  = 2,
-    CONTROL_UNKNOWN  = 255
+    CONTROL_POSITION          = 0,
+    CONTROL_VELOCITY          = 1,
+    CONTROL_CURRENT           = 2,
+    CONTROL_UNKNOWN           = 255
   };
 
   static Servos servos;
@@ -148,6 +148,9 @@ public:
   ServoControlOutput(uint8_t servoNum, float offset=0.0f, Servos::ControlMode mode=Servos::CONTROL_POSITION);
   float present();
   bb::Result set(float value);
+
+  void setMode(Servos::ControlMode mode);
+  Servos::ControlMode mode() { return mode_; }
 
 protected:
   uint8_t sn_;
