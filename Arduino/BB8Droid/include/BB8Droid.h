@@ -82,6 +82,7 @@ protected:
   void setServoParameters();
 
   float driveSpeedGoal_, bodyRollGoal_, domePitchGoal_, domeRollGoal_;
+  float maxRollLoad_;
   bool pwmControl_;
 
   ConfigStorage::HANDLE paramsHandle_;

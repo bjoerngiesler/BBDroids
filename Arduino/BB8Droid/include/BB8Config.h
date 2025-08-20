@@ -19,25 +19,28 @@ struct BB8Params {
   // Motion Limits
   float bodyRollRange     = 25.0; // in the station don't go beyond 25, in the droid 30 is OK
   float bodyRollOffset    = 2;
+  float bodyRollVel       = 500;
+  float bodyRollAccel     = 30;
   float domePitchRange    = 45.0;
   float domePitchOffset   = 0.0;
+  float domePitchVel      = 100;
   float domeHeadingRange  = 90.0;
   float domeHeadingOffset = 0.0;
-  float domeRollRange     = 45.0;
+  float domeHeadingVel    = 100;
+  float domeRollRange     = 20.0;
   float domeRollOffset    = 0.0;
+  float domeRollVel       = 100;
 
   // PID controller parameters
-  float driveSpeedKp       = 0.065f;
+  float driveSpeedKp       = 0.05f;
   float driveSpeedKi       = 0.2f;
   float driveSpeedKd       = 0.0f;
   float balKp              = 25;
   float balKi              = 0;
   float balKd              = 0.2;
-  float rollKp             = 1.05;
+  float rollKp             = 1.5;
   float rollKi             = 0;
   float rollKd             = 0;
-  float rollServoVel       = 0;
-  float rollServoAccel     = 0;
 
   bool rollDirect          = false;
   bool rollInhibit         = false;
@@ -50,15 +53,18 @@ struct BB8Params {
 
   float rollIMax            = 50;
   float rollTorquePercent   = 90;
-  float domeMaxVel          = 130; // degrees per second
 
   bool domeHeadingServoReverse = true;
   bool domeRollServoReverse    = true;
   bool domePitchServoReverse   = false;
-  bool bodyRollServoReverse    = true;
+  bool bodyRollServoReverse    = false;
 
-  float faDomeAnnealTime   = .5;     // Time it takes for all head axes ot return to 0 after control has been relinquished.
-  float faDomeAnnealDelay  = .3;     // Delay before we anneal the head position if button is released
+  float faDomeAnnealTime     = .5;     // Time it takes for all head axes ot return to 0 after control has been relinquished.
+  float faDomeAnnealDelay    = .3;     // Delay before we anneal the head position if button is released
+  float faSpeedSPToDome      = -.01;
+  float faRollSPToDome       = -.5;
+  float faDomePitchToWeight  = .5;
+  float faDomeRollToWeight   = .5;
 };
 
 static const int DOME_HEADING_SERVO  = 1;
