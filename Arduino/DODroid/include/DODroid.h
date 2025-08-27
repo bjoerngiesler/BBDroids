@@ -15,7 +15,6 @@ public:
   static DOParams params_;
   static bb::ConfigStorage::HANDLE paramsHandle_;
 
-
   enum MotorStatus { // FIXME this probably needs to go somewhere else, closer to DCMotor or EncoderMotor?
     MOTOR_UNTESTED         = 0,
     MOTOR_OK               = 1,
