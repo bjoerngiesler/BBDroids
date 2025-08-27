@@ -8,6 +8,9 @@ bb::DCMotor::DCMotor(uint8_t pin_a, uint8_t pin_b, uint8_t pin_pwm, uint8_t pin_
   pin_en_ = pin_en;
   scheme_ = SCHEME_A_B_PWM;
 
+  pin_endstop_ = PIN_OFF;
+  endstop_mode_ = HIGH;
+
   pinMode(pin_a_, OUTPUT);
   pinMode(pin_b_, OUTPUT);
 
@@ -128,4 +131,17 @@ void bb::DCMotor::setCustomAnalogWrite(void(*cust)(uint8_t pin, uint8_t dutycycl
 void bb::DCMotor::write(uint8_t pin, uint8_t dutycycle) {
   if(customAnalogWrite_ != nullptr) customAnalogWrite_(pin, dutycycle);
   else analogWrite(pin, dutycycle);
+}
+
+void bb::DCMotor::setEndstop(uint8_t endstop, uint8_t mode) {
+  pin_endstop_ = endstop;
+  endstop_mode_ = mode;
+}
+
+bool bb::DCMotor::brakeIfEndstop(float force) {
+  if(digitalRead(pin_endstop_) == endstop_mode_) {
+    brake(force);
+    return true;
+  }
+  return false;
 }

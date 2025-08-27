@@ -90,6 +90,20 @@ bb::Result bb::Subsystem::initialize() {
 	return registerWithManager(); 
 }
 
+bb::Result bb::Subsystem::start(ConsoleStream *stream) {
+	if(isStarted()) return RES_SUBSYS_ALREADY_STARTED;
+	operationStatus_ = RES_OK;
+	started_ = true;
+	return RES_OK;
+}
+
+bb::Result bb::Subsystem::stop(ConsoleStream *stream) {
+	if(!isStarted()) return RES_SUBSYS_NOT_STARTED;
+	operationStatus_ = RES_SUBSYS_NOT_STARTED;
+	started_ = false;
+	return RES_OK;
+}
+
 String bb::Subsystem::statusLine() {
 	String line = String(name()) + " (" + description() + "): ";
 	if(isStarted()) {

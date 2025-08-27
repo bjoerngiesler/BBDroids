@@ -18,7 +18,7 @@ static const float ROLL_REDUCTION                 = 80.0/22.0;
 struct BB8Params {
   // Motion Limits
   float bodyRollRange     = 25.0; // in the station don't go beyond 25, in the droid 30 is OK
-  float bodyRollOffset    = 2;
+  float bodyRollOffset    = -15;
   float bodyRollVel       = 500;
   float bodyRollAccel     = 30;
   float domePitchRange    = 45.0;
@@ -30,24 +30,35 @@ struct BB8Params {
   float domeRollRange     = 20.0;
   float domeRollOffset    = 0.0;
   float domeRollVel       = 100;
-
+ 
   // PID controller parameters
   float driveSpeedKp       = 0.05f;
   float driveSpeedKi       = 0.2f;
   float driveSpeedKd       = 0.0f;
+
   float balKp              = 25;
   float balKi              = 0;
   float balKd              = 0.2;
-  float rollKp             = 1.5;
+
+  float rollKp             = 2;
   float rollKi             = 0;
   float rollKd             = 0;
 
+  float autoPosKp          = 0;
+  float autoPosKi          = 0;
+  float autoPosKd          = 0;
+
+  float posKp             = 1.2;
+  float posKi             = 0.2;
+  float posKd             = 0;
+
+  // Flags to modify roll behavior
   bool rollDirect          = false;
   bool rollInhibit         = false;
   bool rollDebug           = false;
   bool autoPosControl      = false;
 
-  float driveSpeedDeadband = 0.01f; // not used yet
+  float driveSpeedDeadband = 0.01f;
   float driveSpeedMax      = DRIVE_MOTOR_MAX_SPEED_MM_PER_S;
   float rollAngleMax       = 20.0;
 

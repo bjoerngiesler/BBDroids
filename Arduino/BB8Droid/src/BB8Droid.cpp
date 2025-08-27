@@ -47,6 +47,9 @@ BB8::BB8():
     driveController_(driveEncoder_, driveMotor_),
     balanceController_(balanceInput_, driveController_),
     rollController_(rollInput_, rollOutput_),
+    posControlOutput_(balanceController_),
+    autoPosController_(driveEncoder_, posControlOutput_),
+    posController_(driveEncoder_, posControlOutput_),
     statusPixels_(3, P_STATUS_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 {
   name_ = "bb8";
@@ -92,16 +95,27 @@ Result BB8::initialize() {
   addParameter("drive_speed_kp", "Proportional constant for drive speed controller", params_.driveSpeedKp);
   addParameter("drive_speed_ki", "Integral constant for drive speed controller", params_.driveSpeedKi);
   addParameter("drive_speed_kd", "Derivative constant for drive speed controller", params_.driveSpeedKd);
+
   addParameter("bal_kp", "Proportional constant for drive balance controller", params_.balKp);
   addParameter("bal_ki", "Integral constant for drive balance controller", params_.balKi);
   addParameter("bal_kd", "Derivative constant for drive balance controller", params_.balKd);
+
   addParameter("roll_kp", "Proportional constant for roll controller", params_.rollKp);
   addParameter("roll_ki", "Integral constant for roll controller", params_.rollKi);
   addParameter("roll_kd", "Derivative constant for roll controller", params_.rollKd);
 
+  addParameter("auto_pos_kp", "Proportional constant for position PID controller", params_.autoPosKp, -INT_MAX, INT_MAX);
+  addParameter("auto_pos_ki", "Integrative constant for position PID controller", params_.autoPosKi, -INT_MAX, INT_MAX);
+  addParameter("auto_pos_kd", "Derivative constant for position PID controller", params_.autoPosKd, -INT_MAX, INT_MAX);
+
+  addParameter("pos_kp", "Proportional constant for position PID controller", params_.posKp, -INT_MAX, INT_MAX);
+  addParameter("pos_ki", "Integrative constant for position PID controller", params_.posKi, -INT_MAX, INT_MAX);
+  addParameter("pos_kd", "Derivative constant for position PID controller", params_.posKd, -INT_MAX, INT_MAX);
+
   addParameter("roll_direct", "Set to true for direct roll servo control, false for PID control", params_.rollDirect);
   addParameter("roll_inhibit", "Set to true to inhibit roll controller output (but continue updating, for debugging)", params_.rollInhibit);
   addParameter("roll_debug", "Set to true to debug roll controller", params_.rollDebug);
+  addParameter("auto_pos_control", "Automatically switch to position control", params_.autoPosControl);
 
   addParameter("drive_speed_deadband", "Deadband for drive speed controller", params_.driveSpeedDeadband);
   addParameter("drive_speed_max", "Max speed for drive controller", params_.driveSpeedMax);
@@ -262,12 +276,15 @@ Result BB8::stepDriveMotor() {
     switchDrive(DRIVE_OFF);
   }
 
-  if(driveMode_ != DRIVE_OFF) {
-    balanceController_.update();
-    driveController_.update();
-  } else {
+  if(driveMode_ == DRIVE_OFF) {
     driveMotor_.set(0);
+    return RES_OK;
   }
+
+  balanceController_.update();
+  driveController_.update();
+  if(driveMode_ == DRIVE_POS) posController_.update();
+  else if(driveMode_ == DRIVE_AUTO_POS) autoPosController_.update();
   return RES_OK;
 }
 
@@ -380,6 +397,9 @@ void BB8::setControlParameters() {
   rollController_.setRamp(0.0);
 #endif
   rollController_.reset();
+
+  autoPosController_.setControlParameters(params_.autoPosKp, params_.autoPosKi, params_.autoPosKd);
+  posController_.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
 }
 
 void BB8::setServoParameters() {
@@ -469,13 +489,13 @@ Result BB8::servoTest(ConsoleStream *stream) {
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
-  if(bb::Servos::servos.home(DOME_HEADING_SERVO, 5.0, 50, stream) != RES_OK) {
-    Console::console.printfBroadcast("Homing dome heading servo failed!\n");
+  if(bb::Servos::servos.home(DOME_ROLL_SERVO, 5.0, 50, stream) != RES_OK) {
+    Console::console.printfBroadcast("Homing dome roll servo failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
-  if(bb::Servos::servos.home(DOME_ROLL_SERVO, 5.0, 50, stream) != RES_OK) {
-    Console::console.printfBroadcast("Homing dome roll servo failed!\n");
+  if(bb::Servos::servos.home(DOME_HEADING_SERVO, 5.0, 50, stream) != RES_OK) {
+    Console::console.printfBroadcast("Homing dome heading servo failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
@@ -529,11 +549,17 @@ void BB8::printExtendedStatus(ConsoleStream *stream) {
 void BB8::switchDrive(DriveMode mode) {
   driveController_.reset();
   driveController_.setGoal(0);
-  //autoPosController_.reset();
-  //autoPosController_.setPresentAsGoal();
-  //posController_.reset();
-  //posController_.setPresentAsGoal();
-  //posControllerZero_ = posController_.present();
+
+  balanceController_.reset();
+  balanceController_.setControlOffset(0);
+  balanceController_.setGoal(0);
+
+  autoPosController_.reset();
+  autoPosController_.setPresentAsGoal();
+
+  posController_.reset();
+  posController_.setPresentAsGoal();
+  posControllerZero_ = posController_.present();
 
   driveMode_ = mode;
   switch(driveMode_) {
@@ -548,22 +574,14 @@ void BB8::switchDrive(DriveMode mode) {
       break;
 
     case DRIVE_POS: 
-      LOG(LOG_INFO, "Position control mode not yet implemented.\n");
-#if 0
       setLED(LED_DRIVE, YELLOW);
-      setControlStrip(head::CONTROL_STRIP_MAN_POS, true);
       LOG(LOG_INFO, "Switched drive mode to position.\n");
-#endif
       break;
 
     case DRIVE_AUTO_POS:
     default: 
-      LOG(LOG_INFO, "Position control mode not yet implemented.\n");
-#if 0
       setLED(LED_DRIVE, BLUE);
-      setControlStrip(head::CONTROL_STRIP_AUTO_POS, true);
       LOG(LOG_INFO, "Switched drive mode to auto_position.\n");
-#endif
       break;
   }
 }
@@ -616,36 +634,51 @@ Result BB8::incomingControlPacket(const HWAddress& srcAddr, PacketSource source,
   if(packet.primary == true) {
     msLastPrimaryCtrlPacket_ = millis();
     
-    // Joystick button switches drive mode
+    // Joystick button toggles drive mode: OFF/VEL or OFF/AUTO_POS (if enabled)
     if(packet.button4 && !lastPrimaryCtrlPacket_.button4) {
       if(driveMode_ == DRIVE_OFF || driveMode_ == DRIVE_POS) {
-        if(params_.autoPosControl == true) {
-          switchDrive(DRIVE_AUTO_POS);
-        } else {
-          switchDrive(DRIVE_VEL);
-        }
+        switchDrive(params_.autoPosControl == true ? DRIVE_AUTO_POS : DRIVE_VEL);
       } else {
         switchDrive(DRIVE_OFF);
       }
     }
   
+    if(driveMode_ != DRIVE_OFF) {
+      float vel = packet.getAxis(1);
+
+      // In DRIVE_VEL, if no drive input for a while, switch to AUTO_POS if enabled
+      if(EPSILON(vel) && params_.autoPosControl == true) { 
+        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && 
+           driveMode_ == DRIVE_VEL) {
+          switchDrive(DRIVE_AUTO_POS);
+        }
+      } else { // We have drive input - switch to velocity control mode
+        if(driveMode_ == DRIVE_AUTO_POS) {
+          switchDrive(DRIVE_VEL);
+        }
+        msSinceDriveInput_ = millis();
+      }
+
+      if(driveMode_ == DRIVE_VEL) {
+        if(fabs(vel) <= params_.driveSpeedDeadband) {
+          vel = 0;
+        } else {
+          vel *= params_.driveSpeedMax;
+        }
+
+        balanceController_.setControlOffset(vel);
+      } else if(driveMode_ == DRIVE_POS) {
+        float posDelta = packet.getAxis(1) * 1000;
+        posController_.setGoal(posControllerZero_ + posDelta);
+      }
+    } else {
+      setLED(LED_DRIVE, OFF);
+    }
+
     float bodyRollInput = -packet.getAxis(0) * params_.rollAngleMax;
     if(params_.rollDirect) Servos::servos.setGoalPos(BODY_ROLL_SERVO, bodyRollInput * ROLL_REDUCTION + 180.0);
     else {
       rollController_.setGoal(bodyRollInput);
-    }
-
-    if(driveMode_ != DRIVE_OFF) {
-      float velInput = packet.getAxis(1);
-      if(fabs(velInput) <= params_.driveSpeedDeadband) {
-        velInput = 0;
-      } else {
-        velInput *= params_.driveSpeedMax;
-      }
-
-      balanceController_.setControlOffset(velInput);
-    } else {
-      balanceController_.setControlOffset(0);
     }
 
     if(packet.button3) {

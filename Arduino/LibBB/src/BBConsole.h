@@ -53,7 +53,8 @@ public:
 };
 
 #if defined(ARDUINO_ARCH_ESP32)
-#define HWSERIAL_CLASS HWCDC
+#define HWSERIAL_CLASS USBCDC
+//#define HWSERIAL_CLASS HardwareSerial
 #else
 #define HWSERIAL_CLASS HardwareSerial
 #endif

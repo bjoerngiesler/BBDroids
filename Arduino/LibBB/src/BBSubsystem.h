@@ -43,8 +43,8 @@ public:
 	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
 	virtual Result initialize();
-	virtual Result start(ConsoleStream *stream) = 0;
-	virtual Result stop(ConsoleStream *stream) = 0;
+	virtual Result start(ConsoleStream *stream = NULL);
+	virtual Result stop(ConsoleStream *stream = NULL);
 	virtual Result step() = 0;
 	virtual Result stepIfNotStarted() { return RES_OK; }
 	virtual bool isStarted() { return started_; }

@@ -50,6 +50,9 @@ public:
   virtual void setReverse(bool reverse_);
   virtual bool isReverse() { return reverse_; }
 
+  virtual void setEndstop(uint8_t endstop, uint8_t mode);
+  virtual bool brakeIfEndstop(float force=10.0);
+
   virtual uint8_t deadband() { return deadband_; }
   virtual void setDeadband(uint8_t db) { deadband_ = db; }
 
@@ -62,6 +65,7 @@ protected:
   void (*customAnalogWrite_)(uint8_t pin, uint8_t dutycycle);
 
   uint8_t pin_a_, pin_b_, pin_pwm_, pin_en_;
+  uint8_t pin_endstop_, endstop_mode_;
   uint8_t deadband_;
   float speed_;
   bool en_, reverse_;

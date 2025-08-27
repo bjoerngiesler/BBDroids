@@ -5,6 +5,7 @@
 #include <Adafruit_NeoPixel.h>
 
 #include "BB8Config.h"
+#include "BB8PosControlOutput.h"
 
 using namespace bb;
 
@@ -93,6 +94,7 @@ protected:
   uint8_t lastLeftSeqnum_, lastRightSeqnum_;
   unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_, msLastPrimaryCtrlPacket_;
   bb::ControlPacket lastPrimaryCtrlPacket_, lastSecondaryCtrlPacket_;
+  float msSinceDriveInput_;
 
   DriveMode driveMode_;
 
@@ -118,7 +120,8 @@ protected:
   bb::IMUControlInput balanceInput_, rollInput_;
   bb::ServoControlOutput rollOutput_;
   bb::PIDController driveController_, balanceController_, rollController_;
-  //bb::PIDController autoPosController_, posController_; 
+  BB8PosCtrlOutput posControlOutput_;
+  bb::PIDController autoPosController_, posController_; 
   float posControllerZero_;
 
   float remoteP_, remoteH_, remoteR_;
@@ -130,5 +133,6 @@ protected:
 
   bool servosOK_;
 };
+
 
 #endif // BB8_H
