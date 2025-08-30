@@ -17,6 +17,8 @@ public:
     virtual uint8_t numAxes() = 0;
     virtual const std::string& axisName(uint8_t axis) = 0;
     virtual uint8_t bitDepthForAxis(uint8_t axis) = 0;
+    virtual void setRawAxisValue(uint8_t axis, uint32_t value) = 0;
+    virtual uint32_t rawAxisValue(uint8_t axis) = 0;
 
     virtual uint8_t numInputs() = 0;
     virtual const std::string& inputName(uint8_t input) = 0;
@@ -25,7 +27,10 @@ public:
     virtual void addAxisInputMapping(const AxisInputMapping& mapping) { axisInputMappings_.push_back(mapping); }
     virtual void clearAxisInputMappings() { axisInputMappings_.clear(); }
 
-    virtual void setAxisValue(uint8_t axis, float value, Unit unit) = 0;
+    virtual void setAxisValue(uint8_t axis, float value, Unit unit);
+    virtual float axisValue(uint8_t axis, Unit unit);
+    //! Always computed as a percentage from -1 to 1 internally
+    virtual float computeInputValue(uint8_t input);
     virtual Result transmit() = 0;
 
     virtual bool receiverSideAxisMapping() = 0;

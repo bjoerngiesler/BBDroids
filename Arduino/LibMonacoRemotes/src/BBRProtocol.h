@@ -25,7 +25,7 @@ public:
     virtual Receiver* createReceiver() { return nullptr; }
     virtual Configurator* createConfigurator() { return nullptr; }
 
-    virtual Result discoverNodes() = 0;
+    virtual Result discoverNodes(float timeout = 5) = 0;
     virtual unsigned int numDiscoveredNodes() { return discoveredNodes_.size(); }
     const NodeDescription& discoveredNode(unsigned int index) {
         static NodeDescription nil;

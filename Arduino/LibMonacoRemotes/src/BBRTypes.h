@@ -90,29 +90,148 @@ struct NodeDescription {
 };
 
 enum MixType {
-    MIX_MULT = 0, // input = map(p1*a1*a2)
-    MIX_ADD  = 1, // input = map(p1*a1 + p2*a2)
-    MIX_NONE = 2  // 
+    MIX_NONE = 0, // don't mix -- input = a1
+    MIX_ADD  = 1, // input = map(interp(a1) + interp(a2))
+    MIX_MULT = 2, // input = map(p1*a1*a2)
 };
 
 static const uint8_t INPUT_INVALID = 255;
-static const uint8_t AXIS_INVALID = 255;
+static const uint8_t AXIS_INVALID = 127;
 
+// FIXME bit of a problem - AxisInputMapping is 13 bytes (input, 2x 5-byte interpolator, 2x 7-bit axis, 2 bits mix type). 
+// We really don't want to enlarge the config packet format, it's at 12 bytes max now, so we have to save 1 byte?
+// Options --
+// 1. don't care, just make it bigger.
+// 2. steal bits from Interpolator structure by going to half resolution (2 instead of 1) - would save 10 bits, but at the expense of accuracy?
+// 3. reduce number of possible inputs and axes - could maybe save 2 bits here? not enough.
 struct __attribute__ ((packed)) AxisInputMapping {
 public:
-    AxisInputMapping(uint8_t inp, uint8_t ax) { 
-        input = inp; axis1 = ax; 
-    }
+    struct Interpolator {
+        int8_t i0, i25, i50, i75, i100;
+    };
+    static constexpr Interpolator INTERP_ZERO = {0, 0, 0, 0, 0};
+    static constexpr Interpolator INTERP_LIN_POSITIVE = {0, 25, 50, 75, 100};
+    static constexpr Interpolator INTERP_LIN_CENTERED = {-100, -50, 0, 50, 100};
+    static constexpr Interpolator INTERP_LIN_CENTERED_INV = {100, 50, 0, -50, -100};
+
     uint8_t input = INPUT_INVALID;
-    int8_t interp1[5] = {0, 25, 50, 57, 100};
-    uint8_t axis1 = AXIS_INVALID;
-    int8_t interp2[5] = {0, 25, 50, 57, 100};
-    uint8_t axis2 = AXIS_INVALID;
-    MixType mixType = MIX_NONE;
+    Interpolator interp1 = INTERP_LIN_POSITIVE;
+    Interpolator interp2 = INTERP_LIN_POSITIVE;
+    uint8_t axis1   : 6;
+    uint8_t axis2   : 6;
+    MixType mixType : 2;
+
+    AxisInputMapping(uint8_t inp, uint8_t ax1, Interpolator ip1 = INTERP_LIN_CENTERED, 
+                     uint8_t ax2=AXIS_INVALID, Interpolator ip2 = INTERP_ZERO,
+                     MixType mix=MIX_NONE) { 
+        input = inp; 
+        axis1 = ax1; interp1 = ip1;
+        axis2 = ax2; interp2 = ip2;
+        mixType = mix;
+    }
+
+    float computeMix(float a1, float min1, float max1, float a2, float min2, float max2) {
+        float i0=0, i1=0, frac=0, b1=0, b2=0;
+        
+        if(axis1 == AXIS_INVALID && axis2 == AXIS_INVALID) return 0;
+
+        frac = (a1-min1)/(max1-min1);
+        if(frac >= 0 && frac <= 0.25) {
+            i0 = float(interp1.i0)/100.0f;
+            i1 = float(interp1.i25)/100.0f;
+            frac = frac * 4;
+        } else if(frac > 0.25 && frac <= 0.5) {
+            i0 = float(interp1.i25)/100.0f;
+            i1 = float(interp1.i50)/100.0f;
+            frac = (frac-0.25)*4;
+        } else if(frac > 0.5 && frac <= 0.75) {
+            i0 = float(interp1.i50)/100.0f;
+            i1 = float(interp1.i75)/100.0f;
+            frac = (frac-0.5)*4;
+        } else if(frac > 0.75 && frac <= 1) {
+            i0 = float(interp1.i75)/100.0f;
+            i1 = float(interp1.i100)/100.0f;
+            frac = (frac-0.75)*4;
+        }
+        b1 = i0 + (i1-i0)*frac;
+
+        frac = (a2-min2)/(max2-min2);
+        if(frac >= 0 && frac <= 0.25) {
+            i0 = float(interp2.i0)/100.0f;
+            i1 = float(interp2.i25)/100.0f;
+            frac = frac * 4;
+        } else if(frac > 0.25 && frac <= 0.5) {
+            i0 = float(interp2.i25)/100.0f;
+            i1 = float(interp2.i50)/100.0f;
+            frac = (frac-0.25)*4;
+        } else if(frac > 0.5 && frac <= 0.75) {
+            i0 = float(interp2.i50)/100.0f;
+            i1 = float(interp2.i75)/100.0f;
+            frac = (frac-0.5)*4;
+        } else if(frac > 0.75 && frac <= 1) {
+            i0 = float(interp2.i75)/100.0f;
+            i1 = float(interp2.i100)/100.0f;
+            frac = (frac-0.75)*4;
+        }
+        b2 = i0 + (i1-i0)*frac;
+
+        // we capture the case of both invalid at the beginning of the function
+        if(axis1 == AXIS_INVALID) return b2;
+        if(axis2 == AXIS_INVALID) return b1;
+
+        switch(mixType) {
+        case MIX_ADD:
+            return b1+b2;
+            break;
+        case MIX_MULT:
+            return b1*b2;
+            break;
+        case MIX_NONE:
+        default:
+            return b1;
+            break;
+        }
+    }
 };
 
 static uint8_t AXIS_NONE = 0xff;
 
+//! normed goes from 0 to 1, and gets transformed into [0..360], [-180..180], [-1..1] depending on Unit value.
+static float normedToUnit(float normed, Unit unit) {
+    normed = constrain(normed, 0.0f, 1.0f);
+    switch(unit) {
+    case UNIT_DEGREES:
+        return normed * 360.0f;
+    case UNIT_DEGREES_CENTERED:
+        return (normed-0.5)*360.0f;
+    case UNIT_UNITY_CENTERED:
+        return (normed-0.5)*2.0f;
+    default:
+        break;
+    }
+    return normed;
+}
+
+//! val goes from [0..360], [-180..180], [-1..1] depending on Unit value. Returns value in range [0..1].
+static float unitToNormed(float val, Unit unit) {
+    switch(unit) {
+    case UNIT_DEGREES:
+        val = constrain(val, 0.0f, 360.0f);
+        return val / 360.0f;
+    case UNIT_DEGREES_CENTERED:
+        val = constrain(val, -180.0f, 180.0f);
+        return (val / 360.0f) + 0.5;
+    case UNIT_UNITY_CENTERED:
+        val = constrain(val, -1.0f, 1.0f);
+        return (val / 2.0f) + 0.5;
+    case UNIT_UNITY:
+        return constrain(val, 0.0f, 1.0f);
+        break;
+    default:
+        break;
+    }
+    return val;
+}
 
 }; // rmt
 }; // bb

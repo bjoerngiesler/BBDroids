@@ -1,5 +1,5 @@
-#if !defined(BBRTRANSDDBLE_H)
-#define BBRTRANSDDBLE_H
+#if !defined(BBRSHPEROTRANSMITTER_H)
+#define BBRSPHEROTRANSMITTER_H
 
 #include <BLEDevice.h>
 #include <BLEUtils.h>
@@ -10,9 +10,9 @@
 
 namespace bb {
 namespace rmt {
-class DroidDepotBLETransmitter: public Transmitter, public BLEClientCallbacks {
+class SpheroTransmitter: public Transmitter, public BLEClientCallbacks {
 public:
-    DroidDepotBLETransmitter();
+    SpheroTransmitter();
 
     virtual uint8_t numAxes();
     virtual const std::string& axisName(uint8_t axis);
@@ -23,7 +23,8 @@ public:
 
     virtual bool pairWith(const NodeAddr& node);
 
-    virtual void setAxisValue(uint8_t axis, float value, Unit unit);
+    virtual void setRawAxisValue(uint8_t axis, uint32_t value);
+    virtual uint32_t rawAxisValue(uint8_t axis);
     virtual Result transmit();
 
     virtual bool receiverSideAxisMapping() { return false; }
@@ -36,16 +37,26 @@ public:
     // BLEClientCallbacks methods
     void onConnect(BLEClient *pClient);
     void onDisconnect(BLEClient *pClient);
-    
+
+    struct Command {
+        uint8_t byte1, byte2, byte3;
+    };
+
 protected:
-    void initialWrites();
+    bool initialWrites();
+    bool sleep(bool onoff);
+
+    void floatToBuf(float f, uint8_t* buf);
+    bool transmitCommand(const Command &cmd, uint8_t *payload, uint8_t len);
 
     std::vector<uint8_t> axisValues_;
     BLEClient *pClient_;
-    BLERemoteCharacteristic *pCharacteristic_;
+    BLERemoteCharacteristic *pInitialChar_, *pControlChar_;
     bool connected_;
+    bool sleeping_;
+    uint8_t seqnum_;
 };
 }; // rmt
 }; // bb
 
-#endif // BBRTRANSDDBLE_H
+#endif // BBRSPHEROTRANSMITTER_H

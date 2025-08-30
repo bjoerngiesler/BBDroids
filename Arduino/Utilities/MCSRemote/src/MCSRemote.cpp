@@ -17,12 +17,12 @@
 // ****************
 
 // To control Droid Depot droids, uncomment the next two lines and comment the others
-#include <DroidDepotBLE/BBRProtoDDBLE.h>
-#define PROTOCOL DroidDepotBLEProtocol
+// #include <BLE/DroidDepot/BBRDroidDepotProtocol.h>
+// #define PROTOCOL DroidDepotProtocol
 
 // To control Sphero droids, uncomment the next two lines and comment the others
-// #include <SpheroBLE/BBRProtoSpheroBLE.h>
-// #define PROTOCOL SpheroBLEProtocol
+#include <BLE/Sphero/BBRSpheroProtocol.h>
+#define PROTOCOL SpheroProtocol
 
 // To control droids running the Monaco Control System (MCS) protocol over XBee, 
 // uncomment the next two lines and comment the others
@@ -50,9 +50,8 @@
 // PINS SECTION
 // ************
 
-static const uint8_t CHANNEL_0_PIN = A0;
-static const uint8_t CHANNEL_1_PIN = A1;
-static const uint8_t CHANNEL_2_PIN = A2;
+static const uint8_t CHANNEL_0_PIN = A8; // Joy ver
+static const uint8_t CHANNEL_1_PIN = A3; // Joy hor
 
 // Code below
 
@@ -112,7 +111,13 @@ void loop() {
   if(tx->requiresConnection() && !tx->isConnected()) tx->connect();
 
   if(tx->isPaired() == true && (tx->requiresConnection() == false || tx->isConnected() == true)) {
+    float joy_ver = analogRead(CHANNEL_0_PIN) / 4096.0f;
+    float joy_hor = analogRead(CHANNEL_1_PIN) / 4096.0f;
+    tx->setAxisValue(0, joy_ver, UNIT_UNITY);
+    tx->setAxisValue(2, joy_hor, UNIT_UNITY);
+    tx->transmit();
+    delay(10);
+  } else {
+    delay(1000);
   }
-
-  delay(1000);
-}
+} 

@@ -1,4 +1,4 @@
-#include "BBRTransDDBLE.h"
+#include "BBRDroidDepotTransmitter.h"
 #include <string>
 #include <vector>
 
@@ -24,7 +24,7 @@ enum Inputs {
 
 static std::string invalidAxisName = "INVALID";
 
-DroidDepotBLETransmitter::DroidDepotBLETransmitter() {
+DroidDepotTransmitter::DroidDepotTransmitter() {
     axisValues_ = {127, 127, 127, 127, 127};
     pClient_ = nullptr;
     pCharacteristic_ = nullptr;
@@ -33,38 +33,49 @@ DroidDepotBLETransmitter::DroidDepotBLETransmitter() {
     addAxisInputMapping(AxisInputMapping(INPUT_TURN, 1));
 }
 
-void DroidDepotBLETransmitter::onConnect(BLEClient *pClient) {
+void DroidDepotTransmitter::setRawAxisValue(uint8_t axis, uint32_t value) {
+    if(axis >= axisValues_.size()) return;
+    value = constrain(value, 0, MAXVAL);
+    axisValues_[axis] = uint8_t(value);
+}
+
+uint32_t DroidDepotTransmitter::rawAxisValue(uint8_t axis) {
+    if(axis >= axisValues_.size()) return 0;
+    return axisValues_[axis];
+}
+
+void DroidDepotTransmitter::onConnect(BLEClient *pClient) {
     Serial.printf("Connected\n");
     connected_ = true;
 }
 
-void DroidDepotBLETransmitter::onDisconnect(BLEClient *pClient) {
+void DroidDepotTransmitter::onDisconnect(BLEClient *pClient) {
     Serial.printf("Disconnected\n");
     connected_ = false;
 }
 
-uint8_t DroidDepotBLETransmitter::numAxes() { 
+uint8_t DroidDepotTransmitter::numAxes() { 
     return axisNames.size(); 
 }
 
-const std::string& DroidDepotBLETransmitter::axisName(uint8_t axis) { 
+const std::string& DroidDepotTransmitter::axisName(uint8_t axis) { 
     if(axis >= axisNames.size()) return invalidAxisName;
     return axisNames[axis];
 }
 
-uint8_t DroidDepotBLETransmitter::bitDepthForAxis(uint8_t axis) { 
+uint8_t DroidDepotTransmitter::bitDepthForAxis(uint8_t axis) { 
     return 8; 
 }
 
-uint8_t DroidDepotBLETransmitter::numInputs() {
+uint8_t DroidDepotTransmitter::numInputs() {
     return inputNames.size();
 }
 
-const std::string& DroidDepotBLETransmitter::inputName(uint8_t input) {
+const std::string& DroidDepotTransmitter::inputName(uint8_t input) {
     return inputNames[input];
 }
 
-bool DroidDepotBLETransmitter::pairWith(const NodeAddr& addr) {
+bool DroidDepotTransmitter::pairWith(const NodeAddr& addr) {
     if(isPaired(addr)) {
         Serial.printf("Already paired with %s\n", addr.toString().c_str());
         return false;
@@ -87,41 +98,16 @@ bool DroidDepotBLETransmitter::pairWith(const NodeAddr& addr) {
     return true;
 }
 
-void DroidDepotBLETransmitter::setAxisValue(uint8_t axis, float value, Unit unit) {
-    if(axis >= axisValues_.size()) return;
-    switch(unit) {
-    case UNIT_DEGREES:
-        value = (value/360.0f) * MAXVAL;
-        break;
-    case UNIT_DEGREES_CENTERED:
-        value = ((value+180.0f)/360.0f) * MAXVAL;
-        break;
-    case UNIT_UNITY_CENTERED:
-        value = ((value + 1.0f)/2.0f) * MAXVAL;
-        break;
-    case UNIT_UNITY:
-        value = value * MAXVAL;
-        break;
-    case UNIT_RAW:
-        break;
-    default:
-        break;
-    }
-
-    value = constrain(value, 0.0f, MAXVAL);
-    axisValues_[axis] = uint8_t(value);
-}
-
-Result DroidDepotBLETransmitter::transmit() {
+Result DroidDepotTransmitter::transmit() {
     return RES_OK;
 }
 
-bool DroidDepotBLETransmitter::isConnected() {
+bool DroidDepotTransmitter::isConnected() {
     return connected_;
 }
 
-bool DroidDepotBLETransmitter::connect(const NodeAddr& addr) {
-    // Connect to the remove BLE Server.
+bool DroidDepotTransmitter::connect(const NodeAddr& addr) {
+    // Connect to the remote BLE Server.
     Serial.printf("Connecting to %s\n", addr.toString().c_str());
     pClient_->connect(BLEAddress(addr.toString()), esp_ble_addr_type_t(1));
     Serial.printf(" - Connected to server\n");
@@ -150,7 +136,7 @@ bool DroidDepotBLETransmitter::connect(const NodeAddr& addr) {
     return true;
 }
 
-void DroidDepotBLETransmitter::initialWrites() {
+void DroidDepotTransmitter::initialWrites() {
     if(pCharacteristic_ == nullptr) {
         Serial.printf("Characteristic is NULL\n");
         return;
