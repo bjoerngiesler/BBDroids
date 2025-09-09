@@ -41,10 +41,16 @@ Result MTransmitter::transmit(){
 
     packet.type = MPacket::PACKET_TYPE_CONTROL;
     MControlPacket& p = packet.payload.control;
-    for(uint8_t i=0; i<axes_.size(); i++)
+    for(uint8_t i=0; i<axes_.size(); i++) {
         p.setAxis(i, axes_[i].value, UNIT_RAW);
+    }
 
-    protocol_->sendPacket(protocol_->pairedReceivers(), packet);
+    for(auto& n: protocol_->pairedNodes()) {
+        if(n.isReceiver) {
+            protocol_->sendPacket(n.addr, packet, false);
+        }
+        protocol_->bumpSeqnum();
+    }
 
     return RES_OK;
 }

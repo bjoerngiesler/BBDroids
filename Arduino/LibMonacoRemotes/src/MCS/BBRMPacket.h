@@ -2,6 +2,7 @@
 #define BBRMPACKET_H
 
 #include <LibBB.h>
+#include "../BBRTypes.h"
 
 //
 // REALTIME PROTOCOL
@@ -21,7 +22,6 @@ namespace rmt {
 */
 
 struct __attribute__ ((packed)) MPairingPacket {
-	static const uint8_t NAME_MAXLEN = 10;
 	enum PairingType {
 		PAIRING_DISCOVERY_BROADCAST = 0,
 		PAIRING_DISCOVERY_REPLY     = 1,
@@ -31,9 +31,12 @@ struct __attribute__ ((packed)) MPairingPacket {
 	};
 
 	enum PairingReplyResult {
-		PAIRING_REPLY_OK             = 0,
-		PAIRING_REPLY_INVALID_SECRET = 1,
-		PAIRING_REPLY_OTHER_ERROR    = 2
+		PAIRING_REPLY_OK               = 0,
+		PAIRING_REPLY_INVALID_SECRET   = 1,
+		PAIRING_REPLY_INVALID_ARGUMENT = 2,
+		PAIRING_REPLY_UNKNOWN_NODE     = 3,
+		PAIRING_REPLY_ALREADY_PAIRED   = 4,
+		PAIRING_REPLY_OTHER_ERROR      = 5
 	};
 
 	PairingType      type;          // byte 0

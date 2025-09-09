@@ -42,18 +42,16 @@ public:
 
     virtual bool step();
 
-    const std::vector<NodeAddr>& pairedReceivers() { return pairedReceivers_; }
+    const std::vector<NodeDescription>& pairedNodes() { return pairedNodes_; }
     
 protected:
     virtual bool connect(const NodeAddr& addr) { return false; }
 
     std::vector<NodeDescription> discoveredNodes_;
+    std::vector<NodeDescription> pairedNodes_;
     Transmitter* transmitter_ = nullptr;
     Receiver* receiver_ = nullptr;
     Configurator* configurator_ = nullptr;
-    std::vector<NodeAddr> pairedTransmitters_;
-    std::vector<NodeAddr> pairedReceivers_;
-    std::vector<NodeAddr> pairedConfigurators_;
     std::string nodeName_;
 };
 

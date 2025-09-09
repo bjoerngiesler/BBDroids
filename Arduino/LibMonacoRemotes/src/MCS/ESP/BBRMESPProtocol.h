@@ -25,10 +25,8 @@ public:
 
     virtual bool step();
 
-    virtual bool sendPacket(const NodeAddr& addr, const MPacket& packet);
-    virtual bool sendPacket(const std::vector<NodeAddr>& addrs, const MPacket& packet);
-
-    virtual bool sendBroadcastPacket(const MPacket& packet);
+    virtual bool sendPacket(const NodeAddr& addr, const MPacket& packet, bool bumpSeqnum=true);
+    virtual bool sendBroadcastPacket(const MPacket& packet, bool bumpSeqnum=true);
 
     virtual bool incomingPairingPacket(const NodeAddr& addr, MPacket::PacketSource source, uint8_t seqnum, const MPairingPacket& packet);
 

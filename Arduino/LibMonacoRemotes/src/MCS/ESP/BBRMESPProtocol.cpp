@@ -87,37 +87,17 @@ bool MESPProtocol::step() {
     return MProtocol::step();
 }
 
-bool MESPProtocol::sendPacket(const NodeAddr& addr, const MPacket& packet) {
+bool MESPProtocol::sendPacket(const NodeAddr& addr, const MPacket& packet, bool bumpS) {
     packet.seqnum = seqnum_;
     packet.crc = packet.calculateCRC();
 
     bool retval = (esp_now_send(addr.byte, (uint8_t*)&packet, sizeof(packet)) == ESP_OK);
-    if(retval == true) {
-        seqnum_ = (seqnum_ + 1) % MAX_SEQUENCE_NUMBER;
-    }
+    if(retval == true && bumpS) bumpSeqnum();
     return retval;
 }
 
-bool MESPProtocol::sendPacket(const std::vector<NodeAddr>& addrs, const MPacket& packet) {
-    packet.seqnum = seqnum_;
-    packet.crc = packet.calculateCRC();
-
-    bool oneOK = false, allOK = true;
-
-    for(auto& a: addrs) {
-        if(esp_now_send(a.byte, (uint8_t*)&packet, sizeof(packet)) == ESP_OK) oneOK = true;
-        else allOK = false;
-    }
-
-    if(oneOK) {
-        seqnum_ = (seqnum_ + 1) % MAX_SEQUENCE_NUMBER;
-    }
-
-    return allOK;
-}
-
-bool MESPProtocol::sendBroadcastPacket(const MPacket& packet) {
-    if(sendPacket(broadcastAddr, packet) == true) {
+bool MESPProtocol::sendBroadcastPacket(const MPacket& packet, bool bumpS) {
+    if(sendPacket(broadcastAddr, packet, bumpS) == true) {
         return true;
     } else {
         Serial.printf("Failed to send broadcast packet\n");
@@ -126,12 +106,11 @@ bool MESPProtocol::sendBroadcastPacket(const MPacket& packet) {
 }
 
 bool MESPProtocol::acceptsPairingRequests() {
-    // we don't HAVE a configurator and we ARE not a configurator either
-    if(pairedConfigurators_.size() == 0 && configurator_ == nullptr) {
-        return true;
-    } else {
-        return false;
+    bool isConfigurator = (configurator_ == nullptr);
+    for(auto& n: pairedNodes_) {
+        if(n.isConfigurator) isConfigurator = true;
     }
+    return isConfigurator;
 }
 
 void MESPProtocol::enterPairingModeIfNecessary() {

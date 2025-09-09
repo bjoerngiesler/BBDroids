@@ -36,4 +36,9 @@ const std::string& DroidDepotTransmitter::inputName(uint8_t input) {
     return inputNames[input];
 }
 
+Result DroidDepotTransmitter::transmit() {
+    return RES_OK;
+}
+
+
 #endif // !CONFIG_IDF_TARGET_ESP32S2

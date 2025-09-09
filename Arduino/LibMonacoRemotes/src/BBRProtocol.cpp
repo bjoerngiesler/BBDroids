@@ -32,29 +32,20 @@ const NodeDescription& Protocol::discoveredNode(unsigned int index) {
 }
 
 bool Protocol::isPaired() { 
-    return pairedConfigurators_.size() != 0 || pairedReceivers_.size() != 0 || pairedTransmitters_.size() != 0; 
+    return pairedNodes_.size() != 0;
 }
 
 bool Protocol::isPaired(const NodeAddr& addr) { 
-    bool paired = false;
-    if(std::find(pairedTransmitters_.begin(), pairedTransmitters_.end(), addr) != pairedTransmitters_.end()) {
-        paired = true;
-    }
-    if(std::find(pairedReceivers_.begin(), pairedReceivers_.end(), addr) != pairedReceivers_.end()) {
-        paired = true;
-    }
-    if(std::find(pairedConfigurators_.begin(), pairedConfigurators_.end(), addr) != pairedConfigurators_.end()) {
-        paired = true;
+    for(auto& d: pairedNodes_) {
+        if(d.addr == addr) return true;
     }
 
-    return paired;
+    return false;
 }
 
 bool Protocol::pairWith(const NodeDescription& node) {
     if(isPaired(node.addr)) return true; // already paired
-    if(node.isTransmitter) pairedTransmitters_.push_back(node.addr);
-    if(node.isReceiver) pairedReceivers_.push_back(node.addr);
-    if(node.isConfigurator) pairedConfigurators_.push_back(node.addr);
+    pairedNodes_.push_back(node);
     return true;
 }
     

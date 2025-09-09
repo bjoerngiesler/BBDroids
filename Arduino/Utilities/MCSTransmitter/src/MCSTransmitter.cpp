@@ -14,53 +14,28 @@
 #include <LibBBRemotes.h>
 #include <Adafruit_MCP23X17.h>
 
-// PROTOCOL SECTION
-// ****************
+using namespace bb::rmt;
 
-// To control Droid Depot droids, uncomment the next two lines and comment the others
-// #include <BLE/DroidDepot/BBRDroidDepotProtocol.h>
-// #define PROTOCOL DroidDepotProtocol
-
-// To control Sphero droids, uncomment the next two lines and comment the others
-// #include <BLE/Sphero/BBRSpheroProtocol.h>
-// #define PROTOCOL SpheroProtocol
-
-// To control droids running the Monaco Control System (MCS) protocol over XBee, 
-// uncomment the next two lines and comment the others
-// #include <MCS/XBee/BBRProtoMCSXBee.h>
-// #define PROTOCOL MCSXBeeProtocol
-
-// To control droids running the Monaco Control System (MCS) protocol over ESPnow, 
-// uncomment the next two lines and comment the others
-#include <MCS/ESP/BBRMESPProtocol.h>
-#define PROTOCOL bb::rmt::MESPProtocol
-
-// To control droids running the Monaco Control System (MCS) protocol over Bluetooth, 
-// uncomment the next two lines and comment the others
-// #include <MCS/BLE/BBRProtoMCSBLE.h>
-// #define PROTOCOL MCSBLEProtocol
-
-// To control droids running the Monaco Control System (MCS) protocol over UDP, 
-// uncomment the next two lines and comment the others
-// #include <MCS/UDP/BBRProtoMCSUDP.h>
-// #define PROTOCOL MCSUDPProtocol
+// Uncomment the protocol you want to use
+ProtocolType type = 
+  // MONACO_XBEE;
+  MONACO_ESPNOW;
+  // MONACO_BLE;
+  // MONACO_UDP;
+  // SPHERO_BLE;
+  // DROIDDEPOT_BLE;
+  // SPEKTRUM_DSSS;
 
 // These input pins are used to read the remote hardware. Modify them so they reflect
 // how you connect your joystick module or similar to the remote.
-
-// CONFIG SECTION
-// **************
-
-static const uint8_t JOY_VER_PIN        = A2; // A8;
 static const uint8_t JOY_HOR_PIN        = A1;
+static const uint8_t JOY_VER_PIN        = A2;
 
 // Code below
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
-
-using namespace bb::rmt;
-PROTOCOL protocol;
+Protocol *protocol = nullptr;
 Transmitter *tx = nullptr;
 
 enum Axes {
@@ -71,21 +46,22 @@ enum Axes {
 float joyCalibHor, joyCalibVer;
 
 bool pair() {
-  protocol.discoverNodes();
-  Serial.printf("%d nodes discovered\n", protocol.numDiscoveredNodes());
+  protocol->discoverNodes();
+  Serial.printf("%d nodes discovered\n", protocol->numDiscoveredNodes());
 
-  if(protocol.numDiscoveredNodes() != 0) {
-    for(unsigned int i=0; i<protocol.numDiscoveredNodes(); i++) {
-      const bb::rmt::NodeDescription& descr = protocol.discoveredNode(i);
-      Serial.printf("    %s: %s\n", descr.addr.toString().c_str(), descr.name.c_str());
+  if(protocol->numDiscoveredNodes() != 0) {
+    for(unsigned int i=0; i<protocol->numDiscoveredNodes(); i++) {
+      const NodeDescription& descr = protocol->discoveredNode(i);
+      Serial.printf("    %s: %s\n", descr.addr.toString().c_str(), descr.getName().c_str());
     }
 
-    NodeDescription node = protocol.discoveredNode(0);
-    if(protocol.pairWith(node) == true) {
-      Serial.printf("Successfully paired with \"%s\" (%s)!\n", node.name.c_str(), node.addr.toString().c_str());
+    const NodeDescription& descr = protocol->discoveredNode(0);
+    Serial.printf("Trying to pair with \"%s\" (%s)... ", descr.getName().c_str(), descr.addr.toString().c_str());
+    if(protocol->pairWith(descr) == true) {
+      Serial.printf("success!\n");
       return true;
     }
-    Serial.printf("Something went wrong trying to pair with %s(%s)\n", node.name.c_str(), node.addr.toString().c_str());
+    Serial.printf("failure.\n");
     return false;
   }
 
@@ -107,19 +83,24 @@ void setup() {
   joyCalibHor /= 100.0f;
   joyCalibVer /= 100.0f;
 
-  protocol.init("Transmitter");
-  tx = protocol.createTransmitter();
+  protocol = ProtocolFactory::createProtocol(type);
+  if(protocol == nullptr) {
+    Serial.printf("Error: Could not create protocol!\n");
+    while(true);
+  }
+  protocol->init("Transmitter");
+  tx = protocol->createTransmitter();
   if(tx == nullptr) {
     Serial.printf("Error: Could not create transmitter!\n");
     while(true);
   }
 
   while(true) {
-    if(!protocol.isPaired()) pair();
-    if(!protocol.isConnected()) protocol.connect();
-    if(protocol.isPaired() && protocol.isConnected()) break;
+    if(!protocol->isPaired()) pair();
+    if(!protocol->isConnected()) protocol->connect();
+    if(protocol->isPaired() && protocol->isConnected()) break;
 
-    protocol.step();
+    protocol->step();
 
     delay(1000);
   }
@@ -133,6 +114,6 @@ void loop() {
   float joyHor = analogRead(JOY_HOR_PIN) / 4096.0f - joyCalibHor;
   tx->setAxisValue(JOY_VER_AXIS, joyVer, UNIT_UNITY);
   tx->setAxisValue(JOY_HOR_AXIS, joyHor, UNIT_UNITY);
-  protocol.step();
+  protocol->step();
   delay(10);
 }

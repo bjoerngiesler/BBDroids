@@ -8,6 +8,8 @@
 namespace bb {
 namespace rmt {
 
+static const uint8_t NAME_MAXLEN = 10;
+
 enum Unit {
     UNIT_DEGREES          = 0, // [0..360)
     UNIT_DEGREES_CENTERED = 1, // (-180..180)
@@ -76,13 +78,32 @@ struct __attribute__ ((packed)) NodeAddr {
     }
 };
 
-struct NodeDescription {
-    NodeAddr addr;
-    bool isTransmitter;
-    bool isReceiver;
-    bool isConfigurator;
-    std::string name;
-    void* protocolSpecific;
+// NodeDescription - 20 bytes
+struct __attribute__ ((packed)) NodeDescription {
+    NodeAddr addr;               // byte 0..7
+    char name_[NAME_MAXLEN];     // byte 8..17
+    bool isTransmitter     : 1;  // byte 18 bit 0
+    bool isReceiver        : 1;  // byte 18 bit 1
+    bool isConfigurator    : 1;  // byte 18 bit 2
+    uint16_t protoSpecific : 13; // byte 18 bit 3..7, byte 19
+
+    void setName(const std::string& n) {
+        memset(name_, 0, 10);
+        for(uint8_t i=0; i<n.length() && i<NAME_MAXLEN; i++) name_[i] = n[i];
+    }
+    void setName(const char* buf) {
+        memset(name_, 0, 10);
+        for(uint8_t i=0; i<NAME_MAXLEN; i++) {
+            if(buf[i] == '\0') break;
+            name_[i] = buf[i];
+        } 
+    }
+    std::string getName() const {
+        char buf[NAME_MAXLEN+1];
+        memset(buf, 0, NAME_MAXLEN+1);
+        memcpy(buf, name_, NAME_MAXLEN);
+        return std::string(buf);
+    }
 };
 
 // Some standard input names. Of course you can define your own but these help to programmatically decide what to map to what.

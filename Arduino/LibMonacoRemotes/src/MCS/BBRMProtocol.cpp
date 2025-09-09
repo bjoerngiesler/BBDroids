@@ -161,7 +161,7 @@ bool MProtocol::incomingPairingPacket(const NodeAddr& addr, MPacket::PacketSourc
 		p.pairingPayload.discovery.isTransmitter = (transmitter_ != nullptr);
 		p.pairingPayload.discovery.isReceiver = (receiver_ != nullptr);
 		p.pairingPayload.discovery.isConfigurator = (configurator_ != nullptr);
-		snprintf(p.pairingPayload.discovery.name, p.NAME_MAXLEN, nodeName_.c_str());
+		snprintf(p.pairingPayload.discovery.name, NAME_MAXLEN, nodeName_.c_str());
 
 		reply.seqnum = seqnum_;
 		seqnum_ = (seqnum_ + 1) % MAX_SEQUENCE_NUMBER;
@@ -181,11 +181,11 @@ bool MProtocol::incomingPairingPacket(const NodeAddr& addr, MPacket::PacketSourc
 		descr.isConfigurator = packet.pairingPayload.discovery.isConfigurator;
 		descr.isTransmitter = packet.pairingPayload.discovery.isTransmitter;
 		descr.isReceiver = packet.pairingPayload.discovery.isReceiver;
-		descr.name = packet.pairingPayload.discovery.name;
+		descr.setName(packet.pairingPayload.discovery.name);
 
 		if(!descr.isConfigurator && !descr.isTransmitter && !descr.isReceiver) {
 			Serial.printf("Node \"%s\" at %s is neither configurator nor receiver nor transmitter. Ignoring.\n",
-			              descr.name.c_str(), addr.toString().c_str());
+			              descr.getName().c_str(), addr.toString().c_str());
 			return false;
 		}
 
@@ -206,6 +206,7 @@ bool MProtocol::incomingPairingPacket(const NodeAddr& addr, MPacket::PacketSourc
 		reply.type = MPacket::PACKET_TYPE_PAIRING;
 		reply.payload.pairing.type = MPairingPacket::PAIRING_REPLY;
 		
+		// Secret invalid? ==> error
 		if(r.pairingSecret != pairingSecret_) {
 			Serial.printf("Invalid secret.\n");
 			reply.payload.pairing.pairingPayload.reply.res = MPairingPacket::PAIRING_REPLY_INVALID_SECRET;
@@ -213,20 +214,35 @@ bool MProtocol::incomingPairingPacket(const NodeAddr& addr, MPacket::PacketSourc
 			return true;
 		}
 
-		if(r.pairAsConfigurator) {
-			Serial.printf("Upon request -- paired as configurator\n");
-			pairedConfigurators_.push_back(addr);
-		} 
-		if(r.pairAsReceiver) {
-			Serial.printf("Upon request -- paired as receiver\n");
-			pairedReceivers_.push_back(addr);
+		// Pairing request nonsensical? ==> error
+		if(!r.pairAsConfigurator && !r.pairAsReceiver && !r.pairAsTransmitter) {
+			Serial.printf("Received pairing request but as neither configurator nor receiver nor transmitter.\n");
+			reply.payload.pairing.pairingPayload.reply.res = MPairingPacket::PAIRING_REPLY_INVALID_ARGUMENT;
+			sendPacket(addr, reply);
+			return true;
 		}
-		if(r.pairAsTransmitter) {
-			Serial.printf("Upon request -- paired as transmitter\n");
-			pairedTransmitters_.push_back(addr);
+
+		// Already have this node? ==> error
+		for(auto& n: pairedNodes_) {
+			if(n.addr == addr) {
+				reply.payload.pairing.pairingPayload.reply.res = MPairingPacket::PAIRING_REPLY_ALREADY_PAIRED;
+				sendPacket(addr, reply);
+				return true;
+			}
 		}
-		reply.payload.pairing.pairingPayload.reply.res = MPairingPacket::PAIRING_REPLY_OK;
-		Serial.printf("Sending pairing reply.\n");
+
+		// Do we know this node from the discovery? Add it and reply OK
+		for(auto& n: discoveredNodes_) {
+			if(n.addr == addr) {
+				pairedNodes_.push_back(n);
+				reply.payload.pairing.pairingPayload.reply.res = MPairingPacket::PAIRING_REPLY_OK;
+				sendPacket(addr, reply);
+				return true;
+			}
+		}
+
+		// Don't know this node from the discovery? ==> error
+		reply.payload.pairing.pairingPayload.reply.res = MPairingPacket::PAIRING_REPLY_UNKNOWN_NODE;
 		sendPacket(addr, reply);
 	}
 
@@ -250,7 +266,7 @@ Result MProtocol::discoverNodes(float timeout) {
 	p.pairingPayload.discovery.isTransmitter = (transmitter_ != nullptr);
 	p.pairingPayload.discovery.isReceiver = (receiver_ != nullptr);
 	p.pairingPayload.discovery.isConfigurator = (configurator_ != nullptr);
-	snprintf(p.pairingPayload.discovery.name, p.NAME_MAXLEN, nodeName_.c_str());
+	snprintf(p.pairingPayload.discovery.name, NAME_MAXLEN, nodeName_.c_str());
 	sendBroadcastPacket(packet);
 
 	unsigned long msSinceDiscoveryPacket = millis();
@@ -314,18 +330,6 @@ bool MProtocol::pairWith(const NodeDescription& descr) {
 				Serial.printf("Huh. This node is neither configurator nor receiver nor transmitter. Ignoring.\n");
 				return false;
 			}
-			if(n.isConfigurator) {
-				//Serial.printf("Upon reply - pairing as configurator.\n");
-				pairedConfigurators_.push_back(addr);
-			}
-			if(n.isReceiver) {
-				//Serial.printf("Upon reply - pairing as receiver.\n");
-				pairedReceivers_.push_back(addr);
-			}
-			if(n.isTransmitter) {
-				//Serial.printf("Upon reply - pairing as transmitter.\n");
-				pairedTransmitters_.push_back(addr);
-			}
 
 			return Protocol::pairWith(descr);
 		}
@@ -339,3 +343,6 @@ bool MProtocol::step() {
     return Protocol::step();
 }
 
+void MProtocol::bumpSeqnum() {
+	seqnum_ = (seqnum_ + 1) % MAX_SEQUENCE_NUMBER;
+}

@@ -41,9 +41,9 @@ bool SpheroProtocol::isAcceptableForDiscovery(BLEAdvertisedDevice advertisedDevi
     return false;
 }
 
-bool SpheroProtocol::pairWith(const NodeAddr& addr) {
-    if(isPaired(addr)) {
-        Serial.printf("Already paired with %s\n", addr.toString().c_str());
+bool SpheroProtocol::pairWith(const NodeDescription& descr) {
+    if(isPaired(descr.addr)) {
+        Serial.printf("Already paired with %s\n", descr.addr.toString().c_str());
         return false;
     }
 
@@ -53,22 +53,20 @@ bool SpheroProtocol::pairWith(const NodeAddr& addr) {
         pClient_->setClientCallbacks(this);
     }
 
-    if(connect(addr) == false) {
+    if(connect(descr.addr) == false) {
         Serial.printf("Could not connect\n");
         return false;
     }
     
-    pairedReceivers_.push_back(addr);
-
-    return true;
+    return Protocol::pairWith(descr);
 }
 
 bool SpheroProtocol::connect() {
-    if(pairedReceivers_.size() == 0) {
+    if(pairedNodes_.size() == 0) {
         Serial.printf("No paired receivers -- cannot connect!\n");
         return false;
     }
-    return connect(pairedReceivers_[0]);
+    return connect(pairedNodes_[0].addr);
 }
 
 bool SpheroProtocol::connect(const NodeAddr& addr) {

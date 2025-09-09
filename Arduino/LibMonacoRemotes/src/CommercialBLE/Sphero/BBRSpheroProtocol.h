@@ -18,9 +18,11 @@ public:
     virtual Receiver* createReceiver() { return nullptr; }
     virtual Configurator* createConfigurator() { return nullptr; }
 
-    virtual bool pairWith(const NodeAddr& node);
+    virtual bool pairWith(const NodeDescription& descr);
 
     virtual bool isAcceptableForDiscovery(BLEAdvertisedDevice advertisedDevice);
+    virtual bool acceptsPairingRequests() { return false; }
+
 
     virtual bool connect();
 

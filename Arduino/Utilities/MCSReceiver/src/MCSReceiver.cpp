@@ -16,19 +16,20 @@
 using namespace bb::rmt;
 
 // Uncomment the protocol you want to use
-
-// #define PROTOCOL DroidDepotProtocol
-// #define PROTOCOL SpheroProtocol
-// #define PROTOCOL MCSXBeeProtocol
-#define PROTOCOL MESPProtocol
-// #define PROTOCOL MCSBLEProtocol
-// #define PROTOCOL MCSUDPProtocol
+ProtocolType type = 
+  // MONACO_XBEE;
+  MONACO_ESPNOW;
+  // MONACO_BLE;
+  // MONACO_UDP;
+  // SPHERO_BLE;
+  // DROIDDEPOT_BLE;
+  // SPEKTRUM_DSSS;
 
 // Code below
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
-PROTOCOL protocol;
+Protocol *protocol = nullptr;
 Receiver *rx = nullptr;
 
 // These variables hold the values for the inputs the droid defines.
@@ -53,10 +54,16 @@ void setup() {
   Serial.printf("MCS Receiver example\n");
   Serial.printf("Protocol used: %s\n", XSTR(PROTOCOL));
 
+  protocol = ProtocolFactory::createProtocol(type);
+  if(protocol == nullptr) {
+    Serial.printf("Error: Could not create protocol!\n");
+    while(true);
+  }
+
   // Initialize the protocol, giving this station a name
-  protocol.init("Receiver");
+  protocol->init("Receiver");
   // Ask the protocol to create a receiver. Some protocols cannot do this and will return nullptr.
-  rx = protocol.createReceiver();
+  rx = protocol->createReceiver();
   if(rx == nullptr) {
     Serial.printf("Error: Could not create receiver!\n");
     while(true);
@@ -79,6 +86,6 @@ void setup() {
 
 void loop() {
   // Let the protocol do its work
-  protocol.step();
+  protocol->step();
   delay(5);
 }

@@ -29,9 +29,9 @@ public:
     bool pairWith(const NodeDescription& descr);
 
     virtual bool step();
-    virtual bool sendPacket(const NodeAddr& addr, const MPacket& packet) = 0;
-    virtual bool sendPacket(const std::vector<NodeAddr>& addrs, const MPacket& packet) = 0;
-    virtual bool sendBroadcastPacket(const MPacket& packet) = 0;
+    virtual bool sendPacket(const NodeAddr& addr, const MPacket& packet, bool bumpSeqnum=true) = 0;
+    virtual bool sendBroadcastPacket(const MPacket& packet, bool bumpSeqnum=true) = 0;
+    virtual void bumpSeqnum();
 
     void setPacketSource(MPacket::PacketSource src) { source_ = src; }
 	MPacket::PacketSource packetSource() { return source_; }

@@ -19,8 +19,9 @@ public:
     virtual Configurator* createConfigurator() { return nullptr; }
 
     virtual bool isAcceptableForDiscovery(BLEAdvertisedDevice advertisedDevice);
+    virtual bool acceptsPairingRequests() { return false; }
 
-    virtual bool pairWith(const NodeAddr& node);
+    virtual bool pairWith(const NodeDescription& node);
 
 protected:
     virtual bool connect(const NodeAddr& addr);

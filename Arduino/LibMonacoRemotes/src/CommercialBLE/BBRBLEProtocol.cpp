@@ -38,7 +38,7 @@ void BLEProtocol::onResult(BLEAdvertisedDevice advertisedDevice) {
 
         NodeDescription descr;
         descr.addr.fromMACAddress(*addr);
-        descr.name = advertisedDevice.getName();
+        descr.setName(advertisedDevice.getName());
         descr.isReceiver = true;
         descr.isConfigurator = false;
         descr.isTransmitter = false;
