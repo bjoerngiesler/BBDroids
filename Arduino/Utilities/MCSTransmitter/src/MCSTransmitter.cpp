@@ -12,6 +12,7 @@
 
 #include <LibBB.h>
 #include <LibBBRemotes.h>
+#include <Adafruit_MCP23X17.h>
 
 // PROTOCOL SECTION
 // ****************
@@ -21,8 +22,8 @@
 // #define PROTOCOL DroidDepotProtocol
 
 // To control Sphero droids, uncomment the next two lines and comment the others
-#include <BLE/Sphero/BBRSpheroProtocol.h>
-#define PROTOCOL SpheroProtocol
+// #include <BLE/Sphero/BBRSpheroProtocol.h>
+// #define PROTOCOL SpheroProtocol
 
 // To control droids running the Monaco Control System (MCS) protocol over XBee, 
 // uncomment the next two lines and comment the others
@@ -31,8 +32,8 @@
 
 // To control droids running the Monaco Control System (MCS) protocol over ESPnow, 
 // uncomment the next two lines and comment the others
-// #include <MCS/ESP/BBRProtoMCSESP.h>
-// #define PROTOCOL MCSESPProtocol
+#include <MCS/ESP/BBRMESPProtocol.h>
+#define PROTOCOL bb::rmt::MESPProtocol
 
 // To control droids running the Monaco Control System (MCS) protocol over Bluetooth, 
 // uncomment the next two lines and comment the others
@@ -47,11 +48,11 @@
 // These input pins are used to read the remote hardware. Modify them so they reflect
 // how you connect your joystick module or similar to the remote.
 
-// PINS SECTION
-// ************
+// CONFIG SECTION
+// **************
 
-static const uint8_t CHANNEL_0_PIN = A8; // Joy ver
-static const uint8_t CHANNEL_1_PIN = A3; // Joy hor
+static const uint8_t JOY_VER_PIN        = A2; // A8;
+static const uint8_t JOY_HOR_PIN        = A1;
 
 // Code below
 
@@ -62,12 +63,14 @@ using namespace bb::rmt;
 PROTOCOL protocol;
 Transmitter *tx = nullptr;
 
-bool pair() {
-  if(tx == nullptr) {
-    Serial.printf("No transmitter created!\n");
-    return false;
-  }
+enum Axes {
+  JOY_HOR_AXIS  = 0,
+  JOY_VER_AXIS  = 1
+};
 
+float joyCalibHor, joyCalibVer;
+
+bool pair() {
   protocol.discoverNodes();
   Serial.printf("%d nodes discovered\n", protocol.numDiscoveredNodes());
 
@@ -78,8 +81,8 @@ bool pair() {
     }
 
     NodeDescription node = protocol.discoveredNode(0);
-    if(tx->pairWith(node.addr) == true) {
-      Serial.printf("Successfully paired with %s(%s)!\n", node.name.c_str(), node.addr.toString().c_str());
+    if(protocol.pairWith(node) == true) {
+      Serial.printf("Successfully paired with \"%s\" (%s)!\n", node.name.c_str(), node.addr.toString().c_str());
       return true;
     }
     Serial.printf("Something went wrong trying to pair with %s(%s)\n", node.name.c_str(), node.addr.toString().c_str());
@@ -92,32 +95,44 @@ bool pair() {
 
 void setup() {
   Serial.begin(115200);
-  while(!Serial);
-  
-  Serial.printf("BBRemoteTransmitter example\n");
+  Serial.printf("MCS Transmitter example\n");
   Serial.printf("Transmission protocol used: %s\n", XSTR(PROTOCOL));
-  
-  protocol.init();
+
+  joyCalibHor = 0;
+  joyCalibVer = 0;
+  for(unsigned int i=0; i<100; i++) {
+    joyCalibHor += digitalRead(JOY_HOR_PIN) / 4096.0f;
+    joyCalibVer += digitalRead(JOY_VER_PIN) / 4096.0f;
+  }
+  joyCalibHor /= 100.0f;
+  joyCalibVer /= 100.0f;
+
+  protocol.init("Transmitter");
   tx = protocol.createTransmitter();
-  
   if(tx == nullptr) {
     Serial.printf("Error: Could not create transmitter!\n");
     while(true);
   }
+
+  while(true) {
+    if(!protocol.isPaired()) pair();
+    if(!protocol.isConnected()) protocol.connect();
+    if(protocol.isPaired() && protocol.isConnected()) break;
+
+    protocol.step();
+
+    delay(1000);
+  }
+
+  tx->setAxisName(JOY_HOR_AXIS, "JoyHor");
+  tx->setAxisName(JOY_VER_AXIS, "JoyVer");
 }
 
 void loop() {
-  if(!tx->isPaired()) pair();
-  if(tx->requiresConnection() && !tx->isConnected()) tx->connect();
-
-  if(tx->isPaired() == true && (tx->requiresConnection() == false || tx->isConnected() == true)) {
-    float joy_ver = analogRead(CHANNEL_0_PIN) / 4096.0f;
-    float joy_hor = analogRead(CHANNEL_1_PIN) / 4096.0f;
-    tx->setAxisValue(0, joy_ver, UNIT_UNITY);
-    tx->setAxisValue(2, joy_hor, UNIT_UNITY);
-    tx->transmit();
-    delay(10);
-  } else {
-    delay(1000);
-  }
-} 
+  float joyVer = analogRead(JOY_VER_PIN) / 4096.0f - joyCalibVer;
+  float joyHor = analogRead(JOY_HOR_PIN) / 4096.0f - joyCalibHor;
+  tx->setAxisValue(JOY_VER_AXIS, joyVer, UNIT_UNITY);
+  tx->setAxisValue(JOY_HOR_AXIS, joyHor, UNIT_UNITY);
+  protocol.step();
+  delay(10);
+}

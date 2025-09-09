@@ -1,3 +1,7 @@
+#include <Arduino.h>
+
+#if !CONFIG_IDF_TARGET_ESP32S2
+
 #include "BBRBLEProtocol.h"
 
 using namespace bb;
@@ -6,7 +10,6 @@ using namespace bb::rmt;
 BLEProtocol::BLEProtocol() {
     pBLEScan_ = nullptr;
     myDevice_ = nullptr;
-    pRemoteCharacteristic_ = nullptr;
 }
 
 bool BLEProtocol::init() {
@@ -36,8 +39,21 @@ void BLEProtocol::onResult(BLEAdvertisedDevice advertisedDevice) {
         NodeDescription descr;
         descr.addr.fromMACAddress(*addr);
         descr.name = advertisedDevice.getName();
-        descr.type = NODE_RECEIVER;
+        descr.isReceiver = true;
+        descr.isConfigurator = false;
+        descr.isTransmitter = false;
         discoveredNodes_.push_back(descr);
     }
 }
 
+void BLEProtocol::onConnect(BLEClient *pClient) {
+    Serial.printf("Connected\n");
+    connected_ = true;
+}
+
+void BLEProtocol::onDisconnect(BLEClient *pClient) {
+    Serial.printf("Disconnected\n");
+    connected_ = false;
+}
+
+#endif // !CONFIG_IDF_TARGET_ESP32S2

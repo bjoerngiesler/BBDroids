@@ -1,7 +1,9 @@
+#include <Arduino.h>
+
+#if !CONFIG_IDF_TARGET_ESP32S2
+
+#include "BBRSpheroProtocol.h"
 #include "BBRSpheroTransmitter.h"
-#include <string>
-#include <vector>
-#include <map>
 
 using namespace bb;
 using namespace bb::rmt;
@@ -11,14 +13,6 @@ static BLEUUID INITIAL_CHR_UUID("00020005-574f-4f20-5370-6865726f2121");
 static BLEUUID CONTROL_SVC_UUID("00010001-574f-4f20-5370-6865726f2121");
 static BLEUUID CONTROL_CHR_UUID("00010002-574f-4f20-5370-6865726f2121");
 
-static const SpheroTransmitter::Command CMD_WAKEUP = {0x0a, 0x13, 0x0d}; // no args
-static const SpheroTransmitter::Command CMD_SLEEP = {0x0a, 0x13, 0x01};  // no args
-static const SpheroTransmitter::Command CMD_MOVE = {0x0a, 0x16, 0x07};   // 6 bytes: uint8_t speed, float32 degree, 0x00
-static const SpheroTransmitter::Command CMD_ANIM = {0x0a, 0x17, 0x05};   // 2 bytes: 0x00, num
-static const SpheroTransmitter::Command CMD_232 = {0x0a, 0x17, 0x0d};    // 0x01 -- 3-leg mode, 0x02 -- 2-leg mode
-static const SpheroTransmitter::Command CMD_DOME = {0x0a, 0x17, 0x0f};   // 4 bytes: float32 degree
-static const SpheroTransmitter::Command CMD_HOLO = {0x0a, 0x1a, 0x0e};   // 3 bytes: 0x00, 0x80, intensity
-
 static const uint8_t ESC = 0xAB;
 static const uint8_t SOP = 0x8D;
 static const uint8_t EOP = 0xD8;
@@ -26,68 +20,28 @@ static const uint8_t ESC_ESC = 0x23;
 static const uint8_t ESC_SOP = 0x05;
 static const uint8_t ESC_EOP = 0x50;
 
-#define BITDEPTH 8
-#define MAXVAL ((1<<BITDEPTH)-1)
-
-static std::vector<std::string> axisNames = {"CH0", "CH1", "CH2", "CH3", "CH4"};
-static std::vector<std::string> inputNames = {"speed", "turn", "dome", "sound", "accessory"};
-enum Inputs {
-    INPUT_SPEED     = 0,
-    INPUT_TURN      = 1,
-    INPUT_DOME      = 2,
-    INPUT_SOUND     = 3,
-    INPUT_ACCESSORY = 4
-};
-
-static std::string invalidAxisName = "INVALID";
-
-SpheroTransmitter::SpheroTransmitter() {
-    axisValues_ = {127, 127, 127, 127, 127};
-    pClient_ = nullptr;
+SpheroProtocol::SpheroProtocol() {
+    seqnum_ = 0;
     pInitialChar_ = nullptr;
     pControlChar_ = nullptr;
-    seqnum_ = 0;
-
-    sleeping_ = true;
-    connected_ = false;
-
-    addAxisInputMapping(AxisInputMapping(INPUT_SPEED, 0));
-    addAxisInputMapping(AxisInputMapping(INPUT_TURN, 1));
-    addAxisInputMapping(AxisInputMapping(INPUT_DOME, 2, AxisInputMapping::INTERP_LIN_CENTERED_INV));
 }
 
-void SpheroTransmitter::onConnect(BLEClient *pClient) {
-    Serial.printf("Connected\n");
-    connected_ = true;
+uint8_t SpheroProtocol::numTransmitterTypes() { return 1; }
+
+Transmitter* SpheroProtocol::createTransmitter(uint8_t transmitterType) {
+    if(transmitter_ == nullptr) transmitter_ = new SpheroTransmitter(this);
+    return transmitter_;
 }
 
-void SpheroTransmitter::onDisconnect(BLEClient *pClient) {
-    Serial.printf("Disconnected\n");
-    connected_ = false;
+bool SpheroProtocol::isAcceptableForDiscovery(BLEAdvertisedDevice advertisedDevice) {
+    if(advertisedDevice.getName().rfind("D2-", 0) == 0) {
+        Serial.printf("Found device with name \"%s\"\n", advertisedDevice.getName().c_str());
+        return true;
+    }
+    return false;
 }
 
-uint8_t SpheroTransmitter::numAxes() { 
-    return axisNames.size(); 
-}
-
-const std::string& SpheroTransmitter::axisName(uint8_t axis) { 
-    if(axis >= axisNames.size()) return invalidAxisName;
-    return axisNames[axis];
-}
-
-uint8_t SpheroTransmitter::bitDepthForAxis(uint8_t axis) { 
-    return 8; 
-}
-
-uint8_t SpheroTransmitter::numInputs() {
-    return inputNames.size();
-}
-
-const std::string& SpheroTransmitter::inputName(uint8_t input) {
-    return inputNames[input];
-}
-
-bool SpheroTransmitter::pairWith(const NodeAddr& addr) {
+bool SpheroProtocol::pairWith(const NodeAddr& addr) {
     if(isPaired(addr)) {
         Serial.printf("Already paired with %s\n", addr.toString().c_str());
         return false;
@@ -96,7 +50,6 @@ bool SpheroTransmitter::pairWith(const NodeAddr& addr) {
     if(pClient_ == nullptr) {
         pClient_ = BLEDevice::createClient();
         Serial.printf(" - Created client\n");
-
         pClient_->setClientCallbacks(this);
     }
 
@@ -105,35 +58,26 @@ bool SpheroTransmitter::pairWith(const NodeAddr& addr) {
         return false;
     }
     
-    pairedNodes_.push_back(addr);
+    pairedReceivers_.push_back(addr);
 
     return true;
 }
 
-void SpheroTransmitter::setRawAxisValue(uint8_t axis, uint32_t value) {
-    if(axis >= axisValues_.size()) return;
-    value = constrain(value, 0, MAXVAL);
-    axisValues_[axis] = uint8_t(value);
+bool SpheroProtocol::connect() {
+    if(pairedReceivers_.size() == 0) {
+        Serial.printf("No paired receivers -- cannot connect!\n");
+        return false;
+    }
+    return connect(pairedReceivers_[0]);
 }
 
-uint32_t SpheroTransmitter::rawAxisValue(uint8_t axis) {
-    if(axis >= axisValues_.size()) return 0;
-    return axisValues_[axis];
-}
-
-Result SpheroTransmitter::transmit() {
-    float dome = computeInputValue(INPUT_DOME) * 180.0f;
-    uint8_t buf[4];
-    floatToBuf(dome, buf);
-    transmitCommand(CMD_DOME, buf, 4);
-    return RES_OK;
-}
-
-bool SpheroTransmitter::isConnected() {
-    return connected_;
-}
-
-bool SpheroTransmitter::connect(const NodeAddr& addr) {
+bool SpheroProtocol::connect(const NodeAddr& addr) {
+    if(pClient_ == nullptr) {
+        pClient_ = BLEDevice::createClient();
+        Serial.printf(" - Created client\n");
+        pClient_->setClientCallbacks(this);
+    }
+    
     // Connect to the remove BLE Server.
     Serial.printf("Connecting to %s\n", addr.toString().c_str());
     pClient_->connect(BLEAddress(addr.toString()), esp_ble_addr_type_t(1));
@@ -186,23 +130,7 @@ bool SpheroTransmitter::connect(const NodeAddr& addr) {
     return true;
 }
 
-bool SpheroTransmitter::sleep(bool onoff) {
-    if(pControlChar_ == nullptr) {
-        Serial.printf("Control characteristic is NULL\n");
-        return false;
-    }
-    if(onoff) {
-        transmitCommand(CMD_SLEEP, nullptr, 0);
-        sleeping_ = true;
-    } else {
-        transmitCommand(CMD_WAKEUP, nullptr, 0);
-        sleeping_ = false;
-    }
-    
-    return true;
-}
-
-bool SpheroTransmitter::initialWrites() {
+bool SpheroProtocol::initialWrites() {
     if(pInitialChar_ == nullptr) {
         Serial.printf("Initial characteristic is NULL\n");
         return false;
@@ -213,14 +141,7 @@ bool SpheroTransmitter::initialWrites() {
     return true;
 }
 
-void SpheroTransmitter::floatToBuf(float f, uint8_t *buf) {
-    buf[0] = ((uint8_t*)&f)[3];
-    buf[1] = ((uint8_t*)&f)[2];
-    buf[2] = ((uint8_t*)&f)[1];
-    buf[3] = ((uint8_t*)&f)[0];
-}
-
-bool SpheroTransmitter::transmitCommand(const Command& cmd, uint8_t *payload, uint8_t len) {
+bool SpheroProtocol::transmitCommand(const Command& cmd, uint8_t *payload, uint8_t len) {
     if(pControlChar_ == nullptr) return false;
     uint8_t buf[255], escapedBuf[255];
     uint8_t i=0, j=0, checksum=0;
@@ -272,3 +193,5 @@ bool SpheroTransmitter::transmitCommand(const Command& cmd, uint8_t *payload, ui
     pControlChar_->writeValue(escapedBuf, j);
     return true;
 }
+
+#endif // !CONFIG_IDF_TARGET_ESP32S2

@@ -6,4 +6,9 @@
 #include "BBRTransmitter.h"
 #include "BBRProtocol.h"
 
+#include "CommercialBLE/DroidDepot/BBRDroidDepotProtocol.h"
+#include "CommercialBLE/Sphero/BBRSpheroProtocol.h"
+#include "MCS/ESP/BBRMESPProtocol.h"
+
+
 #endif // LIBBBREMOTES_H

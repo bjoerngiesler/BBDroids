@@ -3,6 +3,7 @@
 
 #include <sys/types.h>
 #include <string>
+#include <Arduino.h>
 
 namespace bb {
 namespace rmt {
@@ -13,13 +14,6 @@ enum Unit {
     UNIT_UNITY            = 2, // [0..1]
     UNIT_UNITY_CENTERED   = 3, // [-1..1]
     UNIT_RAW              = 4  // dependent on wire interface
-};
-
-enum NodeType {
-    NODE_TRANSMITTER = 0,
-    NODE_RECEIVER    = 1,
-    NODE_OTHER       = 2,
-    NODE_UNKNOWN     = 3
 };
 
 struct __attribute__ ((packed)) NodeAddr {
@@ -51,7 +45,7 @@ struct __attribute__ ((packed)) NodeAddr {
         for(int i=4; i<8; i++) byte[i] = (addrHi<<(8*(i-4))) & 0xff;
     }
 
-    void fromMACAddress(uint8_t addr[6]) {
+    void fromMACAddress(const uint8_t addr[6]) {
         for(int i=0; i<6; i++) byte[i] = addr[i];
         byte[6] = byte[7] = 0;
     }
@@ -84,9 +78,44 @@ struct __attribute__ ((packed)) NodeAddr {
 
 struct NodeDescription {
     NodeAddr addr;
-    NodeType type;
+    bool isTransmitter;
+    bool isReceiver;
+    bool isConfigurator;
     std::string name;
     void* protocolSpecific;
+};
+
+// Some standard input names. Of course you can define your own but these help to programmatically decide what to map to what.
+// Note that these are truncated to 10 chars in MCP packets, so don't make them too long.
+static const std::string INPUT_SPEED        = "Speed";     // body speed over ground -- v_x, forward positive
+static const std::string INPUT_TURN_RATE    = "TurnRate";  // body turn rate         -- v_alpha, left positive
+static const std::string INPUT_DOME_RATE    = "DomeRate";  // dome turn rate         -- left positive
+static const std::string INPUT_DOME_ANGLE   = "DomeAngle"; // dome absolute angle    -- left positive
+static const std::string INPUT_TURN_ANGLE   = "TurnAngle"; // body absolute angle    -- alpha, left positive
+static const std::string INPUT_HEAD_ROLL    = "HeadRoll";
+static const std::string INPUT_HEAD_PITCH   = "HeadPitch";
+static const std::string INPUT_HEAD_HEADING = "HeadHeadng"; // calling this "heading" because "yaw" is abbrev'd to "y" which is confusing
+static const std::string INPUT_V_Y          = "v_y";        // for holonomous droids (e.g. B2EMO) - l/r motion, left positive
+static const std::string INPUT_EMOTE_0      = "Emote0";     // sound or other emotion -- specific one from the 0 group if there are several
+static const std::string INPUT_EMOTE_0_RND  = "Emote0Rnd";  // random sound from the 0 group
+static const std::string INPUT_EMOTE_0_INC  = "Emote0Inc";  // next sound from the 0 group
+static const std::string INPUT_EMOTE_1      = "Emote1";     // sound or other emotion
+static const std::string INPUT_EMOTE_1_RND  = "Emote1Rnd";  // random sound from the 1 group
+static const std::string INPUT_EMOTE_1_INC  = "Emote1Inc";  // next sound from the 1 group
+static const std::string INPUT_EMOTE_2      = "Emote2";     // sound or other emotion
+static const std::string INPUT_EMOTE_2_RND  = "Emote2Rnd";  // random sound from the 2 group
+static const std::string INPUT_EMOTE_2_INC  = "Emote2Inc";  // next sound from the 2 group
+static const std::string INPUT_EMOTE_3      = "Emote3";     // sound or other emotion
+static const std::string INPUT_EMOTE_3_RND  = "Emote3Rnd";  // random sound from the 3 group
+static const std::string INPUT_EMOTE_3_INC  = "Emote3Inc";  // next sound from the 3 group
+static const std::string INPUT_EMOTE_4      = "Emote4";     // sound or other emotion
+static const std::string INPUT_EMOTE_4_RND  = "Emote4Rnd";  // random sound from the 4 group
+static const std::string INPUT_EMOTE_4_INC  = "Emote4Inc";  // next sound from the 4 group
+
+struct Axis {
+    std::string name;
+    uint8_t bitDepth;
+    uint32_t value;
 };
 
 enum MixType {
@@ -98,6 +127,15 @@ enum MixType {
 static const uint8_t INPUT_INVALID = 255;
 static const uint8_t AXIS_INVALID = 127;
 
+struct Interpolator {
+    int8_t i0, i25, i50, i75, i100;
+};
+static constexpr Interpolator INTERP_ZERO = {0, 0, 0, 0, 0};
+static constexpr Interpolator INTERP_LIN_POSITIVE = {0, 25, 50, 75, 100};
+static constexpr Interpolator INTERP_LIN_POSITIVE_INV = {100, 75, 50, 25, 0};
+static constexpr Interpolator INTERP_LIN_CENTERED = {-100, -50, 0, 50, 100};
+static constexpr Interpolator INTERP_LIN_CENTERED_INV = {100, 50, 0, -50, -100};
+
 // FIXME bit of a problem - AxisInputMapping is 13 bytes (input, 2x 5-byte interpolator, 2x 7-bit axis, 2 bits mix type). 
 // We really don't want to enlarge the config packet format, it's at 12 bytes max now, so we have to save 1 byte?
 // Options --
@@ -106,20 +144,21 @@ static const uint8_t AXIS_INVALID = 127;
 // 3. reduce number of possible inputs and axes - could maybe save 2 bits here? not enough.
 struct __attribute__ ((packed)) AxisInputMapping {
 public:
-    struct Interpolator {
-        int8_t i0, i25, i50, i75, i100;
-    };
-    static constexpr Interpolator INTERP_ZERO = {0, 0, 0, 0, 0};
-    static constexpr Interpolator INTERP_LIN_POSITIVE = {0, 25, 50, 75, 100};
-    static constexpr Interpolator INTERP_LIN_CENTERED = {-100, -50, 0, 50, 100};
-    static constexpr Interpolator INTERP_LIN_CENTERED_INV = {100, 50, 0, -50, -100};
-
     uint8_t input = INPUT_INVALID;
     Interpolator interp1 = INTERP_LIN_POSITIVE;
     Interpolator interp2 = INTERP_LIN_POSITIVE;
-    uint8_t axis1   : 6;
-    uint8_t axis2   : 6;
+    uint8_t axis1   : 7;
+    uint8_t axis2   : 7;
     MixType mixType : 2;
+
+    AxisInputMapping() { 
+        input = INPUT_INVALID; 
+        interp1 = INTERP_ZERO;
+        interp2 = INTERP_ZERO;
+        axis1 = AXIS_INVALID; 
+        axis2 = AXIS_INVALID;
+        mixType = MIX_NONE;
+    }
 
     AxisInputMapping(uint8_t inp, uint8_t ax1, Interpolator ip1 = INTERP_LIN_CENTERED, 
                      uint8_t ax2=AXIS_INVALID, Interpolator ip2 = INTERP_ZERO,
@@ -130,7 +169,7 @@ public:
         mixType = mix;
     }
 
-    float computeMix(float a1, float min1, float max1, float a2, float min2, float max2) {
+    float computeMix(float a1, float min1, float max1, float a2, float min2, float max2) const {
         float i0=0, i1=0, frac=0, b1=0, b2=0;
         
         if(axis1 == AXIS_INVALID && axis2 == AXIS_INVALID) return 0;
@@ -193,8 +232,6 @@ public:
         }
     }
 };
-
-static uint8_t AXIS_NONE = 0xff;
 
 //! normed goes from 0 to 1, and gets transformed into [0..360], [-180..180], [-1..1] depending on Unit value.
 static float normedToUnit(float normed, Unit unit) {

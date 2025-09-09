@@ -12,28 +12,49 @@
 namespace bb {
 namespace rmt {
 
+class Transmitter;
+class Receiver;
+class Configurator;
+
 // Abstract protocol superclass
 class Protocol {
 public:
-    virtual bool init() = 0;
+    virtual bool init(const std::string& nodeName);
 
     virtual uint8_t numTransmitterTypes() = 0;
-    virtual uint8_t numChannels(uint8_t transmitterType) = 0;
-    virtual uint8_t bitDepthForChannel(uint8_t transmitterType, uint8_t channel) = 0;
-
-    virtual Transmitter* createTransmitter(uint8_t transmitterType=0) { return nullptr; }
-    virtual Receiver* createReceiver() { return nullptr; }
-    virtual Configurator* createConfigurator() { return nullptr; }
+    virtual Transmitter* createTransmitter(uint8_t transmitterType=0);
+    virtual Receiver* createReceiver();
+    virtual Configurator* createConfigurator();
 
     virtual Result discoverNodes(float timeout = 5) = 0;
-    virtual unsigned int numDiscoveredNodes() { return discoveredNodes_.size(); }
-    const NodeDescription& discoveredNode(unsigned int index) {
-        static NodeDescription nil;
-        if(index >= discoveredNodes_.size()) return nil;
-        return discoveredNodes_[index];
-    }
+    virtual unsigned int numDiscoveredNodes();
+    const NodeDescription& discoveredNode(unsigned int index);
+
+    virtual bool pairWith(const NodeDescription& node);
+
+    virtual bool isPaired();
+    virtual bool isPaired(const NodeAddr& node);
+    virtual bool acceptsPairingRequests() = 0;
+
+    virtual bool requiresConnection() { return false; }
+    virtual bool isConnected() { if(!requiresConnection()) return true; else return false; }
+    virtual bool connect() { return false; }
+
+    virtual bool step();
+
+    const std::vector<NodeAddr>& pairedReceivers() { return pairedReceivers_; }
+    
 protected:
+    virtual bool connect(const NodeAddr& addr) { return false; }
+
     std::vector<NodeDescription> discoveredNodes_;
+    Transmitter* transmitter_ = nullptr;
+    Receiver* receiver_ = nullptr;
+    Configurator* configurator_ = nullptr;
+    std::vector<NodeAddr> pairedTransmitters_;
+    std::vector<NodeAddr> pairedReceivers_;
+    std::vector<NodeAddr> pairedConfigurators_;
+    std::string nodeName_;
 };
 
 };

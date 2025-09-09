@@ -6,7 +6,8 @@ namespace rmt {
 
 //! Abstract configurator superclass
 class Configurator {
-
+public:
+    virtual bool handle() = 0;
 };
 
 };
