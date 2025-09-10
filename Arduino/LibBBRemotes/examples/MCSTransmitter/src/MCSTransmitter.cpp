@@ -11,7 +11,6 @@
 */
 
 #include <LibBBRemotes.h>
-#include <Adafruit_MCP23X17.h>
 
 using namespace bb::rmt;
 
