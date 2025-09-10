@@ -4,7 +4,7 @@
 using namespace bb;
 using namespace bb::rmt;
 
-static AxisInputMapping InvalidMapping;
+static AxisMix InvalidMix;
 
 uint8_t AxisInputManager::inputWithName(const std::string& name) {
     for(int i=0; i<numInputs(); i++) {
@@ -13,30 +13,30 @@ uint8_t AxisInputManager::inputWithName(const std::string& name) {
     return INPUT_INVALID;
 }
 
-uint8_t AxisInputManager::numMappings() { 
-    return axisInputMappings_.size(); 
+uint8_t AxisInputManager::numMixes() { 
+    return mixes_.size(); 
 }
 
-const AxisInputMapping& AxisInputManager::mappingForInput(uint8_t input) { 
-    for(auto& mapping: axisInputMappings_) {
-        if(mapping.input == input) return mapping;
+const AxisMix& AxisInputManager::mixForInput(uint8_t input) { 
+    for(auto& mix: mixes_) {
+        if(mix.first == input) return mix.second;
     }
-    return InvalidMapping;
+    return InvalidMix;
 }
 
-bool AxisInputManager::addMapping(const AxisInputMapping& mapping) { 
-    if(hasMappingForInput(mapping.input) || mapping.input == INPUT_INVALID) return false;
-    axisInputMappings_.push_back(mapping);
+bool AxisInputManager::addMix(uint8_t input, const AxisMix& mix) { 
+    if(hasMixForInput(input) || input == INPUT_INVALID) return false;
+    mixes_[input] = mix;
     return true;
 }
 
-void AxisInputManager::clearMappings() { 
-    axisInputMappings_.clear(); 
+void AxisInputManager::clearMixes() { 
+    mixes_.clear(); 
 }
 
-bool AxisInputManager::hasMappingForInput(uint8_t input) {
-    for(auto& mapping: axisInputMappings_) {
-        if(mapping.input == input) return true;
+bool AxisInputManager::hasMixForInput(uint8_t input) {
+    for(auto& mix: mixes_) {
+        if(mix.first == input) return true;
     }
     return false;
 }

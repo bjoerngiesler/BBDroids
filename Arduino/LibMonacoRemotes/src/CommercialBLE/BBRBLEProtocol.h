@@ -22,7 +22,7 @@ public:
     virtual bool init();
 
     // BLE callbacks
-    virtual Result discoverNodes(float timeout = 5);
+    virtual bool discoverNodes(float timeout = 5);
     virtual void onResult(BLEAdvertisedDevice advertisedDevice);
 
     virtual bool isAcceptableForDiscovery(BLEAdvertisedDevice advertisedDevice) = 0;

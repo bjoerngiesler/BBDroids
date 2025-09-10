@@ -114,13 +114,13 @@ uint32_t Transmitter::rawAxisValue(uint8_t axis) {
 float Transmitter::computeInputValue(uint8_t input) {
     //Serial.printf("Computing input value for input %d\n", input);
     float value = 0;
-    for(auto& aim: axisInputMappings_) {
-        if(aim.input == input) {
+    for(auto& mix: mixes_) {
+        if(mix.first == input) {
             //Serial.printf("Found input mapping: axes %d and %d, mix mode %d\n", aim.axis1, aim.axis2, aim.mixType);
-            float v1 = axisValue(aim.axis1, UNIT_UNITY);
-            float v2 = axisValue(aim.axis2, UNIT_UNITY);
+            float v1 = axisValue(mix.second.axis1, UNIT_UNITY);
+            float v2 = axisValue(mix.second.axis2, UNIT_UNITY);
             //Serial.printf("Mixing %.2f and %.2f with mix mode %d\n", v1, v2, aim.mixType);
-            return aim.computeMix(v1, 0.0f, 1.0f, v2, 0.0f, 1.0f);
+            return mix.second.compute(v1, 0.0f, 1.0f, v2, 0.0f, 1.0f);
         }
     }
 

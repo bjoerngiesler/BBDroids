@@ -36,7 +36,7 @@ const std::string& MTransmitter::inputName(uint8_t input) {
     return EMPTY;
 }
 
-Result MTransmitter::transmit(){
+bool MTransmitter::transmit(){
     MPacket packet;
 
     packet.type = MPacket::PACKET_TYPE_CONTROL;
@@ -52,7 +52,7 @@ Result MTransmitter::transmit(){
         protocol_->bumpSeqnum();
     }
 
-    return RES_OK;
+    return true;
 }
 
 bool MTransmitter::syncReceiverSideMapping() {

@@ -10,8 +10,8 @@
        the hardware (joysticks, pots, buttons) to.
 */
 
-#include <LibBB.h>
 #include <LibBBRemotes.h>
+#include <MCS/ESP/BBRMESPProtocol.h>
 
 using namespace bb::rmt;
 
@@ -29,7 +29,7 @@ ProtocolType type =
 
 #define XSTR(s) STR(s)
 #define STR(s) #s
-Protocol *protocol = nullptr;
+MESPProtocol protocol;
 Receiver *rx = nullptr;
 
 // These variables hold the values for the inputs the droid defines.
@@ -54,16 +54,10 @@ void setup() {
   Serial.printf("MCS Receiver example\n");
   Serial.printf("Protocol used: %s\n", XSTR(PROTOCOL));
 
-  protocol = ProtocolFactory::createProtocol(type);
-  if(protocol == nullptr) {
-    Serial.printf("Error: Could not create protocol!\n");
-    while(true);
-  }
-
   // Initialize the protocol, giving this station a name
-  protocol->init("Receiver");
+  protocol.init("Receiver");
   // Ask the protocol to create a receiver. Some protocols cannot do this and will return nullptr.
-  rx = protocol->createReceiver();
+  rx = protocol.createReceiver();
   if(rx == nullptr) {
     Serial.printf("Error: Could not create receiver!\n");
     while(true);
@@ -74,8 +68,8 @@ void setup() {
   turnInput = rx->addInput(INPUT_TURN_RATE, turn);
 
   // Tell the receiver which axis to map to which input, and how to interpolate
-  rx->addMapping(AxisInputMapping(speedInput, 0, INTERP_LIN_CENTERED));
-  rx->addMapping(AxisInputMapping(turnInput, 1, INTERP_LIN_CENTERED));
+  rx->addMix(speedInput, AxisMix(0, INTERP_LIN_CENTERED));
+  rx->addMix(turnInput, AxisMix(1, INTERP_LIN_CENTERED));
 
   // Tell the receiver to call dataFinishedCB() whenever a packet was handled
   rx->setDataFinishedCallback(dataFinishedCB);
@@ -86,6 +80,6 @@ void setup() {
 
 void loop() {
   // Let the protocol do its work
-  protocol->step();
+  protocol.step();
   delay(5);
 }

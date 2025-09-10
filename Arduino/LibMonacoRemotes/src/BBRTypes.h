@@ -148,7 +148,7 @@ enum MixType {
 static const uint8_t INPUT_INVALID = 255;
 static const uint8_t AXIS_INVALID = 127;
 
-struct Interpolator {
+struct __attribute__ ((packed)) Interpolator {
     int8_t i0, i25, i50, i75, i100;
 };
 static constexpr Interpolator INTERP_ZERO = {0, 0, 0, 0, 0};
@@ -157,23 +157,22 @@ static constexpr Interpolator INTERP_LIN_POSITIVE_INV = {100, 75, 50, 25, 0};
 static constexpr Interpolator INTERP_LIN_CENTERED = {-100, -50, 0, 50, 100};
 static constexpr Interpolator INTERP_LIN_CENTERED_INV = {100, 50, 0, -50, -100};
 
-// FIXME bit of a problem - AxisInputMapping is 13 bytes (input, 2x 5-byte interpolator, 2x 7-bit axis, 2 bits mix type). 
+// FIXME bit of a problem - AxisMix is 12 bytes (input, 2x 5-byte interpolator, 2x 7-bit axis, 2 bits mix type). 
+// To transport on the wire, we need to add the input byte, which adds a 13th byte.
 // We really don't want to enlarge the config packet format, it's at 12 bytes max now, so we have to save 1 byte?
 // Options --
 // 1. don't care, just make it bigger.
 // 2. steal bits from Interpolator structure by going to half resolution (2 instead of 1) - would save 10 bits, but at the expense of accuracy?
 // 3. reduce number of possible inputs and axes - could maybe save 2 bits here? not enough.
-struct __attribute__ ((packed)) AxisInputMapping {
+struct __attribute__ ((packed)) AxisMix {
 public:
-    uint8_t input = INPUT_INVALID;
-    Interpolator interp1 = INTERP_LIN_POSITIVE;
-    Interpolator interp2 = INTERP_LIN_POSITIVE;
-    uint8_t axis1   : 7;
-    uint8_t axis2   : 7;
-    MixType mixType : 2;
+    Interpolator interp1 = INTERP_LIN_POSITIVE;  // byte 0..4
+    Interpolator interp2 = INTERP_LIN_POSITIVE;  // byte 5..9
+    uint8_t axis1   : 7;                         // byte 10 bit 0..6
+    uint8_t axis2   : 7;                         // byte 10 bit 7 to byte 11 bit 0..5
+    MixType mixType : 2;                         // byte 11 bit 6..7
 
-    AxisInputMapping() { 
-        input = INPUT_INVALID; 
+    AxisMix() { 
         interp1 = INTERP_ZERO;
         interp2 = INTERP_ZERO;
         axis1 = AXIS_INVALID; 
@@ -181,16 +180,15 @@ public:
         mixType = MIX_NONE;
     }
 
-    AxisInputMapping(uint8_t inp, uint8_t ax1, Interpolator ip1 = INTERP_LIN_CENTERED, 
+    AxisMix(uint8_t ax1, Interpolator ip1 = INTERP_LIN_CENTERED, 
                      uint8_t ax2=AXIS_INVALID, Interpolator ip2 = INTERP_ZERO,
                      MixType mix=MIX_NONE) { 
-        input = inp; 
         axis1 = ax1; interp1 = ip1;
         axis2 = ax2; interp2 = ip2;
         mixType = mix;
     }
 
-    float computeMix(float a1, float min1, float max1, float a2, float min2, float max2) const {
+    float compute(float a1, float min1, float max1, float a2, float min2, float max2) const {
         float i0=0, i1=0, frac=0, b1=0, b2=0;
         
         if(axis1 == AXIS_INVALID && axis2 == AXIS_INVALID) return 0;
@@ -252,6 +250,11 @@ public:
             break;
         }
     }
+};
+
+struct __attribute__ ((packed)) InputMixMapping {
+    uint8_t input;
+    AxisMix mix;
 };
 
 //! normed goes from 0 to 1, and gets transformed into [0..360], [-180..180], [-1..1] depending on Unit value.

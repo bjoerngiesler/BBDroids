@@ -6,6 +6,10 @@
 using namespace bb;
 using namespace bb::rmt;
 
+#if !defined(WRAPPEDDIFF)
+#define WRAPPEDDIFF(a, b, max) ((a>=b) ? a-b : (max-b)+a)
+#endif // WRAPPEDDIFF
+
 static MESPProtocol *proto = nullptr;
 
 static const NodeAddr broadcastAddr = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x00};
@@ -38,9 +42,9 @@ bool MESPProtocol::init(const std::string& nodeName) {
     return MProtocol::init(nodeName);
 }
 
-Result MESPProtocol::discoverNodes(float timeout) {
+bool MESPProtocol::discoverNodes(float timeout) {
     if(!broadcastAdded_) addBroadcastAddress();
-    Result res = MProtocol::discoverNodes(timeout);
+    bool res = MProtocol::discoverNodes(timeout);
     removeBroadcastAddress();
     return res;
 }

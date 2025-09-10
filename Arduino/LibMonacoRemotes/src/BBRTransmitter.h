@@ -4,8 +4,6 @@
 #include <string>
 #include <vector>
 
-#include <LibBB.h>
-
 #include "BBRTypes.h"
 #include "BBRProtocol.h"
 #include "BBRAxisInputManager.h"
@@ -62,7 +60,7 @@ public:
     virtual float computeInputValue(uint8_t input);
     virtual float computeInputValue(const std::string& name) { return computeInputValue(inputWithName(name)); }
     
-    virtual Result transmit() = 0;
+    virtual bool transmit() = 0;
 
 protected:
     std::vector<Axis> axes_;

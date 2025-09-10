@@ -36,8 +36,8 @@ const std::string& DroidDepotTransmitter::inputName(uint8_t input) {
     return inputNames[input];
 }
 
-Result DroidDepotTransmitter::transmit() {
-    return RES_OK;
+bool DroidDepotTransmitter::transmit() {
+    return true;
 }
 
 

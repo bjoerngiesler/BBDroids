@@ -17,7 +17,7 @@ public:
     virtual uint8_t numInputs();
     virtual const std::string& inputName(uint8_t input);
 
-    virtual Result transmit();
+    virtual bool transmit();
 
     virtual bool receiverSideMapping() { return true; }
     virtual bool syncReceiverSideMapping();

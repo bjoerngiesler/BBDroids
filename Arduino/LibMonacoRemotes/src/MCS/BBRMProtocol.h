@@ -25,7 +25,7 @@ public:
     virtual uint8_t numTransmitterTypes() { return 2; }
     virtual uint8_t numChannels(uint8_t transmitterType) { return 19; }
 
-    virtual Result discoverNodes(float timeout = 5);
+    virtual bool discoverNodes(float timeout = 5);
     bool pairWith(const NodeDescription& descr);
 
     virtual bool step();

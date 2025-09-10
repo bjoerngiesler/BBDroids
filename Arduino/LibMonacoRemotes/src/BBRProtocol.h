@@ -26,7 +26,7 @@ public:
     virtual Receiver* createReceiver();
     virtual Configurator* createConfigurator();
 
-    virtual Result discoverNodes(float timeout = 5) = 0;
+    virtual bool discoverNodes(float timeout = 5) = 0;
     virtual unsigned int numDiscoveredNodes();
     const NodeDescription& discoveredNode(unsigned int index);
 

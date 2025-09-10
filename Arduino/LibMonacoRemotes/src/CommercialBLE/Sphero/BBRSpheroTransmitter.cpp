@@ -50,12 +50,12 @@ const std::string& SpheroTransmitter::inputName(uint8_t input) {
 }
 
 
-Result SpheroTransmitter::transmit() {
+bool SpheroTransmitter::transmit() {
     float dome = 0;
     
-    if(hasMappingForInput(INPUT_DOME_ANGLE)) {
+    if(hasMixForInput(INPUT_DOME_ANGLE)) {
         dome = computeInputValue(INPUT_DOME_ANGLE) * 180.0f;
-    } else if(hasMappingForInput(INPUT_DOME_RATE)) {
+    } else if(hasMixForInput(INPUT_DOME_RATE)) {
         domeAngle_ += computeInputValue(INPUT_DOME_RATE) * 1.8f;
         if(domeAngle_ > 100) domeAngle_ = 100;
         if(domeAngle_ < -100) domeAngle_ = -100;
@@ -67,9 +67,9 @@ Result SpheroTransmitter::transmit() {
 
     float speed = computeInputValue(INPUT_SPEED) * 255.0f;
     float turn = 0;
-    if(hasMappingForInput(INPUT_TURN_ANGLE)) {
+    if(hasMixForInput(INPUT_TURN_ANGLE)) {
         turn = computeInputValue(INPUT_TURN_ANGLE) * 360.0f;
-    } else if(hasMappingForInput(INPUT_TURN_RATE)) {
+    } else if(hasMixForInput(INPUT_TURN_RATE)) {
         turnAngle_ += computeInputValue(INPUT_TURN_RATE) * 3.6f;
         if(turnAngle_ > 360) turnAngle_ -= 360;
         if(turnAngle_ < 0) turnAngle_ += 360;
@@ -86,7 +86,7 @@ Result SpheroTransmitter::transmit() {
     protocol_->transmitCommand(CMD_MOVE, moveBuf, 4);
 
     uint8_t emoteBuf[2];
-    if(hasMappingForInput(INPUT_EMOTE_0)) {
+    if(hasMixForInput(INPUT_EMOTE_0)) {
         float emote = computeInputValue(INPUT_EMOTE_0);
         if(emote > 0.5 && emote != lastEmote0_) {
             emoteBuf[0] = 0; 
@@ -95,7 +95,7 @@ Result SpheroTransmitter::transmit() {
         }
         lastEmote0_ = emote;
     }
-    if(hasMappingForInput(INPUT_EMOTE_1)) {
+    if(hasMixForInput(INPUT_EMOTE_1)) {
         float emote = computeInputValue(INPUT_EMOTE_1);
         if(emote > 0.5 && emote != lastEmote1_) {
             emoteBuf[0] = 0; 
@@ -104,7 +104,7 @@ Result SpheroTransmitter::transmit() {
         }
         lastEmote1_ = emote;
     }
-    if(hasMappingForInput(INPUT_EMOTE_2)) {
+    if(hasMixForInput(INPUT_EMOTE_2)) {
         float emote = computeInputValue(INPUT_EMOTE_2);
         if(emote > 0.5 && emote != lastEmote2_) {
             emoteBuf[0] = 0; 
@@ -113,7 +113,7 @@ Result SpheroTransmitter::transmit() {
         }
         lastEmote2_ = emote;
     }
-    if(hasMappingForInput(INPUT_EMOTE_3)) {
+    if(hasMixForInput(INPUT_EMOTE_3)) {
         float emote = computeInputValue(INPUT_EMOTE_3);
         if(emote > 0.5 && emote != lastEmote3_) {
             emoteBuf[0] = 0; 
@@ -122,7 +122,7 @@ Result SpheroTransmitter::transmit() {
         }
         lastEmote3_ = emote;
     }
-    if(hasMappingForInput(INPUT_EMOTE_4)) {
+    if(hasMixForInput(INPUT_EMOTE_4)) {
         float emote = computeInputValue(INPUT_EMOTE_4);
         if(emote > 0.5 && emote != lastEmote4_) {
             emoteBuf[0] = 0; 
@@ -132,7 +132,7 @@ Result SpheroTransmitter::transmit() {
         lastEmote4_ = emote;
     }
     
-    return RES_OK;
+    return true;
 }
 
 bool SpheroTransmitter::sleep(bool onoff) {

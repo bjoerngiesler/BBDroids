@@ -28,7 +28,7 @@ public:
 
     virtual bool receiverSideMapping() { return false; }
     virtual bool syncReceiverSideMapping() {return true; }
-    virtual Result transmit();
+    virtual bool transmit();
    
 protected:
     void initialWrites();

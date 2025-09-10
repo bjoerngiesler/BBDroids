@@ -1,7 +1,6 @@
 #if !defined(BBRMPACKET_H)
 #define BBRMPACKET_H
 
-#include <LibBB.h>
 #include "../BBRTypes.h"
 
 //
@@ -282,7 +281,7 @@ struct __attribute__ ((packed)) MConfigPacket {
 	ConfigType      type  : 6;
 	ConfigReplyType reply : 2;
 	union {
-		HWAddress address;
+		NodeAddr address;
 		uint64_t magic;
 		RemoteConfigPacket remoteConfig;
 	} cfgPayload;

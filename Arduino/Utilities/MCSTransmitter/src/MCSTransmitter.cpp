@@ -10,7 +10,6 @@
        the hardware (joysticks, pots, buttons) to.
 */
 
-#include <LibBB.h>
 #include <LibBBRemotes.h>
 #include <Adafruit_MCP23X17.h>
 

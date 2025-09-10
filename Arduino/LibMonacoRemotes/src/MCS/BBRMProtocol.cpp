@@ -5,6 +5,10 @@
 using namespace bb;
 using namespace bb::rmt;
 
+#if !defined(WRAPPEDDIFF)
+#define WRAPPEDDIFF(a, b, max) ((a>=b) ? a-b : (max-b)+a)
+#endif // WRAPPEDDIFF
+
 static const uint8_t crc7Table[256] = {
 	0x00, 0x12, 0x24, 0x36, 0x48, 0x5a, 0x6c, 0x7e,
 	0x90, 0x82, 0xb4, 0xa6, 0xd8, 0xca, 0xfc, 0xee,
@@ -49,7 +53,7 @@ static uint8_t calcCRC7(const uint8_t *buffer, size_t len) {
 }
 
 uint8_t MPacket::calculateCRC() const {
-	return calcCRC7((const uint8_t*)this, sizeof(Packet)-1);
+	return calcCRC7((const uint8_t*)this, sizeof(MPacket)-1);
 }
 
 MProtocol::MProtocol() {
@@ -105,7 +109,7 @@ bool MProtocol::incomingPacket(const NodeAddr& addr, const MPacket& packet) {
 		Serial.printf("Config packet from %s\n", addr.toString().c_str());
 		if(reply == MConfigPacket::CONFIG_REPLY_ERROR || reply == MConfigPacket::CONFIG_REPLY_OK) {
 			Serial.printf("This is a Reply packet! Discarding.\n");
-			return RES_SUBSYS_COMM_ERROR;
+			return false;
 		}
 		res = incomingConfigPacket(addr, packet.source, packet.seqnum, packet.payload.config);
 		if(res == true) {
@@ -251,7 +255,7 @@ bool MProtocol::incomingPairingPacket(const NodeAddr& addr, MPacket::PacketSourc
 }
 
 
-Result MProtocol::discoverNodes(float timeout) {
+bool MProtocol::discoverNodes(float timeout) {
 	discoveredNodes_.clear();
 
 	MPacket packet;
@@ -283,7 +287,7 @@ Result MProtocol::discoverNodes(float timeout) {
 		timeout -= .01;
 	}
 
-	return RES_OK;
+	return true;
 }
 
 bool MProtocol::pairWith(const NodeDescription& descr) {

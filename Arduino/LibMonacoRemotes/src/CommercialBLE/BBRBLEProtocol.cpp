@@ -17,7 +17,7 @@ bool BLEProtocol::init() {
     return true;
 }
 
-Result BLEProtocol::discoverNodes(float timeout) {
+bool BLEProtocol::discoverNodes(float timeout) {
     discoveredNodes_.clear();
     if(pBLEScan_ == nullptr) pBLEScan_ = BLEDevice::getScan(); //create new scan
     pBLEScan_->setAdvertisedDeviceCallbacks(this);
@@ -25,7 +25,7 @@ Result BLEProtocol::discoverNodes(float timeout) {
     pBLEScan_->setInterval(100);
     pBLEScan_->setWindow(99);  // less or equal setInterval value
     pBLEScan_->start(timeout, false);
-    return RES_OK;
+    return true;
 }
 
 void BLEProtocol::onResult(BLEAdvertisedDevice advertisedDevice) {
