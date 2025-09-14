@@ -7,7 +7,7 @@
 #include "BBConfigStorage.h"
 #include "BBPacket.h"
 
-#define DEFAULT_CHAN    0x19   // no overlap with Wifi according to XBee documentation
+#define DEFAULT_CHAN    0x14   // no overlap with Wifi according to XBee documentation
 #define DEFAULT_PAN     0x3332
 
 #define DEFAULT_BPS     9600

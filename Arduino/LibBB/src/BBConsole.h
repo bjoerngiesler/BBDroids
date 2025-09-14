@@ -53,9 +53,12 @@ public:
 };
 
 #if defined(ARDUINO_ARCH_ESP32)
+#if CONFIG_IDF_TARGET_ESP32S2
 #define HWSERIAL_CLASS USBCDC
-//#define HWSERIAL_CLASS HardwareSerial
 #else
+#define HWSERIAL_CLASS HWCDC
+#endif
+#else // !defined(ARDUINO_ARCH_ESP32)
 #define HWSERIAL_CLASS HardwareSerial
 #endif
 

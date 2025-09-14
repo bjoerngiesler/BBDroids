@@ -273,10 +273,16 @@ Result DODroid::step() {
     if((seqnum % 4) == 0) {
       fillAndSendStatePacket();
     }
-    if(!imu_.available())
+    if(!imu_.available()) {
       LOG(LOG_FATAL, "IMU missing - critical error\n");
-    if(!DOBattStatus::batt.available()) 
+      leftMotor_.set(0);
+      rightMotor_.set(0);
+    }
+    if(!DOBattStatus::batt.available()) {
       LOG(LOG_FATAL, "Battery missing - critical error\n");
+      leftMotor_.set(0);
+      rightMotor_.set(0);
+    }
     
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
@@ -367,16 +373,16 @@ bb::Result DODroid::stepHead() {
 
       float neck = nod + params_.faNeckIMUPitch*p;
       neck = constrain(neck, -params_.neckRange, params_.neckRange);
-      bb::Servos::servos.setGoal(SERVO_NECK, 180 + neck);
+      bb::Servos::servos.setGoalPos(SERVO_NECK, 180 + neck);
 
       float headPitch = -nod;
       headPitch += remoteP_;
       headPitch += params_.faHeadPitchSpeedSP*speedSP;
-      bb::Servos::servos.setGoal(SERVO_HEAD_PITCH, 180 + headPitch);
-      bb::Servos::servos.setGoal(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh + remoteH_);
-      bb::Servos::servos.setGoal(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh + remoteR_);
+      bb::Servos::servos.setGoalPos(SERVO_HEAD_PITCH, 180 + headPitch);
+      bb::Servos::servos.setGoalPos(SERVO_HEAD_HEADING, 180.0 + params_.faHeadHeadingTurn * dh + remoteH_);
+      bb::Servos::servos.setGoalPos(SERVO_HEAD_ROLL, 180.0 - params_.faHeadRollTurn * dh + remoteR_);
     } else {
-      bb::Servos::servos.setGoal(SERVO_NECK, 180);
+      bb::Servos::servos.setGoalPos(SERVO_NECK, 180);
     }
   }
   
@@ -432,7 +438,7 @@ bb::Result DODroid::stepHead() {
 
 bb::Result DODroid::stepDrive() {
   unsigned long timeSinceLastPrimary = WRAPPEDDIFF(millis(), msLastPrimaryCtrlPacket_, ULONG_MAX);
-  if(timeSinceLastPrimary > 500 && driveMode_ != DRIVE_OFF && driveSafety_ == true) {
+  if(timeSinceLastPrimary > 1000 && driveMode_ != DRIVE_OFF && driveSafety_ == true) {
     LOG(LOG_INFO, "No control packet from primary in %ldms. Switching drive off.\n", timeSinceLastPrimary);
     switchDrive(DRIVE_OFF);
     DOSound::sound.playSystemSound(SystemSounds::DISCONNECTED);
@@ -1005,6 +1011,7 @@ bool DODroid::setControlStrip(uint8_t strip, bool update) {
 }
 
 bool DODroid::updateHead() {
+  return false;
   if(!aerialsOK_) return false;
 
   Wire.beginTransmission(AERIAL_ADDR);
