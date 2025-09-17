@@ -1040,10 +1040,12 @@ Result bb::Servos::syncReadInfo(ConsoleStream *stream) {
 }
 
 Result bb::Servos::syncWriteInfo(ConsoleStream* stream) {
-  if(dxl_.syncWrite(&swPrfVelInfos) == false) {
-    if(stream) stream->printf("servo: Sending servo profile velocity failed!\n");
-    else Console::console.printfBroadcast("servo: Sending servo profile velocity failed!\n");
-    return RES_SUBSYS_COMM_ERROR;
+  if(swPrfVelInfos.is_info_changed == true) {
+    if(dxl_.syncWrite(&swPrfVelInfos) == false) {
+      if(stream) stream->printf("servo: Sending servo profile velocity failed!\n");
+      else Console::console.printfBroadcast("servo: Sending servo profile velocity failed!\n");
+      return RES_SUBSYS_COMM_ERROR;
+    }
   }
 
   if(swGoalPosInfos.is_info_changed == true) {

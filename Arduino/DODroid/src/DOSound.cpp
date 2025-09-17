@@ -5,7 +5,7 @@
 using namespace bb;
 
 DOSound DOSound::sound;
-#define DOSOUND_REPEATS 1
+#define DOSOUND_REPEATS 2
 #define DOSOUND_DELAY_US 100
 
 DOSound::DOSound(uint8_t volume, bool debug) {
@@ -31,13 +31,13 @@ bool DOSound::begin() {
   bb::printf("Setting up sound... ");
   ser_->begin(9600);
   if(dfp_.begin(*ser_, debug_)) {
-    for(int i=0; i<3; i++) {
-      if(checkSDCard() == true) break;
-      delay(1000);
-    }
     for(int i=0; i<DOSOUND_REPEATS; i++) {
       dfp_.volume(volume_);
       delayMicroseconds(DOSOUND_DELAY_US);
+    }
+    for(int i=0; i<3; i++) {
+      if(checkSDCard() == true) break;
+      delay(1000);
     }
     available_ = true;
     bb::printf("OK\n");
@@ -54,6 +54,11 @@ bool DOSound::playSound(unsigned int fileNumber) {
   }
 
   for(int i=0; i<DOSOUND_REPEATS; i++) {
+    dfp_.stop();
+    delayMicroseconds(DOSOUND_DELAY_US);
+  }
+
+  for(int i=0; i<DOSOUND_REPEATS; i++) {
     dfp_.play(fileNumber);
     delayMicroseconds(DOSOUND_DELAY_US);
   }
@@ -64,6 +69,11 @@ bool DOSound::playFolder(unsigned int folder, unsigned int filenumber, bool over
   if(!available_) {
     bb::printf("Sound system not available!\n");
     if(override == false) return false;
+  }
+
+  for(int i=0; i<DOSOUND_REPEATS; i++) {
+    dfp_.stop();
+    delayMicroseconds(DOSOUND_DELAY_US);
   }
 
   for(int i=0; i<DOSOUND_REPEATS; i++) {
@@ -189,10 +199,12 @@ bool DOSound::checkSDCard() {
       dumbMode_ = false;
     }
 
-    bb::printf("Playing initial system sound %d.\n", SystemSounds::SOUND_SYSTEM_READY);
-    dfp_.playFolder(int(1), SystemSounds::SOUND_SYSTEM_READY);
-    delay(1000);
-    bb::printf("Done.\n");
+    for(int i=0; i<DOSOUND_REPEATS; i++) {
+      dfp_.playFolder(1, SystemSounds::SOUND_SYSTEM_READY);
+      delayMicroseconds(DOSOUND_DELAY_US);
+    }
+    delay(1500);
+
     return true;
   } else {
     if(fc == fileCount_) return true; // no change

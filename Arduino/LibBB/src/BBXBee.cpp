@@ -217,7 +217,7 @@ bb::Result bb::XBee::step() {
 				//Console::console.printfBroadcast("receiveAPIMode(): %s\n", errorMessage(retval));
 				continue;
 			}
-			//Console::console.printfBroadcast("Received packet from %lx:%lx type %d\n", srcAddr.addrHi, srcAddr.addrLo, packet.type);
+//			Console::console.printfBroadcast("Received packet from %lx:%lx type %d\n", srcAddr.addrHi, srcAddr.addrLo, packet.type);
 			for(auto& r: receivers_) {
 				r->incomingPacket(srcAddr, rssi, packet);
 			}
@@ -820,7 +820,10 @@ bb::Result bb::XBee::receiveAPIMode(HWAddress& srcAddr, uint8_t& rssi, Packet& p
 	Result retval;
 
 	retval = receive(frame);
-	if(retval != RES_OK) return retval;
+	if(retval != RES_OK) {
+		//bb::printf("receive(): %s\n", errorMessage(retval));
+		return retval;
+	}
 
 	//Console::console.printfBroadcast("Received frame of length %d, first char 0x%x\n", frame.length(), frame.data()[0]);
 
@@ -1213,6 +1216,17 @@ bb::Result bb::XBee::send(const APIFrame& frame) {
 	return RES_OK;
 }
 
+
+static bool waitfor(std::function<bool(void)> fn, uint8_t timeout) {
+	while(fn() == false && timeout>0) {
+		delayMicroseconds(1);
+		timeout = timeout - 1;
+	}
+	//bb::printf("remaining: %d\n", timeout);
+	if(timeout > 0) return true;
+	return false;
+}
+
 bb::Result bb::XBee::receive(APIFrame& frame) {
 	uint8_t byte = 0xff;
 
@@ -1229,11 +1243,13 @@ bb::Result bb::XBee::receive(APIFrame& frame) {
 	}
 //	Console::console.printfBroadcast("Start delimiter found\n");
 
-	if(!uart_->available()) delayMicroseconds(200);
-	if(!uart_->available()) return RES_SUBSYS_COMM_ERROR;	
+	//if(!uart_->available()) delayMicroseconds(200);
+	//if(!uart_->available()) return RES_SUBSYS_COMM_ERROR;	
+	if(waitfor([=]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
 	uint8_t lengthMSB = readEscapedByte(uart_);
-	if(!uart_->available()) delayMicroseconds(200);
-	if(!uart_->available()) return RES_SUBSYS_COMM_ERROR;	
+	if(waitfor([=]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
+	//if(!uart_->available()) delayMicroseconds(200);
+	//if(!uart_->available()) return RES_SUBSYS_COMM_ERROR;	
 	uint8_t lengthLSB = readEscapedByte(uart_);
 
 	if(lengthLSB == 0x7e || lengthMSB == 0x7e) {
@@ -1246,12 +1262,14 @@ bb::Result bb::XBee::receive(APIFrame& frame) {
 	uint8_t *buf = frame.data();
 	for(uint16_t i=0; i<length; i++) {
 		//Console::console.printfBroadcast("Reading byte %d of %d\n", i, length);
-		if(!uart_->available()) delayMicroseconds(200);
+		if(waitfor([=]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
+		//if(!uart_->available()) delayMicroseconds(200);
 		buf[i] = readEscapedByte(uart_);
 	}
 	frame.calcChecksum();
 
-	if(!uart_->available()) delayMicroseconds(200);
+	if(waitfor([=]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
+	//if(!uart_->available()) delayMicroseconds(200);
 	uint8_t checksum = readEscapedByte(uart_);
 
 	if(frame.verifyChecksum(checksum) == false) {

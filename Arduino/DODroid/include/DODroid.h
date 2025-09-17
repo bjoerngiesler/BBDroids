@@ -100,8 +100,8 @@ public:
     WHITE  = 5
   };
 
-  Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b);
-  Result setLED(WhichLED which, WhatColor color);
+  Result setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b, bool autoshow = true);
+  Result setLED(WhichLED which, WhatColor color, bool autoshow = true);
   void setLEDBrightness(uint8_t brightness);
 
 protected:

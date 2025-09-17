@@ -224,6 +224,8 @@ Result DODroid::start(ConsoleStream* stream) {
   setLED(LED_STATUS, GREEN);
   setEyes(head::EYE_COLOR_WHITE, 10, 150, head::EYE_COLOR_WHITE, 10, 150);
   updateHead();
+  statusPixels_.show();
+
   return operationStatus_;
 }
 
@@ -267,6 +269,7 @@ void DODroid::setControlParameters() {
 
 Result DODroid::step() {
   unsigned long seqnum = Runloop::runloop.getSequenceNumber();
+  static unsigned long lastSDCardCheck = millis();
   
   // We're broken; still send out the state packet.
   if(!imu_.available() || !DOBattStatus::batt.available()) {
@@ -289,13 +292,15 @@ Result DODroid::step() {
 
   // Look for battery undervoltage
   if((Runloop::runloop.getSequenceNumber() % 100) == 0) {
+    Runloop::runloop.excuseOverrun();
     stepPowerProtect();
   }
 
   // Check if SD card was changed
-  if((seqnum % 1000) == 0 && driveMode_ == DRIVE_OFF) {
+  if(WRAPPEDDIFF(millis(), lastSDCardCheck, ULONG_MAX) > 1000 && driveMode_ == DRIVE_OFF) {
     Runloop::runloop.excuseOverrun();
     DOSound::sound.checkSDCard();
+    lastSDCardCheck = millis();
   }
 
   // Encoder and IMU updates are needed for everything, so we do them here.
@@ -312,9 +317,11 @@ Result DODroid::step() {
 
   if((seqnum % 4) == 0) {
     fillAndSendStatePacket();
-    if(XBee::xbee.isStarted() && Servos::servos.isStarted()) setLED(LED_STATUS, GREEN);
-    else setLED(LED_STATUS, YELLOW);
+    if(XBee::xbee.isStarted() && Servos::servos.isStarted()) setLED(LED_STATUS, GREEN, false);
+    else setLED(LED_STATUS, YELLOW, false);
   }
+
+  statusPixels_.show();
 
   return RES_OK;
 }
@@ -468,6 +475,9 @@ bb::Result DODroid::stepIfNotStarted() {
     DOBattStatus::batt.updateVoltage();
     DOBattStatus::batt.updateCurrent();
   }
+
+  statusPixels_.show();
+
   return RES_OK;
 }
 
@@ -487,26 +497,26 @@ void DODroid::switchDrive(DriveMode mode) {
   driveMode_ = mode;
   switch(driveMode_) {
     case DRIVE_OFF: 
-      setLED(LED_DRIVE, OFF);
+      setLED(LED_DRIVE, OFF, false);
       setControlStrip(head::CONTROL_STRIP_OFF, true);
       LOG(LOG_INFO, "Switched drive mode to off.\n");
       break;
     
     case DRIVE_VEL: 
-      setLED(LED_DRIVE, GREEN);
+      setLED(LED_DRIVE, GREEN, false);
       setControlStrip(head::CONTROL_STRIP_VEL, true);
       LOG(LOG_INFO, "Switched drive mode to velocity.\n");
       break;
 
     case DRIVE_POS: 
-      setLED(LED_DRIVE, YELLOW);
+      setLED(LED_DRIVE, YELLOW, false);
       setControlStrip(head::CONTROL_STRIP_MAN_POS, true);
       LOG(LOG_INFO, "Switched drive mode to position.\n");
       break;
 
     case DRIVE_AUTO_POS:
     default: 
-      setLED(LED_DRIVE, BLUE);
+      setLED(LED_DRIVE, BLUE, false);
       setControlStrip(head::CONTROL_STRIP_AUTO_POS, true);
       LOG(LOG_INFO, "Switched drive mode to auto_position.\n");
       break;
@@ -587,14 +597,14 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     if(ms - msLastLeftCtrlPacket_ < 100) {
       if(ms - msLastRightCtrlPacket_ < 100) {
         // both coming in - white
-        setLED(LED_COMM, WHITE);
+        setLED(LED_COMM, WHITE, false);
       } else {
         // Only left coming in - blue
-        setLED(LED_COMM, BLUE);
+        setLED(LED_COMM, BLUE, false);
       }
     } else {
       // Only right coming in - green
-      setLED(LED_COMM, GREEN);
+      setLED(LED_COMM, GREEN, false);
     }
   
     commLEDOn_ = true;
@@ -700,7 +710,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
       }
 
     } else {
-      setLED(LED_DRIVE, OFF);
+      setLED(LED_DRIVE, OFF, false);
     }
 
     DOSound::sound.setVolume(int(30.0 * packet.getAxis(8, bb::ControlPacket::UNIT_UNITY)));
@@ -832,6 +842,7 @@ Result DODroid::setParameterValue(const String& name, const String& stringVal) {
 }
 
 Result DODroid::fillAndSendStatePacket() {
+  
   if(params_.leftRemoteAddress.isZero()) return RES_OK;
 
   Packet packet(PACKET_TYPE_STATE, PACKET_SOURCE_DROID, sequenceNumber());
@@ -1011,7 +1022,6 @@ bool DODroid::setControlStrip(uint8_t strip, bool update) {
 }
 
 bool DODroid::updateHead() {
-  return false;
   if(!aerialsOK_) return false;
 
   Wire.beginTransmission(AERIAL_ADDR);
@@ -1049,20 +1059,20 @@ bool DODroid::getAerials(uint8_t& a1, uint8_t& a2, uint8_t& a3) {
   return true;
 }
 
-Result DODroid::setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b) {
+Result DODroid::setLED(WhichLED which, uint8_t r, uint8_t g, uint8_t b, bool autoshow) {
   statusPixels_.setPixelColor(int(which), r, g, b);
-  statusPixels_.show();
+  if(autoshow)   statusPixels_.show();
   return RES_OK;
 }
 
-Result DODroid::setLED(WhichLED which, WhatColor color) {
+Result DODroid::setLED(WhichLED which, WhatColor color, bool autoshow) {
   switch(color) {
-    case RED: return setLED(which, 255, 0, 0); break;
-    case GREEN: return setLED(which, 0, 255, 0); break;
-    case BLUE: return setLED(which, 0, 0, 255); break;
-    case YELLOW: return setLED(which, 255, 255, 0); break;
-    case WHITE: return setLED(which, 255, 255, 255); break;
-    case OFF: default: return setLED(which, 0, 0, 0); break;
+    case RED: return setLED(which, 255, 0, 0, autoshow); break;
+    case GREEN: return setLED(which, 0, 255, 0, autoshow); break;
+    case BLUE: return setLED(which, 0, 0, 255, autoshow); break;
+    case YELLOW: return setLED(which, 255, 255, 0, autoshow); break;
+    case WHITE: return setLED(which, 255, 255, 255, autoshow); break;
+    case OFF: default: return setLED(which, 0, 0, 0, autoshow); break;
   }
   return RES_COMMON_NOT_IN_LIST;
 }
