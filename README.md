@@ -14,6 +14,11 @@ Hardware concept, layout and realization by Felix Beyer, software concept and re
 
 *Watch this space for official releases!*
 
+## Where to get support
+
+* [Discord server](https://discord.gg/hqGrzcHk)
+* [Facebook group](https://fb.me/g/F03MIWsuE/jJoWm4zk) Please note that we are slowly phasing out Facebook usage.
+
 ## D-Ov2Evo Electronics Kit Info Collection
 
 If you have just received your D-Ov2Evo electonics kit, these pages will help you get started.
