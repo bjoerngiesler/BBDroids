@@ -858,7 +858,9 @@ bb::Result bb::XBee::receiveAPIMode(HWAddress& srcAddr, uint8_t& rssi, Packet& p
 
 	uint8_t crc = packet.calculateCRC();
 	if(packet.calculateCRC() != packet.crc) {
-		bb::printf("Error: Wrong CRC 0x%x, expected 0x%x\n", crc, packet.crc);
+		if(debug_ & DEBUG_XBEE_COMM) {
+			bb::printf("Error: Wrong CRC 0x%x, expected 0x%x\n", crc, packet.crc);
+		}
 		return RES_SUBSYS_COMM_ERROR;
 	}
 

@@ -184,6 +184,8 @@ Result DODroid::start(ConsoleStream* stream) {
   driveSafety_ = true;
   headIsOn_ = false;
   pitchAtRest_ = 0;
+  lastLeftSeqnum_ = 255;
+  lastRightSeqnum_ = 255;
 
   DOSound::sound.begin();
   imu_.begin();
@@ -270,7 +272,7 @@ void DODroid::setControlParameters() {
 Result DODroid::step() {
   unsigned long seqnum = Runloop::runloop.getSequenceNumber();
   static unsigned long lastSDCardCheck = millis();
-  
+
   // We're broken; still send out the state packet.
   if(!imu_.available() || !DOBattStatus::batt.available()) {
     if((seqnum % 4) == 0) {
@@ -312,7 +314,9 @@ Result DODroid::step() {
   if((seqnum % 2) == 0) {
     stepHead();
   } else {
+    // stepDrive() takes less time than stepHead()
     stepDrive();
+    updateHead();
   }
 
   if((seqnum % 4) == 0) {
@@ -437,7 +441,8 @@ bb::Result DODroid::stepHead() {
     uint8_t eyeSize = 10 - uint8_t(8.0*(speed / params_.maxSpeed));
     setEyes(head::EYE_COLOR_WHITE, eyeSize, eyePos, head::EYE_COLOR_WHITE, eyeSize, eyePos);
 
-    updateHead();
+    // updateHead() is done in step(), in the stepDrive() part of the loop, for performance reasons
+    // updateHead();
   }
   
   return RES_OK;
@@ -611,10 +616,16 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     Runloop::runloop.scheduleTimedCallback(100, [=]{ setLED(LED_COMM, OFF); commLEDOn_ = false; });
   }
 
+  // TOLERATE_PACKET_LOSS: Set this to 0 to get warnings as soon as individual packets are lost,
+  // > 0 to get a bit less noise on the console.
+#define TOLERATE_PACKET_LOSS 1
+
   // Check for duplicates and lost packets
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
-    if(seqnum == lastLeftSeqnum_) return RES_OK; // duplicate
-    if(WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8) != 1) {
+    if(seqnum == lastLeftSeqnum_) { // duplicate, caused by remote resend
+      return RES_OK;
+    }
+    if(lastLeftSeqnum_ != 255 && WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8) > TOLERATE_PACKET_LOSS+1) {
       LOG(LOG_WARN, "Left control packet: seqnum %d, last %d, lost %d packets!\n", 
                     seqnum, lastLeftSeqnum_, WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8)-1);
     }
@@ -622,8 +633,10 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     numLeftCtrlPackets_++;
     msLastLeftCtrlPacket_ = millis();
   } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
-    if(seqnum == lastRightSeqnum_) return RES_OK; // duplicate
-    if(WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8) != 1) {
+    if(seqnum == lastRightSeqnum_) { // duplicate, caused by remote resend
+      return RES_OK;
+    }
+    if(lastRightSeqnum_ != 255 && WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8) > TOLERATE_PACKET_LOSS+1) {
       LOG(LOG_WARN, "Right control packet: seqnum %d, last %d, lost %d packets!\n", 
                     seqnum, lastRightSeqnum_, WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8)-1);
     }

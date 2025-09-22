@@ -111,12 +111,14 @@ bool bb::IMU::update(bool block) {
   if(!available_) return false;
 
   int timeout = 3;
-  while(!imu_.gyroscopeAvailable() && !imu_.accelerationAvailable()) {
-    if(timeout < 0 || block==false) {
-      return false;
+  if(block == true) {
+    while(!imu_.gyroscopeAvailable() && !imu_.accelerationAvailable()) {
+      if(timeout < 0) {
+        return false;
+      }
+      timeout--;
+      delayMicroseconds(1);
     }
-    timeout--;
-    delayMicroseconds(1);
   }
   
   imu_.readGyroscope(lastP_, lastR_, lastH_);
