@@ -24,7 +24,7 @@ Hardware concept, layout and realization by Felix Beyer, software concept and re
 If you have just received your D-Ov2Evo electonics kit, these pages will help you get started.
 
 * [Software: Install tools, build, upload](https://github.com/bjoerngiesler/BBDroids/wiki/01-Build:-Software)
-* [Remotes: Build howto](https://github.com/bjoerngiesler/BBDroids/wiki/02-Build:-Remotes)
+* [Remotes: Build howto](https://github.com/bjoerngiesler/BBDroids/wiki/11-Remotes:-Building-the-Hardware)
 * [D-Ov2Evo droid: Electronics build howto](https://github.com/bjoerngiesler/BBDroids/wiki/03-Build:-D%E2%80%90Ov2Evo-Power-and-Main-PCBs)
 * [D-Ov2Evo droid: Hardware build howto](https://github.com/bjoerngiesler/BBDroids/wiki/04-Build:-D%E2%80%90Ov2Evo-Hardware-Step%E2%80%90By%E2%80%90Step-Instructions)
 
