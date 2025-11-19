@@ -9,7 +9,6 @@ using namespace bb::rmt;
 
 RemoteSubsys RemoteSubsys::inst;
 
-
 static const char* STORAGE_NAMESPACE = "rss";
 
 bool RemoteSubsys::memoryRead(ProtocolStorage& storage) {
@@ -25,7 +24,7 @@ bool RemoteSubsys::memoryRead(ProtocolStorage& storage) {
     // Write blob
     bb::printf("Retrieving protocol storage data blob...\n");
     size_t size;
-    err = nvs_get_blob(handle, "protocol_storage", (void*)&storage, &size);
+    err = nvs_get_blob(handle, "proto_s", (void*)&storage, &size);
     if (err != ESP_OK) {
         bb::printf("Failed to read protocol storage data blob!\n");
         nvs_close(handle);
@@ -53,10 +52,10 @@ bool RemoteSubsys::memoryWrite(const ProtocolStorage& storage) {
     }
 
     // Write blob
-    bb::printf("Saving protocol storage data blob...\n");
-    err = nvs_set_blob(handle, "protocol_storage", &storage, sizeof(ProtocolStorage));
+    bb::printf("Saving %d bytes of protocol storage data blob (name max %d)...\n", sizeof(ProtocolStorage), NVS_KEY_NAME_MAX_SIZE);
+    err = nvs_set_blob(handle, "proto_s", &storage, sizeof(ProtocolStorage));
     if (err != ESP_OK) {
-        bb::printf("Failed to write protocol storage data blob!\n");
+        bb::printf("Failed to write protocol storage data blob (%s)!\n", esp_err_to_name(err));
         nvs_close(handle);
         return false;
     }
@@ -84,12 +83,12 @@ Result RemoteSubsys::initialize() {
     description_ = "Remote Subsystem";
     help_ = "This subsystem encapsulates the BBRemote library.\n" \
 "Commands:\n" \
-"\tlist_stored            List all stored protocols\n"\
-"\tcurrent_create <type>  Shutdown current protocol and create new of type <type> (X/E/B/U/S/D/d)\n"\
-"\tcurrent_load <name>    Shutdown current protocol and load the named one\n"\
-"\tcurrent_store <name>   Store current protocol under the given name\n"\
-"\tcurrent_discover       Run discovery on current\n"\
-"\tinterremote_discover   Run discovery on interremote\n";
+"\tlist                           List all stored protocols\n"\
+"\tcreate <type>                  Shutdown current protocol (if not interremote) and create new of type <type> (X/E/B/U/S/D/d)\n"\
+"\tload {current|inter} <name>    Shutdown current protocol and load the named one\n"\
+"\tstore {current|inter} <name>   Store current protocol under the given name\n"\
+"\tprint_storage                  Print a description of storage contents\n"\
+"\tdiscover {current|inter}       Run discovery on current\n";
 
     return Subsystem::initialize();
 }
@@ -111,14 +110,21 @@ Result RemoteSubsys::step() {
 Result RemoteSubsys::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {
     if(words.size() == 0) return RES_CMD_INVALID_ARGUMENT;
 
-    if(words[0] == "list_stored") {
+    if(words[0] == "list") {
         std::vector<std::string> storedNames = ProtocolFactory::storedProtocols();
         stream->printf("Stored protocols: %d\n", storedNames.size());
         for(auto s: storedNames) stream->printf("\t\"%s\"\n", s.c_str());
         return RES_OK;
     }
 
-    if(words[0] == "current_create") {
+    if(words[0] == "print_storage") {
+        if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
+
+        ProtocolFactory::printStorage();
+        return RES_OK;
+    }
+
+    if(words[0] == "create") {
         if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 
         ProtocolType type = (ProtocolType)words[1][0];
@@ -139,23 +145,45 @@ Result RemoteSubsys::handleConsoleCommand(const std::vector<String>& words, Cons
         return RES_OK;
     }
 
-    if(words[0] == "current_load") {
-        return RES_OK;
-    }
-
-    if(words[0] == "current_store") {
-        return RES_OK;
-    }
-
-    if(words[0] == "current_discover") {
-        if(current == nullptr) {
-            stream->printf("No current protocol\n");
+    if(words[0] == "load") {
+        if(words.size() != 3) return RES_CMD_INVALID_ARGUMENT_COUNT;
+        
+        Protocol *proto = (words[1]=="current" ? current : (words[1]=="inter" ? interremote : nullptr));
+        const String& name = words[2];
+        if(proto == nullptr) {
+            stream->printf("Protocol is null\n");
             return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
         }
-        current->discoverNodes();
-        stream->printf("%d nodes discovered\n", current->numDiscoveredNodes());
+
+        return RES_OK;
+    }
+
+    if(words[0] == "store") {
+        Protocol *proto = (words[1]=="current" ? current : (words[1]=="inter" ? interremote : nullptr));
+        const String& name = words[2];
+        if(proto == nullptr) {
+            stream->printf("Protocol is null\n");
+            return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+        }
+
+        if(ProtocolFactory::storeProtocol(name.c_str(), proto) == true) return RES_OK;
+
+        return RES_CMD_FAILURE;
+    }
+
+    if(words[0] == "discover") {
+        if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
+
+        Protocol *proto = (words[1]=="current" ? current : (words[1]=="inter" ? interremote : nullptr));
+
+        if(proto == nullptr) {
+            stream->printf("Protocol is null\n");
+            return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
+        }
+        proto->discoverNodes();
+        stream->printf("%d nodes discovered\n", proto->numDiscoveredNodes());
         for(int i=0; i<current->numDiscoveredNodes(); i++) {
-            const NodeDescription& descr = current->discoveredNode(i);
+            const NodeDescription& descr = proto->discoveredNode(i);
             stream->printf("    Name: %s Addr: %s (configurator: %s receiver: %s transmitter: %s)\n", 
                 descr.getName().c_str(), descr.addr.toString().c_str(),
                 descr.isConfigurator ? "true" : "false",
