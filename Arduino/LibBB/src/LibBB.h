@@ -15,9 +15,7 @@
 #include "BBDCMotor.h"
 #include "BBIMU.h"
 #include "BBServos.h"
-#if defined(ARDUINO_ARCH_SAMD)
 #include "BBEncoder.h"
-#endif
 #include "BBLinAlg.h"
 
 // A couple of convenience macros

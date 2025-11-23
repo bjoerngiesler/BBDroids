@@ -9,6 +9,8 @@ using namespace bb;
 
 RInput RInput::input;
 
+extern bool isLeftRemote;
+
 #if !defined(ARDUINO_ARCH_ESP32)
 static void prepareInterruptPin(int pin, void (*isr)(void)) {
   pinMode(pin, INPUT_PULLUP);
@@ -108,7 +110,7 @@ RInput::ButtonPin RInput::buttonToPin(RInput::Button button) {
 }
 
 bool RInput::initIMU() {
-  if(imu_.begin() == true) {
+  if(imu_.begin(isLeftRemote ? LEFT_IMU_ADDR : RIGHT_IMU_ADDR) == true) {
     float dr = imu_.dataRate();
     Console::console.printfBroadcast("Successfully initialized IMU; data rate: %f\n", dr);
     Runloop::runloop.setCycleTimeMicros(1e6/dr);
@@ -155,7 +157,7 @@ bool RInput::initMCP() {
   return true;
 }
 
-RInput::RInput(): joyHFilter_(100, 0.01), joyVFilter_(100, 0.01), imu_(IMU_ADDR) {
+RInput::RInput(): joyHFilter_(100, 0.01), joyVFilter_(100, 0.01) {
   for(auto& b: buttons) b.second = false;
   lms_ = rms_ = cms_ = 0;
   longPressThresh_ = 500;

@@ -1,7 +1,7 @@
 #if !defined(RWIDGET_H)
 #define RWIDGET_H
 
-#include "UI/RDisplay.h"
+#include "UI/Display.h"
 
 class RWidget {
 public:

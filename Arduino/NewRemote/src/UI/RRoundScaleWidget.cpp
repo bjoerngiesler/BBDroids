@@ -19,8 +19,8 @@ Result RRoundScaleWidget::draw(ConsoleStream* stream) {
     y = height_ / 2 + y_;
 
     if(needsFullRedraw_) {
-        RDisplay::display.circle(x, y, radius, bgCol_, true);
-        RDisplay::display.circle(x, y, radius, frameCol_, false);
+        Display::display.circle(x, y, radius, bgCol_, true);
+        Display::display.circle(x, y, radius, frameCol_, false);
         needsFullRedraw_ = false;
         needsContentsRedraw_ = true;
     }
@@ -31,12 +31,12 @@ Result RRoundScaleWidget::draw(ConsoleStream* stream) {
     if(radius > 5) radius -= 1;
     if(radius > 3) radius -= 1;
 
-    RDisplay::display.line(x, y, x+radius*cos(oldAngle_), y+radius*sin(oldAngle_), bgCol_);
+    Display::display.line(x, y, x+radius*cos(oldAngle_), y+radius*sin(oldAngle_), bgCol_);
     if(!infinite_) {
-        RDisplay::display.line(x, y, x+radius*cos(start_), y+radius*sin(start_), markingCol_);
-        RDisplay::display.line(x, y, x+radius*cos(end_), y+radius*sin(end_), markingCol_);
+        Display::display.line(x, y, x+radius*cos(start_), y+radius*sin(start_), markingCol_);
+        Display::display.line(x, y, x+radius*cos(end_), y+radius*sin(end_), markingCol_);
     }
-    RDisplay::display.line(x, y, x+radius*cos(angle_), y+radius*sin(angle_), cursorCol_);
+    Display::display.line(x, y, x+radius*cos(angle_), y+radius*sin(angle_), cursorCol_);
     oldAngle_ = angle_;
     needsContentsRedraw_ = false;
 

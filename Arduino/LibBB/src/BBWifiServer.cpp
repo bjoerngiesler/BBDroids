@@ -1,3 +1,5 @@
+#if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_ARCH_SAMD)
+
 #include <BBWifiServer.h>
 #include <BBRunloop.h>
 #if !defined(ARDUINO_PICO_VERSION_STR)
@@ -394,3 +396,5 @@ void bb::WifiServer::printExtendedStatus(ConsoleStream *stream) {
 
 	stream->printf(".\n");
 }
+
+#endif // #if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_ARCH_SAMD)

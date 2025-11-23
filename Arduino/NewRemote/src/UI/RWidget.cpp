@@ -4,12 +4,12 @@ RWidget::RWidget(): name_("Widget") {
     needsFullRedraw_ = needsContentsRedraw_ = true; 
     x_ = y_ = 1;
     width_ = height_ = 10;
-    frameCol_ = RDisplay::WHITE;
-    bgCol_ = RDisplay::BLACK;
-    fgCol_ = RDisplay::WHITE;
-    hlCol_ = RDisplay::LIGHTBLUE2;
-    cursorCol_ = RDisplay::LIGHTGREEN1;
-    markingCol_ = RDisplay::BLUE;
+    frameCol_ = Display::WHITE;
+    bgCol_ = Display::BLACK;
+    fgCol_ = Display::WHITE;
+    hlCol_ = Display::LIGHTBLUE2;
+    cursorCol_ = Display::LIGHTGREEN1;
+    markingCol_ = Display::BLUE;
     fillsBg_ = false;
     drawsFrame_ = false;
     action_ = nullptr;
@@ -41,13 +41,13 @@ void RWidget::setSize(uint8_t w, uint8_t h) {
 }
 
 void RWidget::centerOnDisplay() {
-    setPosition(RDisplay::MAIN_X + (RDisplay::DISPLAY_WIDTH-width())/2, 
-                RDisplay::MAIN_Y + (RDisplay::DISPLAY_HEIGHT-height())/2);
+    setPosition(Display::MAIN_X + (Display::DISPLAY_WIDTH-width())/2, 
+                Display::MAIN_Y + (Display::DISPLAY_HEIGHT-height())/2);
 }
 
 void RWidget::centerOnMain() {
-    setPosition(RDisplay::MAIN_X + (RDisplay::MAIN_WIDTH-width())/2, 
-                RDisplay::MAIN_Y + (RDisplay::MAIN_HEIGHT-height())/2);
+    setPosition(Display::MAIN_X + (Display::MAIN_WIDTH-width())/2, 
+                Display::MAIN_Y + (Display::MAIN_HEIGHT-height())/2);
 }
 
 void RWidget::setNeedsFullRedraw(bool needs) { 

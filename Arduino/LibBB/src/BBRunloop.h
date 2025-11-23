@@ -21,6 +21,8 @@ public:
 	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
 	unsigned long getSequenceNumber() { return seqnum_; }
+	virtual unsigned long sequenceNumber(bool autoincrement = false) { return seqnum_; }
+
 
 	void setCycleTimeMicros(unsigned long microseconds); // not milli, micro.
 	unsigned long cycleTimeMicros();

@@ -3,7 +3,7 @@
 RMenuWidget::RMenuWidget() {
   cursor_ = 0;
   top_ = 0;
-  width_ = RDisplay::DISPLAY_WIDTH;
+  width_ = Display::DISPLAY_WIDTH;
   setFillsBackground();
 }
 
@@ -21,8 +21,8 @@ RLabelWidget* RMenuWidget::addEntry(const String& title, std::function<void(void
     label->setBackgroundColor(bgCol_);
     label->setForegroundColor(fgCol_);
   }
-  label->setSize(width(), RDisplay::CHAR_HEIGHT);
-  label->setPosition(0, (widgets_.size()-top_)*RDisplay::CHAR_HEIGHT + y_);
+  label->setSize(width(), Display::CHAR_HEIGHT);
+  label->setPosition(0, (widgets_.size()-top_)*Display::CHAR_HEIGHT + y_);
   label->setJustification(RLabelWidget::LEFT_JUSTIFIED, RLabelWidget::VER_CENTERED);
 
   label->setAction(callback);
@@ -77,12 +77,12 @@ void RMenuWidget::select() {
 }
 
 void RMenuWidget::takeInputFocus() {
-  RInput::input.clearCallbacks();
-  RInput::input.setLeftShortPressCallback([this]{this->up();});
-  RInput::input.setRightShortPressCallback([this]{this->down();});
-  RInput::input.setRightLongPressCallback([this]{this->select();});
-  RInput::input.setConfirmShortPressCallback([this]{this->select();});
-  RInput::input.setEncTurnCallback([this](float enc) {this->encTurn(enc);});
+  Input::inst.clearCallbacks();
+  Input::inst.setLeftShortPressCallback([this]{this->up();});
+  Input::inst.setRightShortPressCallback([this]{this->down();});
+  Input::inst.setRightLongPressCallback([this]{this->select();});
+  Input::inst.setConfirmShortPressCallback([this]{this->select();});
+  Input::inst.setEncTurnCallback([this](float enc) {this->encTurn(enc);});
   resetCursor();
 }
 

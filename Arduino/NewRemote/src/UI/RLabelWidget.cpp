@@ -56,15 +56,15 @@ RLabelWidget::RLabelWidget() {
 Result RLabelWidget::draw(ConsoleStream *stream) {
     if(needsFullRedraw_ || needsContentsRedraw_) {
         if(fillsBg_) {
-            RDisplay::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
+            Display::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
         }
         if(frameType_ == FRAME_ALL) {
-            RDisplay::display.rect(x_, y_, x_+width_, y_+height_, frameCol_, false);
+            Display::display.rect(x_, y_, x_+width_, y_+height_, frameCol_, false);
         } else {
-            if(frameType_ & FRAME_BOTTOM) RDisplay::display.hline(x_, y_+height_, width_, frameCol_);
-            if(frameType_ & FRAME_TOP) RDisplay::display.hline(x_, y_, width_, frameCol_);
-            if(frameType_ & FRAME_LEFT) RDisplay::display.vline(x_, y_, height_, frameCol_);
-            if(frameType_ & FRAME_RIGHT) RDisplay::display.vline(x_+width_, y_, height_, frameCol_);
+            if(frameType_ & FRAME_BOTTOM) Display::display.hline(x_, y_+height_, width_, frameCol_);
+            if(frameType_ & FRAME_TOP) Display::display.hline(x_, y_, width_, frameCol_);
+            if(frameType_ & FRAME_LEFT) Display::display.vline(x_, y_, height_, frameCol_);
+            if(frameType_ & FRAME_RIGHT) Display::display.vline(x_+width_, y_, height_, frameCol_);
         }
         needsFullRedraw_ = false;
         needsContentsRedraw_ = true;
@@ -82,23 +82,23 @@ Result RLabelWidget::draw(ConsoleStream *stream) {
         if(frameType_&FRAME_TOP) y++;
         break;
     case VER_CENTERED:
-        y = rint(float(height_ - lines_.size()*RDisplay::CHAR_HEIGHT)/2.0f);
+        y = rint(float(height_ - lines_.size()*Display::CHAR_HEIGHT)/2.0f);
         break;
     case BOTTOM_JUSTIFIED:
     default:
-        y = height_ - lines_.size()*RDisplay::CHAR_HEIGHT;
+        y = height_ - lines_.size()*Display::CHAR_HEIGHT;
         if(frameType_&FRAME_BOTTOM) y--;
         break;
     }
 
     for(unsigned int i=0; i<lines_.size(); i++) {
         if(lines_[i].length() == 0) { 
-            y += RDisplay::CHAR_HEIGHT;
+            y += Display::CHAR_HEIGHT;
             continue;
         }
-        if(y + RDisplay::CHAR_HEIGHT > height_) continue;
+        if(y + Display::CHAR_HEIGHT > height_) continue;
 
-        unsigned int pixelwidth = lines_[i].length() * RDisplay::CHAR_WIDTH;
+        unsigned int pixelwidth = lines_[i].length() * Display::CHAR_WIDTH;
         switch(hor_) {
         case LEFT_JUSTIFIED:
             if(frameType_&FRAME_LEFT) x++;
@@ -113,8 +113,8 @@ Result RLabelWidget::draw(ConsoleStream *stream) {
             break;
         }
 
-        RDisplay::display.text(x_+x+1, y_+y+1, highlighted_ ? hlCol_ : fgCol_, lines_[i]);
-        y += RDisplay::CHAR_HEIGHT;
+        Display::display.text(x_+x+1, y_+y+1, highlighted_ ? hlCol_ : fgCol_, lines_[i]);
+        y += Display::CHAR_HEIGHT;
     }
 
     needsContentsRedraw_ = false;
@@ -128,8 +128,8 @@ void RLabelWidget::setTitle(const String& title) {
     title_ = title;
 
     if(linebreak_) {
-        if(autosize_) lines_ = RLabelWidget::splitLines(title, (RDisplay::DISPLAY_WIDTH-4)/RDisplay::CHAR_WIDTH);
-        else lines_ = RLabelWidget::splitLines(title, width_/RDisplay::CHAR_WIDTH);
+        if(autosize_) lines_ = RLabelWidget::splitLines(title, (Display::DISPLAY_WIDTH-4)/Display::CHAR_WIDTH);
+        else lines_ = RLabelWidget::splitLines(title, width_/Display::CHAR_WIDTH);
     } else {
         lines_.clear();
         lines_.push_back(title_);
@@ -141,10 +141,10 @@ void RLabelWidget::setTitle(const String& title) {
             if(str.length() > maxLineLen) maxLineLen = str.length();
         }
 
-        unsigned int width = maxLineLen*RDisplay::CHAR_WIDTH+4;
-        if(width > RDisplay::DISPLAY_WIDTH) width = RDisplay::DISPLAY_WIDTH;
-        unsigned int height = lines_.size()*RDisplay::CHAR_HEIGHT+4;
-        if(height > RDisplay::DISPLAY_HEIGHT) height = RDisplay::DISPLAY_HEIGHT;
+        unsigned int width = maxLineLen*Display::CHAR_WIDTH+4;
+        if(width > Display::DISPLAY_WIDTH) width = Display::DISPLAY_WIDTH;
+        unsigned int height = lines_.size()*Display::CHAR_HEIGHT+4;
+        if(height > Display::DISPLAY_HEIGHT) height = Display::DISPLAY_HEIGHT;
         setSize(width, height);
     }
 

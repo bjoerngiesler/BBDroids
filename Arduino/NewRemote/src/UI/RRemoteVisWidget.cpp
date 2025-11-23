@@ -39,13 +39,15 @@ static const uint8_t battStateY = by + joyW + 9;
 static const uint8_t battStateXL = bxl + 7;
 static const uint8_t battStateXR = bxr + 7;
 
+using namespace bb::rmt;
+
 RRemoteVisWidget::RRemoteVisWidget() {
     for(auto& b: mainBtns_) {
         b.setDrawsFrame();
         b.setFillsBackground();
         b.setTitle("");
-        b.setBackgroundColor(RDisplay::DARKBLUE);
-        b.setFrameColor(RDisplay::LIGHTBLUE2);
+        b.setBackgroundColor(Display::DARKBLUE);
+        b.setFrameColor(Display::LIGHTBLUE2);
 
     }
 
@@ -58,7 +60,7 @@ RRemoteVisWidget::RRemoteVisWidget() {
         b.setDrawsFrame();
         b.setFillsBackground();
         b.setTitle("");
-        b.setBackgroundColor(RDisplay::LIGHTGREEN1);
+        b.setBackgroundColor(Display::LIGHTGREEN1);
         b.setSize(battStateW, battStateW);
     }
 
@@ -68,8 +70,8 @@ RRemoteVisWidget::RRemoteVisWidget() {
     pot1_.setSize(potW, potW);
     pot2_.setSize(potW, potW);
 
-    bgCol_ = RDisplay::LIGHTGREY;
-    fgCol_ = RDisplay::GREY;
+    bgCol_ = Display::LIGHTGREY;
+    fgCol_ = Display::GREY;
 
     setRepresentsLeftRemote(false);
 
@@ -89,7 +91,7 @@ void RRemoteVisWidget::setRepresentsLeftRemote(bool left) {
     addWidget(&pot1_);
     addWidget(&pot2_);
 
-    if(left) pot1_.setFrameColor(RDisplay::GREEN);
+    if(left) pot1_.setFrameColor(Display::GREEN);
 
     moveWidgetsAround();
 }
@@ -131,13 +133,13 @@ void RRemoteVisWidget::moveWidgetsAround() {
 
 Result RRemoteVisWidget::draw(ConsoleStream* stream) {
     if(needsFullRedraw_) {
-        RDisplay::display.rect(0, y_, w, h+y_, RDisplay::BLACK, true);
+        Display::display.rect(0, y_, w, h+y_, Display::BLACK, true);
         if(left_) {
-            RDisplay::display.rect(bxl, y_+by, bxl+bw, y_+by+bh, bgCol_, true);
-            RDisplay::display.rect(bxl, y_+by, bxl+bw, y_+by+bh, fgCol_, false);
+            Display::display.rect(bxl, y_+by, bxl+bw, y_+by+bh, bgCol_, true);
+            Display::display.rect(bxl, y_+by, bxl+bw, y_+by+bh, fgCol_, false);
         } else {
-            RDisplay::display.rect(bxr, y_+by, bxr+bw, y_+by+bh, bgCol_, true);
-            RDisplay::display.rect(bxr, y_+by, bxr+bw, y_+by+bh, fgCol_, false);
+            Display::display.rect(bxr, y_+by, bxr+bw, y_+by+bh, bgCol_, true);
+            Display::display.rect(bxr, y_+by, bxr+bw, y_+by+bh, fgCol_, false);
         }
         needsFullRedraw_ = false;
     }
@@ -147,96 +149,132 @@ Result RRemoteVisWidget::draw(ConsoleStream* stream) {
 
 void RRemoteVisWidget::takeInputFocus() {
     if(left_) {
-        RInput::input.setEncTurnCallback([this](float enc) { this->encTurn(enc); });
-        RInput::input.setLeftPressCallback([this]{ this->selectPot2();});
-        RInput::input.setLeftReleaseCallback([this]{ this->selectPot1();});
+        Input::inst.setEncTurnCallback([this](float enc) { this->encTurn(enc); });
+        Input::inst.setLeftPressCallback([this]{ this->selectPot2();});
+        Input::inst.setLeftReleaseCallback([this]{ this->selectPot1();});
     } else {
-        RInput::input.setEncTurnCallback(nullptr);
+        Input::inst.setEncTurnCallback(nullptr);
     }
 }
 
 void RRemoteVisWidget::encTurn(float enc) {
     if(left_) {
         if(potSelected_ == POT1_SELECTED) {
-            RInput::input.pot1 += enc/360;
-            if(RInput::input.pot1 > 1.0) RInput::input.pot1 = 1.0;
-            if(RInput::input.pot1 < 0) RInput::input.pot1 = 0;
+            Input::inst.pot1 += enc/360;
+            if(Input::inst.pot1 > 1.0) Input::inst.pot1 = 1.0;
+            if(Input::inst.pot1 < 0) Input::inst.pot1 = 0;
         } else {
-            RInput::input.pot2 += enc/360;
-            if(RInput::input.pot2 > 1.0) RInput::input.pot2 = 1.0;
-            if(RInput::input.pot2 < 0) RInput::input.pot2 = 0;
+            Input::inst.pot2 += enc/360;
+            if(Input::inst.pot2 > 1.0) Input::inst.pot2 = 1.0;
+            if(Input::inst.pot2 < 0) Input::inst.pot2 = 0;
         }
     }
 }
 
 void RRemoteVisWidget::selectPot1() {
     pot2_.setFrameColor(pot1_.frameColor());
-    pot1_.setFrameColor(RDisplay::GREEN);
+    pot1_.setFrameColor(Display::GREEN);
     potSelected_ = POT1_SELECTED;
 }
 
 void RRemoteVisWidget::selectPot2() {
     pot1_.setFrameColor(pot2_.frameColor());
-    pot2_.setFrameColor(RDisplay::GREEN);
+    pot2_.setFrameColor(Display::GREEN);
     potSelected_ = POT2_SELECTED;
 }
 
-Result RRemoteVisWidget::visualizeFromControlPacket(const bb::ControlPacket& packet) {
-    crosshair_.setHorVer(packet.getAxis(0, bb::ControlPacket::UNIT_UNITY_CENTERED), 
-                         packet.getAxis(1, bb::ControlPacket::UNIT_UNITY_CENTERED));
+Result RRemoteVisWidget::visualizeFromInput() {
+    crosshair_.setHorVer(Input::inst.joyH, Input::inst.joyV);
+    if(EPSILON(Input::inst.joyH) && EPSILON(Input::inst.joyV)) {
+        crosshair_.setCursorColor(Display::WHITE);
+    } else {
+        crosshair_.setCursorColor(Display::LIGHTGREEN1);
+    }
+    
+    imu_.setRPH(Input::inst.rotR, Input::inst.rotP, Input::inst.rotH);
+    imu_.setAccel(Input::inst.aX, Input::inst.aY, Input::inst.aZ);
+    pot1_.setAngle(Input::inst.pot1*360.0);
+    pot2_.setAngle(Input::inst.pot2*360.0);
+
+    float batt = 6*Input::inst.battery;
+    for(int i=1; i<=batt&&i<=4; i++) batteryState_[i-1].setBackgroundColor(Display::LIGHTGREEN1);
+    for(int i=batt; i<=4; i++) batteryState_[i-1].setBackgroundColor(Display::LIGHTRED1);
+    
+    for(int i=0; i<4; i++) {
+        if(Input::inst.buttons[(Input::Button)i] == true) {
+            mainBtns_[i].setBackgroundColor(Display::LIGHTRED1);
+            mainBtns_[i].setFrameColor(Display::RED);
+        } else {
+            mainBtns_[i].setBackgroundColor(Display::DARKBLUE);
+            mainBtns_[i].setFrameColor(Display::LIGHTBLUE2);
+        }
+    }
+
+    if(Input::inst.buttons[Input::BUTTON_JOY] == true) {
+        crosshair_.setBackgroundColor(Display::RED);
+    } else {
+        crosshair_.setBackgroundColor(Display::BLACK);
+    }
+
+    return RES_OK;
+}
+
+Result RRemoteVisWidget::visualizeFromControlPacket(const bb::rmt::MControlPacket& packet) {
+    crosshair_.setHorVer(packet.getAxis(0, UNIT_UNITY_CENTERED), 
+                         packet.getAxis(1, UNIT_UNITY_CENTERED));
     if(EPSILON(packet.getAxis(0)) && EPSILON(packet.getAxis(1))) {
-        crosshair_.setCursorColor(RDisplay::WHITE);
+        crosshair_.setCursorColor(Display::WHITE);
     } else {
-        crosshair_.setCursorColor(RDisplay::LIGHTGREEN1);
+        crosshair_.setCursorColor(Display::LIGHTGREEN1);
     }
 
-    imu_.setRPH(packet.getAxis(2, bb::ControlPacket::UNIT_DEGREES_CENTERED), 
-                packet.getAxis(3, bb::ControlPacket::UNIT_DEGREES_CENTERED),
-                packet.getAxis(4, bb::ControlPacket::UNIT_DEGREES));
-    imu_.setAccel(packet.getAxis(5, bb::ControlPacket::UNIT_UNITY_CENTERED),
-                  packet.getAxis(6, bb::ControlPacket::UNIT_UNITY_CENTERED),
-                  packet.getAxis(7, bb::ControlPacket::UNIT_UNITY_CENTERED));
+    imu_.setRPH(packet.getAxis(2, UNIT_DEGREES_CENTERED), 
+                packet.getAxis(3, UNIT_DEGREES_CENTERED),
+                packet.getAxis(4, UNIT_DEGREES));
+    imu_.setAccel(packet.getAxis(5, UNIT_UNITY_CENTERED),
+                  packet.getAxis(6, UNIT_UNITY_CENTERED),
+                  packet.getAxis(7, UNIT_UNITY_CENTERED));
 
-    if(packet.button0) {
-        mainBtns_[0].setBackgroundColor(RDisplay::LIGHTRED1);
-        mainBtns_[0].setFrameColor(RDisplay::RED);
-    } else {
-        mainBtns_[0].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[0].setFrameColor(RDisplay::LIGHTBLUE2);
-    }
-    if(packet.button1) {
-        mainBtns_[1].setBackgroundColor(RDisplay::LIGHTRED1);
-        mainBtns_[1].setFrameColor(RDisplay::RED);
-    } else {
-        mainBtns_[1].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[1].setFrameColor(RDisplay::LIGHTBLUE2);
-    }
-    if(packet.button2) {
-        mainBtns_[2].setBackgroundColor(RDisplay::LIGHTRED1);
-        mainBtns_[2].setFrameColor(RDisplay::RED);
-    } else {
-        mainBtns_[2].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[2].setFrameColor(RDisplay::LIGHTBLUE2);
-    }
-    if(packet.button3) {
-        mainBtns_[3].setBackgroundColor(RDisplay::LIGHTRED1);
-        mainBtns_[3].setFrameColor(RDisplay::RED);
-    } else {
-        mainBtns_[3].setBackgroundColor(RDisplay::DARKBLUE);
-        mainBtns_[3].setFrameColor(RDisplay::LIGHTBLUE2);
-    }
-    if(packet.button4) {
-        crosshair_.setBackgroundColor(RDisplay::RED);
-    } else {
-        crosshair_.setBackgroundColor(RDisplay::BLACK);
-    }
+    pot1_.setAngle(packet.getAxis(8, UNIT_DEGREES));
+    pot2_.setAngle(packet.getAxis(9, UNIT_DEGREES));
 
-    pot1_.setAngle(packet.getAxis(8, bb::ControlPacket::UNIT_DEGREES));
-    pot2_.setAngle(packet.getAxis(9, bb::ControlPacket::UNIT_DEGREES));
+    float batt = 6*(packet.getAxis(10, UNIT_UNITY));
+    for(int i=1; i<=batt&&i<=4; i++) batteryState_[i-1].setBackgroundColor(Display::LIGHTGREEN1);
+    for(int i=batt; i<=4; i++) batteryState_[i-1].setBackgroundColor(Display::LIGHTRED1);
 
-    float batt = 6*(float(packet.battery)/float(BATTERY_MAX));
-    for(int i=1; i<=batt&&i<=4; i++) batteryState_[i-1].setBackgroundColor(RDisplay::LIGHTGREEN1);
-    for(int i=batt; i<=4; i++) batteryState_[i-1].setBackgroundColor(RDisplay::LIGHTRED1);
+    if(packet.getAxis(11, UNIT_UNITY)>0) {
+        mainBtns_[0].setBackgroundColor(Display::LIGHTRED1);
+        mainBtns_[0].setFrameColor(Display::RED);
+    } else {
+        mainBtns_[0].setBackgroundColor(Display::DARKBLUE);
+        mainBtns_[0].setFrameColor(Display::LIGHTBLUE2);
+    }
+    if(packet.getAxis(12, UNIT_UNITY)>0) {
+        mainBtns_[1].setBackgroundColor(Display::LIGHTRED1);
+        mainBtns_[1].setFrameColor(Display::RED);
+    } else {
+        mainBtns_[1].setBackgroundColor(Display::DARKBLUE);
+        mainBtns_[1].setFrameColor(Display::LIGHTBLUE2);
+    }
+    if(packet.getAxis(13, UNIT_UNITY)>0) {
+        mainBtns_[2].setBackgroundColor(Display::LIGHTRED1);
+        mainBtns_[2].setFrameColor(Display::RED);
+    } else {
+        mainBtns_[2].setBackgroundColor(Display::DARKBLUE);
+        mainBtns_[2].setFrameColor(Display::LIGHTBLUE2);
+    }
+    if(packet.getAxis(14, UNIT_UNITY)>0) {
+        mainBtns_[3].setBackgroundColor(Display::LIGHTRED1);
+        mainBtns_[3].setFrameColor(Display::RED);
+    } else {
+        mainBtns_[3].setBackgroundColor(Display::DARKBLUE);
+        mainBtns_[3].setFrameColor(Display::LIGHTBLUE2);
+    }
+    if(packet.getAxis(15, UNIT_UNITY)>0) {
+        crosshair_.setBackgroundColor(Display::RED);
+    } else {
+        crosshair_.setBackgroundColor(Display::BLACK);
+    }
 
     return RES_OK;
 }

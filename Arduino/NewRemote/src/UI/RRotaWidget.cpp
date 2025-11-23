@@ -1,11 +1,11 @@
 #include "UI/RRotaWidget.h"
 #include "Todo/RRemote.h"
-#include "UI/RUI.h"
+#include "UI/UI.h"
 
 void RRotaWidget::showIndex(unsigned int i) {
     if(i >= widgets_.size()) return;
     index_ = i;
-    RUI::ui.setTopTitle(name());
+    UI::ui.setTopTitle(name());
     takeInputFocus();
     widgetsChanged_ = true;
 }
@@ -29,8 +29,8 @@ Result RRotaWidget::draw(ConsoleStream* stream) {
 }
 
 void RRotaWidget::takeInputFocus() {
-    RInput::input.setLeftShortPressCallback([=]{ showPrevious(); });
-    RInput::input.setRightShortPressCallback([=]{ showNext(); });
+    Input::inst.setLeftShortPressCallback([=]{ showPrevious(); });
+    Input::inst.setRightShortPressCallback([=]{ showNext(); });
 
     if(widgets_.size() == 0 || index_ >= widgets_.size()) return;
     widgets_[index_]->takeInputFocus();

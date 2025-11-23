@@ -41,10 +41,10 @@ void RMultiWidget::setPosition(int x, int y) {
 
 Result RMultiWidget::draw(ConsoleStream* stream) {
     if(fillsBg_ && needsFullRedraw_) {
-        RDisplay::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
+        Display::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
     }
     if(drawsFrame_ && needsFullRedraw_) {
-        RDisplay::display.rect(x_, y_, x_+width_, y_+height_, frameCol_, false);
+        Display::display.rect(x_, y_, x_+width_, y_+height_, frameCol_, false);
     }
     needsFullRedraw_ = false;
     for(auto w: widgets_) w->draw(stream);

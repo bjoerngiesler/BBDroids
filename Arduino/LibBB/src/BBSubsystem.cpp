@@ -84,6 +84,13 @@ bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words,
 }
 
 bb::Result bb::Subsystem::initialize() { 
+	return initialize(name_, description_, help_);
+}
+
+bb::Result bb::Subsystem::initialize(const char *name, const char *description, const char *help) {
+	name_ = name;
+	description_ = description;
+	help_ = help;
 	operationStatus_ = RES_SUBSYS_NOT_STARTED; 
 	loglevel_ = LOG_INFO;
 	addParameter("loglevel", "0: all, 1: debug, 2: info, 3: warn, 4: error, 5: fatal", loglevel_);

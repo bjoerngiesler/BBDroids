@@ -3,9 +3,9 @@
 
 #include <LibBB.h>
 
-#include "UI/RDisplay.h"
+#include "UI/Display.h"
 #include "UI/RWidget.h"
-#include "Todo/RInput.h"
+#include "Input.h"
 
 using namespace bb;
 

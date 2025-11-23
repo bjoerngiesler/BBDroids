@@ -1,5 +1,5 @@
 #include "UI/RCrosshairWidget.h"
-#include "UI/RDisplay.h"
+#include "UI/Display.h"
 
 RCrosshairWidget::RCrosshairWidget():
     hor_(2048),
@@ -23,9 +23,9 @@ RCrosshairWidget::RCrosshairWidget():
 Result RCrosshairWidget::draw(ConsoleStream* stream) {
     if(needsFullRedraw_) {
         if(fillsBg_)
-            RDisplay::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
+            Display::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
         if(drawsFrame_)
-            RDisplay::display.rect(x_, y_, x_+width_, y_+height_, frameCol_, false);
+            Display::display.rect(x_, y_, x_+width_, y_+height_, frameCol_, false);
         needsFullRedraw_ = false;
     }
 
@@ -36,25 +36,25 @@ Result RCrosshairWidget::draw(ConsoleStream* stream) {
         if(showsMinMaxRect_) {
             horVerToScreen(oldMinHor_, oldMinVer_, x1, y1);
             horVerToScreen(oldMaxHor_, oldMaxVer_, x2, y2);
-            RDisplay::display.rect(x1, y1, x2, y2, bgCol_);
+            Display::display.rect(x1, y1, x2, y2, bgCol_);
             horVerToScreen(minHor_, minVer_, x1, y1);
             horVerToScreen(maxHor_, maxVer_, x2, y2);
-            RDisplay::display.rect(x1, y1, x2, y2, minMaxRectCol_);
+            Display::display.rect(x1, y1, x2, y2, minMaxRectCol_);
         }
 
         // erase old coord cross
         horVerToScreen(oldHor_, oldVer_, x, y);
-        RDisplay::display.hline(x_+1, y, width_-2, bgCol_);
-        RDisplay::display.vline(x, y_+1, height_-2, bgCol_);
+        Display::display.hline(x_+1, y, width_-2, bgCol_);
+        Display::display.vline(x, y_+1, height_-2, bgCol_);
 
         // center cross in grey
-        RDisplay::display.hline(x_+1, y_+height_/2, width_-2, markingCol_);
-        RDisplay::display.vline(x_+width_/2, y_+1, height_-2, markingCol_);
+        Display::display.hline(x_+1, y_+height_/2, width_-2, markingCol_);
+        Display::display.vline(x_+width_/2, y_+1, height_-2, markingCol_);
         
         // draw new coord cross
         horVerToScreen(hor_, ver_, x, y);
-        RDisplay::display.hline(x_+1, y, width_-2, cursorCol_);
-        RDisplay::display.vline(x, y_+1, height_-2, cursorCol_);
+        Display::display.hline(x_+1, y, width_-2, cursorCol_);
+        Display::display.vline(x, y_+1, height_-2, cursorCol_);
 
         oldHor_ = hor_; oldVer_ = ver_;
         oldMinHor_ = minHor_; oldMaxHor_ = maxHor_;

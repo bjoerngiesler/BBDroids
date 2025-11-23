@@ -12,19 +12,19 @@ Result RGraphsWidget::draw(ConsoleStream* stream) {
   int y, titlex;
   
   y = GRAPH0_Y;
-  RDisplay::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, RDisplay::WHITE);
-  titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[TOP])*RDisplay::CHAR_WIDTH)/2;
-  RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[TOP]);
+  Display::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, Display::WHITE);
+  titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[TOP])*Display::CHAR_WIDTH)/2;
+  Display::display.text(titlex, y+2, Display::WHITE, title_[TOP]);
 
   y += GRAPH_HEIGHT + GRAPH_DIST;
-  RDisplay::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, RDisplay::WHITE);
-  titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[MIDDLE])*RDisplay::CHAR_WIDTH)/2;
-  RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[MIDDLE]);
+  Display::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, Display::WHITE);
+  titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[MIDDLE])*Display::CHAR_WIDTH)/2;
+  Display::display.text(titlex, y+2, Display::WHITE, title_[MIDDLE]);
 
   y += GRAPH_HEIGHT + GRAPH_DIST;
-  RDisplay::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, RDisplay::WHITE);
-  titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[BOTTOM])*RDisplay::CHAR_WIDTH)/2;
-  RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[BOTTOM]);
+  Display::display.rect(GRAPH_X-1, y, GRAPH_X+GRAPH_WIDTH+1, y+GRAPH_HEIGHT, Display::WHITE);
+  titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[BOTTOM])*Display::CHAR_WIDTH)/2;
+  Display::display.text(titlex, y+2, Display::WHITE, title_[BOTTOM]);
 
   return RWidget::draw(stream);
 }
@@ -43,11 +43,11 @@ void RGraphsWidget::plotAxisData(Graph g, float a0, float a1, float a2, float a3
   y += GRAPH_HEIGHT/2;
   x = GRAPH_X + cursor_[g];
 
-  RDisplay::display.plot(x, y+(a0*GRAPH_HEIGHT/2.2), RDisplay::RED);
-  RDisplay::display.plot(x, y+(a1*GRAPH_HEIGHT/2.2), RDisplay::GREEN);
-  RDisplay::display.plot(x, y+(a2*GRAPH_HEIGHT/2.2), RDisplay::WHITE);
-  RDisplay::display.plot(x, y+(a3*GRAPH_HEIGHT/2.2), RDisplay::BLUE);
-  RDisplay::display.plot(x, y+(a4*GRAPH_HEIGHT/2.2), RDisplay::YELLOW);
+  Display::display.plot(x, y+(a0*GRAPH_HEIGHT/2.2), Display::RED);
+  Display::display.plot(x, y+(a1*GRAPH_HEIGHT/2.2), Display::GREEN);
+  Display::display.plot(x, y+(a2*GRAPH_HEIGHT/2.2), Display::WHITE);
+  Display::display.plot(x, y+(a3*GRAPH_HEIGHT/2.2), Display::BLUE);
+  Display::display.plot(x, y+(a4*GRAPH_HEIGHT/2.2), Display::YELLOW);
 }
 
 void RGraphsWidget::plotControlPacket(Graph g, const bb::ControlPacket& packet) {
@@ -64,10 +64,10 @@ void RGraphsWidget::advanceCursor(Graph g) {
       case MIDDLE: y = GRAPH0_Y + GRAPH_HEIGHT + GRAPH_DIST; break;
       case BOTTOM: default: y = GRAPH0_Y + 2*GRAPH_HEIGHT + 2*GRAPH_DIST; break;
     }
-    titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[g])*RDisplay::CHAR_WIDTH)/2;
+    titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[g])*Display::CHAR_WIDTH)/2;
 
-    RDisplay::display.rect(GRAPH_X, y+2, GRAPH_X+GRAPH_WIDTH, y+GRAPH_HEIGHT-2, RDisplay::BLACK, true);
-    RDisplay::display.text(titlex, y+2, RDisplay::WHITE, title_[g]);
+    Display::display.rect(GRAPH_X, y+2, GRAPH_X+GRAPH_WIDTH, y+GRAPH_HEIGHT-2, Display::BLACK, true);
+    Display::display.text(titlex, y+2, Display::WHITE, title_[g]);
   }
 }
 

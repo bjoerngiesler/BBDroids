@@ -1,8 +1,10 @@
 #include <LibBB.h>
 
 #include "Config.h"
-#include "UI/RDisplay.h"
+#include "UI/Display.h"
 #include "RemoteSubsys.h"
+#include "RightSubsys.h"
+#include "LeftSubsys.h"
 
 using namespace bb;
 
@@ -13,9 +15,9 @@ bool isLeftRemote;
 
 void setup() {
   Serial.begin(2000000);
-
-  Serial.println("BBDroids Remote Software");
+  while(!Serial);
   
+  Serial.println("BBDroids Remote Software");
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, LOW);
 
@@ -46,8 +48,6 @@ void setup() {
     digitalWrite(pins.P_D_RST_IOEXP, HIGH);
   }
 
-  delay(1000);
-
   Console::console.initialize();
   Console::console.start();
 
@@ -58,13 +58,25 @@ void setup() {
 
   ConfigStorage::storage.initialize();
   Runloop::runloop.initialize();
-
-  RDisplay::display.initialize();
-  RDisplay::display.start();
-  RDisplay::display.setLEDBrightness(16);
-
+  Display::display.initialize();
   RemoteSubsys::inst.initialize();
+  
+  if(isLeftRemote) {
+    Input::inst.begin(leftRemotePins);
+    LeftSubsys::inst.initialize();
+  } else {
+    Input::inst.begin(rightRemotePins);
+    RightSubsys::inst.initialize();
+  }
+
+  Display::display.setLEDBrightness(16);  
   RemoteSubsys::inst.start();
+  Display::display.start();
+  if(isLeftRemote) {
+    LeftSubsys::inst.start();
+  } else {
+    RightSubsys::inst.start();
+  }
 
   Runloop::runloop.start(); // never returns
 }

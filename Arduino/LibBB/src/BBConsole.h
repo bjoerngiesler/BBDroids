@@ -59,7 +59,11 @@ public:
 #define HWSERIAL_CLASS HWCDC
 #endif
 #else // !defined(ARDUINO_ARCH_ESP32)
+#if defined(USE_TINYUSB)
+#define HWSERIAL_CLASS Adafruit_USBD_CDC
+#else
 #define HWSERIAL_CLASS HardwareSerial
+#endif
 #endif
 
 /*!

@@ -123,6 +123,7 @@ Result bb::Servos::start(ConsoleStream* stream) {
   unsigned int bps = 0;
 
   if(stream) stream->printf("Detecting Dynamixels... ");
+
   for (unsigned int i = 0; i < numBps; i++) {
     dxl_.begin(bpsList[i]);
     if (dxl_.scan() == false) {
@@ -160,51 +161,6 @@ Result bb::Servos::start(ConsoleStream* stream) {
       getControlTableItemInfo(model, ControlTableItem::GOAL_CURRENT, ctrlGoalCur_);
       getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY, ctrlProfileVel_);
       getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT, ctrlPresentLoad_);
-#if 0
-      if (ctrlPresentPos_.addr == 0) {
-        ctrlPresentPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
-        ctrlGoalPos_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
-        ctrlGoalVel_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_VELOCITY);
-        ctrlGoalCur_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_CURRENT);
-        ctrlProfileVel_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
-        // PRESENT_LOAD and PRESENT_CURRENT have the same addresses but different names (and units - 0.1% vs mA). Robotis, why do you do this to us?
-        ctrlPresentLoad_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
-        if(ctrlPresentLoad_.addr == 0) ctrlPresentLoad_ = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT); 
-      } else {
-        DYNAMIXEL::ControlTableItemInfo_t item;
-        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_POSITION);
-        if (item.addr != ctrlPresentPos_.addr || item.addr_length != ctrlPresentPos_.addr_length) {
-          if (stream) stream->printf("Servos use differing control tables (%d/%d), that is not supported currently!\n", item.addr, item.addr_length);
-          //return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-        }
-        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_POSITION);
-        if (item.addr != ctrlGoalPos_.addr || item.addr_length != ctrlGoalPos_.addr_length) {
-          if (stream) stream->printf("Servos use differing control tables (%d/%d), that is not supported currently!\n", item.addr, item.addr_length);
-          //return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-        }
-        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_VELOCITY);
-        if (item.addr != ctrlGoalVel_.addr || item.addr_length != ctrlGoalVel_.addr_length) {
-          if (stream) stream->printf("Servos use differing control tables (%d/%d), that is not supported currently!\n", item.addr, item.addr_length);
-          //return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-        }
-        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::GOAL_CURRENT);
-        if (item.addr != ctrlGoalCur_.addr || item.addr_length != ctrlGoalCur_.addr_length) {
-          if (stream) stream->printf("Servos use differing control tables (%d/%d), that is not supported currently!\n", item.addr, item.addr_length);
-          //return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-        }
-        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PROFILE_VELOCITY);
-        if (item.addr != ctrlProfileVel_.addr || item.addr_length != ctrlProfileVel_.addr_length) {
-          if (stream) stream->printf("Servos use differing control tables (%d/%d), that is not supported currently!\n", item.addr, item.addr_length);
-          //return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-        }
-        item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_LOAD);
-        if(item.addr == 0) item = DYNAMIXEL::getControlTableItemInfo(model, ControlTableItem::PRESENT_CURRENT);
-        if (item.addr != ctrlPresentLoad_.addr || item.addr_length != ctrlPresentLoad_.addr_length) {
-          if (stream) stream->printf("Servos use differing control tables, that is not supported currently! (addr %d!=%d, length %d!=%d)\n", item.addr, ctrlPresentLoad_.addr, item.addr_length, ctrlPresentLoad_.addr_length);
-          //return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-        }
-      }
-#endif
     } 
     break;
   }
@@ -285,7 +241,7 @@ Result bb::Servos::step() {
 
   if (!started_ || operationStatus_ != RES_OK) return RES_SUBSYS_NOT_STARTED;
 
-  if (failcount > 100) {
+  if (failcount > 10) {
     Console::console.printfBroadcast("Servo communication failed more than %d times in a row. Stopping subsystem.\n", failcount);
     stop();
     failcount = 0;
@@ -307,7 +263,7 @@ Result bb::Servos::step() {
   for(auto& s: servos_) {
     int maxload = (int)(1193.0*0.8);
     if(s.load > maxload || s.load < -maxload) {
-      Console::console.printfBroadcast("Warning - servo %d load %d exceeds 80%%!\n", s.id, s.load);
+      Console::console.printfBroadcast("Warning - servo %d load %d exceeds 80\%!\n", s.id, s.load);
     }
   }
 
@@ -1024,16 +980,18 @@ Result bb::Servos::syncReadInfo(ConsoleStream *stream) {
   
   recv_cnt = dxl_.syncRead(&srPresentInfos);
   if(recv_cnt != servos_.size()) {
-    if(stream) stream->printf("servo: Receiving position failed (%d instead of %d replies)!\n", recv_cnt, servos_.size());
-    else Console::console.printfBroadcast("servo: Receiving position failed (%d instead of %d replies)!\n", recv_cnt, servos_.size());
+    if(stream) stream->printf("servo: Receiving position failed (%d instead of %d replies), error code %d!\n", recv_cnt, servos_.size(), dxl_.getLastLibErrCode());
+    else Console::console.printfBroadcast("servo: Receiving position failed (%d instead of %d replies), error code %d!\n", recv_cnt, servos_.size(), dxl_.getLastLibErrCode());
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
   recv_cnt = dxl_.syncRead(&srLoadInfos);
   if(recv_cnt != servos_.size()) {
+  #if 0
     if(stream) stream->printf("servo: Receiving initial load failed!\n");
     else Console::console.printfBroadcast("servo: Receiving initial load failed!\n");
-    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+  #endif
+      return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
   return RES_OK;
@@ -1042,24 +1000,30 @@ Result bb::Servos::syncReadInfo(ConsoleStream *stream) {
 Result bb::Servos::syncWriteInfo(ConsoleStream* stream) {
   if(swPrfVelInfos.is_info_changed == true) {
     if(dxl_.syncWrite(&swPrfVelInfos) == false) {
+#if 0
       if(stream) stream->printf("servo: Sending servo profile velocity failed!\n");
       else Console::console.printfBroadcast("servo: Sending servo profile velocity failed!\n");
+#endif
       return RES_SUBSYS_COMM_ERROR;
     }
   }
 
   if(swGoalPosInfos.is_info_changed == true) {
     if(dxl_.syncWrite(&swGoalPosInfos) == false) {
+#if 0
       if(stream) stream->printf("servo: Sending servo position goal failed!\n");
       else Console::console.printfBroadcast("servo: Sending servo position goal failed!\n");
+#endif
       return RES_SUBSYS_COMM_ERROR;
     }
   }
 
   if(swGoalVelInfos.is_info_changed == true) {
     if(dxl_.syncWrite(&swGoalVelInfos) == false) {
+#if 0
       if(stream) stream->printf("servo: Sending servo velocity goal failed!\n");
       else Console::console.printfBroadcast("servo: Sending servo velocity goal failed!\n");
+#endif
       return RES_SUBSYS_COMM_ERROR;
     }
   }

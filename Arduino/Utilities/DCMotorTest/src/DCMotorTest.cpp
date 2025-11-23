@@ -5,49 +5,9 @@ using namespace bb;
 
 static const uint8_t PIN_DISABLE = 255;
 
-// STEP 1
-// Define your motor driver and pins here
-
-//#define DIRECTIONPIN_MOTOR_DRIVER
-#define DUALPWM_MOTOR_DRIVER
-#if defined(USE_DIRECTIONPIN_MOTOR_DRIVER)
-static const uint8_t PIN_DIR_A_1   = 2;
-static const uint8_t PIN_DIR_B_1   = 3;
-static const uint8_t PIN_DIR_PWM_1 = 19;
-static const uint8_t PIN_ENABLE_1  = 20;
-static const uint8_t PIN_DIR_A_2   = PIN_DISABLE;
-static const uint8_t PIN_DIR_B_2   = PIN_DISABLE;
-static const uint8_t PIN_DIR_PWM_2 = PIN_DISABLE;
-static const uint8_t PIN_ENABLE_2  = PIN_DISABLE
-DCMotor motor[2] = {
-  DCMotor(PIN_DIR_A_1, PIN_DIR_B_1, PIN_DIR_PWM_1, PIN_ENABLE_1), 
-  DCMotor(PIN_DIR_A_2, PIN_DIR_B_2, PIN_DIR_PWM_2, PIN_ENABLE_2)
-  };
-#elif defined(DUALPWM_MOTOR_DRIVER)
-static const uint8_t PIN_PWM_A_1   = 18;
-static const uint8_t PIN_PWM_B_1   = 19;
-static const uint8_t PIN_PWM_A_2   = 3;
-static const uint8_t PIN_PWM_B_2   = 2;
-DCMotor motor[2] = {
-  DCMotor(PIN_PWM_A_1, PIN_PWM_B_1), 
-  DCMotor(PIN_PWM_A_2, PIN_PWM_B_2)
-  };
-#else
-#error No valid motors defined!
-#endif
-
-// STEP 2
-// Define your encoder pins here
-
-static const uint8_t PIN_ENC_A_1 = 17;
-static const uint8_t PIN_ENC_B_1 = 16;
-static const uint8_t PIN_ENC_A_2 = 7;
-static const uint8_t PIN_ENC_B_2 = 6;
-
-bb::Encoder input[2] = {bb::Encoder(PIN_ENC_A_1, PIN_ENC_B_1), bb::Encoder(PIN_ENC_A_2, PIN_ENC_B_2)};
-
-// STEP 3
-// Compile and upload and connect via serial monitor!
+//#include "ConfigBB8.h"
+//#include "ConfigDO.h"
+#include "ConfigSerf.h"
 
 // --------------------------------------------------
 
@@ -73,30 +33,7 @@ const uint8_t UNIT_TICKS = 1;
 const uint8_t UNIT_FAKE = 2;
 int unit = 1;
 
-#define DROID_DO
-//#define DROID_BB8
-
 int pwmSpeedReduction = 0;
-
-#if defined(DROID_DO)
-// Values for D-O. This gives about 0.14mm per tick.
-static const float WHEEL_CIRCUMFERENCE = 722.566310325652445;
-static const float WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979 ticks per one turn of the drive gear, 18 teeth on the drive gear, 96 teeth on the main gear.
-float speedKp = 0.13, speedKi = 0.8, speedKd = 0.0;
-float speedCutoff = 25;
-float posKp = 0.05, posKi = 0.0, posKd = 0.0;
-float posCutoff = 25;
-#endif
-
-#if defined(DROID_BB8)
-// Values for BB-8. This gives about 0.33mm per tick.
-static const float WHEEL_CIRCUMFERENCE     = 2*M_PI*253.0; // bb8 motor pwm 0
-static const float WHEEL_TICKS_PER_TURN    = 4776.384;
-float speedKp = 0.075, speedKi = 0.2, speedKd = 0.0;
-float posKp = 0.027, posKi = 0.005, posKd = 0.0;
-float speedCutoff = 25;
-float posCutoff = 25;
-#endif
 
 static const float MM_PER_TICK = WHEEL_CIRCUMFERENCE / WHEEL_TICKS_PER_TURN;
 
@@ -150,6 +87,8 @@ public:
 
     control[0].reset();
     control[1].reset();
+    control[0].setReverse(motor1Reverse);
+    control[1].setReverse(motor2Reverse);
     motor[0].setEnabled(true);
     motor[1].setEnabled(true);
     return RES_OK;
@@ -191,7 +130,7 @@ public:
           input[i].update();
 
           if(outputMode == OUTPUT_SERIALPLOTTER)
-            Console::console.printfBroadcast(",RawEnc%d:%f", i, input[i].present(bb::Encoder::INPUT_SPEED));
+            Console::console.printfBroadcast(",RawEnc%d:%f", i, input[i].present(bb::Encoder::INPUT_POSITION));
           else {
             Console::console.printfBroadcast("%f %f", 
                                              input[i].present(bb::Encoder::INPUT_SPEED, true), 

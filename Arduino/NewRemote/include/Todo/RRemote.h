@@ -4,7 +4,7 @@
 #include <LibBB.h>
 #include <deque>
 #include "Config.h"
-#include "RInput.h"
+#include "Input.h"
 
 using namespace bb;
 
@@ -60,20 +60,19 @@ public:
 
   Result sendConfigToRightRemote();
   void storeParams() { ConfigStorage::storage.writeBlock(paramsHandle_);  }
-  void runTestsuite();
 
   const HWAddress& droidAddress() { return params_.droidAddress; }
   const HWAddress& otherRemoteAddress() { return params_.otherRemoteAddress; }
 
-  RInput::Button incrRotButton(PacketSource source);
-  void setIncrRotButton(PacketSource source, RInput::Button btn);
+  Input::Button incrRotButton(PacketSource source);
+  void setIncrRotButton(PacketSource source, Input::Button btn);
 
   PacketSource primary() { return params_.config.leftIsPrimary ? PACKET_SOURCE_LEFT_REMOTE : PACKET_SOURCE_RIGHT_REMOTE; }
   void setLeftIsPrimary(bool yesno);
   bool isPrimary() { return (isLeftRemote && params_.config.leftIsPrimary) || (!isLeftRemote && !params_.config.leftIsPrimary);}
 
   // Callbacks
-  void setIncrRotButtonCB(RInput::Button button, bool left);
+  void setIncrRotButtonCB(Input::Button button, bool left);
   void sendStartCalibration();
   void finishCalibrationCB(bool left);
 
@@ -96,14 +95,14 @@ protected:
   static const uint8_t MAX_CALIB_BUFSIZE = 100;
   static const uint8_t MAX_CALIB_DIFF = 30;
   std::deque<uint16_t> rawHBuf, rawVBuf;
-  RInput::AxisCalib hCalib, vCalib;
+  Input::AxisCalib hCalib, vCalib;
   int16_t calibRounds;
 
   struct RemoteParams {
     HWAddress otherRemoteAddress = {0, 0};
     HWAddress droidAddress = {0, 0};
-    RInput::AxisCalib hCalib = RInput::AxisCalib();
-    RInput::AxisCalib vCalib = RInput::AxisCalib();
+    Input::AxisCalib hCalib = Input::AxisCalib();
+    Input::AxisCalib vCalib = Input::AxisCalib();
     bb::RemoteConfigPacket config;
   };
 

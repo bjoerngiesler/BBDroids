@@ -40,9 +40,9 @@ protected:
 
 class IMU {
 public:
-  IMU(uint8_t addr);
+  IMU();
 
-  bool begin();
+  bool begin(uint8_t addr);
   bool available() { return available_; }
   bool calibrate(ConsoleStream *stream=NULL, int milliseconds = 2000, int step = 10);
 

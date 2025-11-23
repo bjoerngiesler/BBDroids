@@ -1,10 +1,12 @@
 #if !defined(BBWIFISERVER_H)
 #define BBWIFISERVER_H
 
+#if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_ARCH_SAMD)
+
 #include <Arduino.h>
 #if defined(ARDUINO_ARCH_ESP32)
 #include <Wifi.h>
-#else
+#elif defined(ARDUINO_ARCH_SAMD)
 #include <WiFiNINA.h>
 #endif
 #include "BBSubsystem.h"
@@ -80,4 +82,6 @@ protected:
 
 };
 
-#endif // BBTCPSERVER_H
+#endif // #if defined(ARDUINO_ARCH_ESP32) && defined(ARDUINO_ARCH_SAMD)
+
+#endif // BBWIFISERVER_H

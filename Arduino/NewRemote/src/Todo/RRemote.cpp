@@ -1,6 +1,6 @@
 #include <cstdio>
 #include "Todo/RRemote.h"
-#include "UI/RUI.h"
+#include "UI/UI.h"
 
 RRemote RRemote::remote;
 RRemote::RemoteParams RRemote::params_;
@@ -14,7 +14,6 @@ RRemote::RRemote():
 "Available commands:\r\n"\
 "\tstatus                 Prints current status (buttons, axes, etc.)\r\n"\
 "\trunning_status on|off  Continuously prints status\r\n"\
-"\ttestsuite              Run test suite\r\n"\
 "\tcalibrate_imu          Run IMU calibration\r\n"\
 "\treset                  Factory reset\n"\
 "\tset_droid ADDR         Set droid address to ADDR (64bit hex - max 16 digits, omit the 0x)\n"\
@@ -30,10 +29,10 @@ RRemote::RRemote():
   params_.config.leftIsPrimary = true;
   params_.config.ledBrightness = 7;
   params_.config.sendRepeats = 1;
-  params_.config.lIncrRotBtn = RInput::BUTTON_4;
-  params_.config.rIncrRotBtn = RInput::BUTTON_4;
-  params_.config.lIncrTransBtn = RInput::BUTTON_NONE;
-  params_.config.rIncrTransBtn = RInput::BUTTON_NONE;
+  params_.config.lIncrRotBtn = Input::BUTTON_4;
+  params_.config.rIncrRotBtn = Input::BUTTON_4;
+  params_.config.lIncrTransBtn = Input::BUTTON_NONE;
+  params_.config.rIncrTransBtn = Input::BUTTON_NONE;
   params_.config.deadbandPercent = 8;
 }
 
@@ -53,19 +52,19 @@ Result RRemote::initialize() {
     ConfigStorage::storage.writeBlock(paramsHandle_);
   }
 
-  RInput::input.setCalibration(params_.hCalib, params_.vCalib);
-  if(isLeftRemote) RInput::input.setIncrementalRot(RInput::Button(params_.config.lIncrRotBtn));
-  else RInput::input.setIncrementalRot(RInput::Button(params_.config.rIncrRotBtn));
+  Input::inst.setCalibration(params_.hCalib, params_.vCalib);
+  if(isLeftRemote) Input::inst.setIncrementalRot(Input::Button(params_.config.lIncrRotBtn));
+  else Input::inst.setIncrementalRot(Input::Button(params_.config.rIncrRotBtn));
   deadbandPercent_ = params_.config.deadbandPercent;
   ledBrightness_ = params_.config.ledBrightness;
   sendRepeats_ = params_.config.sendRepeats;
-  RInput::input.setDeadbandPercent(params_.config.deadbandPercent);
-  RDisplay::display.setLEDBrightness(ledBrightness_<<2);
+  Input::inst.setDeadbandPercent(params_.config.deadbandPercent);
+  Display::display.setLEDBrightness(ledBrightness_<<2);
 
   if(isLeftRemote) {
-    RUI::ui.setSeqnumState(PACKET_SOURCE_RIGHT_REMOTE, params_.otherRemoteAddress.isZero() != false);
-    RUI::ui.setSeqnumState(PACKET_SOURCE_DROID, params_.droidAddress.isZero() != false);
-    RUI::ui.setSeqnumState(PACKET_SOURCE_LEFT_REMOTE, true);
+    UI::ui.setSeqnumState(PACKET_SOURCE_RIGHT_REMOTE, params_.otherRemoteAddress.isZero() != false);
+    UI::ui.setSeqnumState(PACKET_SOURCE_DROID, params_.droidAddress.isZero() != false);
+    UI::ui.setSeqnumState(PACKET_SOURCE_LEFT_REMOTE, true);
     setPacketSource(PACKET_SOURCE_LEFT_REMOTE);
   } else {
     setPacketSource(PACKET_SOURCE_RIGHT_REMOTE);
@@ -79,12 +78,12 @@ Result RRemote::start(ConsoleStream *stream) {
   runningStatus_ = false;
   operationStatus_ = RES_OK;
 
-  bb::printf("Starting RInput\n");
-  if(RInput::input.begin() == false) {
-    LOG(LOG_FATAL, "Error initializing RInput\n");
+  bb::printf("Starting Input:\n");
+  if(Input::inst.begin(rightRemotePins) == false) {
+    LOG(LOG_FATAL, "Error initializing Input:\n");
   }
 
-  if(isLeftRemote) RUI::ui.start();
+  if(isLeftRemote) UI::ui.start();
 
   started_ = true;
 
@@ -93,7 +92,7 @@ Result RRemote::start(ConsoleStream *stream) {
 
 Result RRemote::stop(ConsoleStream *stream) {
   (void)stream;
-  RDisplay::display.setLED(RDisplay::LED_BOTH, RDisplay::LED_YELLOW);
+  Display::display.setLED(Display::LED_BOTH, Display::LED_YELLOW);
   operationStatus_ = RES_OK;
   started_ = false;
   
@@ -103,10 +102,10 @@ Result RRemote::stop(ConsoleStream *stream) {
 Result RRemote::step() {
   if(!started_) return RES_SUBSYS_NOT_STARTED;
 
-  RInput::input.update();
+  Input::inst.update();
   if(isLeftRemote) {
-    if(millis()-lastDroidMs_ > 500) RUI::ui.setNoComm(PACKET_SOURCE_DROID, true);
-    if(millis()-lastRightMs_ > 500) RUI::ui.setNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
+    if(millis()-lastDroidMs_ > 500) UI::ui.setNoComm(PACKET_SOURCE_DROID, true);
+    if(millis()-lastRightMs_ > 500) UI::ui.setNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
   }
 
   if((bb::Runloop::runloop.getSequenceNumber() % 4) == 0) {
@@ -117,18 +116,18 @@ Result RRemote::step() {
   } else if((bb::Runloop::runloop.getSequenceNumber() % 4) == 1) {
     updateStatusLED();
     if(isLeftRemote) {
-      if(RInput::input.secondsSinceLastMotion() > 10.0) RUI::ui.drawScreensaver();
-      else RUI::ui.drawGUI();
+      if(Input::inst.secondsSinceLastMotion() > 10.0) UI::ui.drawScreensaver();
+      else UI::ui.drawGUI();
     }
   } else {
-    RDisplay::display.setLED(RDisplay::LED_COMM, RDisplay::LED_OFF);
+    Display::display.setLED(Display::LED_COMM, Display::LED_OFF);
   }
 
   if((bb::Runloop::runloop.getSequenceNumber() % 10) == 0) {
-    if(RInput::input.secondsSinceLastMotion() > 10 || params_.config.ledBrightness <= 2) {
-      RDisplay::display.setLEDBrightness(1);
+    if(Input::inst.secondsSinceLastMotion() > 10 || params_.config.ledBrightness <= 2) {
+      Display::display.setLEDBrightness(1);
     } else {
-      RDisplay::display.setLEDBrightness(params_.config.ledBrightness << 2);
+      Display::display.setLEDBrightness(params_.config.ledBrightness << 2);
     }
   }
 
@@ -138,11 +137,11 @@ Result RRemote::step() {
 void RRemote::parameterChangedCallback(const String& name) {
   if(name == "deadband") {
     params_.config.deadbandPercent = deadbandPercent_;
-    RInput::input.setDeadbandPercent(deadbandPercent_);
+    Input::inst.setDeadbandPercent(deadbandPercent_);
     Console::console.printfBroadcast("Set deadband percent to %d\n", deadbandPercent_);
   } else if (name == "led_brightness") {
     params_.config.ledBrightness = ledBrightness_;
-    RDisplay::display.setLEDBrightness(ledBrightness_<<2);
+    Display::display.setLEDBrightness(ledBrightness_<<2);
     Console::console.printfBroadcast("Set LED Brightness to %d\n", ledBrightness_);
   } else if(name == "send_repeats") {
     params_.config.sendRepeats = sendRepeats_;
@@ -171,10 +170,10 @@ void RRemote::selectDroid(const HWAddress& droid) {
   packet.cfgPayload.address = XBee::xbee.hwAddress();
   Result res = XBee::xbee.sendConfigPacket(params_.droidAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
   if(res != RES_OK) {
-    RUI::ui.showMessage(String("L ID -> D:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
+    UI::ui.showMessage(String("L ID -> D:\n") + bb::errorMessage(res), MSGDELAY, Display::LIGHTRED2);
     return;
   } else if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-    RUI::ui.showMessage(String("L ID -> D:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
+    UI::ui.showMessage(String("L ID -> D:\nError ") + int(reply), MSGDELAY, Display::LIGHTRED2);
     return;
   }
 
@@ -184,18 +183,18 @@ void RRemote::selectDroid(const HWAddress& droid) {
     packet.cfgPayload.address = params_.droidAddress;
     Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
     if(res != RES_OK) {
-      RUI::ui.showMessage(String("D ID -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
+      UI::ui.showMessage(String("D ID -> R:\n") + bb::errorMessage(res), MSGDELAY, Display::LIGHTRED2);
       showSuccess = false;
     } else if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-      RUI::ui.showMessage(String("D ID -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
+      UI::ui.showMessage(String("D ID -> R:\nError ") + int(reply), MSGDELAY, Display::LIGHTRED2);
       showSuccess = false;
     }
   } 
         
-  if(showSuccess) RUI::ui.showMessage("Success", MSGDELAY, RDisplay::LIGHTGREEN2);
-  RUI::ui.setSeqnumState(PACKET_SOURCE_DROID, true);
+  if(showSuccess) UI::ui.showMessage("Success", MSGDELAY, Display::LIGHTGREEN2);
+  UI::ui.setSeqnumState(PACKET_SOURCE_DROID, true);
   ConfigStorage::storage.writeBlock(paramsHandle_);
-  RUI::ui.setNeedsMenuRebuild();
+  UI::ui.setNeedsMenuRebuild();
 }
 
 void RRemote::selectRightRemote(const HWAddress& address) {
@@ -219,11 +218,11 @@ void RRemote::selectRightRemote(const HWAddress& address) {
   packet.cfgPayload.address = XBee::xbee.hwAddress();
   Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
   if(res != RES_OK) {
-    RUI::ui.showMessage(String("L ID -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
+    UI::ui.showMessage(String("L ID -> R:\n") + bb::errorMessage(res), MSGDELAY, Display::LIGHTRED2);
     return;
   }
   if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-    RUI::ui.showMessage(String("L ID -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
+    UI::ui.showMessage(String("L ID -> R:\nError ") + int(reply), MSGDELAY, Display::LIGHTRED2);
     return;
   }
 
@@ -233,43 +232,43 @@ void RRemote::selectRightRemote(const HWAddress& address) {
     packet.cfgPayload.address = params_.droidAddress;
     Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
     if(res != RES_OK) {
-      RUI::ui.showMessage(String("D ID -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
+      UI::ui.showMessage(String("D ID -> R:\n") + bb::errorMessage(res), MSGDELAY, Display::LIGHTRED2);
       showSuccess = false;
     }
     if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-      RUI::ui.showMessage(String("D ID -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
+      UI::ui.showMessage(String("D ID -> R:\nError ") + int(reply), MSGDELAY, Display::LIGHTRED2);
       showSuccess = false;
     }
   }
 
-  if(showSuccess) RUI::ui.showMessage("Success", MSGDELAY, RDisplay::LIGHTGREEN2);
+  if(showSuccess) UI::ui.showMessage("Success", MSGDELAY, Display::LIGHTGREEN2);
   ConfigStorage::storage.writeBlock(paramsHandle_);
 
-  RUI::ui.setSeqnumState(PACKET_SOURCE_RIGHT_REMOTE, true);
-  RUI::ui.setNeedsMenuRebuild();
+  UI::ui.setSeqnumState(PACKET_SOURCE_RIGHT_REMOTE, true);
+  UI::ui.setNeedsMenuRebuild();
 }
 
 void RRemote::updateStatusLED() {
   if(mode_ == MODE_CALIBRATION) {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_BLUE);
-  } else if(Console::console.isStarted() && XBee::xbee.isStarted() && isStarted() && RInput::input.imuOK() && RInput::input.mcpOK()) {
-    if(RInput::input.joyAtZero())
-      RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_WHITE);
+    Display::display.setLED(Display::LED_STATUS, Display::LED_BLUE);
+  } else if(Console::console.isStarted() && XBee::xbee.isStarted() && isStarted() && Input::inst.imuOK() && Input::inst.mcpOK()) {
+    if(Input::inst.joyAtZero())
+      Display::display.setLED(Display::LED_STATUS, Display::LED_WHITE);
     else
-      RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_GREEN);
-  } else if(!XBee::xbee.isStarted() || !RInput::input.imuOK() || !RInput::input.mcpOK() ) {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_RED);
+      Display::display.setLED(Display::LED_STATUS, Display::LED_GREEN);
+  } else if(!XBee::xbee.isStarted() || !Input::inst.imuOK() || !Input::inst.mcpOK() ) {
+    Display::display.setLED(Display::LED_STATUS, Display::LED_RED);
   } else {
-    RDisplay::display.setLED(RDisplay::LED_STATUS, RDisplay::LED_YELLOW);
+    Display::display.setLED(Display::LED_STATUS, Display::LED_YELLOW);
   }
 }
 
 void RRemote::factoryReset() {
   bb::ConfigStorage::storage.factoryReset();
-  if(isLeftRemote) RUI::ui.showMessage("Please restart");
+  if(isLeftRemote) UI::ui.showMessage("Please restart");
   int i=0, dir=1;
   while(true) {
-    RDisplay::display.setLED(RDisplay::LED_BOTH, 0, 0, i);
+    Display::display.setLED(Display::LED_BOTH, 0, 0, i);
     i = i+dir;
     if(dir > 0 && i>=255) dir = -1;
     if(dir < 0 && i<=0) dir = 1;
@@ -278,12 +277,12 @@ void RRemote::factoryReset() {
 }
 
 void RRemote::finishCalibration() {
-  uint16_t hMin = RInput::input.minJoyRawH;
-  uint16_t hMax = RInput::input.maxJoyRawH;
-  uint16_t vMin = RInput::input.minJoyRawV;
-  uint16_t vMax = RInput::input.maxJoyRawV;
-  uint16_t hCur = RInput::input.joyRawH;
-  uint16_t vCur = RInput::input.joyRawV;
+  uint16_t hMin = Input::inst.minJoyRawH;
+  uint16_t hMax = Input::inst.maxJoyRawH;
+  uint16_t vMin = Input::inst.minJoyRawV;
+  uint16_t vMax = Input::inst.maxJoyRawV;
+  uint16_t hCur = Input::inst.joyRawH;
+  uint16_t vCur = Input::inst.joyRawV;
 
   Console::console.printfBroadcast("Hor: [%d..%d..%d] Ver: [%d..%d..%d] \n", hMin, hCur, hMax, vMin, vCur, vMax);
   if(hMin < 800 && hMax > 4096-800 && vMin < 800 && vMax > 4096-800) { 
@@ -294,22 +293,22 @@ void RRemote::finishCalibration() {
     params_.vCalib.min = vMin;
     params_.vCalib.max = vMax;
     params_.vCalib.center = vCur;
-    RInput::input.setCalibration(params_.hCalib, params_.vCalib);
+    Input::inst.setCalibration(params_.hCalib, params_.vCalib);
     
     ConfigStorage::storage.writeBlock(paramsHandle_);
 
-    RDisplay::display.flashLED(RDisplay::LED_BOTH, 2, 250, 250, 0, 150, 0);
+    Display::display.flashLED(Display::LED_BOTH, 2, 250, 250, 0, 150, 0);
   } else {
     // Values out of acceptable bounds - reject calibration.
-    RDisplay::display.flashLED(RDisplay::LED_BOTH, 2, 250, 250, 150, 0, 0);
+    Display::display.flashLED(Display::LED_BOTH, 2, 250, 250, 150, 0, 0);
   }
   mode_ = MODE_REGULAR;
 
-  RInput::input.clearCallbacks();
+  Input::inst.clearCallbacks();
   if(isLeftRemote) {
     Runloop::runloop.excuseOverrun();
-    RUI::ui.hideCalibration(PACKET_SOURCE_LEFT_REMOTE);
-    RUI::ui.showMain();
+    UI::ui.hideCalibration(PACKET_SOURCE_LEFT_REMOTE);
+    UI::ui.showMain();
   }
 }
 
@@ -317,7 +316,7 @@ void RRemote::setLEDBrightness(uint8_t brt) {
   if(brt > 7) brt = 7;
   if(brt == params_.config.ledBrightness) return;
   params_.config.ledBrightness = ledBrightness_ = brt;
-  RDisplay::display.setLEDBrightness(brt << 2);
+  Display::display.setLEDBrightness(brt << 2);
   if(isLeftRemote) sendConfigToRightRemote();
   storeParams();
 }
@@ -326,7 +325,7 @@ void RRemote::setJoyDeadband(uint8_t db) {
   if(db > 15) db = 15;
   if(db == params_.config.deadbandPercent) return;
   params_.config.deadbandPercent = deadbandPercent_ = db;
-  RInput::input.setDeadbandPercent(db);
+  Input::inst.setDeadbandPercent(db);
   if(isLeftRemote) sendConfigToRightRemote();
   storeParams();
 }
@@ -357,15 +356,15 @@ Result RRemote::sendConfigToRightRemote() {
 
   Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
   if(res != RES_OK) {
-    RUI::ui.showMessage(String("Config -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
+    UI::ui.showMessage(String("Config -> R:\n") + bb::errorMessage(res), MSGDELAY, Display::LIGHTRED2);
     return res;
   } 
   if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-    RUI::ui.showMessage(String("Config -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
+    UI::ui.showMessage(String("Config -> R:\nError ") + int(reply), MSGDELAY, Display::LIGHTRED2);
     return RES_SUBSYS_COMM_ERROR;
   }
 
-  RUI::ui.showMessage("Success", MSGDELAY, RDisplay::LIGHTGREEN2);
+  UI::ui.showMessage("Success", MSGDELAY, Display::LIGHTGREEN2);
   ConfigStorage::storage.writeBlock(paramsHandle_);
   return RES_OK;
 }
@@ -375,8 +374,8 @@ bb::Result RRemote::fillAndSend() {
 
   packet.payload.control.primary = isPrimary();
 
-  RInput::input.fillControlPacket(packet.payload.control);
-  if(isLeftRemote) RUI::ui.visualizeFromControlPacket(PACKET_SOURCE_LEFT_REMOTE, packet.seqnum, packet.payload.control);
+  //Input::inst.fillControlPacket(packet.payload.control);
+  //if(isLeftRemote) UI::ui.visualizeFromControlPacket(PACKET_SOURCE_LEFT_REMOTE, packet.seqnum, packet.payload.control);
 
   Result res = RES_OK;
   int r=0, g=0, b=0;
@@ -407,7 +406,7 @@ bb::Result RRemote::fillAndSend() {
     }
   }
 
-  RDisplay::display.setLED(RDisplay::LED_COMM, r, g, b);
+  Display::display.setLED(Display::LED_COMM, r, g, b);
 
   return res;
 }
@@ -433,7 +432,7 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
   }
 
   else if(words[0] == "calibrate_imu") {
-    RInput::input.imu().calibrate();
+    Input::inst.imu().calibrate();
     return RES_OK;
   }
 
@@ -482,11 +481,6 @@ Result RRemote::handleConsoleCommand(const std::vector<String>& words, ConsoleSt
     return RES_OK;
   }
 
-  else if(words[0] == "testsuite") {
-    runTestsuite();
-    return RES_OK;
-  }
-
   return Subsystem::handleConsoleCommand(words, stream);
 } 
 
@@ -505,10 +499,10 @@ Result RRemote::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
   if(packet.button5 == true ||
       packet.button6 == true ||
       packet.button7 == true) {
-      RUI::ui.hideCalibration(PACKET_SOURCE_RIGHT_REMOTE);
+      UI::ui.hideCalibration(PACKET_SOURCE_RIGHT_REMOTE);
   }
   
-  RUI::ui.visualizeFromControlPacket(source, seqnum, packet);
+  //UI::ui.visualizeFromControlPacket(source, seqnum, packet);
   
   lastRightMs_ = millis();
 
@@ -526,7 +520,7 @@ Result RRemote::incomingStatePacket(const HWAddress& srcAddr, PacketSource sourc
     return RES_SUBSYS_COMM_ERROR;
   }
 
-  RUI::ui.visualizeFromStatePacket(source, seqnum, packet);
+  //UI::ui.visualizeFromStatePacket(source, seqnum, packet);
 
   lastDroidMs_ = millis();
 
@@ -587,7 +581,7 @@ Result RRemote::incomingConfigPacket(const HWAddress& srcAddr, PacketSource sour
                                       packet.cfgPayload.remoteConfig.lIncrRotBtn, packet.cfgPayload.remoteConfig.rIncrRotBtn, 
                                       packet.cfgPayload.remoteConfig.lIncrTransBtn, packet.cfgPayload.remoteConfig.rIncrTransBtn);
     params_.config = packet.cfgPayload.remoteConfig;
-    RInput::input.setIncrementalRot(RInput::Button(params_.config.rIncrRotBtn));
+    Input::inst.setIncrementalRot(Input::Button(params_.config.rIncrRotBtn));
     ConfigStorage::storage.writeBlock(paramsHandle_);
     return RES_OK; 
 
@@ -615,9 +609,9 @@ Result RRemote::incomingConfigPacket(const HWAddress& srcAddr, PacketSource sour
 
 String RRemote::statusLine() {
   String str = bb::Subsystem::statusLine() + ", ";
-  if(RInput::input.imuOK()) str += "IMU OK, ";
+  if(Input::inst.imuOK()) str += "IMU OK, ";
   else str += "IMU error, ";
-  if(RInput::input.mcpOK()) str += "Buttons OK.";
+  if(Input::inst.mcpOK()) str += "Buttons OK.";
   else str += "Buttons error.";
 
   return str;
@@ -635,14 +629,14 @@ void RRemote::printExtendedStatus(ConsoleStream* stream) {
   stream->printf("\tOther remote: 0x%lx:%lx\n", params_.otherRemoteAddress.addrHi, params_.otherRemoteAddress.addrLo);
   stream->printf("\tDroid:        0x%lx:%lx\n", params_.droidAddress.addrHi, params_.droidAddress.addrLo);
   stream->printf("Joystick:\n");
-  stream->printf("\tHor: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", RInput::input.joyRawH, RInput::input.joyH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max);
-  stream->printf("\tVer: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", RInput::input.joyRawV, RInput::input.joyV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max);
+  stream->printf("\tHor: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", Input::inst.joyRawH, Input::inst.joyH, Input::inst.hCalib.min, Input::inst.hCalib.center, Input::inst.hCalib.max);
+  stream->printf("\tVer: Raw %d\tnormalized %.2f\tcalib [%4d..%4d..%4d]\n", Input::inst.joyRawV, Input::inst.joyV, Input::inst.vCalib.min, Input::inst.vCalib.center, Input::inst.vCalib.max);
 
-  if(RInput::input.imuOK()) {
+  if(Input::inst.imuOK()) {
     float pitch, roll, heading, rax, ray, raz, ax, ay, az;
-    RInput::input.imu().getFilteredPRH(pitch, roll, heading);
-    RInput::input.imu().getAccelMeasurement(rax, ray, raz);
-    RInput::input.imu().getGravCorrectedAccel(ax, ay, az);
+    Input::inst.imu().getFilteredPRH(pitch, roll, heading);
+    Input::inst.imu().getAccelMeasurement(rax, ray, raz);
+    Input::inst.imu().getGravCorrectedAccel(ax, ay, az);
     stream->printf("IMU: OK\n");
     stream->printf("\tRotation             Pitch: %.2f Roll: %.2f Heading: %.2f\n", pitch, roll, heading);
     stream->printf("\tRaw Acceleration     X:%f Y:%f Z:%f\n", rax, ray, raz);
@@ -651,22 +645,22 @@ void RRemote::printExtendedStatus(ConsoleStream* stream) {
     stream->printf("IMU: Error\n");
   }
 
-  if(RInput::input.mcpOK()) {      
+  if(Input::inst.mcpOK()) {      
     stream->printf("Buttons: 1:%c 2:%c 3:%c 4:%c Joy:%c Confirm:%c Left:%c Right:%c\n",
-                  RInput::input.buttons[RInput::BUTTON_1] ? 'X' : '_',
-                  RInput::input.buttons[RInput::BUTTON_2] ? 'X' : '_',
-                  RInput::input.buttons[RInput::BUTTON_3] ? 'X' : '_',
-                  RInput::input.buttons[RInput::BUTTON_4] ? 'X' : '_',
-                  RInput::input.buttons[RInput::BUTTON_JOY] ? 'X' : '_',
-                  RInput::input.buttons[RInput::BUTTON_CONFIRM] ? 'X' : '_',
-                  RInput::input.buttons[RInput::BUTTON_LEFT] ? 'X' : '_',
-                  RInput::input.buttons[RInput::BUTTON_RIGHT] ? 'X' : '_');
+                  Input::inst.buttons[Input::BUTTON_1] ? 'X' : '_',
+                  Input::inst.buttons[Input::BUTTON_2] ? 'X' : '_',
+                  Input::inst.buttons[Input::BUTTON_3] ? 'X' : '_',
+                  Input::inst.buttons[Input::BUTTON_4] ? 'X' : '_',
+                  Input::inst.buttons[Input::BUTTON_JOY] ? 'X' : '_',
+                  Input::inst.buttons[Input::BUTTON_CONFIRM] ? 'X' : '_',
+                  Input::inst.buttons[Input::BUTTON_LEFT] ? 'X' : '_',
+                  Input::inst.buttons[Input::BUTTON_RIGHT] ? 'X' : '_');
   } else {
     stream->printf("Buttons: Error\n");
   }
 
-  stream->printf("Potentiometer 1: %d %.2f\nPotentiometer 2: %d %.2f\n", RInput::input.pot1Raw, RInput::input.pot1, RInput::input.pot2Raw, RInput::input.pot2);
-  stream->printf("Battery: %.1f\n", RInput::input.battery);
+  stream->printf("Potentiometer 1: %d %.2f\nPotentiometer 2: %d %.2f\n", Input::inst.pot1Raw, Input::inst.pot1, Input::inst.pot2Raw, Input::inst.pot2);
+  stream->printf("Battery: %.1f\n", Input::inst.battery);
 }
 
 void RRemote::printExtendedStatusLine(ConsoleStream *stream) {
@@ -675,46 +669,42 @@ void RRemote::printExtendedStatusLine(ConsoleStream *stream) {
   memset(buf, 0, bufsize);
 
   float pitch, roll, heading, rax, ray, raz, ax, ay, az;
-  RInput::input.imu().getFilteredPRH(pitch, roll, heading);
-  RInput::input.imu().getAccelMeasurement(rax, ray, raz);
-  RInput::input.imu().getGravCorrectedAccel(ax, ay, az);
+  Input::inst.imu().getFilteredPRH(pitch, roll, heading);
+  Input::inst.imu().getAccelMeasurement(rax, ray, raz);
+  Input::inst.imu().getGravCorrectedAccel(ax, ay, az);
 
   snprintf(buf, bufsize, "S%ld H%d [%d..%d..%d] %f V%d [%d..%d..%d] %f P%.1f R%.1f H%.1f AX%.2f AY%.2f AZ%.2f P1%.1f P2%.1f Batt%.1f B%c%c%c%c%c%c%c%c",
     seqnum_,
-    RInput::input.joyRawH, RInput::input.hCalib.min, RInput::input.hCalib.center, RInput::input.hCalib.max, RInput::input.joyH,
-    RInput::input.joyRawV, RInput::input.vCalib.min, RInput::input.vCalib.center, RInput::input.vCalib.max, RInput::input.joyV,
+    Input::inst.joyRawH, Input::inst.hCalib.min, Input::inst.hCalib.center, Input::inst.hCalib.max, Input::inst.joyH,
+    Input::inst.joyRawV, Input::inst.vCalib.min, Input::inst.vCalib.center, Input::inst.vCalib.max, Input::inst.joyV,
     pitch, roll, heading,
     ax, ay, az,
-    RInput::input.pot1, RInput::input.pot2,
-    RInput::input.battery,
-    RInput::input.buttons[RInput::BUTTON_1] ? '_' : 'X',
-    RInput::input.buttons[RInput::BUTTON_2] ? '_' : 'X',
-    RInput::input.buttons[RInput::BUTTON_3] ? '_' : 'X',
-    RInput::input.buttons[RInput::BUTTON_4] ? '_' : 'X',
-    RInput::input.buttons[RInput::BUTTON_JOY] ? '_' : 'X',
-    RInput::input.buttons[RInput::BUTTON_CONFIRM] ? '_' : 'X',
-    RInput::input.buttons[RInput::BUTTON_LEFT] ? '_' : 'X',
-    RInput::input.buttons[RInput::BUTTON_RIGHT] ? '_' : 'X');
+    Input::inst.pot1, Input::inst.pot2,
+    Input::inst.battery,
+    Input::inst.buttons[Input::BUTTON_1] ? '_' : 'X',
+    Input::inst.buttons[Input::BUTTON_2] ? '_' : 'X',
+    Input::inst.buttons[Input::BUTTON_3] ? '_' : 'X',
+    Input::inst.buttons[Input::BUTTON_4] ? '_' : 'X',
+    Input::inst.buttons[Input::BUTTON_JOY] ? '_' : 'X',
+    Input::inst.buttons[Input::BUTTON_CONFIRM] ? '_' : 'X',
+    Input::inst.buttons[Input::BUTTON_LEFT] ? '_' : 'X',
+    Input::inst.buttons[Input::BUTTON_RIGHT] ? '_' : 'X');
   if(stream)
     stream->printf("%s\n", buf);
   else 
      bb::printf("%s\n", buf);
 }
 
-void RRemote::runTestsuite() {
-  RInput::input.testMatrix();
-}
-
-RInput::Button RRemote::incrRotButton(PacketSource source) {
+Input::Button RRemote::incrRotButton(PacketSource source) {
   if(source == PACKET_SOURCE_LEFT_REMOTE)
-    return RInput::Button(params_.config.lIncrRotBtn);
+    return Input::Button(params_.config.lIncrRotBtn);
   else if(source == PACKET_SOURCE_RIGHT_REMOTE)
-    return RInput::Button(params_.config.rIncrRotBtn);
+    return Input::Button(params_.config.rIncrRotBtn);
   LOG(LOG_ERROR, "Querying incrRotButton for source type %d is not defined\n", source);
-  return RInput::BUTTON_NONE;
+  return Input::BUTTON_NONE;
 }
 
-void RRemote::setIncrRotButton(PacketSource source, RInput::Button btn) {
+void RRemote::setIncrRotButton(PacketSource source, Input::Button btn) {
   if(source == PACKET_SOURCE_LEFT_REMOTE)
     params_.config.lIncrRotBtn = btn;
   else if(source == PACKET_SOURCE_RIGHT_REMOTE)
@@ -737,16 +727,16 @@ void RRemote::sendFactoryReset() {
 
   params_.otherRemoteAddress = {0, 0};
   ConfigStorage::storage.writeBlock(paramsHandle_);
-  RUI::ui.setNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
-  RUI::ui.setNeedsMenuRebuild();
+  UI::ui.setNoComm(PACKET_SOURCE_RIGHT_REMOTE, true);
+  UI::ui.setNeedsMenuRebuild();
 }
 
 void RRemote::startCalibration() {
   if(isLeftRemote) {
-    RUI::ui.showCalibration(PACKET_SOURCE_LEFT_REMOTE);
+    UI::ui.showCalibration(PACKET_SOURCE_LEFT_REMOTE);
   }
-  RInput::input.setAllCallbacks([=]{finishCalibration();});
-  RInput::input.setCalibration(RInput::AxisCalib(), RInput::AxisCalib());
+  Input::inst.setAllCallbacks([=]{finishCalibration();});
+  Input::inst.setCalibration(Input::AxisCalib(), Input::AxisCalib());
   mode_ = MODE_CALIBRATION;
 }
 
@@ -763,17 +753,17 @@ void RRemote::sendStartCalibration() {
 
   Result res = XBee::xbee.sendConfigPacket(params_.otherRemoteAddress, PACKET_SOURCE_LEFT_REMOTE, packet, reply, sequenceNumber(), true);
   if(res != RES_OK) {
-    RUI::ui.showMessage(String("Calib -> R:\n") + bb::errorMessage(res), MSGDELAY, RDisplay::LIGHTRED2);
-    RUI::ui.showMain();
+    UI::ui.showMessage(String("Calib -> R:\n") + bb::errorMessage(res), MSGDELAY, Display::LIGHTRED2);
+    UI::ui.showMain();
     return;
   } 
   if(reply != ConfigPacket::CONFIG_REPLY_OK) {
-    RUI::ui.showMessage(String("Calib -> R:\nError ") + int(reply), MSGDELAY, RDisplay::LIGHTRED2);
-    RUI::ui.showMain();
+    UI::ui.showMessage(String("Calib -> R:\nError ") + int(reply), MSGDELAY, Display::LIGHTRED2);
+    UI::ui.showMain();
     return;
   }
 
-  RUI::ui.showCalibration(PACKET_SOURCE_RIGHT_REMOTE);
+  UI::ui.showCalibration(PACKET_SOURCE_RIGHT_REMOTE);
 }
 
 void RRemote::setLeftIsPrimary(bool yesno) {
@@ -792,5 +782,5 @@ void RRemote::setLeftIsPrimary(bool yesno) {
   }
   
   storeParams();
-  if(isLeftRemote) RUI::ui.setNeedsMenuRebuild();
+  if(isLeftRemote) UI::ui.setNeedsMenuRebuild();
 }

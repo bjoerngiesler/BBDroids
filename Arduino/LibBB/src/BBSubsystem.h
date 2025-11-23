@@ -42,14 +42,16 @@ public:
 	virtual const char* help() { return help_; }
 	virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
+	// Implement this, setting name_, description_, help_, and registering all parameters. Then chain to superclass.
 	virtual Result initialize();
+	virtual Result initialize(const char *name, const char *description, const char *help);
 	virtual Result start(ConsoleStream *stream = NULL);
 	virtual Result stop(ConsoleStream *stream = NULL);
 	virtual Result step() = 0;
 	virtual Result stepIfNotStarted() { return RES_OK; }
 	virtual bool isStarted() { return started_; }
 	virtual Result operationStatus() { return operationStatus_; }
-	virtual unsigned long sequenceNumber(bool autoincrement = true) { unsigned long s = seqnum_; if(autoincrement) seqnum_++; return s; }
+	virtual unsigned long sequenceNumber(bool autoincrement = false) { unsigned long s = seqnum_; if(autoincrement) seqnum_++; return s; }
 
 	void setLogLevel(unsigned int lvl) { loglevel_ = lvl; }
 

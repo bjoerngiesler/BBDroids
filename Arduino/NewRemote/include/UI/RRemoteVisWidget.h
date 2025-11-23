@@ -1,8 +1,9 @@
 #if !defined(RREMOTEVISWIDGET_H)
 #define RREMOTEVISWIDGET_H
 
+#include <LibBBRemotes.h>
 #include "UI/RMultiWidget.h"
-#include "UI/RDisplay.h"
+#include "UI/Display.h"
 #include "UI/RCrosshairWidget.h"
 #include "UI/RIMUWidget.h"
 #include "UI/RLabelWidget.h"
@@ -17,7 +18,8 @@ public:
 
     virtual void setPosition(int x, int y);
     virtual Result draw(ConsoleStream* stream);
-    virtual Result visualizeFromControlPacket(const bb::ControlPacket& packet);
+    virtual Result visualizeFromControlPacket(const MControlPacket& packet);
+    virtual Result visualizeFromInput();
     virtual void takeInputFocus();
     void encTurn(float enc);
 

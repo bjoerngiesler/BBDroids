@@ -4,7 +4,7 @@
 #include <LibBB.h>
 
 #include "Config.h"
-#include "UI/RDisplay.h"
+#include "UI/Display.h"
 #include "UI/RLabelWidget.h"
 
 class RMessageWidget: public RLabelWidget {

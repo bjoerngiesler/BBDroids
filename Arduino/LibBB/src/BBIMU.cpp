@@ -44,17 +44,18 @@ void bb::IMUControlInput::setFilterCutoff(float frequency) {
   filter_.setCutoff(frequency);
 }
 
-bb::IMU::IMU(uint8_t addr) {
+bb::IMU::IMU() {
   available_ = false;
   calP_ = calR_ = calH_ = 0.0f;
   calX_ = calY_ = calZ_ = 0.0f;
   intRunning_ = false;
-  addr_ = addr;
   rot_ = ROTATE_0;
 }
 
-bool bb::IMU::begin() {
+bool bb::IMU::begin(uint8_t addr) {
   if(available_) return true;
+
+  addr_ = addr;
 
   // Check whether we exist
   int err;

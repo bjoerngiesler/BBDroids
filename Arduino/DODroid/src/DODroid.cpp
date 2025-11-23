@@ -347,7 +347,10 @@ bb::Result DODroid::stepPowerProtect() {
       int i=0;
       if(i%2 == 0) setLED(LED_STATUS, RED);
       else setLED(LED_STATUS, OFF);
-      if(i%5 == 0) DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
+      if(i%5 == 0) {
+        DOSound::sound.playSystemSound(SystemSounds::VOLTAGE_TOO_LOW);
+        LOG(LOG_ERROR, "Voltage too low (%.fV), system disabled!\n", DOBattStatus::batt.voltage());
+      }
       delay(1000);
     }
   }

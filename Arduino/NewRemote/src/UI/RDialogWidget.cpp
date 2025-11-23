@@ -1,13 +1,13 @@
 #include "UI/RDialogWidget.h"
-#include "UI/RUI.h"
+#include "UI/UI.h"
 #include "Todo/RRemote.h"
 
 RDialogWidget::RDialogWidget() {
     titleLabel_.setAutosize();
     titleLabel_.setLinebreak();
     valueLabel_.setAutosize();
-    valueLabel_.setForegroundColor(RDisplay::BLACK);
-    valueLabel_.setBackgroundColor(RDisplay::WHITE);
+    valueLabel_.setForegroundColor(Display::BLACK);
+    valueLabel_.setBackgroundColor(Display::WHITE);
     addWidget(&titleLabel_);
     addWidget(&valueLabel_);
     min_ = 0; max_ = 10; value_ = 5;
@@ -43,9 +43,9 @@ void RDialogWidget::setRange(int min, int max) {
 }
 
 void RDialogWidget::takeInputFocus() {
-    RInput::input.setConfirmShortPressCallback([=](){ok();});
-    RInput::input.setLeftPressCallback([=](){cancel();});
-    RInput::input.setEncTurnCallback([=](float enc){encInput(enc);});
+    Input::inst.setConfirmShortPressCallback([=](){ok();});
+    Input::inst.setLeftPressCallback([=](){cancel();});
+    Input::inst.setEncTurnCallback([=](float enc){encInput(enc);});
 }
 
 void RDialogWidget::setOKCallback(std::function<void(int)> cb) {
@@ -86,10 +86,10 @@ void RDialogWidget::encInput(float enc) {
 
 void RDialogWidget::ok() {
     if(okCallback_ != nullptr) okCallback_(value_);
-    RUI::ui.hideDialog();
+    UI::ui.hideDialog();
 }
 
 void RDialogWidget::cancel() {
     if(cancelCallback_ != nullptr) cancelCallback_();
-    RUI::ui.hideDialog();
+    UI::ui.hideDialog();
 }
