@@ -26,6 +26,8 @@ public:
 
     void setCurrentChangedCB(std::function<void(Protocol*)> currentChangedCB);
 
+    bool loadCurrent(const std::string& name);
+
 protected:
     Protocol *current_, *interremote_;
     MaxlenString currentName_;

@@ -66,7 +66,7 @@ public:
 protected:
     UI();
 
-    RMenuWidget mainMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_;
+    RMenuWidget mainMenu_, configMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_;
     RMenuWidget leftRemoteMenu_, rightRemoteMenu_, bothRemotesMenu_, droidMenu_;
     RMenuWidget lRIncrRotMenu_, rRIncrRotMenu_;
     RMessageWidget message_;

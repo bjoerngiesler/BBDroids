@@ -15,7 +15,7 @@ bool isLeftRemote;
 
 void setup() {
   Serial.begin(2000000);
-  while(!Serial);
+  //while(!Serial);
   
   Serial.println("BBDroids Remote Software");
   pinMode(LED_BUILTIN, OUTPUT);

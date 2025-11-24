@@ -180,6 +180,7 @@ Result DODroid::initialize(Uart* remoteUart) {
   receiver_ = protocol_.createReceiver();
   if(receiver_ == nullptr) {
     bb::printf("Could not create receiver\n");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
   uint8_t turnInput = receiver_->addInput("turn", remTurn_);
@@ -480,6 +481,18 @@ bb::Result DODroid::stepHead() {
 }
 
 bb::Result DODroid::stepDrive() {
+  if(EPSILON(remVel_) && EPSILON(remTurn_) && params_.autoPosControl == true) { 
+      if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && 
+          driveMode_ == DRIVE_VEL) {
+        switchDrive(DRIVE_AUTO_POS);
+      }
+    } else { // We have drive input - switch to velocity control modex
+      if(driveMode_ == DRIVE_AUTO_POS) {
+        switchDrive(DRIVE_VEL);
+      }
+      msSinceDriveInput_ = millis();
+    }
+
   if(driveMode_ == DRIVE_VEL) {
     float vel = remVel_, rot = remTurn_;
 
@@ -710,180 +723,6 @@ void DODroid::printExtendedStatus(ConsoleStream *stream) {
   DOBattStatus::batt.updateCurrent();
   DOBattStatus::batt.updateVoltage();
   stream->printf("Battery: %.2fmA, %.2fV\n", DOBattStatus::batt.current(), DOBattStatus::batt.voltage());
-}
-
-Result DODroid::incomingConfigPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, ConfigPacket& packet) {
-  if(source == PACKET_SOURCE_LEFT_REMOTE && packet.type == ConfigPacket::CONFIG_SET_LEFT_REMOTE_ID) {
-    LOG(LOG_INFO, "Setting left remote id to 0x%lx:%lx.\n", packet.cfgPayload.address.addrHi, packet.cfgPayload.address.addrLo);
-    params_.leftRemoteAddress = packet.cfgPayload.address;
-    ConfigStorage::storage.writeBlock(paramsHandle_);
-    ConfigStorage::storage.commit();
-    return RES_OK;
-  }
-  LOG(LOG_ERROR, "Error - packet of type %d from source %d\n", packet.type, source);
-  return RES_SUBSYS_COMM_ERROR;
-}
-
-Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource source, uint8_t rssi, uint8_t seqnum, const ControlPacket& packet) {
-  if(commLEDOn_ == false) {
-    unsigned long ms = millis();
-    if(ms - msLastLeftCtrlPacket_ < 100) {
-      if(ms - msLastRightCtrlPacket_ < 100) {
-        // both coming in - white
-        setLED(LED_COMM, WHITE, false);
-      } else {
-        // Only left coming in - blue
-        setLED(LED_COMM, BLUE, false);
-      }
-    } else {
-      // Only right coming in - green
-      setLED(LED_COMM, GREEN, false);
-    }
-  
-    commLEDOn_ = true;
-    Runloop::runloop.scheduleTimedCallback(100, [=]{ setLED(LED_COMM, OFF); commLEDOn_ = false; });
-  }
-
-  // TOLERATE_PACKET_LOSS: Set this to 0 to get warnings as soon as individual packets are lost,
-  // > 0 to get a bit less noise on the console.
-#define TOLERATE_PACKET_LOSS 1
-
-  // Check for duplicates and lost packets
-  if(source == PACKET_SOURCE_LEFT_REMOTE) {
-    if(seqnum == lastLeftSeqnum_) { // duplicate, caused by remote resend
-      return RES_OK;
-    }
-    if(lastLeftSeqnum_ != 255 && WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8) > TOLERATE_PACKET_LOSS+1) {
-      LOG(LOG_WARN, "Left control packet: seqnum %d, last %d, lost %d packets!\n", 
-                    seqnum, lastLeftSeqnum_, WRAPPEDDIFF(seqnum, lastLeftSeqnum_, 8)-1);
-    }
-    lastLeftSeqnum_ = seqnum;
-    numLeftCtrlPackets_++;
-    msLastLeftCtrlPacket_ = millis();
-  } else if(source == PACKET_SOURCE_RIGHT_REMOTE) {
-    if(seqnum == lastRightSeqnum_) { // duplicate, caused by remote resend
-      return RES_OK;
-    }
-    if(lastRightSeqnum_ != 255 && WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8) > TOLERATE_PACKET_LOSS+1) {
-      LOG(LOG_WARN, "Right control packet: seqnum %d, last %d, lost %d packets!\n", 
-                    seqnum, lastRightSeqnum_, WRAPPEDDIFF(seqnum, lastRightSeqnum_, 8)-1);
-    }
-    lastRightSeqnum_ = seqnum;
-    numRightCtrlPackets_++;
-    msLastRightCtrlPacket_ = millis();
-  } else {
-    LOG(LOG_ERROR, "Control packet from unknown source %d\n", source);
-    return RES_SUBSYS_COMM_ERROR;
-  }
-
-  // Hardcoded axis / trigger mapping starts here
-  if(packet.primary == true) {
-    msLastPrimaryCtrlPacket_ = millis();
-    
-    // Joystick button switches drive mode
-    if(packet.button4 && !lastPrimaryCtrlPacket_.button4) {
-      if(driveMode_ == DRIVE_OFF || driveMode_ == DRIVE_POS) {
-        if(params_.autoPosControl == true) {
-          switchDrive(DRIVE_AUTO_POS);
-        } else {
-          switchDrive(DRIVE_VEL);
-        }
-      } else {
-        switchDrive(DRIVE_OFF);
-      }
-    }
-
-    // If button 3 is held, axes 2, 3, 4 (IMU rot) control the head
-    if(packet.button3) {
-      remoteR_ = packet.getAxis(2, ControlPacket::UNIT_DEGREES_CENTERED);
-      remoteP_ = packet.getAxis(3, ControlPacket::UNIT_DEGREES_CENTERED);
-      remoteH_ = packet.getAxis(4, ControlPacket::UNIT_DEGREES_CENTERED);
-      annealR_ = fabs(remoteR_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
-      annealP_ = fabs(remoteP_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
-      annealH_ = fabs(remoteH_ / (params_.faHeadAnnealTime / bb::Runloop::runloop.cycleTimeSeconds()));
-    }
-
-    // Button 0, 1, 2 play different sounds
-    if(packet.button0 && !lastPrimaryCtrlPacket_.button0) {
-      LOG(LOG_INFO, "Button 0 pressed on primary remote. Playing next sound in folder 2");
-      DOSound::sound.playFolderNext(2);
-    }
-    
-    if(packet.button1 && !lastPrimaryCtrlPacket_.button1) {
-      LOG(LOG_INFO, "Button 1 pressed on primary remote. Playing next sound in folder 3");
-      DOSound::sound.playFolderNext(3);
-    } 
-    
-    if(packet.button2 && !lastPrimaryCtrlPacket_.button2) {
-      LOG(LOG_INFO, "Button 2 pressed on primary remote. Playing next sound in folder 4");
-      DOSound::sound.playFolderNext(4);
-    }
-
-    // If drive system is on, joystick controls rotation and speed
-    if(driveMode_ != DRIVE_OFF) {
-      float rot = packet.getAxis(0);
-      float vel = packet.getAxis(1);
-
-      // Joystick at zero for >500ms and in velocity control mode? 
-      // ==> Switch to auto position control mode
-      if(EPSILON(vel) && EPSILON(rot) && params_.autoPosControl == true) { 
-        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && 
-           driveMode_ == DRIVE_VEL) {
-          switchDrive(DRIVE_AUTO_POS);
-        }
-      } else { // We have drive input - switch to velocity control modex
-        if(driveMode_ == DRIVE_AUTO_POS) {
-          switchDrive(DRIVE_VEL);
-        }
-        msSinceDriveInput_ = millis();
-      }
-
-      if(driveMode_ == DRIVE_VEL) {
-        vel = constrain(vel * params_.maxSpeed * params_.speedAxisGain, -params_.maxSpeed, params_.maxSpeed);
-        rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
-        velOutput_.setGoalVelocity(vel);
-        velOutput_.setGoalRotation(rot);
-      } else if(driveMode_ == DRIVE_POS) {
-        float posDelta = packet.getAxis(1) * 1000; // FIXME - should be a constant
-        posController_.setGoal(posControllerZero_ + posDelta);
-        //rot = constrain(rot * params_.maxSpeed * params_.rotAxisGain, -params_.maxSpeed, params_.maxSpeed);
-        //velOutput_.setGoalRotation(rot);
-      }
-
-    } else {
-      setLED(LED_DRIVE, OFF, false);
-    }
-
-    DOSound::sound.setVolume(int(30.0 * packet.getAxis(8, bb::ControlPacket::UNIT_UNITY)));
-    eyesOffset_ = int(75.0 * packet.getAxis(9, bb::ControlPacket::UNIT_UNITY_CENTERED));
-    lastPrimaryCtrlPacket_ = packet;
-  } else { // secondary remote
-    // Joystick button switches drive mode
-    if(packet.button4 && !lastSecondaryCtrlPacket_.button4) {
-      if(driveMode_ != DRIVE_POS) {
-        switchDrive(DRIVE_POS);
-      } else {
-        switchDrive(DRIVE_OFF);
-      }
-    }
-    
-    if(packet.button0 && !lastSecondaryCtrlPacket_.button0) {
-      LOG(LOG_INFO, "Button 0 pressed on secondary remote. Playing next sound in folder 5");
-      DOSound::sound.playFolderNext(5);
-    }
-    if(packet.button1 && !lastSecondaryCtrlPacket_.button1) {
-      LOG(LOG_INFO, "Button 1 pressed on secondary remote. Playing next sound in folder 6");
-      DOSound::sound.playFolderNext(6);
-    }
-    if(packet.button2 && !lastSecondaryCtrlPacket_.button2) {
-      LOG(LOG_INFO, "Button 2 pressed on secondary remote. Playing next sound in folder 7");
-      DOSound::sound.playFolderNext(7);
-    }
-
-    lastSecondaryCtrlPacket_ = packet;
-  }
-
-  return RES_OK;
 }
 
 Result DODroid::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {

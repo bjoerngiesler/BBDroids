@@ -3,8 +3,11 @@
 
 #include <LibBB.h>
 #include <DFPlayerMini_Fast.h>
+#include <LibBBRemotes.h>
+#include <pwmWrite.h>
 
 using namespace bb;
+using namespace bb::rmt;
 
 class Mouse: public Subsystem {
 public:
@@ -15,9 +18,19 @@ public:
     virtual Result step();
     virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
 
+    virtual void playSoundCB(float val, uint8_t snd);
+    virtual void commTimeoutCB(Protocol* p, float s);
+    virtual void dataFinishedCB(const NodeAddr& addr, uint8_t seqnum);
+
 protected:
     DFPlayerMini_Fast dfp;
+    MESPProtocol protocol_;
+    Receiver *receiver_;
     bool playing_, soundOK_;
+
+    Pwm pwm;
+
+    float remTurn_, remVel_;
 };
 
 #endif // MOUSE_H

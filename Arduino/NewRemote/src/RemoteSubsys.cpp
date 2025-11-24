@@ -233,8 +233,8 @@ Result RemoteSubsys::handleConsoleCommand(const std::vector<String>& words, Cons
             }
 
             if(current_ != proto && current_ != interremote_) {
-                stream->printf("Deleting current\n");
-                delete current_;
+                stream->printf("Destroying current\n");
+                ProtocolFactory::destroyProtocol(&current_);
             } else {
                 if(current_ == proto) { stream->printf("not deleting, the new one is the current_\n"); }
                 if(current_ == interremote_) { stream->printf("not deleting, the old one is the interremote_\n"); }
@@ -340,4 +340,25 @@ Result RemoteSubsys::handleConsoleCommand(const std::vector<String>& words, Cons
 
 void RemoteSubsys::setCurrentChangedCB(std::function<void(Protocol*)> currentChangedCB) {
     currentChangedCB_ = currentChangedCB;
+}
+
+bool RemoteSubsys::loadCurrent(const std::string& name) {
+    Protocol *proto = ProtocolFactory::loadProtocol(name.c_str());
+    if(proto == nullptr) {
+        bb::printf("Protocol is null\n");
+        return false;
+    }
+
+    if(current_ != proto && current_ != interremote_) {
+        bb::printf("Destroying current\n");
+        ProtocolFactory::destroyProtocol(&current_);
+    } else {
+        if(current_ == proto) { bb::printf("not deleting, the new one is the current_\n"); }
+        if(current_ == interremote_) { bb::printf("not deleting, the old one is the interremote_\n"); }
+    }
+    current_ = proto;
+            
+    if(currentChangedCB_ != nullptr) currentChangedCB_(current_);
+
+    return true;
 }

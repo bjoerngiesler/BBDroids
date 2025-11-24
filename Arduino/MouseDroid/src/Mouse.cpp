@@ -1,16 +1,36 @@
 #include "Mouse.h"
 #include "Config.h"
+#include <LibBBRemotes.h>
 
 Mouse Mouse::mouse;
 
 Result Mouse::initialize() {
     bb::printf("Initializing Mouse\n");
+    //pinMode(LED_BUILTIN, OUTPUT);
+    //digitalWrite(LED_BUILTIN, LOW);
     name_ = "mouse";
     description_ = "Mouse droid";
     Serial1.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
     playing_ = false;
     soundOK_ = false;
-    pinMode(PULSEIN_PIN, INPUT);
+    protocol_.init("MouseDroid");
+    receiver_ = protocol_.createReceiver();
+    if(receiver_ == nullptr) {
+        bb::printf("Could not create receiver\n");
+        return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    }
+
+    uint8_t turnInput = receiver_->addInput("turn", remTurn_);
+    uint8_t velInput = receiver_->addInput("vel", remVel_);
+    uint8_t sndInput = receiver_->addInput("sound", [this](float val){playSoundCB(val, 0);});
+
+    receiver_->setMix(turnInput, AxisMix(0, INTERP_LIN_CENTERED));
+    receiver_->setMix(velInput, AxisMix(1, INTERP_LIN_CENTERED));
+    receiver_->setMix(sndInput, AxisMix(11, INTERP_LIN_POSITIVE));
+
+    receiver_->setDataFinishedCallback([this](const NodeAddr& addr, uint8_t seqnum) { dataFinishedCB(addr, seqnum); });
+    protocol_.setCommTimeoutWatchdog(0.5, [this](Protocol* p, float s) { commTimeoutCB(p, s);});
+
     return Subsystem::initialize();
 }
 
@@ -28,6 +48,7 @@ Result Mouse::start(ConsoleStream *stream) {
         bb::printf("success.\n");
         soundOK_ = true;
     }
+    //digitalWrite(LED_BUILTIN, HIGH);
     return Subsystem::start(stream);
 }
 
@@ -36,19 +57,12 @@ Result Mouse::stop(ConsoleStream *stream) {
 }
 
 Result Mouse::step() {
-    unsigned long p = pulseIn(PULSEIN_PIN, HIGH, 24000);
-    if(p == 0) { // something went wrong
-        return RES_OK;
-    }
-    if(p > 1500 && playing_ == false) {
-        dfp.play(2);
-        playing_ = true;
-        bb::printf("Start playback on PWM=%d\n", p);
-    } else if(p < 1500 && playing_ == true) {
-        dfp.stop();
-        playing_ = false;
-        bb::printf("Stop playback on PWM=%d\n", p);
-    }
+    protocol_.step();
+
+    bb::printf("Turn: %.2f Vel: %.2f\n", remTurn_*90.0+90.0, remVel_*90.0+90.0);
+    pwm.writeServo(STEER_SERVO_PIN, remTurn_*90.0+90.0);
+    pwm.writeServo(DRIVE_SERVO_PIN, remVel_*90.0+90.0);
+
     return RES_OK;
 }
 
@@ -62,4 +76,23 @@ Result Mouse::handleConsoleCommand(const std::vector<String>& words, ConsoleStre
     }
 
     return Subsystem::handleConsoleCommand(words, stream);
+}
+
+void Mouse::playSoundCB(float val, uint8_t snd) {
+    static bool pressed = false;
+    if(val > 0.5 && pressed == false) {
+        pressed = true;
+        dfp.play(snd);
+    } else if(val < 0.5 && pressed == true) {
+        pressed = false;
+    }
+}
+
+void Mouse::commTimeoutCB(Protocol* p, float s) {
+    remTurn_ = remVel_ = 0;
+    //digitalWrite(LED_BUILTIN, HIGH);
+}
+
+void Mouse::dataFinishedCB(const NodeAddr& addr, uint8_t seqnum) {
+    //digitalWrite(LED_BUILTIN, LOW);
 }

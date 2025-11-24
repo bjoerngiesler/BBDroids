@@ -1,5 +1,6 @@
 #include "UI/UI.h"
 #include "Todo/RRemote.h"
+#include "RemoteSubsys.h"
 
 UI UI::ui;
 
@@ -161,8 +162,6 @@ void UI::showMain() {
 void UI::populateMenus() {
     mainMenu_.setName("Main Menu");
 
-
-
     pairMenu_.setName("Pair");
     leftRemoteMenu_.setName("Left Remote");
     rightRemoteMenu_.setName("Right Remote");
@@ -170,13 +169,26 @@ void UI::populateMenus() {
     droidMenu_.setName("Droid");
     
     mainMenu_.clear();
+    mainMenu_.addEntry("Config...", [=]() {showMenu(&configMenu_);});
+#if 0
     if(!RRemote::remote.droidAddress().isZero()) mainMenu_.addEntry("Droid...", [=]() { showMenu(&droidMenu_); });
     mainMenu_.addEntry("Left Remote...", [=]() { showMenu(&leftRemoteMenu_); });
     if(!RRemote::remote.otherRemoteAddress().isZero()) mainMenu_.addEntry("Right Remote...", [=]() { showMenu(&rightRemoteMenu_); });
     mainMenu_.addEntry("Both Remotes...", [=](){showMenu(&bothRemotesMenu_);});
     mainMenu_.addEntry("Pair...", [=]() { showMenu(&pairMenu_); });
+#endif
     mainMenu_.addEntry("<--", [=]() { showMain(); });
-    
+
+    configMenu_.clear();
+    configMenu_.setName("Config");
+    for(auto& n: ProtocolFactory::storedProtocolNames()) {
+        if(n=="inter") 
+            configMenu_.addEntry("D-O", [=]() {RemoteSubsys::inst.loadCurrent(n);});
+        else
+            configMenu_.addEntry(String(n.c_str()), [=]() {RemoteSubsys::inst.loadCurrent(n);});
+    }
+    configMenu_.addEntry("<--", [=]() { showMenu(&mainMenu_); });
+
     pairMenu_.clear();
     pairMenu_.addEntry("Right Remote...", [=]() { showPairRemoteMenu(); });
     pairMenu_.addEntry("Droid...", [=]() { showPairDroidMenu(); });

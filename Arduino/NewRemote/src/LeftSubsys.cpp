@@ -51,11 +51,6 @@ Result LeftSubsys::handleConsoleCommand(const std::vector<String>& words, Consol
 }
 
 void LeftSubsys::setupCurrent(Protocol* p) {
-    if(p == RemoteSubsys::inst.interremoteProtocol() && interSetupComplete_) {
-        bb::printf("Already did setup interremote protocol");
-        return;
-    }
-
     if(p == nullptr) {
         bb::printf("p is nullptr!");
         return;
