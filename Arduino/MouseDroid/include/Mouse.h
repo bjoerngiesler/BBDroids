@@ -12,6 +12,7 @@ using namespace bb::rmt;
 class Mouse: public Subsystem {
 public:
     static Mouse mouse;
+
     virtual Result initialize();
     virtual Result start(ConsoleStream *stream = NULL);
     virtual Result stop(ConsoleStream *stream = NULL);
@@ -22,6 +23,8 @@ public:
     virtual void commTimeoutCB(Protocol* p, float s);
     virtual void dataFinishedCB(const NodeAddr& addr, uint8_t seqnum);
 
+    Result sendTelemetry();
+
 protected:
     DFPlayerMini_Fast dfp;
     MESPProtocol protocol_;
@@ -30,7 +33,9 @@ protected:
 
     Pwm pwm;
 
-    float remTurn_, remVel_;
+    float remTurn_=0, remVel_=0, remDome_=0;
+    bool pressed[4];
+
 };
 
 #endif // MOUSE_H

@@ -36,8 +36,8 @@ void SERCOM3_Handler() {
 void initializeSubsystems() {
   ConfigStorage::storage.initialize();
   Runloop::runloop.initialize();
-  WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
-  WifiServer::server.setOTANameAndPassword("D-O", "OTA");
+  //WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
+  //WifiServer::server.setOTANameAndPassword("D-O", "OTA");
   XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, 230400, serialTXSerial);
   XBee::xbee.setDebugFlags((XBee::DebugFlags)(XBee::DEBUG_PROTOCOL|XBee::DEBUG_XBEE_COMM));
   XBee::xbee.setName(DROID_NAME);
@@ -48,7 +48,7 @@ void initializeSubsystems() {
 }
 
 void startSubsystems() {
-  WifiServer::server.start();
+  //WifiServer::server.start();
   XBee::xbee.addPacketReceiver(&DODroid::droid);
   XBee::xbee.start(Console::console.serialStream());
   XBee::xbee.setAPIMode(true);
@@ -57,7 +57,7 @@ void startSubsystems() {
   Console::console.printfBroadcast("Starting droid\n");
   DODroid::droid.start(Console::console.serialStream());
   // sometimes this doesn't work on the first try for whatever reason
-  if(WifiServer::server.isStarted() == false) WifiServer::server.start(); 
+  //if(WifiServer::server.isStarted() == false) WifiServer::server.start(); 
 }
 
 void setup() {

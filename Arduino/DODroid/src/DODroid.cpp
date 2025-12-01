@@ -42,7 +42,7 @@ static void customAnalogWrite(uint8_t pin, uint8_t dutycycle) {
 }
 
 DODroid::DODroid():
-  imu_(IMU_ADDR),
+  imu_(),
 
   leftMotor_(P_LEFT_PWMA, P_LEFT_PWMB), 
   rightMotor_(P_RIGHT_PWMA, P_RIGHT_PWMB), 
@@ -188,7 +188,7 @@ Result DODroid::start(ConsoleStream* stream) {
   lastRightSeqnum_ = 255;
 
   DOSound::sound.begin();
-  imu_.begin();
+  imu_.begin(IMU_ADDR);
   DOBattStatus::batt.begin();
 
   //operationStatus_ = RES_OK;
@@ -625,6 +625,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
 
   // Check for duplicates and lost packets
   if(source == PACKET_SOURCE_LEFT_REMOTE) {
+    bb::printf("Packet from left\n");
     if(seqnum == lastLeftSeqnum_) { // duplicate, caused by remote resend
       return RES_OK;
     }
@@ -651,6 +652,7 @@ Result DODroid::incomingControlPacket(const HWAddress& srcAddr, PacketSource sou
     return RES_SUBSYS_COMM_ERROR;
   }
 
+  bb::printf("Packet primary: %d\n", packet.primary);
   // Hardcoded axis / trigger mapping starts here
   if(packet.primary == true) {
     msLastPrimaryCtrlPacket_ = millis();
@@ -1008,7 +1010,7 @@ Result DODroid::fillAndSendStatePacket() {
   p.battery[1].errorState = ERROR_NOT_PRESENT;
   p.battery[2].errorState = ERROR_NOT_PRESENT;
 
-  WifiServer::server.broadcastUDPPacket((const uint8_t*)&p, sizeof(p));
+  //WifiServer::server.broadcastUDPPacket((const uint8_t*)&p, sizeof(p));
 
   return RES_OK;
 }

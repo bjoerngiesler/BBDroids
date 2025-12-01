@@ -157,7 +157,8 @@ protected:
   Adafruit_NeoPixel statusPixels_;
   bool commLEDOn_;
 
-  MXBProtocol protocol_;
+  //MXBProtocol protocol_;
+  MSatProtocol protocol_;
   Receiver *receiver_;
 };
 

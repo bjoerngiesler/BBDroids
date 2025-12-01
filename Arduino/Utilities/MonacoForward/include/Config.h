@@ -6,8 +6,5 @@
 
 static const uint8_t RX_PIN = D7;
 static const uint8_t TX_PIN = D6;
-static const uint8_t DOME_SERVO_PIN = D0;
-static const uint8_t MOTL_SERVO_PIN = D1;
-static const uint8_t MOTR_SERVO_PIN = D2;
 
 #endif // CONFIG_H

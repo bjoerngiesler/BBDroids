@@ -376,6 +376,7 @@ bb::Result RRemote::fillAndSend() {
   packet.payload.control.primary = isPrimary();
 
   RInput::input.fillControlPacket(packet.payload.control);
+  packet.seqnum = (seqnum_++)%8;
   if(isLeftRemote) RUI::ui.visualizeFromControlPacket(PACKET_SOURCE_LEFT_REMOTE, packet.seqnum, packet.payload.control);
 
   Result res = RES_OK;

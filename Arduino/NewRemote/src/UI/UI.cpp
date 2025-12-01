@@ -442,6 +442,8 @@ void UI::updateRightSeqnum(uint8_t seqnum) {
 void UI::visualizeFromTelemetry(Protocol* proto, const NodeAddr& addr, uint8_t seqnum, const Telemetry& telem) {
     uint8_t expected;
 
+    bb::printf("Got telemetry from %s\n", addr.toString().c_str());
+
     droidSeqnum_.setSquareColor(seqnum%8, Display::GREEN);
     droidSeqnum_.setSquareColor((seqnum+1)%8, rightSeqnum_.backgroundColor());
     droidSeqnum_.setNoComm(false);

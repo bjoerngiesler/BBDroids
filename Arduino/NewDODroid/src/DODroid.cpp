@@ -176,7 +176,8 @@ Result DODroid::initialize(Uart* remoteUart) {
 
   //setPacketSource(PACKET_SOURCE_DROID);
 
-  protocol_.init("DODroid", DEFAULT_CHAN, DEFAULT_PAN, remoteUart);
+  //protocol_.init("DODroid", DEFAULT_CHAN, DEFAULT_PAN, remoteUart);
+  protocol_.init(remoteUart);
   receiver_ = protocol_.createReceiver();
   if(receiver_ == nullptr) {
     bb::printf("Could not create receiver\n");
@@ -484,10 +485,11 @@ bb::Result DODroid::stepDrive() {
   if(EPSILON(remVel_) && EPSILON(remTurn_) && params_.autoPosControl == true) { 
       if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && 
           driveMode_ == DRIVE_VEL) {
+        bb::printf("No input - switching to auto pos\n");
         switchDrive(DRIVE_AUTO_POS);
       }
-    } else { // We have drive input - switch to velocity control modex
-      if(driveMode_ == DRIVE_AUTO_POS) {
+    } else {
+      if(driveMode_ == DRIVE_AUTO_POS) { // We have drive input - switch to velocity control modex
         switchDrive(DRIVE_VEL);
       }
       msSinceDriveInput_ = millis();
@@ -543,8 +545,10 @@ void DODroid::primaryDriveButtonCB(float val) {
   if(wasPressed == false && val > 0.5) {
     wasPressed = true;
 
-    if(driveMode_ != DRIVE_VEL) switchDrive(DRIVE_VEL);
-    else switchDrive(DRIVE_OFF);
+    if(driveMode_ == DRIVE_OFF) {
+      bb::printf("Primary btn - Switching to vel\n");
+      switchDrive(DRIVE_VEL);
+    } else switchDrive(DRIVE_OFF);
   } else if(wasPressed == true && val < 0.5) {
     wasPressed = false;
   }
@@ -555,8 +559,10 @@ void DODroid::secondaryDriveButtonCB(float val) {
   if(wasPressed == false && val > 0.5) {
     wasPressed = true;
 
-    if(driveMode_ != DRIVE_POS) switchDrive(DRIVE_POS);
-    else switchDrive(DRIVE_OFF);
+    if(driveMode_ != DRIVE_POS) {
+      bb::printf("Secondary btn - switching to pos\n");
+      switchDrive(DRIVE_POS);
+    } else switchDrive(DRIVE_OFF);
   } else if(wasPressed == true && val < 0.5) {
     bb::printf("2 Released now\n", val);
     wasPressed = false;

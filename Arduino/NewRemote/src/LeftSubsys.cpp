@@ -70,7 +70,9 @@ void LeftSubsys::setupCurrent(Protocol* p) {
         break;
     }
 
+    RemoteSubsys::inst.interremoteProtocol()->setTelemetryReceivedCB(nullptr);
     p->setTelemetryReceivedCB([](Protocol* p, const NodeAddr& a, uint8_t s, const Telemetry& t) {UI::ui.visualizeFromTelemetry(p, a, s, t);});
+
     transmitter_ = p->createTransmitter();
     if(transmitter_ != nullptr) Input::inst.setupAxesFromTransmitter(transmitter_);
 

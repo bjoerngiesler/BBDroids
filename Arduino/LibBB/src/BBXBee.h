@@ -7,7 +7,7 @@
 #include "BBConfigStorage.h"
 #include "BBPacket.h"
 
-#define DEFAULT_CHAN    0x14   // Best channels for non-overlap with Wifi: 0x0d, 0x13, 0x19
+#define DEFAULT_CHAN    0x15   // Best channels for non-overlap with Wifi: 0x0d, 0x13, 0x19
 #define DEFAULT_PAN     0x3332
 
 #define DEFAULT_BPS     9600
