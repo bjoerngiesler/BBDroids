@@ -1,12 +1,12 @@
-#if !defined(RSEQNUMWIDGET_H)
-#define RSEQNUMWIDGET_H
+#if !defined(SEQNUMWIDGET_H)
+#define SEQNUMWIDGET_H
 
-#include "UI/RWidget.h"
+#include "UI/Widget.h"
 
-class RSeqnumWidget: public RWidget {
+class SeqnumWidget: public Widget {
 public:
-    RSeqnumWidget();
-    virtual Result draw(ConsoleStream *stream = NULL);
+    SeqnumWidget();
+    virtual Result draw();
 
     void setChar(char c);
     void setSquareColor(uint8_t square, uint8_t color);

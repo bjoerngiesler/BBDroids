@@ -1,6 +1,6 @@
-#include "UI/RWidget.h"
+#include "UI/Widget.h"
 
-RWidget::RWidget(): name_("Widget") { 
+Widget::Widget(): name_("Widget") { 
     needsFullRedraw_ = needsContentsRedraw_ = true; 
     x_ = y_ = 1;
     width_ = height_ = 10;
@@ -17,107 +17,107 @@ RWidget::RWidget(): name_("Widget") {
     tag_ = 0;
 }
 
-RWidget::~RWidget() {
+Widget::~Widget() {
 }
 
-Result RWidget::draw(ConsoleStream* stream) {
+Result Widget::draw() {
     needsContentsRedraw_ = false;
     needsFullRedraw_ = false;
     return RES_OK;
 }
 
-void RWidget::setPosition(int x, int y) { 
+void Widget::setPosition(int x, int y) { 
     if(x == x_ && y == y_) return;
     x_ = x; 
     y_ = y; 
     setNeedsFullRedraw();
 }
 
-void RWidget::setSize(uint8_t w, uint8_t h) { 
+void Widget::setSize(uint8_t w, uint8_t h) { 
     if(w == width_ && h == height_) return;
     width_ = w; 
     height_ = h; 
     setNeedsFullRedraw(); 
 }
 
-void RWidget::centerOnDisplay() {
+void Widget::centerOnDisplay() {
     setPosition(Display::MAIN_X + (Display::DISPLAY_WIDTH-width())/2, 
                 Display::MAIN_Y + (Display::DISPLAY_HEIGHT-height())/2);
 }
 
-void RWidget::centerOnMain() {
+void Widget::centerOnMain() {
     setPosition(Display::MAIN_X + (Display::MAIN_WIDTH-width())/2, 
                 Display::MAIN_Y + (Display::MAIN_HEIGHT-height())/2);
 }
 
-void RWidget::setNeedsFullRedraw(bool needs) { 
+void Widget::setNeedsFullRedraw(bool needs) { 
     needsFullRedraw_ = needs; 
     if(needs) needsContentsRedraw_ = true; 
 }
 
-void RWidget::setNeedsContentsRedraw(bool needs) { 
+void Widget::setNeedsContentsRedraw(bool needs) { 
     needsContentsRedraw_ = needs; 
 }
 
-void RWidget::setBackgroundColor(uint8_t background) {
+void Widget::setBackgroundColor(uint8_t background) {
     if(bgCol_ == background) return;
     bgCol_ = background;
     needsFullRedraw_ = true;
 }
 
-void RWidget::setForegroundColor(uint8_t foreground) {
+void Widget::setForegroundColor(uint8_t foreground) {
     if(fgCol_ == foreground) return;
     fgCol_ = foreground;
     needsFullRedraw_ = true;
 }
 
-void RWidget::setCursorColor(uint8_t cursor) {
+void Widget::setCursorColor(uint8_t cursor) {
     if(cursorCol_ == cursor) return;
     cursorCol_ = cursor;
     needsFullRedraw_ = true;
 }
 
-void RWidget::setMarkingColor(uint8_t marking) {
+void Widget::setMarkingColor(uint8_t marking) {
     if(markingCol_ == marking) return;
     markingCol_ = marking;
     needsFullRedraw_ = true;
 }
 
-void RWidget::setFrameColor(uint8_t frame) {
+void Widget::setFrameColor(uint8_t frame) {
     if(frameCol_ == frame) return;
     frameCol_ = frame;
     needsFullRedraw_ = true;
 }
 
-void RWidget::setHighlightColor(uint8_t highlight) {
+void Widget::setHighlightColor(uint8_t highlight) {
     if(hlCol_ == highlight) return;
     hlCol_ = highlight;
     needsFullRedraw_ = true;
 }
 
-void RWidget::setHighlighted(bool yesno) {
+void Widget::setHighlighted(bool yesno) {
     if(yesno == highlighted_) return;
     highlighted_ = yesno;
     needsFullRedraw_ = true;
 }
 
-void RWidget::setName(const String& name) {
+void Widget::setName(const String& name) {
     name_ = name;
 }
 
-void RWidget::takeInputFocus() {
+void Widget::takeInputFocus() {
 }
 
-void RWidget::setAction(std::function<void(void)> cb) {
+void Widget::setAction(std::function<void(Widget*)> cb) {
     action_ = cb;
 }
 
-std::function<void(void)> RWidget::action() {
+std::function<void(Widget*)> Widget::action() {
     return action_;
 }
 
-void RWidget::triggerAction() {
+void Widget::triggerAction() {
     if(action_ == nullptr) return;
-    action_();
+    action_(this);
 }
 

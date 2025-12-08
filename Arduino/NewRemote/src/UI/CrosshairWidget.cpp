@@ -1,7 +1,7 @@
-#include "UI/RCrosshairWidget.h"
+#include "UI/CrosshairWidget.h"
 #include "UI/Display.h"
 
-RCrosshairWidget::RCrosshairWidget():
+CrosshairWidget::CrosshairWidget():
     hor_(2048),
     ver_(2048),
     oldHor_(2048),
@@ -20,7 +20,7 @@ RCrosshairWidget::RCrosshairWidget():
     minMaxRectCol_ = fgCol_;
 }
   
-Result RCrosshairWidget::draw(ConsoleStream* stream) {
+Result CrosshairWidget::draw() {
     if(needsFullRedraw_) {
         if(fillsBg_)
             Display::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
@@ -61,10 +61,10 @@ Result RCrosshairWidget::draw(ConsoleStream* stream) {
         oldMinVer_ = minVer_; oldMaxVer_ = maxVer_;
     }
 
-    return RWidget::draw(stream);
+    return Widget::draw();
 }
 
-void RCrosshairWidget::setHorVer(uint16_t h, uint16_t v) {
+void CrosshairWidget::setHorVer(uint16_t h, uint16_t v) {
     hor_ = h; ver_ = v;
     if(hor_ < minHor_) {
         minHor_ = hor_;
@@ -81,17 +81,17 @@ void RCrosshairWidget::setHorVer(uint16_t h, uint16_t v) {
     setNeedsContentsRedraw();
 }
 
-void RCrosshairWidget::setHorVer(float h, float v) {
+void CrosshairWidget::setHorVer(float h, float v) {
     oldHor_ = hor_; oldVer_ = ver_;
     setHorVer(uint16_t((h+1.0)*2048), uint16_t((v+1.0)*2048));
     setNeedsContentsRedraw();
 }
 
-void RCrosshairWidget::horVerToScreen(uint16_t h, uint16_t v, uint8_t& x, uint8_t& y) {
+void CrosshairWidget::horVerToScreen(uint16_t h, uint16_t v, uint8_t& x, uint8_t& y) {
     x = (h*(width_-2))/4096+x_+1; y = ((4096-v)*(width_-2))/4096+y_+1;
 }
 
-void RCrosshairWidget::showMinMaxRect(bool show) {
+void CrosshairWidget::showMinMaxRect(bool show) {
     if(showsMinMaxRect_ == show) return;
     showsMinMaxRect_ = show;
     setNeedsFullRedraw();

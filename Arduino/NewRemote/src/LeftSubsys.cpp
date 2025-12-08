@@ -33,7 +33,7 @@ Result LeftSubsys::step() {
 
     if(Runloop::runloop.getSequenceNumber() % 4 == 0) {
         static uint8_t seqnum;
-        UI::ui.leftRemoteVis().visualizeFromInput();
+        //UI::ui.leftRemoteVis()->visualizeFromInput();
         UI::ui.updateLeftSeqnum(seqnum++);
         UI::ui.drawGUI();
     }
@@ -113,7 +113,7 @@ void LeftSubsys::dataReceivedCB(const NodeAddr& addr, uint8_t seqnum, const void
 
     MControlPacket* p = (MControlPacket*)data;
 
-    UI::ui.rightRemoteVis().visualizeFromControlPacket(*p);
+    UI::ui.rightRemoteVis()->visualizeFromControlPacket(*p);
     UI::ui.updateRightSeqnum(seqnum);
     ((MTransmitter*)transmitter_)->transmitRawControlPacket(*p);
 } 

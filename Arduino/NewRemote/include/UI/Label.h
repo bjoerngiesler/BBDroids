@@ -1,11 +1,11 @@
-#if !defined(RLABELWIDGET_H)
-#define RLABELWIDGET_H
+#if !defined(LABEL_H)
+#define LABEL_H
 
-#include "UI/RWidget.h"
+#include "UI/Widget.h"
 
-class RLabelWidget: public RWidget {
+class Label: public Widget {
 public:
-    RLabelWidget();
+    Label();
 
     enum HorizontalJustification {
         LEFT_JUSTIFIED,
@@ -27,7 +27,7 @@ public:
         FRAME_ALL = 0xf
     };
 
-    virtual Result draw(ConsoleStream *stream=NULL);
+    virtual Result draw();
 
     virtual void setTitle(const String& title);
     virtual const String& title() { return title_; }

@@ -1,14 +1,14 @@
-#if !defined(RROTAWIDGET_H)
-#define RROTAWIDGET_H
+#if !defined(ROTAWIDGET_H)
+#define ROTAWIDGET_H
 
-#include "UI/RMultiWidget.h"
+#include "UI/MultiWidget.h"
 #include "Input.h"
 
-class RRotaWidget: public RMultiWidget {
+class RotaWidget: public MultiWidget {
 public:
-    RRotaWidget() { widgetsChanged_ = true; }
+    RotaWidget() { widgetsChanged_ = true; }
 
-    virtual Result draw(ConsoleStream *stream);
+    virtual Result draw();
     virtual void takeInputFocus();
 
     void showIndex(unsigned int i);
@@ -16,7 +16,7 @@ public:
     void showNext() { if(widgets_.size() > 0 && index_ < widgets_.size()-1) showIndex(index_+1); }
     void showPrevious() { if(index_>0) showIndex(index_-1); }
 
-    virtual RWidget::CursorHint cursorHint();
+    virtual Widget::CursorHint cursorHint();
     virtual const String& name();
 protected:
     unsigned int index_;

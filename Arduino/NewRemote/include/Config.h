@@ -122,8 +122,8 @@ static const uint8_t BUILDER_ID = 0; // Reserved values: 0 - Bjoern, 1 - Felix, 
 static const uint8_t REMOTE_ID = 0;
 
 // Fixme - can use these to distinguish
-static const uint8_t LEFT_IMU_ADDR       = 0x6a;
-static const uint8_t RIGHT_IMU_ADDR      = 0x6b;
+static const uint8_t LEFT_IMU_ADDR       = 0x6b;
+static const uint8_t RIGHT_IMU_ADDR      = 0x6c;
 
 static const uint8_t MCP_ADDR1           = 0x27;
 static const uint8_t MCP_ADDR2           = 0x26;

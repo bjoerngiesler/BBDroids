@@ -1,8 +1,8 @@
-#include "UI/RRotaWidget.h"
+#include "UI/RotaWidget.h"
 #include "Todo/RRemote.h"
 #include "UI/UI.h"
 
-void RRotaWidget::showIndex(unsigned int i) {
+void RotaWidget::showIndex(unsigned int i) {
     if(i >= widgets_.size()) return;
     index_ = i;
     UI::ui.setTopTitle(name());
@@ -10,14 +10,14 @@ void RRotaWidget::showIndex(unsigned int i) {
     widgetsChanged_ = true;
 }
 
-RWidget::CursorHint RRotaWidget::cursorHint() {
-    RWidget::CursorHint hint = CURSOR_NONE;
-    if(index_ != 0 && widgets_.size() > 1) hint = (RWidget::CursorHint)(hint|CURSOR_LEFT);
-    if(index_ < widgets_.size()-1) hint = (RWidget::CursorHint)(hint|CURSOR_RIGHT);
+Widget::CursorHint RotaWidget::cursorHint() {
+    Widget::CursorHint hint = CURSOR_NONE;
+    if(index_ != 0 && widgets_.size() > 1) hint = (Widget::CursorHint)(hint|CURSOR_LEFT);
+    if(index_ < widgets_.size()-1) hint = (Widget::CursorHint)(hint|CURSOR_RIGHT);
     return hint;
 }
 
-Result RRotaWidget::draw(ConsoleStream* stream) {
+Result RotaWidget::draw() {
     if(widgets_.size() == 0) return RES_OK;
     if(index_ >= widgets_.size()) index_ = widgets_.size()-1;
 
@@ -25,10 +25,10 @@ Result RRotaWidget::draw(ConsoleStream* stream) {
         widgets_[index_]->setNeedsFullRedraw();
         widgetsChanged_ = false;
     }
-    return widgets_[index_]->draw(stream);
+    return widgets_[index_]->draw();
 }
 
-void RRotaWidget::takeInputFocus() {
+void RotaWidget::takeInputFocus() {
     Input::inst.setLeftShortPressCallback([=]{ showPrevious(); });
     Input::inst.setRightShortPressCallback([=]{ showNext(); });
 
@@ -36,7 +36,7 @@ void RRotaWidget::takeInputFocus() {
     widgets_[index_]->takeInputFocus();
 }
 
-const String& RRotaWidget::name() {
+const String& RotaWidget::name() {
     if(widgets_.size() == 0 || index_ >= widgets_.size()) return name_;
     return widgets_[index_]->name();
 }

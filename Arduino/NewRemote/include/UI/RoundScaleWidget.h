@@ -1,14 +1,14 @@
-#if !defined(RROUNDSCALEWIDGET_H)
-#define RROUNDSCALEWIDGET_H
+#if !defined(ROUNDSCALEWIDGET_H)
+#define ROUNDSCALEWIDGET_H
 
-#include "UI/RWidget.h"
+#include "UI/Widget.h"
 #include "Input.h"
 
-class RRoundScaleWidget: public RWidget {
+class RoundScaleWidget: public Widget {
 public:
-    RRoundScaleWidget();
+    RoundScaleWidget();
 
-    virtual Result draw(ConsoleStream* stream);
+    virtual Result draw();
 
     virtual void setAngle(float angle, bool radians = false);
     virtual void setStartEndAngle(float start, float end);
@@ -23,4 +23,4 @@ protected:
     float min_, max_;
 };
 
-#endif // RROUNDSCALEWIDGET_H
+#endif // ROUNDSCALEWIDGET_H

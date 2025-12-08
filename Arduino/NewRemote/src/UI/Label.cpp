@@ -1,6 +1,6 @@
-#include "UI/RLabelWidget.h"
+#include "UI/Label.h"
 
-std::vector<String> RLabelWidget::splitLines(const String& str, unsigned int maxwidth) {
+std::vector<String> Label::splitLines(const String& str, unsigned int maxwidth) {
     std::vector<String> retval;
     unsigned int first=0, current=0, lastwsp=0;
     if(str.length() == 0) return retval;
@@ -39,7 +39,7 @@ std::vector<String> RLabelWidget::splitLines(const String& str, unsigned int max
     return retval;
 }
 
-RLabelWidget::RLabelWidget() {
+Label::Label() {
     title_ = "(null)";
     hor_ = HOR_CENTERED;
     ver_ = VER_CENTERED;
@@ -53,7 +53,7 @@ RLabelWidget::RLabelWidget() {
     linebreak_ = false;
 }
 
-Result RLabelWidget::draw(ConsoleStream *stream) {
+Result Label::draw() {
     if(needsFullRedraw_ || needsContentsRedraw_) {
         if(fillsBg_) {
             Display::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
@@ -122,14 +122,14 @@ Result RLabelWidget::draw(ConsoleStream *stream) {
     return RES_OK;
 }
 
-void RLabelWidget::setTitle(const String& title) {
+void Label::setTitle(const String& title) {
     if(title_ == title) return;
     
     title_ = title;
 
     if(linebreak_) {
-        if(autosize_) lines_ = RLabelWidget::splitLines(title, (Display::DISPLAY_WIDTH-4)/Display::CHAR_WIDTH);
-        else lines_ = RLabelWidget::splitLines(title, width_/Display::CHAR_WIDTH);
+        if(autosize_) lines_ = Label::splitLines(title, (Display::DISPLAY_WIDTH-4)/Display::CHAR_WIDTH);
+        else lines_ = Label::splitLines(title, width_/Display::CHAR_WIDTH);
     } else {
         lines_.clear();
         lines_.push_back(title_);
@@ -151,17 +151,17 @@ void RLabelWidget::setTitle(const String& title) {
     needsFullRedraw_ = true;
 }
 
-void RLabelWidget::setJustification(RLabelWidget::HorizontalJustification hor, RLabelWidget::VerticalJustification ver) {
+void Label::setJustification(Label::HorizontalJustification hor, Label::VerticalJustification ver) {
     hor_ = hor; ver_ = ver;
     needsContentsRedraw_ = true;
 }
 
-void RLabelWidget::setAutoscroll(bool autoscroll) {
+void Label::setAutoscroll(bool autoscroll) {
     autoscroll_ = autoscroll;
     needsContentsRedraw_ = true;
 }
 
-void RLabelWidget::setAutoscrollTiming(float leftwait, float pixelwait, float rightwait) {
+void Label::setAutoscrollTiming(float leftwait, float pixelwait, float rightwait) {
     leftwait_ = leftwait; 
     pixelwait_ = pixelwait; 
     rightwait_ = rightwait;

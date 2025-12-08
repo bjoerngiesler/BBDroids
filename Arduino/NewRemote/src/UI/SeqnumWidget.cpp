@@ -1,9 +1,9 @@
-#include "UI/RSeqnumWidget.h"
+#include "UI/SeqnumWidget.h"
 
 #define NUMROWS 2
 #define NUMCOLS 4
 
-RSeqnumWidget::RSeqnumWidget(): RWidget(), c_('?'), nocomm_(true){
+SeqnumWidget::SeqnumWidget(): Widget(), c_('?'), nocomm_(true){
     for(int c=0; c<NUMCOLS; c++) for(int r=0; r<NUMROWS; r++) {
         Square s = {true, Display::DARKBLUE};
         squares_.push_back(s);
@@ -12,12 +12,12 @@ RSeqnumWidget::RSeqnumWidget(): RWidget(), c_('?'), nocomm_(true){
     needsFullRedraw_ = true;
 }
 
-void RSeqnumWidget::setChar(char c) {
+void SeqnumWidget::setChar(char c) {
     c_ = c;
     setNeedsFullRedraw(true);
 }
 
-Result RSeqnumWidget::draw(ConsoleStream* stream) {
+Result SeqnumWidget::draw() {
     if(needsFullRedraw_) {
         Display::display.rect(x_, y_, x_+width_, y_+height_, bgCol_, true);
         setNeedsFullRedraw(false);
@@ -59,7 +59,7 @@ Result RSeqnumWidget::draw(ConsoleStream* stream) {
     return RES_OK;
 }
 
-void RSeqnumWidget::setSquareColor(uint8_t s, uint8_t color) {
+void SeqnumWidget::setSquareColor(uint8_t s, uint8_t color) {
     if(s > NUMROWS*NUMCOLS) return;
 
     setNoComm(false);
@@ -68,7 +68,7 @@ void RSeqnumWidget::setSquareColor(uint8_t s, uint8_t color) {
     squares_[s].dirty = true;
 }
 
-void RSeqnumWidget::setNoComm(bool yesno) {
+void SeqnumWidget::setNoComm(bool yesno) {
     if(yesno == nocomm_) return;
     nocomm_ = yesno;
     setNeedsContentsRedraw();

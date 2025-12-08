@@ -9,6 +9,8 @@ using namespace bb::rmt;
 
 class RemoteSubsys: public Subsystem {
 public:
+    static const std::string INTERREMOTE_PROTOCOL_NAME;
+    
     static RemoteSubsys inst;
 
     virtual Result initialize();
@@ -21,7 +23,11 @@ public:
     Protocol *currentProtocol() { return current_; }
     Protocol *interremoteProtocol() { return interremote_; }
 
-    bool storeCurrent(const MaxlenString& name);
+    Protocol *createProtocol(ProtocolType type);
+
+    std::string nextProtocolName();
+
+    bool storeCurrent(const std::string& name);
     bool storeInterremote();
 
     void setCurrentChangedCB(std::function<void(Protocol*)> currentChangedCB);

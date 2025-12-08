@@ -1,29 +1,29 @@
-#if !defined(RREMOTEVISWIDGET_H)
-#define RREMOTEVISWIDGET_H
+#if !defined(REMOTEVISWIDGET_H)
+#define REMOTEVISWIDGET_H
 
 #include <LibBBRemotes.h>
-#include "UI/RMultiWidget.h"
+#include "UI/MultiWidget.h"
 #include "UI/Display.h"
-#include "UI/RCrosshairWidget.h"
-#include "UI/RIMUWidget.h"
-#include "UI/RLabelWidget.h"
-#include "UI/RRoundScaleWidget.h"
+#include "UI/CrosshairWidget.h"
+#include "UI/IMUWidget.h"
+#include "UI/Label.h"
+#include "UI/RoundScaleWidget.h"
 
-class RRemoteVisWidget: public RMultiWidget {
+class RemoteVisWidget: public MultiWidget {
 public:
-    RRemoteVisWidget();
+    RemoteVisWidget();
 
     void setRepresentsLeftRemote(bool left);
     virtual void setSize(uint8_t w, uint8_t h) {}
 
     virtual void setPosition(int x, int y);
-    virtual Result draw(ConsoleStream* stream);
+    virtual Result draw();
     virtual Result visualizeFromControlPacket(const MControlPacket& packet);
     virtual Result visualizeFromInput();
     virtual void takeInputFocus();
     void encTurn(float enc);
 
-    RCrosshairWidget& crosshair() { return crosshair_; }
+    std::shared_ptr<CrosshairWidget>& crosshair() { return crosshair_; }
 
     void selectPot1();
     void selectPot2();
@@ -31,14 +31,14 @@ public:
 protected:
     void moveWidgetsAround();
 
-    RCrosshairWidget crosshair_;
-    RIMUWidget imu_;
-    RLabelWidget mainBtns_[4];
-    RLabelWidget topButtons_[3];
-    RLabelWidget batteryState_[4];
+    shared_ptr<CrosshairWidget> crosshair_;
+    shared_ptr<IMUWidget> imu_;
+    shared_ptr<Label> mainBtns_[4];
+    shared_ptr<Label> topButtons_[3];
+    shared_ptr<Label> batteryState_[4];
     bool left_;
     uint8_t bodyWidth_, bodyHeight_;
-    RRoundScaleWidget pot1_, pot2_;
+    shared_ptr<RoundScaleWidget> pot1_, pot2_;
     enum PotSelected {
         POT1_SELECTED,
         POT2_SELECTED

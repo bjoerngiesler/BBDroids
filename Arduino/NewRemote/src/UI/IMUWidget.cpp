@@ -1,8 +1,8 @@
-#include "UI/RIMUWidget.h"
+#include "UI/IMUWidget.h"
 
 using namespace bb;
 
-RIMUWidget::RIMUWidget() {
+IMUWidget::IMUWidget() {
     accelX_ = accelY_ = accelZ_ = 0;
     roll_ = pitch_ = heading_ = 0;
     showsText_ = false;
@@ -10,7 +10,7 @@ RIMUWidget::RIMUWidget() {
     snprintf(buf_, BUFLEN, "R? P? H?");
 }
 
-Result RIMUWidget::draw(ConsoleStream* stream) {
+Result IMUWidget::draw() {
     int diam, x, y;
 
     if(height_ < width_/2) {
@@ -136,7 +136,7 @@ Result RIMUWidget::draw(ConsoleStream* stream) {
     return RES_OK;
 }   
 
-void RIMUWidget::setRPH(float r, float p, float h) {
+void IMUWidget::setRPH(float r, float p, float h) {
     // yeah yeah, these are drawn swapped. So sue me.
     roll_ = p;
     pitch_ = r;
@@ -145,7 +145,7 @@ void RIMUWidget::setRPH(float r, float p, float h) {
     setNeedsContentsRedraw();
 }
 
-void RIMUWidget::setAccel(float x, float y, float z) {
+void IMUWidget::setAccel(float x, float y, float z) {
     accelX_ = x;
     accelY_ = y;
     accelZ_ = z;
@@ -153,13 +153,13 @@ void RIMUWidget::setAccel(float x, float y, float z) {
     setNeedsContentsRedraw();
 }
 
-void RIMUWidget::setShowsText(bool shows) {
+void IMUWidget::setShowsText(bool shows) {
     showsText_ = shows;
     if(showsText_ == false) setNeedsFullRedraw(); // so that we paint over any residual text
     setNeedsContentsRedraw();
 }
 
-void RIMUWidget::setShowsAccel(bool shows) {
+void IMUWidget::setShowsAccel(bool shows) {
     showsAccel_ = shows;
     setNeedsContentsRedraw();
 }

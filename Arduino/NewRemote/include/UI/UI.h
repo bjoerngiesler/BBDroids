@@ -2,21 +2,26 @@
 #define UI_H
 
 #include <LibBBRemotes.h>
+
+#include "Menu.h"
+
 #include "UI/DroidVisWidget.h"
-#include "UI/RWidget.h"
-#include "UI/RMenuWidget.h"
-#include "UI/RMessageWidget.h"
-#include "UI/RGraphsWidget.h"
-#include "UI/RCrosshairWidget.h"
-#include "UI/RLabelWidget.h"
-#include "UI/RIMUWidget.h"
-#include "UI/RRemoteVisWidget.h"
-#include "UI/RRotaWidget.h"
-#include "UI/RSeqnumWidget.h"
-#include "UI/RDialogWidget.h"
+#include "UI/Widget.h"
+#include "UI/Menu.h"
+#include "UI/MessageWidget.h"
+#include "UI/GraphsWidget.h"
+#include "UI/CrosshairWidget.h"
+#include "UI/Label.h"
+#include "UI/IMUWidget.h"
+#include "UI/RemoteVisWidget.h"
+#include "UI/RotaWidget.h"
+#include "UI/SeqnumWidget.h"
+#include "UI/Dialog.h"
+#include "UI/Button.h"
 
 using namespace bb;
 using namespace bb::rmt;
+using namespace std;
 
 class UI {
 public:
@@ -24,11 +29,12 @@ public:
 
     void start();
 
-    void setMainWidget(RWidget* widget);
+    void setMainWidget(Widget* widget);
 
-    void showPairDroidMenu();
-    void showPairRemoteMenu();
-    void showMenu(RMenuWidget* menu);
+    void populateConfigMenu(Menu* menu);
+    void populatePairDroidMenu(Menu* menu);
+    void populatePairRemoteMenu(Menu* menu);
+    void showMenu(const shared_ptr<Menu>& menu);
     void showMain();
 
     void setNeedsMenuRebuild(bool yesno = true) { needsMenuRebuild_ = yesno; }
@@ -40,6 +46,7 @@ public:
 
     // Other callbacks
     void setIncrRotButtonCB(Input::Button button, bool left);
+    void saveCurrentConfigAsCB(Dialog* dialog);
 
     void showMessage(const String& str, unsigned int delayms=0, uint8_t color=Display::WHITE);
     void showDialog();
@@ -54,8 +61,8 @@ public:
     void setSeqnumState(bb::PacketSource source, bool active);
     void setNoComm(bb::PacketSource source, bool nocomm);
 
-    RRemoteVisWidget& leftRemoteVis() { return remoteVisL_; }
-    RRemoteVisWidget& rightRemoteVis() { return remoteVisR_; }
+    shared_ptr<RemoteVisWidget> leftRemoteVis() { return remoteVisL_; }
+    shared_ptr<RemoteVisWidget> rightRemoteVis() { return remoteVisR_; }
 
     void updateLeftSeqnum(uint8_t seqnum);
     void updateRightSeqnum(uint8_t seqnum);
@@ -66,25 +73,27 @@ public:
 protected:
     UI();
 
-    RMenuWidget mainMenu_, configMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_;
-    RMenuWidget leftRemoteMenu_, rightRemoteMenu_, bothRemotesMenu_, droidMenu_;
-    RMenuWidget lRIncrRotMenu_, rRIncrRotMenu_;
-    RMessageWidget message_;
-    RDialogWidget dialog_;
-    bool dialogActive_;
-    RLabelWidget topLabel_, bottomLabel_, lockedLabel_;
-    RSeqnumWidget leftSeqnum_, rightSeqnum_, droidSeqnum_;
-    RRotaWidget mainVis_;
-    RRemoteVisWidget remoteVisL_, remoteVisR_;
-    DroidVisWidget droidVis_;
-    RWidget titleWidget;
+    shared_ptr<Menu> main_;
+    //MenuItem config_;
 
-    RWidget* mainWidget_;
-    RLabelWidget *ledBrightnessLabel_, *deadbandPercentLabel_, *sendRepeatsLabel_;
+    shared_ptr<Button> testBtn_;
+    shared_ptr<Menu> mainMenu_, configMenu_, pairMenu_, pairDroidMenu_, pairRemoteMenu_;
+    shared_ptr<Menu>leftRemoteMenu_, rightRemoteMenu_, bothRemotesMenu_, droidMenu_;
+    shared_ptr<Menu>lRIncrRotMenu_, rRIncrRotMenu_;
+    shared_ptr<MessageWidget> message_;
+    shared_ptr<Dialog> dialog_;
+    bool dialogActive_;
+    shared_ptr<Label> topLabel_, bottomLabel_, lockedLabel_;
+    shared_ptr<SeqnumWidget> leftSeqnum_, rightSeqnum_, droidSeqnum_;
+    shared_ptr<RotaWidget> mainVis_;
+    shared_ptr<RemoteVisWidget> remoteVisL_, remoteVisR_;
+    shared_ptr<DroidVisWidget> droidVis_;
+    shared_ptr<Widget> titleWidget;
+
+    Widget* mainWidget_;
+    shared_ptr<Label> ledBrightnessLabel_, deadbandPercentLabel_, sendRepeatsLabel_;
 
     bool needsMenuRebuild_, needsScreensaverRedraw_;
-
-    std::vector<XBee::Node> discoveredNodes_;
 
     uint8_t lastRightSeqnum_, lastDroidSeqnum_;
 };

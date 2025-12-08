@@ -1,14 +1,14 @@
 #if !defined(DROIDVISWIDGET_H)
 #define DROIDVISWIDGET_H
 
-#include "UI/RMultiWidget.h"
-#include "UI/RLabelWidget.h"
-#include "UI/RRoundScaleWidget.h"
-#include "UI/RIMUWidget.h"
+#include "UI/MultiWidget.h"
+#include "UI/Label.h"
+#include "UI/RoundScaleWidget.h"
+#include "UI/IMUWidget.h"
 
 #include <LibBBRemotes.h>
 
-class DroidVisWidget: public RMultiWidget {
+class DroidVisWidget: public MultiWidget {
 public:
     DroidVisWidget();
 
@@ -19,23 +19,23 @@ public:
 
     void moveWidgetsAround();
 protected:
-    void configureLabel(RLabelWidget& widget, Telemetry::SubsysStatus type, bool setTitle);
+    void configureLabel(shared_ptr<Label>& widget, Telemetry::SubsysStatus type, bool setTitle);
 
-    RLabelWidget droidStatusLabel_;
-    RLabelWidget battLabel_;
-    RLabelWidget driveStatusLabel_;
-    RLabelWidget servoStatusLabel_;
-    RLabelWidget driveModeLabel_;
+    shared_ptr<Label> droidStatusLabel_;
+    shared_ptr<Label> battLabel_;
+    shared_ptr<Label> driveStatusLabel_;
+    shared_ptr<Label> servoStatusLabel_;
+    shared_ptr<Label> driveModeLabel_;
     
-    RLabelWidget droidStatus_;
-    RLabelWidget battStatus_;
-    RLabelWidget driveStatus_;
-    RLabelWidget servoStatus_;
-    RLabelWidget driveMode_;
+    shared_ptr<Label> droidStatus_;
+    shared_ptr<Label> battStatus_;
+    shared_ptr<Label> driveStatus_;
+    shared_ptr<Label> servoStatus_;
+    shared_ptr<Label> driveMode_;
 
-    RRoundScaleWidget velScale_;
-    RLabelWidget velLabel_;
-    RIMUWidget imuDisplay_;
+    shared_ptr<RoundScaleWidget> velScale_;
+    shared_ptr<Label> velLabel_;
+    shared_ptr<IMUWidget> imuDisplay_;
 };
 
 #endif

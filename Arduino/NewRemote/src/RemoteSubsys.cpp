@@ -8,8 +8,8 @@ using namespace bb::rmt;
 
 RemoteSubsys RemoteSubsys::inst;
 
+const std::string RemoteSubsys::INTERREMOTE_PROTOCOL_NAME = "default";
 static const char* STORAGE_NAMESPACE = "rss";
-static const char* INTERREMOTE_PROTOCOL_NAME = "inter";
 
 static const char *HELP = 
 "This subsystem encapsulates the BBRemote library.\n" \
@@ -136,7 +136,7 @@ Result RemoteSubsys::stop() {
     return Subsystem::stop();
 }
 
-bool RemoteSubsys::storeCurrent(const MaxlenString& name) {
+bool RemoteSubsys::storeCurrent(const std::string& name) {
     currentName_ = name;
     return ProtocolFactory::storeProtocol(name, current_);
 }
@@ -144,6 +144,53 @@ bool RemoteSubsys::storeCurrent(const MaxlenString& name) {
 bool RemoteSubsys::storeInterremote() {
     return ProtocolFactory::storeProtocol(INTERREMOTE_PROTOCOL_NAME, interremote_);
 }
+
+Protocol* RemoteSubsys::createProtocol(ProtocolType type) {
+    if(type == interremote_->protocolType()) {
+        return nullptr;
+    }
+    Protocol *proto = ProtocolFactory::getOrCreateProtocol(type);
+    if(proto == nullptr) {
+        return nullptr;
+    }
+    if(current_ != nullptr && current_ != interremote_) {
+        delete current_;
+    }
+    current_ = proto;
+    current_->init(isLeftRemote ? "LeftRemote" : "RightRemote");
+    current_->setStorageName(nextProtocolName());
+
+    if(currentChangedCB_ != nullptr) {
+        currentChangedCB_(current_);
+    }
+
+    return current_;
+}
+
+std::string RemoteSubsys::nextProtocolName() {
+    int idx = 1;
+    std::string name;
+    while(true) {
+        name = "Config" + std::to_string(idx);
+        std::vector<std::string> storedNames = ProtocolFactory::storedProtocolNames();
+        bool found = false;
+        for(auto n: storedNames) {
+            if(n == name) {
+                found = true;
+                break;
+            } 
+        }
+        if(current_->storageName() == name) {
+            found = true;
+        }
+        if(!found) {
+            return name;
+        }
+        idx++;
+    }
+}
+
+
 
 Result RemoteSubsys::step() {
     if(interremote_ == nullptr) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
@@ -204,19 +251,10 @@ Result RemoteSubsys::handleConsoleCommand(const std::vector<String>& words, Cons
             stream->printf("Refuse to create new protocol of type '%c' as it's also the interremote protocol.\n", type);
             return RES_CMD_INVALID_ARGUMENT;
         }
-        Protocol *proto = ProtocolFactory::getOrCreateProtocol(type);
+        Protocol *proto = createProtocol(type);
         if(proto == nullptr) {
             stream->printf("createProtocol() returns nullptr\n");
             return RES_SUBSYS_RESOURCE_NOT_AVAILABLE;
-        }
-        if(current_ != nullptr && current_ != interremote_) {
-            delete current_;
-        }
-        current_ = proto;
-        current_->init(isLeftRemote ? "LeftRemote" : "RightRemote");
-
-        if(currentChangedCB_ != nullptr) {
-            currentChangedCB_(current_);
         }
         return RES_OK;
     }

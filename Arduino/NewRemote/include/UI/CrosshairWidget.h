@@ -1,19 +1,19 @@
-#if !defined(RCROSSHAIRWIDGET_H)
-#define RCROSSHAIRWIDGET_H
+#if !defined(CROSSHAIRWIDGET_H)
+#define CROSSHAIRWIDGET_H
 
 #include <LibBB.h>
 
 #include "UI/Display.h"
-#include "UI/RWidget.h"
+#include "UI/Widget.h"
 #include "Input.h"
 
 using namespace bb;
 
 // Crosshair Visualization Drawable
-class RCrosshairWidget: public RWidget {
+class CrosshairWidget: public Widget {
 public:
-  RCrosshairWidget();
-  virtual Result draw(ConsoleStream* stream = NULL);
+  CrosshairWidget();
+  virtual Result draw();
 
   void setHorVer(uint16_t h, uint16_t v);
   void setHorVer(float h, float v);

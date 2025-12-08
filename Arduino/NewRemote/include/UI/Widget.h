@@ -1,14 +1,14 @@
-#if !defined(RWIDGET_H)
-#define RWIDGET_H
+#if !defined(WIDGET_H)
+#define WIDGET_H
 
 #include "UI/Display.h"
 
-class RWidget {
+class Widget {
 public:
-    RWidget();
-    virtual ~RWidget();
+    Widget();
+    virtual ~Widget();
 
-    virtual Result draw(ConsoleStream* stream = NULL);
+    virtual Result draw();
 
     virtual void setPosition(int x, int y);
     virtual void setSize(uint8_t w, uint8_t h);
@@ -42,8 +42,8 @@ public:
 
     virtual void takeInputFocus();
 
-    virtual void setAction(std::function<void(void)> cb);
-    virtual std::function<void(void)> action();
+    virtual void setAction(std::function<void(Widget*)> cb);
+    virtual std::function<void(Widget*)> action();
     virtual void triggerAction();
 
     enum CursorHint {
@@ -58,7 +58,7 @@ public:
     virtual CursorHint cursorHint() { return CURSOR_NONE; }
 
     //! Highlighted widgets draw their fg in hlCol_ instead of fgCol_
-    virtual void setHighlighted(bool yesno); 
+    virtual void setHighlighted(bool yesno=true); 
     virtual bool isHighlighted() { return highlighted_; }
 
     void setTag(int tag) { tag_ = tag; }
@@ -71,7 +71,7 @@ protected:
     uint8_t bgCol_, fgCol_, frameCol_, cursorCol_, markingCol_, hlCol_;
     bool fillsBg_, drawsFrame_;
     String name_;
-    std::function<void(void)> action_;
+    std::function<void(Widget*)> action_;
     bool highlighted_;
     int tag_;
 };

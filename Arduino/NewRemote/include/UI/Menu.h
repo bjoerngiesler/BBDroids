@@ -1,40 +1,71 @@
-#if !defined(MENU_H)
-#define MENU_H
+#if !defined(MENUWIDGET_H)
+#define MENUWIDGET_H
 
-#include "RWidget.h"
+#include <vector>
+#include <functional>
+#include <LibBB.h>
 
-class Menu; // forward declaration
+#include "Config.h"
+#include "UI/Display.h"
+#include "UI/MultiWidget.h"
+#include "UI/Label.h"
+#include "UI/Button.h"
+#include "UI/PercentageBar.h"
+#include "Input.h"
 
-class MenuItem {
+using namespace bb;
+
+class Menu; // fwd decl
+class Button; // fwd decl
+
+class Menu: public MultiWidget {
 public:
-    MenuItem(std::string label, std::function<void(const MenuItem&)> action = nullptr);
-    MenuItem(std::string label, std::unique_ptr<Menu> submenu);
+  Menu();
 
-    bool hasSubmenu() const { return submenu != nullptr; }
-    void trigger();  // run action or open submenu
+  std::shared_ptr<Button> addEntry(const String& title, std::function<void(Widget*)> callback, int tag=0);
+  std::shared_ptr<Menu> addSubmenu(const String& title);
 
-    const std::string& getLabel() const { return label; }
-    Menu* getSubmenu() const { return submenu.get(); }
+  virtual Result draw();
 
-private:
-    std::string label;
-    std::function<void()> action;
-    std::unique_ptr<Menu> submenu;
+  void clear();
+
+  void up() {setCursor(cursor_-1);};
+  void down() {setCursor(cursor_+1);}
+  void setCursor(int cursor);
+  void encTurn(float enc);
+  void resetCursor();
+
+  virtual void takeInputFocus();
+
+  void enter();
+  
+  void back(Widget* w);
+  void select();
+
+  void setOnEnterCallback(std::function<void(Menu*)> enterCB) { enterCB_ = enterCB; }
+  void setOnLeaveCallback(std::function<void(Menu*)> leaveCB) { leaveCB_ = leaveCB; }
+  void setParent(Menu* parent) { parent_ = parent; }
+  Menu* parent() { return parent_; }
+
+  virtual void setSize(uint8_t w, uint8_t h);
+  virtual void setPosition(int x, int y);
+
+protected:
+  void addEntry(const std::shared_ptr<Button>& entry);
+  void moveWidgets();
+
+  int cursor_;
+  int top_;
+  float currentEnc_;
+  std::function<void(Menu*)> enterCB_, leaveCB_;
+
+  std::shared_ptr<Button> backEntry_;
+  std::shared_ptr<PercentageBar> scrollBar_;
+
+  Menu* parent_ = nullptr;
+
+  static const uint8_t SCROLLBAR_WIDTH = 4;
 };
 
-class Menu {
-public:
-    Menu(std::string title);
 
-    void addItem(MenuItem item);
-    void show();               // display menu
-    void handleInput();        // take user input (simple example)
-
-    const std::string& getTitle() const { return title; }
-
-private:
-    std::string title;
-    std::vector<MenuItem> items;
-};
-
-#endif // MENU_H
+#endif

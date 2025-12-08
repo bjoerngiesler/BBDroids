@@ -1,13 +1,13 @@
-#if !defined(RIMUWIDGET_H)
-#define RIMUWIDGET_H
+#if !defined(IMUWIDGET_H)
+#define IMUWIDGET_H
 
-#include "UI/RWidget.h"
+#include "UI/Widget.h"
 
-class RIMUWidget: public RWidget {
+class IMUWidget: public Widget {
 public:
-    RIMUWidget();
+    IMUWidget();
 
-    virtual Result draw(ConsoleStream* stream = NULL);
+    virtual Result draw();
     virtual void setRPH(float r, float p, float h);
     virtual void setAccel(float x, float y, float z);
     virtual void setShowsText(bool shows=true);

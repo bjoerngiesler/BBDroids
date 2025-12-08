@@ -1,14 +1,14 @@
-#include "UI/RGraphsWidget.h"
+#include "UI/GraphsWidget.h"
 #include "Todo/RRemote.h"
 
-RGraphsWidget::RGraphsWidget() {
+GraphsWidget::GraphsWidget() {
   cursor_[TOP] = cursor_[MIDDLE] = cursor_[BOTTOM] = 0;
   title_[TOP] = "Left";
   title_[MIDDLE] = "Right";
   title_[BOTTOM] = "Droid";
 }
 
-Result RGraphsWidget::draw(ConsoleStream* stream) {
+Result GraphsWidget::draw() {
   int y, titlex;
   
   y = GRAPH0_Y;
@@ -26,14 +26,14 @@ Result RGraphsWidget::draw(ConsoleStream* stream) {
   titlex = GRAPH_X-1 + (GRAPH_WIDTH-strlen(title_[BOTTOM])*Display::CHAR_WIDTH)/2;
   Display::display.text(titlex, y+2, Display::WHITE, title_[BOTTOM]);
 
-  return RWidget::draw(stream);
+  return Widget::draw();
 }
   
-void RGraphsWidget::setTitle(Graph g, const char* t) {
+void GraphsWidget::setTitle(Graph g, const char* t) {
   title_[g] = t;
 }
 
-void RGraphsWidget::plotAxisData(Graph g, float a0, float a1, float a2, float a3, float a4) {
+void GraphsWidget::plotAxisData(Graph g, float a0, float a1, float a2, float a3, float a4) {
   int x, y;
   switch(g) {
     case TOP: y = GRAPH0_Y; break;
@@ -50,11 +50,11 @@ void RGraphsWidget::plotAxisData(Graph g, float a0, float a1, float a2, float a3
   Display::display.plot(x, y+(a4*GRAPH_HEIGHT/2.2), Display::YELLOW);
 }
 
-void RGraphsWidget::plotControlPacket(Graph g, const bb::ControlPacket& packet) {
+void GraphsWidget::plotControlPacket(Graph g, const bb::ControlPacket& packet) {
   plotAxisData(g, packet.getAxis(0), packet.getAxis(1), packet.getAxis(2), packet.getAxis(3), packet.getAxis(4));
 }
 
-void RGraphsWidget::advanceCursor(Graph g) { 
+void GraphsWidget::advanceCursor(Graph g) { 
   cursor_[g]++; 
   if(cursor_[g]>GRAPH_WIDTH) {
     cursor_[g]=0;
@@ -71,15 +71,15 @@ void RGraphsWidget::advanceCursor(Graph g) {
   }
 }
 
-void RGraphsWidget::buttonTopLeftPressed() {
+void GraphsWidget::buttonTopLeftPressed() {
   //RRemote::remote.showMainMenu();
 }
 
-void RGraphsWidget::buttonTopRightPressed() {
+void GraphsWidget::buttonTopRightPressed() {
   //RRemote::remote.showMainMenu();
 }
 
-void RGraphsWidget::buttonConfirmPressed() {
+void GraphsWidget::buttonConfirmPressed() {
   //RRemote::remote.showMainMenu();
 }
 

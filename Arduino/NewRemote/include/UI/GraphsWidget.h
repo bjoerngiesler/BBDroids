@@ -1,15 +1,15 @@
-#if !defined(RGRAPHSWIDGET_H)
-#define RGRAPHSWIDGET_H
+#if !defined(GRAPHSWIDGET_H)
+#define GRAPHSWIDGET_H
 
 #include <LibBB.h>
 
 #include "UI/Display.h"
-#include "UI/RWidget.h"
+#include "UI/Widget.h"
 #include "Input.h"
 
 using namespace bb;
 
-class RGraphsWidget: public RWidget {
+class GraphsWidget: public Widget {
 public:
   enum Graph {
     TOP     = 0,
@@ -23,8 +23,8 @@ public:
   static const int GRAPH0_Y = 3;
   static const int GRAPH_DIST = 3;
 
-  RGraphsWidget();
-  virtual Result draw(ConsoleStream* stream = NULL);
+  GraphsWidget();
+  virtual Result draw();
   void setTitle(Graph g, const char* t);
   void plotAxisData(Graph g, float a0, float a1, float a2, float a3, float a4);
   void plotControlPacket(Graph g, const bb::ControlPacket& packet);
