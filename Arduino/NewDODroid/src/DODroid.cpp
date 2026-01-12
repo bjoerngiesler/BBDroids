@@ -176,8 +176,8 @@ Result DODroid::initialize(Uart* remoteUart) {
 
   //setPacketSource(PACKET_SOURCE_DROID);
 
-  //protocol_.init("DODroid", DEFAULT_CHAN, DEFAULT_PAN, remoteUart);
-  protocol_.init(remoteUart);
+  protocol_.init("DODroid", DEFAULT_RCHAN, DEFAULT_RPAN, remoteUart);
+  //protocol_.init(remoteUart);
   receiver_ = protocol_.createReceiver();
   if(receiver_ == nullptr) {
     bb::printf("Could not create receiver\n");
@@ -387,6 +387,8 @@ Result DODroid::step() {
 bb::Result DODroid::stepPowerProtect() {
   DOBattStatus::batt.updateVoltage();
   DOBattStatus::batt.updateCurrent();
+  bb::printf("Current: %f\n", DOBattStatus::batt.current());
+
 
   // CRITICAL: Switch everything off (except the neck servo, so that we don't drop the head) and go into endless loop if power 
   if(DOBattStatus::batt.voltage() > 2.0 &&
@@ -427,7 +429,7 @@ bb::Result DODroid::stepHead() {
   float accelSP = (speedSP-speed);
   if(speedSP == 0) accelSP = 0;
 
-  if(servosOK_ && headIsOn_) {
+  if(servosOK_ /*&& headIsOn_*/) {
     float nod;
     if(HEAD_COUNTERWEIGHT == false) {
       nod = params_.faNeckIMUAccel*ax + params_.faNeckSPAccel*accelSP + params_.faNeckSpeed*speed;
@@ -533,6 +535,7 @@ bb::Result DODroid::stepIfNotStarted() {
   if((Runloop::runloop.getSequenceNumber() % 100) == 0 && DOBattStatus::batt.available()) {
     DOBattStatus::batt.updateVoltage();
     DOBattStatus::batt.updateCurrent();
+    bb::printf("Current: %f\n", DOBattStatus::batt.current());
   }
 
   statusPixels_.show();
@@ -570,14 +573,13 @@ void DODroid::secondaryDriveButtonCB(float val) {
 }
 
 void DODroid::playSoundCB(float val, uint8_t folder) {
-  static bool wasPressed = false;
-  if(wasPressed == false && val > 0.5) {
-    wasPressed = true;
+  if(playFolderBtnPressed_[folder] == false && val > 0.5) {
+    playFolderBtnPressed_[folder] = true;
 
     DOSound::sound.playFolderNext(folder);
-  } else if(wasPressed == true && val < 0.5) {
-    bb::printf("2 Released now\n", val);
-    wasPressed = false;
+  } else if(playFolderBtnPressed_[folder] == true && val < 0.5) {
+    bb::printf("%d Released now\n", folder);
+    playFolderBtnPressed_[folder] = false;
   }
 }
 

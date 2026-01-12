@@ -12,12 +12,14 @@ Menu::Menu() {
 
   backEntry_ = make_shared<Button>();
   backEntry_->setTitle("<< Back <<");
+  backEntry_->setName("<< Back <<");
   backEntry_->setAction([this](Widget* w){this->back(w);});
   backEntry_->setBackgroundColor(fgCol_);
   backEntry_->setForegroundColor(bgCol_);
   backEntry_->setPosition(0, (widgets_.size()-top_)*Display::CHAR_HEIGHT + y_);
 
   scrollBar_ = make_shared<PercentageBar>();
+  scrollBar_->setName("ScrollBar");
   scrollBar_->setPosition(x_ + width_ - SCROLLBAR_WIDTH, y_);
   scrollBar_->setSize(SCROLLBAR_WIDTH, height_);
   scrollBar_->setOrientation(PercentageBar::VERTICAL);
@@ -25,21 +27,28 @@ Menu::Menu() {
   scrollBar_->setForegroundColor(Display::LIGHTGREY);
 }
 
-std::shared_ptr<Button> Menu::addEntry(const String& title, std::function<void(Widget*)> cb, int tag) {
+std::shared_ptr<Button> Menu::addEntry(const String& title, std::function<void(Widget*)> cb, bool backAfterCB) {
   shared_ptr<Button> entry = make_shared<Button>();
-  entry->setTag(tag);
+  entry->setName(title);
   entry->setTitle(title);
-  entry->setAction(cb);
+  if(backAfterCB) {
+    entry->setAction([this,cb](Widget*w){cb(w); this->back();});
+  } else {
+    entry->setAction(cb);
+  }
   addEntry(entry);
   return entry;
 }
 
-std::shared_ptr<Menu> Menu::addSubmenu(const String& title) {
+std::shared_ptr<Menu> Menu::addSubmenu(const String& title, std::function<void(Menu*)> enterCB, std::function<void(Menu*)> leaveCB) {
   shared_ptr<Menu> menu = make_shared<Menu>();
   menu->setName(title);
   menu->setParent(this);
+  menu->setEnterCallback(enterCB);
+  menu->setLeaveCallback(leaveCB);
   shared_ptr<MenuButton> entry = make_shared<MenuButton>();
   entry->setTitle(title);
+  entry->setName(title + "MB");
   entry->setMenu(menu);
   addEntry(entry);
   return menu;
@@ -169,6 +178,7 @@ void Menu::takeInputFocus() {
   Input::inst.clearCallbacks();
   Input::inst.setLeftShortPressCallback([this]{this->up();});
   Input::inst.setRightShortPressCallback([this]{this->down();});
+  Input::inst.setLeftLongPressCallback([this]{this->back();});
   Input::inst.setRightLongPressCallback([this]{this->select();});
   Input::inst.setConfirmShortPressCallback([this]{this->select();});
   Input::inst.setEncTurnCallback([this](float enc) {this->encTurn(enc);});

@@ -3,9 +3,6 @@
 
 #include <Arduino.h>
 #include <BBError.h>
-#if defined(ARDUINO_ARCH_SAMD)
-#include <Encoder.h>
-#endif
 #include <BBPacket.h>
 #include <BBControllers.h>
 #include <BBLowPassFilter.h>

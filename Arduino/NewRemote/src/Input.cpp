@@ -487,59 +487,27 @@ Result Input::setupAxesFromTransmitter(Transmitter* trans) {
   battAxis = AXIS_INVALID;
 
   uint8_t axis = 0, numAxes = trans->numAxes();
-  #define MAPAXIS(here, minbits, name) { if(axis < numAxes && trans->bitDepthForAxis(axis) >= minbits) {here = axis; bb::printf("Mapped %s to %s\n", name, trans->axisName(axis).c_str()); axis++;} else {bb::printf("Not mapped %s\n", name);} }
+  #define MAPAXIS(here, minbits, maxbits, name) { if(axis < numAxes && trans->bitDepthForAxis(axis) >= minbits) {here = axis; bb::printf("Mapped %s to %s\n", name, trans->axisName(axis).c_str()); axis++;} else if(trans->canAddAxes()) { here = axis; trans->addAxis(name, maxbits); bb::printf("Mapped %s to new axis\n", name); axis++; } else {bb::printf("Not mapped %s\n", name);} }
 
-  MAPAXIS(joyHAxis, 4, "JoyH");
-  MAPAXIS(joyVAxis, 4, "JoyV");
-  MAPAXIS(rotRAxis, 4, "RotR");
-  MAPAXIS(rotPAxis, 4, "RotP");
-  MAPAXIS(rotHAxis, 4, "RotH");
-  MAPAXIS(accXAxis, 4, "AccX");
-  MAPAXIS(accYAxis, 4, "AccY");
-  MAPAXIS(accZAxis, 4, "AccZ");
-  MAPAXIS(pot1Axis, 4, "Pot1");
-  MAPAXIS(pot2Axis, 4, "Pot2");
-  MAPAXIS(battAxis, 4, "Batt");
-  MAPAXIS(btn1Axis, 1, "Btn1");
-  MAPAXIS(btn2Axis, 1, "Btn2");
-  MAPAXIS(btn3Axis, 1, "Btn3");
-  MAPAXIS(btn4Axis, 1, "Btn4");
-  MAPAXIS(btnJoyAxis, 1, "BtnJoy");
-  MAPAXIS(btnLAxis, 1, "BtnL");
-  MAPAXIS(btnRAxis, 1, "BtnR");
-  MAPAXIS(btnConfirmAxis, 1, "BtnConf");
-#if 0
-  if(axis+2 <= numAxes && trans->bitDepthForAxis(axis) >= 4 && trans->bitDepthForAxis(axis+1) >= 4) {
-    joyHAxis = axis++; joyVAxis = axis++;    
-  }
-  if(axis+3 <= numAxes && trans->bitDepthForAxis(axis) >= 4 && trans->bitDepthForAxis(axis+1) >= 4 && trans->bitDepthForAxis(axis+2) >= 4) {
-    bb::printf("Mapping roll to %s, pitch to %s, heading to %s", trans->axisName(axis).c_str(), trans->axisName(axis+1).c_str(), trans->axisName(axis+2).c_str());
-    rotRAxis = axis++; rotPAxis = axis++; rotHAxis = axis++;
-  } else {
-    bb::printf("Not enough axes with sufficient bitdepth for roll, pitch, yaw\n");
-  }
-  if(axis+3 <= numAxes && trans->bitDepthForAxis(axis) >= 4 && trans->bitDepthForAxis(axis+1) >= 4 && trans->bitDepthForAxis(axis+2) >= 4) {
-    bb::printf("Mapping accX to %s, accY to %s, accZ to %s", trans->axisName(axis).c_str(), trans->axisName(axis+1).c_str(), trans->axisName(axis+2).c_str());
-    accXAxis = axis++; accYAxis = axis++; accZAxis = axis++;
-  } else {
-    bb::printf("Not enough axes with sufficient bitdepth for acc\n");
-  }
-
-  if(axis+2 <= numAxes && trans->bitDepthForAxis(axis) >= 4 && trans->bitDepthForAxis(axis+1) >= 4) {
-    bb::printf("Mapping pot1 to %s, pot2 to %s", trans->axisName(axis).c_str(), trans->axisName(axis+1).c_str());
-    pot1Axis = axis++; pot2Axis = axis++;    
-  }
-
-  if(axis+1 <= numAxes && trans->bitDepthForAxis(axis) >= 4) battAxis = axis++;
-  if(axis+1 <= numAxes && trans->bitDepthForAxis(axis) >= 1) btn1Axis = axis++;
-  if(axis+1 <= numAxes && trans->bitDepthForAxis(axis) >= 1) btn2Axis = axis++;
-  if(axis+1 <= numAxes && trans->bitDepthForAxis(axis) >= 1) btn3Axis = axis++;
-  if(axis+1 <= numAxes && trans->bitDepthForAxis(axis) >= 1) btn4Axis = axis++;
-  if(axis+1 <= numAxes && trans->bitDepthForAxis(axis) >= 1) btnJoyAxis = axis++;
-  if(axis+1 <= numAxes && trans->bitDepthForAxis(axis) >= 1) btnLAxis = axis++;
-  if(axis+1 <= numAxes && trans->bitDepthForAxis(axis) >= 1) btnRAxis = axis++;
-  if(axis+1 <= numAxes && trans->bitDepthForAxis(axis) >= 1) btnConfirmAxis = axis++;
-#endif
+  MAPAXIS(joyHAxis, 4, 12, "JoyH");
+  MAPAXIS(joyVAxis, 4, 12, "JoyV");
+  MAPAXIS(rotRAxis, 4, 12, "RotR");
+  MAPAXIS(rotPAxis, 4, 12, "RotP");
+  MAPAXIS(rotHAxis, 4, 12, "RotH");
+  MAPAXIS(accXAxis, 4, 12, "AccX");
+  MAPAXIS(accYAxis, 4, 12, "AccY");
+  MAPAXIS(accZAxis, 4, 12, "AccZ");
+  MAPAXIS(pot1Axis, 4, 12, "Pot1");
+  MAPAXIS(pot2Axis, 4, 12, "Pot2");
+  MAPAXIS(battAxis, 4, 12, "Batt");
+  MAPAXIS(btn1Axis, 1, 1, "Btn1");
+  MAPAXIS(btn2Axis, 1, 1, "Btn2");
+  MAPAXIS(btn3Axis, 1, 1, "Btn3");
+  MAPAXIS(btn4Axis, 1, 1, "Btn4");
+  MAPAXIS(btnJoyAxis, 1, 1, "BtnJoy");
+  MAPAXIS(btnLAxis, 1, 1, "BtnL");
+  MAPAXIS(btnRAxis, 1, 1, "BtnR");
+  MAPAXIS(btnConfirmAxis, 1, 1, "BtnConf");
   return RES_OK;
 }
 

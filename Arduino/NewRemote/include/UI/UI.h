@@ -34,6 +34,10 @@ public:
     void populateConfigMenu(Menu* menu);
     void populatePairDroidMenu(Menu* menu);
     void populatePairRemoteMenu(Menu* menu);
+    void populateMappingMenu(Menu* menu);
+    void populateMappingMenu(Menu* menu, const NodeDescription& n);
+    void populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* tx, MixManager* mgr, InputID inp);
+
     void showMenu(const shared_ptr<Menu>& menu);
     void showMain();
 

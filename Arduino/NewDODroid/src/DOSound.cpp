@@ -13,7 +13,8 @@ DOSound::DOSound(uint8_t volume, bool debug) {
   dumbMode_ = false;
   fileCount_ = -1;
   ser_ = nullptr;
-  volume_ = volume;
+  volume_ = 20;
+  //volume_ = volume;
   debug_ = debug;
 }
 
@@ -150,6 +151,7 @@ bool DOSound::playSystemSound(int snd) {
 }
 
 bool DOSound::setVolume(uint8_t vol) {
+  vol = 30;
   if(!available_) return false;
   if(vol == volume_) return false;
   for(int i=0; i<DOSOUND_REPEATS; i++) {

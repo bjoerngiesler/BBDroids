@@ -1,6 +1,9 @@
 #if !defined(BBENCODER_H)
 #define BBENCODER_H
 
+#if defined(ARDUINO_ARCH_SAMD) // FIXME - get rid of dependency of Arduino Encoder class.
+
+#include <Encoder.h>
 #include <BBControllers.h>
 #include <BBLowPassFilter.h>
 #include <limits.h>
@@ -20,7 +23,6 @@ public:
   };
 
   Encoder(uint8_t pin_enc_a, uint8_t pin_enc_b, InputMode mode = INPUT_POSITION, Unit unit = UNIT_TICKS);
-  ~Encoder();
   
   void setMode(InputMode mode);
   void setUnit(Unit unit);
@@ -42,14 +44,10 @@ public:
 
   float controlGain() { if(unit_ == UNIT_TICKS) return 1.0f; else return 1/mmPT_; }
 
-  void pinAChanged();
-  void pinBChanged();
-
 protected:
-  uint8_t pinEncA_, pinEncB_;
-
   InputMode mode_;
   Unit unit_;
+  ::Encoder enc_; // FIXME -- since this requires SAMD, possibly replace by own encoder handling?
   bb::LowPassFilter filtSpeed_, filtPos_;
 
   float mmPT_;
@@ -59,9 +57,10 @@ protected:
   long presentPosFiltered_;
   float presentSpeed_; // internally always in encoder ticks per second
   float presentSpeedFiltered_;
-
-  uint8_t enc_;
 };
 }
+
+#endif // ARDUINO_ARCH_SAMD
+
 
 #endif //BBENCODER_H

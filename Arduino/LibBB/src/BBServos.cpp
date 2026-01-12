@@ -118,6 +118,7 @@ Result bb::Servos::start(ConsoleStream* stream) {
   if (isStarted()) return RES_SUBSYS_ALREADY_STARTED;
 
   Runloop::runloop.excuseOverrun();
+  servos_.clear();
 
   dxl_.setPortProtocolVersion(2.0);
   unsigned int bps = 0;
@@ -229,7 +230,7 @@ Result bb::Servos::stop(ConsoleStream* stream) {
       dxl_.torqueOff(s.id);
     }
   }
-  while (servos_.size()) servos_.erase(servos_.begin());
+  servos_.clear();
 
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
   started_ = false;
@@ -241,7 +242,7 @@ Result bb::Servos::step() {
 
   if (!started_ || operationStatus_ != RES_OK) return RES_SUBSYS_NOT_STARTED;
 
-  if (failcount > 10) {
+  if (failcount > 100) {
     Console::console.printfBroadcast("Servo communication failed more than %d times in a row. Stopping subsystem.\n", failcount);
     stop();
     failcount = 0;

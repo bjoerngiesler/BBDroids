@@ -103,22 +103,20 @@ void UI::populateConfigMenu(Menu* menu) {
         menu->setName(String("Cur:") + String(current->storageName().c_str()) + " " + char(current->protocolType()));
     }
 
-    shared_ptr<Menu> pairRemoteMenu = menu->addSubmenu("Pair remote...");
-    pairRemoteMenu->setOnEnterCallback([=](Menu* m){ UI::ui.populatePairRemoteMenu(m); });
-    shared_ptr<Menu> pairDroidMenu = menu->addSubmenu("Pair droid...");
-    pairDroidMenu->setOnEnterCallback([=](Menu* m){ UI::ui.populatePairDroidMenu(m); });
+    shared_ptr<Menu> pairRemoteMenu = menu->addSubmenu("Pair remote...", [](Menu* m){ UI::ui.populatePairRemoteMenu(m); });
+    shared_ptr<Menu> pairDroidMenu = menu->addSubmenu("Pair droid...", [](Menu* m){ UI::ui.populatePairDroidMenu(m); });
 
-    menu->addEntry("Save current", [=](Widget*){bb::printf("Save config");
+    menu->addEntry("Save current", [this, current](Widget*){bb::printf("Save config");
         dialog_->setTitle("Save as...");
         dialog_->setValue(current->storageName().c_str());
         dialog_->setMaxLen(10);
-        dialog_->setCancelCallback([=](Dialog* d){UI::ui.hideDialog();});
-        dialog_->setOKCallback([=](Dialog* d){UI::ui.saveCurrentConfigAsCB(d);});
+        dialog_->setCancelCallback([](Dialog* d){UI::ui.hideDialog();});
+        dialog_->setOKCallback([](Dialog* d){UI::ui.saveCurrentConfigAsCB(d);});
         UI::ui.showDialog();
     });
 
     shared_ptr<Menu> newMenu = menu->addSubmenu("New...");
-    newMenu->addEntry("Monaco/XBee", [=](Widget* w){
+    newMenu->addEntry("Monaco/XBee", [menu](Widget* w){
         bb::printf("New Monaco/XBee config\n"); 
         Protocol *p = RemoteSubsys::inst.createProtocol(ProtocolType::MONACO_XBEE);
         if(p != nullptr) {
@@ -127,9 +125,8 @@ void UI::populateConfigMenu(Menu* menu) {
         } else {
             UI::ui.showMessage("Failed to create Monaco/XBee protocol", 2000, Display::LIGHTRED1);
         }
-        newMenu->back(w);
-    });
-    newMenu->addEntry("Monaco/ESPnow", [=](Widget* w){
+    }, true);
+    newMenu->addEntry("Monaco/ESPnow", [menu](Widget* w){
         bb::printf("New Monaco/ESPnow config\n");
         Protocol *p = RemoteSubsys::inst.createProtocol(ProtocolType::MONACO_ESPNOW);
         if(p != nullptr) {
@@ -138,9 +135,8 @@ void UI::populateConfigMenu(Menu* menu) {
         } else {
             UI::ui.showMessage("Failed to create Monaco/ESPNow protocol", 2000, Display::LIGHTRED1);
         }
-        newMenu->back(w);
-    });
-    newMenu->addEntry("DroidDepot", [=](Widget* w){bb::printf("New DroidDepot config\n");
+    }, true);
+    newMenu->addEntry("DroidDepot", [menu](Widget* w){bb::printf("New DroidDepot config\n");
         Protocol *p = RemoteSubsys::inst.createProtocol(ProtocolType::DROIDDEPOT_BLE);
         if(p != nullptr) {
             UI::ui.showMessage("Created DroidDepot protocol", 2000, Display::LIGHTGREEN1);
@@ -148,9 +144,8 @@ void UI::populateConfigMenu(Menu* menu) {
         } else {
             UI::ui.showMessage("Failed to create DroidDepot protocol", 2000, Display::LIGHTRED1);
         }
-        newMenu->back(w);
-    });
-    newMenu->addEntry("Sphero", [=](Widget* w){bb::printf("New Sphero config\n");
+    }, true);
+    newMenu->addEntry("Sphero", [menu](Widget* w){bb::printf("New Sphero config\n");
         Protocol *p = RemoteSubsys::inst.createProtocol(ProtocolType::SPHERO_BLE);
         if(p != nullptr) {
             UI::ui.showMessage("Created Sphero protocol", 2000, Display::LIGHTGREEN1);
@@ -158,37 +153,34 @@ void UI::populateConfigMenu(Menu* menu) {
         } else {
             UI::ui.showMessage("Failed to create Sphero protocol", 2000, Display::LIGHTRED1);
         }
-        newMenu->back(w);
-    });
+    }, true);
 
     std::vector<std::string> names = ProtocolFactory::storedProtocolNames();
     shared_ptr<Menu> loadMenu = menu->addSubmenu("Load...");
     for(auto& n: names) {
         if(n != current->storageName()) // can't load current
-            loadMenu->addEntry(String(n.c_str()), [=](Widget*){
+            loadMenu->addEntry(String(n.c_str()), [menu,n,current](Widget*){
                 bb::printf("Load config %s", n.c_str());
                 UI::ui.showMessage(String("Loading ") + n.c_str() + "...");
                 if(RemoteSubsys::inst.loadCurrent(n) == false) {
-                    UI::showMessage("Loading failed", 2000, Display::LIGHTRED1);
+                    UI::ui.showMessage("Loading failed", 2000, Display::LIGHTRED1);
                     return;
                 }
                 menu->setName(String("Cur:") + String(n.c_str()) + " "+ char(current->protocolType()));
-                loadMenu->back(nullptr);
-            });
+            }, true);
     }
 
     shared_ptr<Menu> deleteMenu = menu->addSubmenu("Delete...");
     for(auto& n: names) {
         if(n != current->storageName() && n != RemoteSubsys::INTERREMOTE_PROTOCOL_NAME) // can't delete current or "default"
-            deleteMenu->addEntry(String(n.c_str()), [=](Widget*){
+            deleteMenu->addEntry(String(n.c_str()), [menu,n](Widget*){
                 bb::printf("Delete config %s", n.c_str());
                 if(ProtocolFactory::eraseProtocol(n.c_str()) == false) {
-                    UI::showMessage("Delete failed", 2000, Display::LIGHTRED1);
+                    UI::ui.showMessage("Delete failed", 2000, Display::LIGHTRED1);
                     return;
                 }
-                UI::showMessage("Deleted", 2000, Display::LIGHTGREEN1);
-                deleteMenu->back(nullptr);
-            });
+                UI::ui.showMessage("Deleted", 2000, Display::LIGHTGREEN1);
+            }, true);
     }
 }
 
@@ -212,16 +204,15 @@ void UI::populatePairDroidMenu(Menu* menu) {
         const NodeDescription& n = current->discoveredNode(num);
         if(!n.isReceiver) continue;
         if(current->isPaired(n.addr)) {
-            menu->addEntry(String("*")+n.name, [=](Widget* w){ UI::ui.showMessage("Already paired", 2000); });
+            menu->addEntry(String("*")+n.name, [](Widget* w){ UI::ui.showMessage("Already paired", 2000); }, true);
         } else {
-            menu->addEntry(String(n.name), [=](Widget* w) { 
-                UI::showMessage("Pairing..."); 
+            menu->addEntry(String(n.name), [current,n](Widget* w) { 
+                UI::ui.showMessage("Pairing..."); 
                 if(current->pairWith(n) == true) {
-                    UI::showMessage("Paired", 2000, Display::LIGHTGREEN1); 
+                    UI::ui.showMessage("Paired", 2000, Display::LIGHTGREEN1); 
                 }
-                else UI::showMessage("Pairing failed", 2000, Display::LIGHTRED1);
-                menu->back(w);
-            });
+                else UI::ui.showMessage("Pairing failed", 2000, Display::LIGHTRED1);
+            }, true);
         }
     }
     menu->setName(String(num) + " Droids");
@@ -244,24 +235,149 @@ void UI::populatePairRemoteMenu(Menu* menu) {
         const NodeDescription& n = inter->discoveredNode(num);
         if(n.isTransmitter == false) continue;
         if(inter->isPaired(n.addr)) {
-            menu->addEntry(String("*")+n.name, [=](Widget* w){ UI::ui.showMessage("Already paired", 2000); });
+            menu->addEntry(String("*")+n.name, [](Widget* w){ UI::ui.showMessage("Already paired", 2000); });
         } else {
-            menu->addEntry(String(n.name), [=](Widget* w) { 
-                UI::showMessage("Pairing..."); 
+            menu->addEntry(String(n.name), [n,inter](Widget* w) { 
+                UI::ui.showMessage("Pairing..."); 
                 if(inter->pairWith(n) == true) {
-                    UI::showMessage("Paired", 2000, Display::LIGHTGREEN1); 
+                    UI::ui.showMessage("Paired", 2000, Display::LIGHTGREEN1); 
                     if(RemoteSubsys::inst.storeInterremote() == false ||
                         ProtocolFactory::commit() == false) {
-                        UI::showMessage("Storing failed", 2000, Display::LIGHTRED1);
+                        UI::ui.showMessage("Storing failed", 2000, Display::LIGHTRED1);
                     }
                 }
-                else UI::showMessage("Pairing failed", 2000, Display::LIGHTRED1);
-                menu->back(w);
-            });
+                else UI::ui.showMessage("Pairing failed", 2000, Display::LIGHTRED1);
+            }, true);
         }
     }
     menu->setName(String(num) + " Remotes");
 }
+
+void UI::populateMappingMenu(Menu* menu) {
+    menu->clear();
+    Protocol* current = RemoteSubsys::inst.currentProtocol();
+    if(current == nullptr) return;
+
+    for(auto& n: current->pairedNodes()) {
+        if(n.isReceiver) {
+            std::shared_ptr<Menu> s = menu->addSubmenu(String(n.name), [n](Menu* m){ UI::ui.populateMappingMenu(m, n); });
+        }
+    }
+}
+
+void UI::populateMappingMenu(Menu* menu, const NodeDescription& n) {
+    menu->clear();
+    menu->setName(std::string(n.name).c_str());
+
+    Protocol* current = RemoteSubsys::inst.currentProtocol();
+    if(current == nullptr) return;
+
+    Transmitter* tx = current->transmitter();
+    if(tx == nullptr) return;
+
+    bb::printf("Showing mapping menu for %s\n", String(n.name).c_str());
+
+    if(current->receiverSideMixing()) {
+        showMessage("Retrieving Inputs...", 0);
+        if(current->retrieveInputs(n) == false) {
+            showMessage("Failed", 2000, Display::LIGHTRED1);
+            return;
+        }
+    }
+
+    MixManager* mgr = &(current->mixManager(n.addr));
+    for(unsigned int i=0; i<current->numInputs(n.addr); i++) {
+        String title = current->inputName(n.addr, i).c_str();
+        
+        if(mgr->hasMixForInput(i)) {
+            title = title + "*";
+        }
+
+        std::shared_ptr<Menu> sub = menu->addSubmenu(title, [n, tx, mgr, i](Menu* m) {UI::ui.populateMappingMenu(m, n, tx, mgr, i);});
+    }
+}
+
+void UI::populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* tx, MixManager* mgr, InputID inp) {
+    menu->clear();
+
+    AxisMix mix = mgr->mixForInput(inp);
+    shared_ptr<Widget> w;
+
+    String axis1Title = String("Ax1: ") + (mix.axis1 == AXIS_INVALID ? "-" : tx->axisName(mix.axis1).c_str());
+    std::shared_ptr<Menu> axis1Menu = menu->addSubmenu(axis1Title);
+    w = axis1Menu->addEntry("-", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.axis1 = AXIS_INVALID; mgr->setMix(inp, m); }, true);
+    if(mix.axis1 == AXIS_INVALID) w->setHighlighted(true);
+    else w->setHighlighted(false);
+    for(AxisID a=0; a<tx->numAxes(); a++) {
+        if(a == mix.axis2) continue;
+        w = axis1Menu->addEntry(tx->axisName(a).c_str(), [mix,mgr,inp,a](Widget* w) { AxisMix m = mix; m.axis1 = a; mgr->setMix(inp, m); }, true);
+        if(mix.axis1 == a) w->setHighlighted(true);
+        else w->setHighlighted(false);
+    }
+
+    std::string interpStr;
+    if(mix.interp1 == INTERP_LIN_CENTERED) interpStr = "LinCtr";
+    else if(mix.interp1 == INTERP_LIN_CENTERED_INV) interpStr = "LinCtrInv";
+    else if(mix.interp1 == INTERP_LIN_POSITIVE) interpStr = "LinPos";
+    else if(mix.interp1 == INTERP_LIN_POSITIVE_INV) interpStr = "LinPosInv";
+    else if(mix.interp1 == INTERP_ZERO) interpStr = "Zero";
+    else interpStr = "Custom";
+
+    std::shared_ptr<Menu> interp1Menu = menu->addSubmenu(String("Ip1: ")+ interpStr.c_str());
+    interp1Menu->addEntry("Zero", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_ZERO; mgr->setMix(inp, m); }, true);
+    interp1Menu->addEntry("LinCtr", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); }, true);
+    interp1Menu->addEntry("LinCtrInv", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); }, true);
+    interp1Menu->addEntry("LinPos", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
+    interp1Menu->addEntry("LinPosInv", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
+    interp1Menu->addEntry("Custom...", [mix,mgr,inp,this](Widget* w) { showMessage("Custom mix curves not implemented", 2000); }, true);
+
+    std::shared_ptr<Menu> axis2Menu = menu->addSubmenu(String("Ax2: ") + (mix.axis2 == AXIS_INVALID ? "-" : tx->axisName(mix.axis2).c_str()));
+    w = axis2Menu->addEntry("-", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.axis2 = AXIS_INVALID; mgr->setMix(inp, m); }, true);
+    if(mix.axis2 == AXIS_INVALID) w->setHighlighted(true);
+    else w->setHighlighted(false);
+    for(AxisID a=0; a<tx->numAxes(); a++) {
+        if(a == mix.axis1) continue;
+        shared_ptr<Widget> w = axis2Menu->addEntry(tx->axisName(a).c_str(), [mix,mgr,inp,a](Widget* w) {AxisMix m = mix; m.axis2 = a; mgr->setMix(inp, m); }, true);
+        if(mix.axis2 == a) w->setHighlighted(true);
+        else w->setHighlighted(false);
+    }
+
+    if(mix.interp2 == INTERP_LIN_CENTERED) interpStr = "LinCtr";
+    else if(mix.interp2 == INTERP_LIN_CENTERED_INV) interpStr = "LinCtrInv";
+    else if(mix.interp2 == INTERP_LIN_POSITIVE) interpStr = "LinPos";
+    else if(mix.interp2 == INTERP_LIN_POSITIVE_INV) interpStr = "LinPosInv";
+    else if(mix.interp2 == INTERP_ZERO) interpStr = "Zero";
+    else interpStr = "Custom";
+
+    std::shared_ptr<Menu> interp2Menu = menu->addSubmenu(String("Ip2: ")+ interpStr.c_str());
+    interp2Menu->addEntry("Zero", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_ZERO; mgr->setMix(inp, m); }, true);
+    interp2Menu->addEntry("LinCtr", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); }, true);
+    interp2Menu->addEntry("LinCtrInv", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); }, true);
+    interp2Menu->addEntry("LinPos", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
+    interp2Menu->addEntry("LinPosInv", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
+    interp2Menu->addEntry("Custom...", [mix,mgr,inp,this](Widget* w) { showMessage("Custom mix curves not implemented", 2000); }, true);
+
+    String mixStr = "Mix: ";
+    switch(mix.mixType) {
+    case MIX_ADD: 
+        mixStr += "Add";
+        break;
+    case MIX_MULT:
+        mixStr += "Mult";
+        break;
+    default:
+        mixStr += "None";
+    }
+
+    std::shared_ptr<Menu> mixMenu = menu->addSubmenu(mixStr);
+    w = mixMenu->addEntry("Add", [mix,mgr,inp](Widget* w) {AxisMix m = mix; m.mixType = MIX_ADD; mgr->setMix(inp, m); }, true);
+    if(mix.mixType == MIX_ADD) w->setHighlighted(true); else w->setHighlighted(false);
+    w = mixMenu->addEntry("Mult", [mix,mgr,inp](Widget* w) {AxisMix m = mix; m.mixType = MIX_MULT; mgr->setMix(inp, m); }, true);
+    if(mix.mixType == MIX_MULT) w->setHighlighted(true); else w->setHighlighted(false);
+    w = mixMenu->addEntry("None", [mix,mgr,inp](Widget* w) {AxisMix m = mix; m.mixType = MIX_NONE; mgr->setMix(inp, m); }, true);
+    if(mix.mixType == MIX_NONE) w->setHighlighted(true); else w->setHighlighted(false);
+}
+
   
 void UI::showMenu(const shared_ptr<Menu>& menu) {
     setMainWidget(menu.get());
@@ -270,18 +386,22 @@ void UI::showMenu(const shared_ptr<Menu>& menu) {
   
 void UI::showMain() {
     setMainWidget(mainVis_.get());
-    Input::inst.setConfirmShortPressCallback([=]{UI::ui.showMenu(mainMenu_);});
-    Input::inst.setConfirmLongPressCallback([=]{UI::ui.toggleLockFaceButtons();});
+    Input::inst.setConfirmShortPressCallback([this]{UI::ui.showMenu(mainMenu_);});
+    Input::inst.setConfirmLongPressCallback([]{UI::ui.toggleLockFaceButtons();});
 }
 
 void UI::populateMenus() {
     mainMenu_ = make_shared<Menu>();
     mainMenu_->setName("Main Menu");
 
-    shared_ptr<Menu> m = mainMenu_->addSubmenu("Config...");
-    m->setOnEnterCallback([this](Menu* menu){ populateConfigMenu(menu); });
+    shared_ptr<Menu> m;
+    Protocol* current = RemoteSubsys::inst.currentProtocol();
+    if(current != nullptr) {
+        m = mainMenu_->addSubmenu("Mapping...", [this](Menu* m) { populateMappingMenu(m); });
+    }
+    
+    m = mainMenu_->addSubmenu("Config...", [this](Menu* menu){ populateConfigMenu(menu); });
 
-    //shared_ptr<Menu> configMenu_ = mainMenu_->addSubmenu("Config");
 #if 0
     mainMenu_.setName("Main Menu");
 
@@ -378,12 +498,6 @@ void UI::drawGUI() {
     droidSeqnum_->draw();
     if(dialogActive_) dialog_->draw();
     else if(mainWidget_ != NULL) mainWidget_->draw();
-#if 0
-    if(needsMenuRebuild_) {
-      populateMenus();
-      needsMenuRebuild_ = false;
-    }
-#endif
     needsScreensaverRedraw_ = true;
 }
 
@@ -475,7 +589,7 @@ void UI::showLEDBrightnessDialog() {
     dialog_->setValue(RRemote::remote.ledBrightness());
     dialog_->setSuffix("");
     dialog_->setRange(0, 7);
-    dialog_->setOKCallback([=](Dialog* d){RRemote::remote.setLEDBrightness(d->value());});
+    dialog_->setOKCallback([](Dialog* d){RRemote::remote.setLEDBrightness(d->value());});
     showDialog();
 }
 
@@ -484,7 +598,7 @@ void UI::showJoyDeadbandDialog() {
     dialog_->setValue(RRemote::remote.joyDeadband());
     dialog_->setSuffix("%");
     dialog_->setRange(0, 15);
-    dialog_->setOKCallback([=](Dialog* d){RRemote::remote.setJoyDeadband(d->value());});
+    dialog_->setOKCallback([](Dialog* d){RRemote::remote.setJoyDeadband(d->value());});
     showDialog();
 }
   
@@ -493,7 +607,7 @@ void UI::showSendRepeatsDialog() {
     dialog_->setValue(RRemote::remote.sendRepeats());
     dialog_->setSuffix("");
     dialog_->setRange(0, 7);
-    dialog_->setOKCallback([=](Dialog* d){RRemote::remote.setSendRepeats(d->value());});
+    dialog_->setOKCallback([](Dialog* d){RRemote::remote.setSendRepeats(d->value());});
     showDialog();
 }
 

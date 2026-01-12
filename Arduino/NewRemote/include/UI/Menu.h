@@ -22,13 +22,11 @@ class Menu: public MultiWidget {
 public:
   Menu();
 
-  std::shared_ptr<Button> addEntry(const String& title, std::function<void(Widget*)> callback, int tag=0);
-  std::shared_ptr<Menu> addSubmenu(const String& title);
+  std::shared_ptr<Button> addEntry(const String& title, std::function<void(Widget*)> callback, bool backAfterCB=false);
+  std::shared_ptr<Menu> addSubmenu(const String& title, std::function<void(Menu*)> enterCB=nullptr, std::function<void(Menu*)> leaveCB=nullptr);
 
   virtual Result draw();
-
   void clear();
-
   void up() {setCursor(cursor_-1);};
   void down() {setCursor(cursor_+1);}
   void setCursor(int cursor);
@@ -38,12 +36,11 @@ public:
   virtual void takeInputFocus();
 
   void enter();
-  
-  void back(Widget* w);
+  void back(Widget* w = nullptr);
   void select();
 
-  void setOnEnterCallback(std::function<void(Menu*)> enterCB) { enterCB_ = enterCB; }
-  void setOnLeaveCallback(std::function<void(Menu*)> leaveCB) { leaveCB_ = leaveCB; }
+  void setEnterCallback(std::function<void(Menu*)> enterCB) { enterCB_ = enterCB; }
+  void setLeaveCallback(std::function<void(Menu*)> leaveCB) { leaveCB_ = leaveCB; }
   void setParent(Menu* parent) { parent_ = parent; }
   Menu* parent() { return parent_; }
 

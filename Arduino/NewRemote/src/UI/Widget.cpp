@@ -18,6 +18,8 @@ Widget::Widget(): name_("Widget") {
 }
 
 Widget::~Widget() {
+    bb::printf("Deleting widget 0x%x \"%s\"\n", this, name_.c_str());
+    bb::printf("Free heap now: %d\n", heap_caps_get_free_size(MALLOC_CAP_DEFAULT));
 }
 
 Result Widget::draw() {

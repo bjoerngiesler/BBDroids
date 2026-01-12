@@ -137,6 +137,8 @@ protected:
   bb::PIDController autoPosController_, posController_; 
   float posControllerZero_;
   
+  bool playFolderBtnPressed_[10];
+
   MotorStatus leftMotorStatus_, rightMotorStatus_;
 
   bb::LowPassFilter leanFilter_;
@@ -157,8 +159,8 @@ protected:
   Adafruit_NeoPixel statusPixels_;
   bool commLEDOn_;
 
-  //MXBProtocol protocol_;
-  MSatProtocol protocol_;
+  MXBProtocol protocol_;
+  //MSatProtocol protocol_;
   Receiver *receiver_;
 };
 

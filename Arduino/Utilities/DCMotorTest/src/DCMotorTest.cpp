@@ -6,8 +6,8 @@ using namespace bb;
 static const uint8_t PIN_DISABLE = 255;
 
 //#include "ConfigBB8.h"
-//#include "ConfigDO.h"
-#include "ConfigSerf.h"
+#include "ConfigDO.h"
+//#include "ConfigSerf.h"
 
 // --------------------------------------------------
 

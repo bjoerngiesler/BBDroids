@@ -258,6 +258,12 @@ Result DODroid::servoTest(ConsoleStream *stream) {
     headIsOn_ = true;
   }
 
+
+  bb::Servos::servos.setGoalVel(SERVO_NECK, 100);
+  bb::Servos::servos.setGoalVel(SERVO_HEAD_PITCH, 100);
+  bb::Servos::servos.setGoalVel(SERVO_HEAD_HEADING, 100);
+  bb::Servos::servos.setGoalVel(SERVO_HEAD_ROLL, 100);
+
   servosOK_ = true;
   LOG(LOG_INFO, "Servos OK.\n");
   return RES_OK;
