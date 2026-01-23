@@ -22,6 +22,7 @@ UI::UI() {
     mainVis_->addWidget(remoteVisL_);
     mainVis_->addWidget(remoteVisR_);
     mainVis_->addWidget(droidVis_);
+    //mainVis_->showFirst();
 
     topLabel_ = make_shared<Label>();
     topLabel_->setSize(Display::DISPLAY_WIDTH, Display::CHAR_HEIGHT);
@@ -73,7 +74,9 @@ void UI::start() {
         mainWidget_->setNeedsFullRedraw();
     leftSeqnum_->setNeedsFullRedraw();
     droidSeqnum_->setNeedsFullRedraw();
-    rightSeqnum_->setNeedsFullRedraw();  
+    rightSeqnum_->setNeedsFullRedraw();
+    topLabel_->setNeedsFullRedraw();
+    bottomLabel_->setNeedsFullRedraw();
 }
 
 void UI::setMainWidget(Widget* widget) {
@@ -89,6 +92,7 @@ void UI::setMainWidget(Widget* widget) {
     mainWidget_->takeInputFocus();
     mainWidget_->setNeedsFullRedraw();
     mainWidget_->setNeedsContentsRedraw();
+
     setTopTitle(mainWidget_->name());
 }
 
@@ -516,7 +520,12 @@ void UI::drawScreensaver() {
 }
 
 void UI::setTopTitle(const String& title) {
-    topLabel_->setTitle(title);
+    if(topLabel_ != nullptr){
+        topLabel_->setTitle(title);
+        bb::printf("Set top title \"%s\"\n", title.c_str());
+    } else {
+        bb::printf("top label is NULL\n");
+    }
 }  
 
 void UI::saveCurrentConfigAsCB(Dialog* dialog) {

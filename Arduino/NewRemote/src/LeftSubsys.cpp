@@ -33,7 +33,7 @@ Result LeftSubsys::step() {
 
     if(Runloop::runloop.getSequenceNumber() % 4 == 0) {
         static uint8_t seqnum;
-        //UI::ui.leftRemoteVis()->visualizeFromInput();
+        UI::ui.leftRemoteVis()->visualizeFromInput();
         UI::ui.updateLeftSeqnum(seqnum++);
         UI::ui.drawGUI();
     }
