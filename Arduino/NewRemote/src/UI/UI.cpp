@@ -65,8 +65,8 @@ UI::UI() {
 
 void UI::start() {
     populateMenus();
-    mainMenu_->enter();
-    //showMain();
+    //mainMenu_->enter();
+    showMain();
     drawGUI();
     delay(10);
     if(mainWidget_ != nullptr)
