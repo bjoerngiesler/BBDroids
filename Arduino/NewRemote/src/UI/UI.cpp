@@ -66,7 +66,6 @@ UI::UI() {
 
 void UI::start() {
     populateMenus();
-    //mainMenu_->enter();
     showMain();
     drawGUI();
     delay(10);
@@ -389,6 +388,7 @@ void UI::showMenu(const shared_ptr<Menu>& menu) {
 }
   
 void UI::showMain() {
+    mainVis_->showFirst();
     setMainWidget(mainVis_.get());
     Input::inst.setConfirmShortPressCallback([this]{UI::ui.showMenu(mainMenu_);});
     Input::inst.setConfirmLongPressCallback([]{UI::ui.toggleLockFaceButtons();});
