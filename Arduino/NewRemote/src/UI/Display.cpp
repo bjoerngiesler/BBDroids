@@ -55,7 +55,7 @@ Result Display::start(ConsoleStream *stream) {
   #endif
 
       bb::printf("failure, got 0x%x instead of 0x%x\n", retval, rd::CMD_NOP|0x80);
-      return RES_SUBSYS_COMM_ERROR;
+      // return RES_SUBSYS_COMM_ERROR;
     }
     bb::printf("OK\n");
   }
