@@ -110,11 +110,13 @@ RInput::ButtonPin RInput::buttonToPin(RInput::Button button) {
 }
 
 bool RInput::initIMU() {
-  if(imu_.begin(isLeftRemote ? LEFT_IMU_ADDR : RIGHT_IMU_ADDR) == true) {
-    float dr = imu_.dataRate();
-    Console::console.printfBroadcast("Successfully initialized IMU; data rate: %f\n", dr);
-    Runloop::runloop.setCycleTimeMicros(1e6/dr);
-    return true;
+  for(uint8_t addr: IMU_ADDRESSES) {
+    if(imu_.begin(addr) == true) {
+      float dr = imu_.dataRate();
+      Console::console.printfBroadcast("Successfully initialized IMU; data rate: %f\n", dr);
+      Runloop::runloop.setCycleTimeMicros(1e6/dr);
+      return true;
+    }
   }
 
   Console::console.printfBroadcast("IMU not available\n");
