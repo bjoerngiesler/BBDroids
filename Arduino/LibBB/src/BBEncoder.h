@@ -1,9 +1,10 @@
 #if !defined(BBENCODER_H)
 #define BBENCODER_H
 
-#if defined(ARDUINO_ARCH_SAMD) // FIXME - get rid of dependency of Arduino Encoder class.
-
+#if !defined(ARDUINO_CYTRON_MOTION_2350_PRO) // FIXME - get rid of dependency of Arduino Encoder class.
 #include <Encoder.h>
+#endif // ARDUINO_CYTRON_MOTION_2350_PRO
+
 #include <BBControllers.h>
 #include <BBLowPassFilter.h>
 #include <limits.h>
@@ -23,6 +24,7 @@ public:
   };
 
   Encoder(uint8_t pin_enc_a, uint8_t pin_enc_b, InputMode mode = INPUT_POSITION, Unit unit = UNIT_TICKS);
+  ~Encoder();
   
   void setMode(InputMode mode);
   void setUnit(Unit unit);
@@ -47,7 +49,12 @@ public:
 protected:
   InputMode mode_;
   Unit unit_;
+#if defined(ARDUINO_CYTRON_MOTION_2350_PRO)
+  uint8_t enc_;
+  uint8_t pinEncA_, pinEncB_;
+#else
   ::Encoder enc_; // FIXME -- since this requires SAMD, possibly replace by own encoder handling?
+#endif
   bb::LowPassFilter filtSpeed_, filtPos_;
 
   float mmPT_;
@@ -59,8 +66,5 @@ protected:
   float presentSpeedFiltered_;
 };
 }
-
-#endif // ARDUINO_ARCH_SAMD
-
 
 #endif //BBENCODER_H

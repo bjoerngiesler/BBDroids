@@ -988,11 +988,9 @@ Result bb::Servos::syncReadInfo(ConsoleStream *stream) {
 
   recv_cnt = dxl_.syncRead(&srLoadInfos);
   if(recv_cnt != servos_.size()) {
-  #if 0
-    if(stream) stream->printf("servo: Receiving initial load failed!\n");
-    else Console::console.printfBroadcast("servo: Receiving initial load failed!\n");
-  #endif
-      return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+    if(stream) stream->printf("servo: Receiving load failed!\n");
+    else Console::console.printfBroadcast("servo: Receiving load failed!\n");
+    return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }
 
   return RES_OK;
