@@ -34,6 +34,8 @@ public:
 
     bool loadCurrent(const std::string& name);
 
+    void protocolPairedCB(Protocol* proto, const NodeDescription& node);
+
 protected:
     Protocol *current_, *interremote_;
     MaxlenString currentName_;

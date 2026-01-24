@@ -100,6 +100,7 @@ Result RemoteSubsys::initialize() {
     if(interremote_ == nullptr) {
         bb::printf("Loading failed, creating new\n");
         interremote_ = ProtocolFactory::getOrCreateProtocol(MONACO_XBEE);
+        interremote_->setPairingCallback([this](Protocol* p,const NodeDescription& n) {this->protocolPairedCB(p, n);});
     }
 
     if(interremote_ == nullptr) {
@@ -159,6 +160,7 @@ Protocol* RemoteSubsys::createProtocol(ProtocolType type) {
     current_ = proto;
     current_->init(isLeftRemote ? "LeftRemote" : "RightRemote");
     current_->setStorageName(nextProtocolName());
+    current_->setPairingCallback([this](Protocol* p,const NodeDescription& n) {this->protocolPairedCB(p, n);});
 
     if(currentChangedCB_ != nullptr) {
         currentChangedCB_(current_);
@@ -399,4 +401,22 @@ bool RemoteSubsys::loadCurrent(const std::string& name) {
     if(currentChangedCB_ != nullptr) currentChangedCB_(current_);
 
     return true;
+}
+
+void RemoteSubsys::protocolPairedCB(Protocol* proto, const NodeDescription& node) {
+    if(proto == interremote_) {
+        bb::printf("New node paired with interremote: %s\n", node.addr.toString().c_str());
+        storeInterremote();
+        ProtocolFactory::commit();
+    } else if(proto == current_) {
+        bb::printf("New node paired with current: %s\n", node.addr.toString().c_str());
+        if(current_->storageName() == "") {
+            bb::printf("Can't store current as storage name is \"\"\n");
+        } else {
+            storeCurrent(current_->storageName());
+            ProtocolFactory::commit();
+        }   
+    } else {
+        bb::printf("Received pairing CB from protocol %x, which is neither current nor inter - ignoring\n", proto);
+    }
 }

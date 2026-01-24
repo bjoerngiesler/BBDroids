@@ -522,7 +522,6 @@ void UI::drawScreensaver() {
 void UI::setTopTitle(const String& title) {
     if(topLabel_ != nullptr){
         topLabel_->setTitle(title);
-        bb::printf("Set top title \"%s\"\n", title.c_str());
     } else {
         bb::printf("top label is NULL\n");
     }
