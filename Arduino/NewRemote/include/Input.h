@@ -28,8 +28,6 @@ public:
   };
   static const uint8_t NUM_BUTTONS = 8;
 
-  // Weird order given by ESP32 layout
-#if defined(ARDUINO_ARCH_ESP32)
   typedef uint8_t ButtonPin;
   static ButtonPin BUTTON_PIN_1;
   static ButtonPin BUTTON_PIN_2;
@@ -39,18 +37,7 @@ public:
   static ButtonPin BUTTON_PIN_CONFIRM;
   static ButtonPin BUTTON_PIN_LEFT;
   static ButtonPin BUTTON_PIN_RIGHT;
-#else
-  enum ButtonPin {
-    BUTTON_PIN_1       = 0,
-    BUTTON_PIN_2       = 1,
-    BUTTON_PIN_3       = 2,
-    BUTTON_PIN_4       = 3,
-    BUTTON_PIN_JOY     = 4,
-    BUTTON_PIN_CONFIRM = 5,
-    BUTTON_PIN_LEFT    = 6,
-    BUTTON_PIN_RIGHT   = 7
-  };
-#endif
+
   struct AxisCalib {
   public:
     AxisCalib(): min(0), max(4095), center(2048) {}

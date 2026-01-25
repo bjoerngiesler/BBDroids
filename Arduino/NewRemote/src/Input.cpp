@@ -73,8 +73,8 @@ void Input::initButtonPinMapping() {
   } else {
     BUTTON_PIN_1       = 5;
     BUTTON_PIN_2       = 4;
-    BUTTON_PIN_3       = 2;
-    BUTTON_PIN_4       = 3;
+    BUTTON_PIN_3       = 3;
+    BUTTON_PIN_4       = 2;
     BUTTON_PIN_JOY     = 1;
     BUTTON_PIN_CONFIRM = 7;
     BUTTON_PIN_LEFT    = 6;
