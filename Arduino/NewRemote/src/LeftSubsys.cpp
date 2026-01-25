@@ -10,9 +10,8 @@ LeftSubsys LeftSubsys::inst;
 
 Result LeftSubsys::initialize() {
     receiver_ = nullptr;
-    currentProto_ = nullptr;
     interSetupComplete_ = false;
-    return Subsystem::initialize("left", "Left Subsystem", "help");
+    return Subsystem::initialize("left", "Left Subsystem", help_.c_str());
 }
 
 Result LeftSubsys::start() {
@@ -43,11 +42,9 @@ Result LeftSubsys::step() {
     Input::inst.updateTransmitter(transmitter_);
     //bb::printf("Updating transmitter in left done\n");
 
-    return RES_OK;
-}
+    LRBase::step();
 
-Result LeftSubsys::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
-    return Subsystem::handleConsoleCommand(words, stream);
+    return RES_OK;
 }
 
 void LeftSubsys::setupCurrent(Protocol* p) {

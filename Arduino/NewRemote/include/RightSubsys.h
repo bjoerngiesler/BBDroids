@@ -4,11 +4,12 @@
 #include <LibBB.h>
 #include <LibBBRemotes.h>
 #include "Input.h"
+#include "LRBase.h"
 
 using namespace bb;
 using namespace bb::rmt;
 
-class RightSubsys: public Subsystem {
+class RightSubsys: public LRBase {
 public:
     static RightSubsys inst;
 
@@ -17,13 +18,9 @@ public:
     virtual Result stop();
     virtual Result step();
 
-    virtual Result handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream);
-
     void protocolDestroyed(Protocol *protocol);
 
 protected:
-    Transmitter* transmitter_;
-    Protocol *currentProto_;
 };
 
 #endif // RCONTROLLERSUBSYS_H

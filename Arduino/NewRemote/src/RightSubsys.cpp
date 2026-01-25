@@ -8,9 +8,7 @@
 RightSubsys RightSubsys::inst;
 
 Result RightSubsys::initialize() {
-    transmitter_ = nullptr;
-    currentProto_ = nullptr;
-    return Subsystem::initialize("right", "Right Subsystem", "help");
+    return Subsystem::initialize("right", "Right Subsystem", help_.c_str());
 }
 
 Result RightSubsys::start() {
@@ -53,11 +51,9 @@ Result RightSubsys::step() {
     if(transmitter_ == nullptr) return RES_SUBSYS_HW_DEPENDENCY_MISSING;
     Input::inst.updateTransmitter(transmitter_);
 
-    return RES_OK;
-}
+    LRBase::step();
 
-Result RightSubsys::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
-    return Subsystem::handleConsoleCommand(words, stream);
+    return RES_OK;
 }
 
 void RightSubsys::protocolDestroyed(Protocol* p) {
