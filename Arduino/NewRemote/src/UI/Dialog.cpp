@@ -244,13 +244,15 @@ void Dialog::encInput(float enc) {
             c = c+1;
             if(c > '9' && c < 'A') c = 'A';
             if(c > 'Z' && c < 'a') c = 'a';
-            if(c > 'z') c = '0';
+            if(c > 'z') c = ' ';
+            if(c > ' ') c = '0';
             currentEnc_ = 0;
         } else if(currentEnc_ < -20.0) {
             c = c-1;
             if(c < 'A' && c > '9') c = '9';
             if(c < 'a' && c > 'Z') c = 'Z';
-            if(c < '0') c = 'z'; 
+            if(c < '0') c = ' ';
+            if(c < ' ') c = 'z'; 
             currentEnc_ = 0;
         }
         valueString_[cursor_] = c;
