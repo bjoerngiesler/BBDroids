@@ -124,6 +124,9 @@ void Menu::clear() {
 }
 
 void Menu::setCursor(int cursor) {
+  if(cursor < 0) cursor = widgets_.size();
+  if(cursor > widgets_.size()) cursor = 0;  
+
   if(cursor == cursor_ || cursor < 0 || cursor > widgets_.size()) return;
 
   if(cursor_ < widgets_.size()) {
