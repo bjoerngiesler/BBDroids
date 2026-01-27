@@ -189,9 +189,11 @@ bool Input::begin(const Pins& pins) {
     }
   }
   bb::printf("Calibration values: %f, %f\n", hval, vval);
+#define INITIAL_INSET 200
+  hCalib.min = vCalib.min = INITIAL_INSET;
   hCalib.center = uint16_t(hval);
   vCalib.center = uint16_t(vval);
-
+  hCalib.max = vCalib.max = 4096-INITIAL_INSET;
 
   initButtonPinMapping();
   for(int i=0; i<10; i++) {
@@ -232,10 +234,16 @@ void Input::update() {
     joyRawV = analogRead(pins_.P_A_JOY_VER);
   }
 
+
   minJoyRawH = min(minJoyRawH, joyRawH);
   maxJoyRawH = max(maxJoyRawH, joyRawH);
   minJoyRawV = min(minJoyRawV, joyRawV);
   maxJoyRawV = max(maxJoyRawV, joyRawV);
+
+  hCalib.min = min(minJoyRawH, hCalib.min);
+  hCalib.max = max(maxJoyRawH, hCalib.max);
+  vCalib.min = min(minJoyRawV, vCalib.min);
+  vCalib.max = max(maxJoyRawV, vCalib.max);
 
   //float joyFilteredH = joyHFilter_.filter(joyRawH);
   //float joyFilteredV = joyVFilter_.filter(joyRawV);
