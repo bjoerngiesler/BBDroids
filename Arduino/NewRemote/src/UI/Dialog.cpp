@@ -22,8 +22,8 @@ Dialog::Dialog() {
     valueLabel_->setAutosize();
     cursorLabel_->setAutosize();
 
-    okLabel_->setAction([=](Widget* w) { ok(w); });
-    cancelLabel_->setAction([=](Widget* w) { cancel(w); });
+    okLabel_->setAction([this](Widget* w) { ok(w); });
+    cancelLabel_->setAction([this](Widget* w) { cancel(w); });
 
     addWidget(titleLabel_);
     addWidget(valueLabel_);
@@ -113,10 +113,10 @@ void Dialog::takeInputFocus() {
     focusedWidget_->setHighlighted(true);
     cursorLabel_->setHighlighted(true);
     cursor_ = 0;
-    Input::inst.setConfirmShortPressCallback([=](){focusedWidget_->triggerAction();});
-    Input::inst.setLeftPressCallback([=](){focusPrev();});
-    Input::inst.setRightPressCallback([=](){focusNext();});
-    Input::inst.setEncTurnCallback([=](float enc){encInput(enc);});
+    Input::inst.setConfirmShortPressCallback([this](){focusedWidget_->triggerAction();});
+    Input::inst.setLeftPressCallback([this](){focusPrev();});
+    Input::inst.setRightPressCallback([this](){focusNext();});
+    Input::inst.setEncTurnCallback([this](float enc){encInput(enc);});
 }
 
 void Dialog::focusNext() {
@@ -244,14 +244,14 @@ void Dialog::encInput(float enc) {
             c = c+1;
             if(c > '9' && c < 'A') c = 'A';
             if(c > 'Z' && c < 'a') c = 'a';
+            if(c > ' ' && c < '0') c = '0';
             if(c > 'z') c = ' ';
-            if(c > ' ') c = '0';
             currentEnc_ = 0;
         } else if(currentEnc_ < -20.0) {
             c = c-1;
             if(c < 'A' && c > '9') c = '9';
             if(c < 'a' && c > 'Z') c = 'Z';
-            if(c < '0') c = ' ';
+            if(c < '0' && c > ' ') c = ' ';
             if(c < ' ') c = 'z'; 
             currentEnc_ = 0;
         }

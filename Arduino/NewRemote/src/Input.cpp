@@ -263,7 +263,6 @@ void Input::update() {
     joyH = 0;
   }
   joyH = constrain(joyH, -1.0f, 1.0f);
-  //bb::printf("Updated joyH to %f\n", joyH);
 
   if(joyFilteredV < vCalib.center-deadbandAbs) {
     joyAtZero_ = false;

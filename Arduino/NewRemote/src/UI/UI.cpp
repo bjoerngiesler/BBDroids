@@ -163,13 +163,14 @@ void UI::populateConfigMenu(Menu* menu) {
     for(auto& n: names) {
         if(n != current->storageName()) // can't load current
             loadMenu->addEntry(String(n.c_str()), [menu,n,current](Widget*){
-                bb::printf("Load config %s", n.c_str());
+                bb::printf("Load config %s\n", n.c_str());
                 UI::ui.showMessage(String("Loading ") + n.c_str() + "...");
                 if(RemoteSubsys::inst.loadCurrent(n) == false) {
                     UI::ui.showMessage("Loading failed", 2000, Display::LIGHTRED1);
                     return;
                 }
-                menu->setName(String("Cur:") + String(n.c_str()) + " "+ char(current->protocolType()));
+                Protocol *c = RemoteSubsys::inst.currentProtocol();
+                menu->setName(String("Cur:") + String(n.c_str()) + " "+ char(c->protocolType()));
             }, true);
     }
 
@@ -182,6 +183,11 @@ void UI::populateConfigMenu(Menu* menu) {
                     UI::ui.showMessage("Delete failed", 2000, Display::LIGHTRED1);
                     return;
                 }
+                if(ProtocolFactory::commit() == false) {
+                    UI::ui.showMessage("Delete failed", 2000, Display::LIGHTRED1);
+                    return;
+                }
+                    
                 UI::ui.showMessage("Deleted", 2000, Display::LIGHTGREEN1);
             }, true);
     }

@@ -49,7 +49,7 @@ Result LeftSubsys::step() {
 
 void LeftSubsys::setupCurrent(Protocol* p) {
     if(p == nullptr) {
-        bb::printf("p is nullptr!");
+        bb::printf("p is nullptr!\n");
         return;
     }
 

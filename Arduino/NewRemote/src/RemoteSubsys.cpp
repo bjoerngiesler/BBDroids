@@ -112,7 +112,7 @@ Result RemoteSubsys::initialize() {
     interremote_->init(isLeftRemote ? "LeftRemote" : "RightRemote");
 
 
-    if(ProtocolFactory::lastUsedProtocolName() != INTERREMOTE_PROTOCOL_NAME) {
+    if(ProtocolFactory::lastUsedProtocolName() != INTERREMOTE_PROTOCOL_NAME && ProtocolFactory::lastUsedProtocolName() != "") {
         bb::printf("Loading protocol %s\n", ProtocolFactory::lastUsedProtocolName().c_str());
         current_ = ProtocolFactory::loadLastUsedProtocol();
         if(current_ == nullptr) {
@@ -383,15 +383,19 @@ void RemoteSubsys::setCurrentChangedCB(std::function<void(Protocol*)> currentCha
 }
 
 bool RemoteSubsys::loadCurrent(const std::string& name) {
-    Protocol *proto = ProtocolFactory::loadProtocol(name.c_str());
+    Protocol *proto;
+    if(name == INTERREMOTE_PROTOCOL_NAME) proto = interremote_;
+    else proto = ProtocolFactory::loadProtocol(name.c_str());
     if(proto == nullptr) {
         bb::printf("Protocol is null\n");
         return false;
     }
 
+    Protocol *needsDestruction = nullptr;
+
     if(current_ != proto && current_ != interremote_) {
-        bb::printf("Destroying current\n");
-        ProtocolFactory::destroyProtocol(&current_);
+        bb::printf("Current needs destruction\n");
+        needsDestruction = current_;
     } else {
         if(current_ == proto) { bb::printf("not deleting, the new one is the current_\n"); }
         if(current_ == interremote_) { bb::printf("not deleting, the old one is the interremote_\n"); }
@@ -399,6 +403,11 @@ bool RemoteSubsys::loadCurrent(const std::string& name) {
     current_ = proto;
             
     if(currentChangedCB_ != nullptr) currentChangedCB_(current_);
+
+    if(needsDestruction != nullptr) {
+        ProtocolFactory::destroyProtocol(&needsDestruction);
+        bb::printf("current destroyed\n");
+    }
 
     return true;
 }
