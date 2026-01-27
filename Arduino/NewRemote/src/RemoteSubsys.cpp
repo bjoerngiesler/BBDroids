@@ -76,6 +76,9 @@ bool RemoteSubsys::memoryWrite(const ProtocolStorage& storage) {
         bb::printf("Failed to commit data\n");
     }
 
+    bb::printf("1s safety break\n");
+    delay(1000);
+
     nvs_close(handle);
     return true;
 }
@@ -407,6 +410,12 @@ bool RemoteSubsys::loadCurrent(const std::string& name) {
     if(needsDestruction != nullptr) {
         ProtocolFactory::destroyProtocol(&needsDestruction);
         bb::printf("current destroyed\n");
+    }
+
+    if(ProtocolFactory::lastUsedProtocolName() != current_->storageName()) {
+        bb::printf("Setting last used protocol name to \"%s\"\n", current_->storageName().c_str());
+        ProtocolFactory::setLastUsedProtocolName(current_->storageName());
+        ProtocolFactory::commit();
     }
 
     return true;

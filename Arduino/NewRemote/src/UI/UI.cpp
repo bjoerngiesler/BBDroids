@@ -106,6 +106,43 @@ void UI::populateConfigMenu(Menu* menu) {
         menu->setName(String("Cur:") + String(current->storageName().c_str()) + " " + char(current->protocolType()));
     }
 
+    menu->addEntry("Info...", [this](Widget*){
+        char buf[255];
+        unsigned int cpR = 0, cpT = 0, cpC = 0, ipR = 0, ipT = 0, ipC = 0;
+        Protocol *current, *inter;
+        current = RemoteSubsys::inst.currentProtocol();
+        inter = RemoteSubsys::inst.interremoteProtocol();
+        for(auto& n: current->pairedNodes()) {
+            if(n.isReceiver) cpR++;
+            if(n.isConfigurator) cpC++;
+            if(n.isTransmitter) cpC++;
+        }
+        ipR = ipC = ipT = 0;
+        for(auto& n: inter->pairedNodes()) {
+            if(n.isReceiver) ipR++;
+            if(n.isConfigurator) ipC++;
+            if(n.isTransmitter) ipT++;
+        }
+        memset(buf, 0, 255);
+        if(current == inter) {
+            snprintf(buf, 254, "Cur Proto:\n\"%s\"\nType: %c\nPaired: %d\n%dT, %dR ,%dC", 
+                current->storageName().c_str(), 
+                current->protocolType(),
+                current->pairedNodes().size(),
+                cpT, cpR, cpC);
+        } else {
+            snprintf(buf, 254, "Cur Proto:\n\"%s\"\nType: %c\nPaired: %d\n%dTX,%dRX,%dCF\n\nInt Proto:\n\"%s\"\nType:%c\nPaired:%d\n%dT, %dR, %dC", 
+                current->storageName().c_str(), 
+                current->protocolType(),
+                current->pairedNodes().size(),
+                cpT, cpR, cpC,
+                inter->storageName().c_str(), 
+                inter->protocolType(),
+                inter->pairedNodes().size(),
+                ipT, ipR, ipC);
+        }
+        showMessage(buf, 5000);
+    });
     shared_ptr<Menu> pairRemoteMenu = menu->addSubmenu("Pair remote...", [](Menu* m){ UI::ui.populatePairRemoteMenu(m); });
     shared_ptr<Menu> pairDroidMenu = menu->addSubmenu("Pair droid...", [](Menu* m){ UI::ui.populatePairDroidMenu(m); });
 
