@@ -1247,9 +1247,9 @@ bb::Result bb::XBee::receive(APIFrame& frame) {
 
 	//if(!uart_->available()) delayMicroseconds(200);
 	//if(!uart_->available()) return RES_SUBSYS_COMM_ERROR;	
-	if(waitfor([=]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
+	if(waitfor([this]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
 	uint8_t lengthMSB = readEscapedByte(uart_);
-	if(waitfor([=]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
+	if(waitfor([this]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
 	//if(!uart_->available()) delayMicroseconds(200);
 	//if(!uart_->available()) return RES_SUBSYS_COMM_ERROR;	
 	uint8_t lengthLSB = readEscapedByte(uart_);
@@ -1264,13 +1264,13 @@ bb::Result bb::XBee::receive(APIFrame& frame) {
 	uint8_t *buf = frame.data();
 	for(uint16_t i=0; i<length; i++) {
 		//Console::console.printfBroadcast("Reading byte %d of %d\n", i, length);
-		if(waitfor([=]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
+		if(waitfor([this]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
 		//if(!uart_->available()) delayMicroseconds(200);
 		buf[i] = readEscapedByte(uart_);
 	}
 	frame.calcChecksum();
 
-	if(waitfor([=]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
+	if(waitfor([this]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
 	//if(!uart_->available()) delayMicroseconds(200);
 	uint8_t checksum = readEscapedByte(uart_);
 

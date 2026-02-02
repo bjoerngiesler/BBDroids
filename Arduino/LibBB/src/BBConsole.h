@@ -41,7 +41,7 @@ public:
 		char *buf = new char[len];
 		vsnprintf(buf, len, format, args);
 		printfFinal(buf);
-		free(buf);
+		delete[] buf;
 		return len;
 	}
 
