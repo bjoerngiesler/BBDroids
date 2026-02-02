@@ -2,6 +2,7 @@
 #include "DOConfig.h"
 #include "DOBattStatus.h"
 #include "DOSound.h"
+#include "BuilderID.h"
 #include <SAMD_PWM.h>
 #include <map>
 #include "../resources/systemsounds.h"
@@ -177,6 +178,9 @@ Result DODroid::initialize(Uart* remoteUart) {
   //setPacketSource(PACKET_SOURCE_DROID);
 
   protocol_.init("DODroid", DEFAULT_RCHAN, DEFAULT_RPAN, remoteUart);
+  protocol_.setBuilderId(BUILDER_ID);
+  protocol_.setStationId(0);
+  protocol_.setStationDetail(0); // FIXME need to specify station detail here
   //protocol_.init(remoteUart);
   receiver_ = protocol_.createReceiver();
   if(receiver_ == nullptr) {

@@ -7,7 +7,6 @@
 // Basic Droid Config
 static const bb::DroidType DROID_TYPE = bb::DroidType::DROID_DO;
 static const char*         DROID_NAME = "Generic D-O";
-static const uint8_t       BUILDER_ID = 0; // Reserved values: 0 Bjoern, 1 Felix, 2 Micke, 3 Brad, 4 Lars, 5 Lukas
 static const uint8_t       DROID_ID   = 0;
 static const float         WHEEL_CIRCUMFERENCE = 722.566;              // Wheel circumference in mm for D-O, required to convert between speed over ground to encoder ticks
 static const float         WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979.2 ticks per one turn of the drive gear, 18 teeth on the drive gear, 97 teeth on the main gear.
