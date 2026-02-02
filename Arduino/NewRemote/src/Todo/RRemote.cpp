@@ -735,7 +735,7 @@ void RRemote::startCalibration() {
   if(isLeftRemote) {
     UI::ui.showCalibration(PACKET_SOURCE_LEFT_REMOTE);
   }
-  Input::inst.setAllCallbacks([=]{finishCalibration();});
+  Input::inst.setAllCallbacks([this]{finishCalibration();});
   Input::inst.setCalibration(Input::AxisCalib(), Input::AxisCalib());
   mode_ = MODE_CALIBRATION;
 }

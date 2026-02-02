@@ -29,6 +29,7 @@ public:
 
     bool storeCurrent(const std::string& name);
     bool storeInterremote();
+    bool store();
 
     void setCurrentChangedCB(std::function<void(Protocol*)> currentChangedCB);
 

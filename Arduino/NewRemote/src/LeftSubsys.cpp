@@ -61,6 +61,7 @@ void LeftSubsys::setupCurrent(Protocol* p) {
     case MONACO_BLE:
         ((MProtocol*)p)->setPacketSource(MPacket::PACKET_SOURCE_LEFT_REMOTE);
         ((MProtocol*)p)->setTransmittersArePrimary(true);
+        ((MProtocol*)p)->setNodeCameAliveCB([this](const NodeAddr& a, const MPairingPacket& p){nodeCameAlive(a,p);});
         p->rePairWithConnected(true, false, false);
         break;
     default:
@@ -114,3 +115,8 @@ void LeftSubsys::dataReceivedCB(const NodeAddr& addr, uint8_t seqnum, const void
     UI::ui.updateRightSeqnum(seqnum);
     ((MTransmitter*)transmitter_)->transmitRawControlPacket(*p);
 } 
+
+void LeftSubsys::nodeCameAlive(const NodeAddr& addr, const MPairingPacket& packet) {
+    if(currentProto_->isPaired(addr))
+        currentProto_->rePairWithConnected(packet.pairingPayload.discovery.isReceiver, packet.pairingPayload.discovery.isTransmitter, packet.pairingPayload.discovery.isConfigurator);
+}

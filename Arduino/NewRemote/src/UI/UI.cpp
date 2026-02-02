@@ -58,10 +58,12 @@ UI::UI() {
     droidSeqnum_->setPosition(rightSeqnum_->x()+rightSeqnum_->width()+4, leftSeqnum_->y());
     droidSeqnum_->setChar('D');
   
-    dialog_ = make_shared<Dialog>();
-    dialog_->setTitle("Hi! :-)");
-    dialog_->setValue(5);
-    dialog_->setRange(0, 10);  
+    valueDialog_ = make_shared<Dialog>();
+    valueDialog_->setTitle("Hi! :-)");
+    valueDialog_->setValue(5);
+    valueDialog_->setRange(0, 10);  
+
+    mixCurveDialog_ = make_shared<MixCurveDialog>();
 }
 
 void UI::start() {
@@ -147,12 +149,12 @@ void UI::populateConfigMenu(Menu* menu) {
     shared_ptr<Menu> pairDroidMenu = menu->addSubmenu("Pair droid...", [](Menu* m){ UI::ui.populatePairDroidMenu(m); });
 
     menu->addEntry("Save current", [this, current](Widget*){bb::printf("Save config");
-        dialog_->setTitle("Save as...");
-        dialog_->setValue(current->storageName().c_str());
-        dialog_->setMaxLen(10);
-        dialog_->setCancelCallback([](Dialog* d){UI::ui.hideDialog();});
-        dialog_->setOKCallback([](Dialog* d){UI::ui.saveCurrentConfigAsCB(d);});
-        UI::ui.showDialog();
+        valueDialog_->setTitle("Save as...");
+        valueDialog_->setValue(current->storageName().c_str());
+        valueDialog_->setMaxLen(10);
+        valueDialog_->setCancelCallback([](Dialog* d){UI::ui.hideDialog();});
+        valueDialog_->setOKCallback([](Dialog* d){UI::ui.saveCurrentConfigAsCB(d);});
+        UI::ui.showDialog(valueDialog_.get());
     });
 
     shared_ptr<Menu> newMenu = menu->addSubmenu("New...");
@@ -256,6 +258,10 @@ void UI::populatePairDroidMenu(Menu* menu) {
                 UI::ui.showMessage("Pairing..."); 
                 if(current->pairWith(n) == true) {
                     UI::ui.showMessage("Paired", 2000, Display::LIGHTGREEN1); 
+                    if(RemoteSubsys::inst.store() == false ||
+                        ProtocolFactory::commit() == false) {
+                        UI::ui.showMessage("Storing failed", 2000, Display::LIGHTRED1);
+                    }
                 }
                 else UI::ui.showMessage("Pairing failed", 2000, Display::LIGHTRED1);
             }, true);
@@ -287,7 +293,7 @@ void UI::populatePairRemoteMenu(Menu* menu) {
                 UI::ui.showMessage("Pairing..."); 
                 if(inter->pairWith(n) == true) {
                     UI::ui.showMessage("Paired", 2000, Display::LIGHTGREEN1); 
-                    if(RemoteSubsys::inst.storeInterremote() == false ||
+                    if(RemoteSubsys::inst.store() == false ||
                         ProtocolFactory::commit() == false) {
                         UI::ui.showMessage("Storing failed", 2000, Display::LIGHTRED1);
                     }
@@ -348,15 +354,16 @@ void UI::populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* 
 
     AxisMix mix = mgr->mixForInput(inp);
     shared_ptr<Widget> w;
+    Protocol *c = RemoteSubsys::inst.currentProtocol();
 
     String axis1Title = String("Ax1: ") + (mix.axis1 == AXIS_INVALID ? "-" : tx->axisName(mix.axis1).c_str());
     std::shared_ptr<Menu> axis1Menu = menu->addSubmenu(axis1Title);
-    w = axis1Menu->addEntry("-", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.axis1 = AXIS_INVALID; mgr->setMix(inp, m); }, true);
+    w = axis1Menu->addEntry("-", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.axis1 = AXIS_INVALID; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
     if(mix.axis1 == AXIS_INVALID) w->setHighlighted(true);
     else w->setHighlighted(false);
     for(AxisID a=0; a<tx->numAxes(); a++) {
         if(a == mix.axis2) continue;
-        w = axis1Menu->addEntry(tx->axisName(a).c_str(), [mix,mgr,inp,a](Widget* w) { AxisMix m = mix; m.axis1 = a; mgr->setMix(inp, m); }, true);
+        w = axis1Menu->addEntry(tx->axisName(a).c_str(), [mix,mgr,inp,a,c](Widget* w) { AxisMix m = mix; m.axis1 = a; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
         if(mix.axis1 == a) w->setHighlighted(true);
         else w->setHighlighted(false);
     }
@@ -370,20 +377,20 @@ void UI::populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* 
     else interpStr = "Custom";
 
     std::shared_ptr<Menu> interp1Menu = menu->addSubmenu(String("Ip1: ")+ interpStr.c_str());
-    interp1Menu->addEntry("Zero", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_ZERO; mgr->setMix(inp, m); }, true);
-    interp1Menu->addEntry("LinCtr", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); }, true);
-    interp1Menu->addEntry("LinCtrInv", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); }, true);
-    interp1Menu->addEntry("LinPos", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
-    interp1Menu->addEntry("LinPosInv", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
-    interp1Menu->addEntry("Custom...", [mix,mgr,inp,this](Widget* w) { showMessage("Custom mix curves not implemented", 2000); }, true);
+    interp1Menu->addEntry("Zero", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_ZERO; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    interp1Menu->addEntry("LinCtr", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    interp1Menu->addEntry("LinCtrInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    interp1Menu->addEntry("LinPos", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    interp1Menu->addEntry("LinPosInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
+    interp1Menu->addEntry("Custom...", [mix,mgr,inp,this,c](Widget* w) { showMessage("Custom mix curves not implemented", 2000); }, true);
 
     std::shared_ptr<Menu> axis2Menu = menu->addSubmenu(String("Ax2: ") + (mix.axis2 == AXIS_INVALID ? "-" : tx->axisName(mix.axis2).c_str()));
-    w = axis2Menu->addEntry("-", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.axis2 = AXIS_INVALID; mgr->setMix(inp, m); }, true);
+    w = axis2Menu->addEntry("-", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.axis2 = AXIS_INVALID; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
     if(mix.axis2 == AXIS_INVALID) w->setHighlighted(true);
     else w->setHighlighted(false);
     for(AxisID a=0; a<tx->numAxes(); a++) {
         if(a == mix.axis1) continue;
-        shared_ptr<Widget> w = axis2Menu->addEntry(tx->axisName(a).c_str(), [mix,mgr,inp,a](Widget* w) {AxisMix m = mix; m.axis2 = a; mgr->setMix(inp, m); }, true);
+        shared_ptr<Widget> w = axis2Menu->addEntry(tx->axisName(a).c_str(), [mix,mgr,inp,a,c](Widget* w) {AxisMix m = mix; m.axis2 = a; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
         if(mix.axis2 == a) w->setHighlighted(true);
         else w->setHighlighted(false);
     }
@@ -396,12 +403,12 @@ void UI::populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* 
     else interpStr = "Custom";
 
     std::shared_ptr<Menu> interp2Menu = menu->addSubmenu(String("Ip2: ")+ interpStr.c_str());
-    interp2Menu->addEntry("Zero", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_ZERO; mgr->setMix(inp, m); }, true);
-    interp2Menu->addEntry("LinCtr", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); }, true);
-    interp2Menu->addEntry("LinCtrInv", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); }, true);
-    interp2Menu->addEntry("LinPos", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
-    interp2Menu->addEntry("LinPosInv", [mix,mgr,inp](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
-    interp2Menu->addEntry("Custom...", [mix,mgr,inp,this](Widget* w) { showMessage("Custom mix curves not implemented", 2000); }, true);
+    interp2Menu->addEntry("Zero", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_ZERO; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    interp2Menu->addEntry("LinCtr", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    interp2Menu->addEntry("LinCtrInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    interp2Menu->addEntry("LinPos", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    interp2Menu->addEntry("LinPosInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    interp2Menu->addEntry("Custom...", [mix,mgr,inp,c,this](Widget* w) { showMessage("Custom mix curves not implemented", 2000); }, true);
 
     String mixStr = "Mix: ";
     switch(mix.mixType) {
@@ -416,11 +423,11 @@ void UI::populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* 
     }
 
     std::shared_ptr<Menu> mixMenu = menu->addSubmenu(mixStr);
-    w = mixMenu->addEntry("Add", [mix,mgr,inp](Widget* w) {AxisMix m = mix; m.mixType = MIX_ADD; mgr->setMix(inp, m); }, true);
+    w = mixMenu->addEntry("Add", [mix,mgr,inp,c](Widget* w) {AxisMix m = mix; m.mixType = MIX_ADD; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
     if(mix.mixType == MIX_ADD) w->setHighlighted(true); else w->setHighlighted(false);
-    w = mixMenu->addEntry("Mult", [mix,mgr,inp](Widget* w) {AxisMix m = mix; m.mixType = MIX_MULT; mgr->setMix(inp, m); }, true);
+    w = mixMenu->addEntry("Mult", [mix,mgr,inp,c](Widget* w) {AxisMix m = mix; m.mixType = MIX_MULT; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
     if(mix.mixType == MIX_MULT) w->setHighlighted(true); else w->setHighlighted(false);
-    w = mixMenu->addEntry("None", [mix,mgr,inp](Widget* w) {AxisMix m = mix; m.mixType = MIX_NONE; mgr->setMix(inp, m); }, true);
+    w = mixMenu->addEntry("None", [mix,mgr,inp,c](Widget* w) {AxisMix m = mix; m.mixType = MIX_NONE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
     if(mix.mixType == MIX_NONE) w->setHighlighted(true); else w->setHighlighted(false);
 }
 
@@ -543,7 +550,7 @@ void UI::drawGUI() {
     leftSeqnum_->draw();
     rightSeqnum_->draw();
     droidSeqnum_->draw();
-    if(dialogActive_) dialog_->draw();
+    if(dialog_ != nullptr) dialog_->draw();
     else if(mainWidget_ != NULL) mainWidget_->draw();
     needsScreensaverRedraw_ = true;
 }
@@ -556,7 +563,7 @@ void UI::drawScreensaver() {
         leftSeqnum_->setNeedsFullRedraw();
         rightSeqnum_->setNeedsFullRedraw();
         droidSeqnum_->setNeedsFullRedraw();
-        if(dialogActive_) dialog_->setNeedsFullRedraw();
+        if(dialog_ != nullptr) dialog_->setNeedsFullRedraw();
         if(mainWidget_ != nullptr) mainWidget_->setNeedsFullRedraw();
         needsScreensaverRedraw_ = false;
     }
@@ -621,14 +628,16 @@ void UI::showMessage(const String& msg, unsigned int delayms, uint8_t color) {
     }
 }
   
-void UI::showDialog() {
-    dialogActive_ = true;
+void UI::showDialog(Widget* dialog) {
+    if(dialog == nullptr) return;
+
+    dialog_ = dialog;
     dialog_->setNeedsFullRedraw();
     dialog_->takeInputFocus();
 }
   
 void UI::hideDialog() {
-    dialogActive_ = false;
+    dialog_ = nullptr;
     if(mainWidget_ != nullptr) {
         mainWidget_->setNeedsFullRedraw();
         mainWidget_->takeInputFocus();
@@ -636,30 +645,30 @@ void UI::hideDialog() {
 }
   
 void UI::showLEDBrightnessDialog() {
-    dialog_->setTitle("LED Level");
-    dialog_->setValue(RRemote::remote.ledBrightness());
-    dialog_->setSuffix("");
-    dialog_->setRange(0, 7);
-    dialog_->setOKCallback([](Dialog* d){RRemote::remote.setLEDBrightness(d->value());});
-    showDialog();
+    valueDialog_->setTitle("LED Level");
+    valueDialog_->setValue(RRemote::remote.ledBrightness());
+    valueDialog_->setSuffix("");
+    valueDialog_->setRange(0, 7);
+    valueDialog_->setOKCallback([](Dialog* d){RRemote::remote.setLEDBrightness(d->value());});
+    showDialog(valueDialog_.get());
 }
 
 void UI::showJoyDeadbandDialog() {
-    dialog_->setTitle("Joy Deadb.");
-    dialog_->setValue(RRemote::remote.joyDeadband());
-    dialog_->setSuffix("%");
-    dialog_->setRange(0, 15);
-    dialog_->setOKCallback([](Dialog* d){RRemote::remote.setJoyDeadband(d->value());});
-    showDialog();
+    valueDialog_->setTitle("Joy Deadb.");
+    valueDialog_->setValue(RRemote::remote.joyDeadband());
+    valueDialog_->setSuffix("%");
+    valueDialog_->setRange(0, 15);
+    valueDialog_->setOKCallback([](Dialog* d){RRemote::remote.setJoyDeadband(d->value());});
+    showDialog(valueDialog_.get());
 }
   
 void UI::showSendRepeatsDialog() {
-    dialog_->setTitle("Send Reps");
-    dialog_->setValue(RRemote::remote.sendRepeats());
-    dialog_->setSuffix("");
-    dialog_->setRange(0, 7);
-    dialog_->setOKCallback([](Dialog* d){RRemote::remote.setSendRepeats(d->value());});
-    showDialog();
+    valueDialog_->setTitle("Send Reps");
+    valueDialog_->setValue(RRemote::remote.sendRepeats());
+    valueDialog_->setSuffix("");
+    valueDialog_->setRange(0, 7);
+    valueDialog_->setOKCallback([](Dialog* d){RRemote::remote.setSendRepeats(d->value());});
+    showDialog(valueDialog_.get());
 }
 
 void UI::showCalibration(PacketSource source) {

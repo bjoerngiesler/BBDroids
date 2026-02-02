@@ -29,8 +29,8 @@ Result RotaWidget::draw() {
 }
 
 void RotaWidget::takeInputFocus() {
-    Input::inst.setLeftShortPressCallback([=]{ showPrevious(); });
-    Input::inst.setRightShortPressCallback([=]{ showNext(); });
+    Input::inst.setLeftShortPressCallback([this]{ showPrevious(); });
+    Input::inst.setRightShortPressCallback([this]{ showNext(); });
 
     if(widgets_.size() == 0 || index_ >= widgets_.size()) return;
     widgets_[index_]->takeInputFocus();

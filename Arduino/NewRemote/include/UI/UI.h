@@ -18,6 +18,7 @@
 #include "UI/SeqnumWidget.h"
 #include "UI/Dialog.h"
 #include "UI/Button.h"
+#include "UI/MixCurveDialog.h"
 
 using namespace bb;
 using namespace bb::rmt;
@@ -53,7 +54,7 @@ public:
     void saveCurrentConfigAsCB(Dialog* dialog);
 
     void showMessage(const String& str, unsigned int delayms=0, uint8_t color=Display::WHITE);
-    void showDialog();
+    void showDialog(Widget* dialog);
     void hideDialog();
     
     void showLEDBrightnessDialog();
@@ -85,8 +86,12 @@ protected:
     shared_ptr<Menu>leftRemoteMenu_, rightRemoteMenu_, bothRemotesMenu_, droidMenu_;
     shared_ptr<Menu>lRIncrRotMenu_, rRIncrRotMenu_;
     shared_ptr<MessageWidget> message_;
-    shared_ptr<Dialog> dialog_;
+    shared_ptr<Dialog> valueDialog_;
+    shared_ptr<MixCurveDialog> mixCurveDialog_;
+    
     bool dialogActive_;
+    Widget *dialog_;
+
     shared_ptr<Label> topLabel_, bottomLabel_, lockedLabel_;
     shared_ptr<SeqnumWidget> leftSeqnum_, rightSeqnum_, droidSeqnum_;
     shared_ptr<RotaWidget> mainVis_;

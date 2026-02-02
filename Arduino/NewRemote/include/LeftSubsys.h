@@ -20,6 +20,7 @@ public:
 
     void setupCurrent(Protocol *protocol);
     void dataReceivedCB(const NodeAddr& addr, uint8_t seqnum, const void* data, uint8_t len);
+    void nodeCameAlive(const NodeAddr& addr, const MPairingPacket& packet);
 
 protected:
     Receiver* receiver_;

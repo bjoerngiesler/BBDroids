@@ -1,4 +1,5 @@
 #include "RemoteSubsys.h"
+#include "BuilderID.h"
 #include "nvs_flash.h"
 #include "nvs.h"
 
@@ -127,6 +128,14 @@ Result RemoteSubsys::initialize() {
         current_ = interremote_;
     }
 
+    interremote_->setBuilderId(BUILDER_ID);
+    interremote_->setStationId(0);
+    interremote_->setStationDetail(isLeftRemote ? PACKET_SOURCE_LEFT_REMOTE : PACKET_SOURCE_RIGHT_REMOTE);
+
+    current_->setBuilderId(BUILDER_ID);
+    current_->setStationId(0);
+    current_->setStationDetail(isLeftRemote ? PACKET_SOURCE_LEFT_REMOTE : PACKET_SOURCE_RIGHT_REMOTE);
+
     initialized_ = true;
 
     return Subsystem::initialize("rss", "Remote Subsystem",  HELP);
@@ -147,6 +156,12 @@ bool RemoteSubsys::storeCurrent(const std::string& name) {
 
 bool RemoteSubsys::storeInterremote() {
     return ProtocolFactory::storeProtocol(INTERREMOTE_PROTOCOL_NAME, interremote_);
+}
+
+bool RemoteSubsys::store() {
+    if(storeCurrent(current_->storageName()) == false) return false;
+    if(storeInterremote() == false) return false;
+    return true;
 }
 
 Protocol* RemoteSubsys::createProtocol(ProtocolType type) {

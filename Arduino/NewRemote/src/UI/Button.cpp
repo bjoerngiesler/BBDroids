@@ -47,10 +47,7 @@ void RadioButton::setRadioGroup(unordered_set<shared_ptr<RadioButton>> group) {
 }
 
 void MenuButton::triggerAction() {
-    bb::printf("triggerAction - showing menu ");
-    if(menu_ == nullptr) bb::printf("null\n");
-    else {
-        bb::printf("%s\n", menu_->name().c_str());
+    if(menu_ != nullptr) {
         menu_->enter();
     }
 }
