@@ -262,7 +262,6 @@ void Input::update() {
   } else {
     joyH = 0;
   }
-  joyH = constrain(joyH, -1.0f, 1.0f);
 
   if(joyFilteredV < vCalib.center-deadbandAbs) {
     joyAtZero_ = false;
@@ -273,8 +272,20 @@ void Input::update() {
   } else {
     joyV = 0;
   }
+
+  int angle = int(fabs(rint(atan2(joyV, joyH)*(180.0/M_PI))));
+  int angleQ = angle % 90; if(angleQ > 45) angleQ = 90-angleQ;
+  float corr = 1.0 + (sqrt(2.0)-1)*(float(angleQ)/45.0);
+  //bb::rmt::printf("Angle: %3d angleQ: %3d corr: %f\n", angle, angleQ, corr);
+
+  float joyHCorr = constrain(joyH*corr, -1.0f, 1.0f);
+  float joyVCorr = constrain(joyV*corr, -1.0f, 1.0f);
+
+  joyH = constrain(joyH, -1.0f, 1.0f);
   joyV = constrain(joyV, -1.0f, 1.0f);
   
+  //bb::rmt::printf("JoyH: %3.2f JoyV: %3.2f JoyHCorr: %3.2f JoyVCorr: %3.2f\n", joyH, joyV, joyHCorr, joyVCorr);
+
   battRaw = analogRead(pins_.P_A_BATT_CHECK);
   float battCooked = (battRaw/4095.0)*3.1;
   (void)battCooked;
