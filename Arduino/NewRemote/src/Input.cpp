@@ -278,6 +278,7 @@ void Input::update() {
   float corr = 1.0 + (sqrt(2.0)-1)*(float(angleQ)/45.0);
   //bb::rmt::printf("Angle: %3d angleQ: %3d corr: %f\n", angle, angleQ, corr);
 
+#if 0
   float joyHCorr = constrain(joyH*corr, -1.0f, 1.0f);
   float joyVCorr = constrain(joyV*corr, -1.0f, 1.0f);
 
@@ -285,6 +286,10 @@ void Input::update() {
   joyV = constrain(joyV, -1.0f, 1.0f);
   
   //bb::rmt::printf("JoyH: %3.2f JoyV: %3.2f JoyHCorr: %3.2f JoyVCorr: %3.2f\n", joyH, joyV, joyHCorr, joyVCorr);
+#endif
+  
+  joyH = constrain(joyH*corr, -1.0f, 1.0f);
+  joyV = constrain(joyV*corr, -1.0f, 1.0f);
 
   battRaw = analogRead(pins_.P_A_BATT_CHECK);
   float battCooked = (battRaw/4095.0)*3.1;
