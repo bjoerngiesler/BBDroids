@@ -65,15 +65,18 @@ bool bb::SerialConsoleStream::readStringUntil(HWSERIAL_CLASS& ser, char c, Strin
 	while(ser.available()) {
 		unsigned char input = Serial.read();
 
-		if(input == '\b') {
-			if(str.length() > 0) str.remove(str.length()-1);
-			ser.print(String("\r> ") + str + " \b");
+		if(Console::console.lineMode() == false) {
+			if(input == '\b') {
+				if(str.length() > 0) str.remove(str.length()-1);
+				ser.print(String("\r> ") + str + " \b");
+			} else {
+				str += (char)input;
+				ser.write(input);
+			}
+			ser.flush();
 		} else {
 			str += (char)input;
-			ser.write(input);
 		}
-
-		ser.flush();
 		if(input == c) {
 			return true;
 		}
@@ -126,7 +129,18 @@ bb::Console::Console() {
 	description_ = "Console interaction facility";
 	help_ = "No help available";
 	firstResponder_ = this;
+	lineMode_ = false;
 }
+
+bb::Result bb::Console::initialize() {
+	serialStream_ = new SerialConsoleStream(Serial);
+	addConsoleStream(serialStream_); 
+
+	addParameter("line_mode", "If on, interactive editing is disabled", lineMode_);
+
+	return Subsystem::initialize(); 
+}
+
 
 bb::Result bb::Console::start(ConsoleStream *stream) {
 	if(stream) stream = stream; // make compiler happy
@@ -173,14 +187,20 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 	static String str;
 	if(stream->readStringUntil('\n', str) == false) return;
 
-	stream->printf("\r");
-	str.trim();
-	std::vector<String> words = split(str);
-	str = "";
+	std::vector<String> words;
+	if(lineMode_ == false) {
+		stream->printf("\r");
+		str.trim();
+		words = split(str);
+		str = "";
 
-	if(words.size() == 0) {
-		stream->printf("> ");
-		return;
+		if(words.size() == 0) {
+			stream->printf("> ");
+			return;
+		}
+	} else {
+		words = split(str);
+		str = "";
 	}
 
 	Result res = firstResponder_->handleConsoleCommand(words, stream);
@@ -265,16 +285,14 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 
 	else {
 		Subsystem *subsys = SubsystemManager::manager.subsystemWithName(words[0]);
-		if(subsys == NULL) {
-			return RES_CMD_UNKNOWN_COMMAND;
-		} else {
+		if(subsys != NULL) {
 			std::vector<String> wordsminusone = words;
 			wordsminusone.erase(wordsminusone.begin());
 			return subsys->handleConsoleCommand(wordsminusone, stream);
 		}
 	}
 
-	return RES_CMD_UNKNOWN_COMMAND;
+	return Subsystem::handleConsoleCommand(words, stream);
 }
 
 #define PRINTF_MAXLEN 254

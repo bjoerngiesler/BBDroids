@@ -80,6 +80,7 @@ bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words,
 		return setParameterValue(words[1], words[2]);
 	}
 
+	bb::printf("Unknown command \"%s\"\n", words[0].c_str());
 	return RES_CMD_UNKNOWN_COMMAND;
 }
 

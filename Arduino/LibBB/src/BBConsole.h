@@ -131,11 +131,7 @@ public:
 	}
 
 	//! Initialize, assuming the Serial port is already opened
-	virtual Result initialize() { 
-		serialStream_ = new SerialConsoleStream(Serial);
-		addConsoleStream(serialStream_); 
-		return Subsystem::initialize(); 
-	}
+	virtual Result initialize();
 	virtual Result start(ConsoleStream* stream = NULL);
 	virtual Result stop(ConsoleStream* stream = NULL);
 	virtual Result step();
@@ -154,11 +150,14 @@ public:
 
 	void setFirstResponder(Subsystem* subsys);
 
+	bool lineMode() { return lineMode_; }
+
 protected:
 	Console();
 	ConsoleStream *serialStream_;
 	std::vector<ConsoleStream*> streams_;
 	Subsystem* firstResponder_;
+	bool lineMode_;
 };
 
 };

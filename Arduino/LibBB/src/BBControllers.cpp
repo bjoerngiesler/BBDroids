@@ -56,6 +56,8 @@ void bb::PIDController::update(void) {
       if(curSetpoint_ < goal_) {
         curSetpoint_ = goal_;
       }
+    } else {
+      curSetpoint_ = goal_;
     }
   }
 
@@ -94,18 +96,20 @@ void bb::PIDController::update(void) {
     controlOut = lastControl_ + controlOffset_;
   }
   if(debug_)
-    Console::console.printfBroadcast("Control: SP: %f Cur In: %f Cur Out: %f Err: %f errI: %f errD: %f Control: %f\n", curSetpoint_, input_.present(), output_.present(), err, errI_, lastErrDFiltered_, lastControl_);
+    Console::console.printfBroadcast("Control: dt: %f SP: %f Cur In: %f Cur Out: %f Err: %f errI: %f errD: %f Control: %f\n", dt, curSetpoint_, input_.present(), output_.present(), err, errI_, lastErrDFiltered_, lastControl_);
   if(inhibit_ == false) setControlOutput(controlOut);
 }
   
 void bb::PIDController::setGoal(const float& sp) {
   goal_ = sp;
   if(EPSILON(ramp_)) curSetpoint_ = goal_;
+  else curSetpoint_ = present();
 }
 
 void bb::PIDController::setPresentAsGoal() {
   goal_ = present();
   if(EPSILON(ramp_)) curSetpoint_ = goal_;
+  else curSetpoint_ = present();
 }
 
 float bb::PIDController::present() {
