@@ -87,7 +87,7 @@ void RRemoteVisWidget::setRepresentsLeftRemote(bool left) {
     addWidget(&crosshair_);
     addWidget(&imu_);
     addWidget(&pot1_);
-    if(!left) addWidget(&pot2_);
+    addWidget(&pot2_);
 
     if(left) pot1_.setFrameColor(RDisplay::GREEN);
 
