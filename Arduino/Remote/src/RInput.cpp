@@ -171,6 +171,9 @@ RInput::RInput(): joyHFilter_(100, 0.01), joyVFilter_(100, 0.01) {
   incrementalRot_ = BUTTON_NONE;
   incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
   joyAtZero_ = false;
+  charging = false;
+  battPrev_ = 0.0f;
+  lastBattCheckMs_ = 0;
   imu_.setRotationAroundZ(bb::IMU::ROTATE_180);
 }
 
@@ -274,7 +277,19 @@ void RInput::update() {
   (void)battCooked;
   battRaw = constrain(battRaw, MIN_ANALOG_IN_VDIV, MAX_ANALOG_IN_VDIV);
   battery = float(battRaw-MIN_ANALOG_IN_VDIV)/float(MAX_ANALOG_IN_VDIV-MIN_ANALOG_IN_VDIV);
-  
+
+  unsigned long battNow = millis();
+  if(battNow - lastBattCheckMs_ >= 5000) {
+    if(lastBattCheckMs_ > 0) {
+      float delta = battery - battPrev_;
+      if(delta > 0.03f)        charging = true;   // battery rising: charging
+      else if(delta < -0.001f) charging = false;  // battery dropping: in use
+      // else: unchanged — keep current charging state
+    }
+    battPrev_ = battery;
+    lastBattCheckMs_ = battNow;
+  }
+
   if(isLeftRemote) {
     processEncoder();
   } else {

@@ -33,8 +33,13 @@ protected:
     RIMUWidget imu_;
     RLabelWidget mainBtns_[4];
     RLabelWidget topButtons_[3];
-    RLabelWidget batteryState_[4];
     bool left_;
+    uint8_t battPrev_;
+    unsigned long lastBattCheckMs_;
+    bool chargingDetected_;
+    float batteryDisplay_;
+    bool chargingDisplay_;
+    bool battNeedsRedraw_;
     uint8_t bodyWidth_, bodyHeight_;
     RRoundScaleWidget pot1_, pot2_;
     enum PotSelected {

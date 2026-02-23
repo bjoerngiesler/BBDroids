@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /c/Users/micke/OneDrive/Documents/GitHub/BBDroids/Arduino/Remote diff --name-only HEAD)"
+    ]
+  }
+}

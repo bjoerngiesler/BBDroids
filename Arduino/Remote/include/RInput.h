@@ -86,6 +86,7 @@ public:
   float pot1, pot2; // range: 0 .. 1.0
   uint16_t pot1Raw, pot2Raw;
   float battery;    // range: 0 .. 1.0
+  bool charging;    // true when battery voltage is rising
   float joyH, joyV; // range: -1.0 .. 1.0
   uint16_t joyRawH, joyRawV, battRaw;
   uint16_t minJoyRawH, maxJoyRawH, minJoyRawV, maxJoyRawV;
@@ -155,8 +156,11 @@ protected:
 
   bool faceButtonsLocked_;
 
+  float battPrev_;
+  unsigned long lastBattCheckMs_;
+
   unsigned long longPressThresh_;
-  Button incrementalPos_, incrementalRot_; 
+  Button incrementalPos_, incrementalRot_;
   float incRotR_, incRotP_, incRotH_;
   unsigned long deadbandPercent_;
   
