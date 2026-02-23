@@ -34,10 +34,12 @@ static const uint8_t potXR = bxr-15;
 static const uint8_t pot1Y = 61;
 static const uint8_t pot2Y = pot1Y+potW+3;
 
-static const uint8_t battStateW = 8;
 static const uint8_t battStateY = by + joyW + 9;
 static const uint8_t battStateXL = bxl + 7;
 static const uint8_t battStateXR = bxr + 7;
+static const uint8_t battBodyW = 34;   // body: rect x1 to x1+battBodyW (35px wide)
+static const uint8_t battBodyH = 7;    // body: rect y1 to y1+battBodyH (8px tall)
+static const uint8_t battNubW = 3;     // positive terminal nub width
 
 RRemoteVisWidget::RRemoteVisWidget() {
     for(auto& b: mainBtns_) {
@@ -54,14 +56,6 @@ RRemoteVisWidget::RRemoteVisWidget() {
     mainBtns_[2].setSize(btnH, btnW);
     mainBtns_[3].setSize(btnH, btnW);
 
-    for(auto& b: batteryState_) {
-        b.setDrawsFrame();
-        b.setFillsBackground();
-        b.setTitle("");
-        b.setBackgroundColor(RDisplay::LIGHTGREEN1);
-        b.setSize(battStateW, battStateW);
-    }
-
     crosshair_.setSize(joyW, joyW);
     imu_.setSize(joyW, joyW);
 
@@ -70,6 +64,13 @@ RRemoteVisWidget::RRemoteVisWidget() {
 
     bgCol_ = RDisplay::LIGHTGREY;
     fgCol_ = RDisplay::GREY;
+
+    battPrev_ = BATTERY_MAX;
+    lastBattCheckMs_ = 0;
+    chargingDetected_ = false;
+    batteryDisplay_ = 0.0f;
+    chargingDisplay_ = false;
+    battNeedsRedraw_ = true;
 
     setRepresentsLeftRemote(false);
 
@@ -83,7 +84,6 @@ void RRemoteVisWidget::setRepresentsLeftRemote(bool left) {
 
     clearWidgets();
     for(auto& b: mainBtns_) addWidget(&b);
-    for(auto& b: batteryState_) addWidget(&b);
     addWidget(&crosshair_);
     addWidget(&imu_);
     addWidget(&pot1_);
@@ -107,9 +107,6 @@ void RRemoteVisWidget::moveWidgetsAround() {
         mainBtns_[1].setPosition(btnSideXL, y_+btn1Y);
         mainBtns_[2].setPosition(btn2XL, y_+btnTopY);
         mainBtns_[3].setPosition(btn3XL, y_+btnTopY);
-        for(unsigned int i=0; i<4; i++) {
-            batteryState_[i].setPosition(battStateXL + i*(battStateW+1), y_+battStateY);
-        }
         pot1_.setPosition(potXL, y_+pot1Y);
         pot2_.setPosition(potXL, y_+pot2Y);
     } else {
@@ -119,9 +116,6 @@ void RRemoteVisWidget::moveWidgetsAround() {
         mainBtns_[1].setPosition(btnSideXR, y_+btn1Y);
         mainBtns_[2].setPosition(btn2XR, y_+btnTopY);
         mainBtns_[3].setPosition(btn3XR, y_+btnTopY);
-        for(unsigned int i=0; i<4; i++) {
-            batteryState_[i].setPosition(battStateXR + i*(battStateW+1), y_+battStateY);
-        }
         pot1_.setPosition(potXR, y_+pot1Y);
         pot2_.setPosition(potXR, y_+pot2Y);
     }
@@ -139,7 +133,34 @@ Result RRemoteVisWidget::draw(ConsoleStream* stream) {
             RDisplay::display.rect(bxr, y_+by, bxr+bw, y_+by+bh, bgCol_, true);
             RDisplay::display.rect(bxr, y_+by, bxr+bw, y_+by+bh, fgCol_, false);
         }
+        battNeedsRedraw_ = true;
         needsFullRedraw_ = false;
+    }
+
+    if(battNeedsRedraw_) {
+        uint8_t bx = left_ ? battStateXL : battStateXR;
+        uint8_t batt_y = y_ + battStateY;
+
+        // Battery body outline
+        RDisplay::display.rect(bx, batt_y, bx+battBodyW, batt_y+battBodyH, RDisplay::WHITE, false);
+        // Positive terminal nub on the right, centered vertically
+        RDisplay::display.rect(bx+battBodyW+1, batt_y+2, bx+battBodyW+battNubW, batt_y+battBodyH-2, RDisplay::WHITE, false);
+        // Clear inner area
+        RDisplay::display.rect(bx+1, batt_y+1, bx+battBodyW-1, batt_y+battBodyH-1, RDisplay::BLACK, true);
+        // Fill bar
+        uint8_t innerW = battBodyW - 1;
+        int fillW = (int)(batteryDisplay_ * float(innerW));
+        if(fillW > innerW) fillW = innerW;
+        if(fillW < 0) fillW = 0;
+        uint8_t fillCol;
+        if(chargingDisplay_)               fillCol = RDisplay::LIGHTBLUE2;
+        else if(batteryDisplay_ >= 0.75f)  fillCol = RDisplay::GREEN;
+        else if(batteryDisplay_ >= 0.40f)  fillCol = RDisplay::YELLOW;
+        else                               fillCol = RDisplay::RED;
+        if(fillW > 0) {
+            RDisplay::display.rect(bx+1, batt_y+1, bx+fillW, batt_y+battBodyH-1, fillCol, true);
+        }
+        battNeedsRedraw_ = false;
     }
 
     return RMultiWidget::draw(stream);
@@ -234,9 +255,28 @@ Result RRemoteVisWidget::visualizeFromControlPacket(const bb::ControlPacket& pac
     pot1_.setAngle(packet.getAxis(8, bb::ControlPacket::UNIT_DEGREES));
     pot2_.setAngle(packet.getAxis(9, bb::ControlPacket::UNIT_DEGREES));
 
-    float batt = 6*(float(packet.battery)/float(BATTERY_MAX));
-    for(int i=1; i<=batt&&i<=4; i++) batteryState_[i-1].setBackgroundColor(RDisplay::LIGHTGREEN1);
-    for(int i=batt; i<=4; i++) batteryState_[i-1].setBackgroundColor(RDisplay::LIGHTRED1);
+    float newLevel = float(packet.battery) / float(BATTERY_MAX);
+    bool isCharging;
+    if(left_) {
+        isCharging = RInput::input.charging;
+    } else {
+        unsigned long now = millis();
+        if(now - lastBattCheckMs_ >= 5000) {
+            if(lastBattCheckMs_ > 0) {
+                if(packet.battery > battPrev_)       chargingDetected_ = true;   // rising
+                else if(packet.battery < battPrev_)  chargingDetected_ = false;  // dropping
+                // else: unchanged — keep current state
+            }
+            battPrev_ = packet.battery;
+            lastBattCheckMs_ = now;
+        }
+        isCharging = chargingDetected_;
+    }
+    if(newLevel != batteryDisplay_ || isCharging != chargingDisplay_) {
+        batteryDisplay_ = newLevel;
+        chargingDisplay_ = isCharging;
+        battNeedsRedraw_ = true;
+    }
 
     return RES_OK;
 }

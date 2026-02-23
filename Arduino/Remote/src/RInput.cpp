@@ -171,6 +171,10 @@ RInput::RInput(): joyHFilter_(100, 0.01), joyVFilter_(100, 0.01) {
   incrementalRot_ = BUTTON_NONE;
   incRotR_ = 0; incRotP_ = 0; incRotH_ = 0;
   joyAtZero_ = false;
+  charging = false;
+  battPrev_ = 0.0f;
+  lastBattCheckMs_ = 0;
+  cLongPressAlreadyFired_ = false;
   imu_.setRotationAroundZ(bb::IMU::ROTATE_180);
 }
 
@@ -274,7 +278,19 @@ void RInput::update() {
   (void)battCooked;
   battRaw = constrain(battRaw, MIN_ANALOG_IN_VDIV, MAX_ANALOG_IN_VDIV);
   battery = float(battRaw-MIN_ANALOG_IN_VDIV)/float(MAX_ANALOG_IN_VDIV-MIN_ANALOG_IN_VDIV);
-  
+
+  unsigned long battNow = millis();
+  if(battNow - lastBattCheckMs_ >= 5000) {
+    if(lastBattCheckMs_ > 0) {
+      float delta = battery - battPrev_;
+      if(delta > 0.03f)        charging = true;   // battery rising: charging
+      else if(delta < -0.001f) charging = false;  // battery dropping: in use
+      // else: unchanged — keep current charging state
+    }
+    battPrev_ = battery;
+    lastBattCheckMs_ = battNow;
+  }
+
   if(isLeftRemote) {
     processEncoder();
   } else {
@@ -359,6 +375,13 @@ void RInput::update() {
       }
     }
   }
+
+  // Fire confirm long press immediately when threshold is reached (don't wait for release)
+  if(buttons[BUTTON_CONFIRM] && !cLongPressAlreadyFired_ &&
+     millis() - cms_ >= longPressThresh_ && cLongPressCB_ != nullptr) {
+    cLongPressCB_();
+    cLongPressAlreadyFired_ = true;
+  }
 }
 
 float RInput::secondsSinceLastMotion() {
@@ -411,6 +434,7 @@ void RInput::btnRightReleased() {
 
 void RInput::btnConfirmPressed() {
   cms_ = millis();
+  cLongPressAlreadyFired_ = false;
   if(cPressCB_ != nullptr && faceButtonsLocked_ == false) cPressCB_();
 }
 
@@ -418,16 +442,19 @@ void RInput::btnConfirmReleased() {
   if(faceButtonsLocked_ == false) {
     if(cReleaseCB_ != nullptr) cReleaseCB_();
 
-    if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
+    if(cLongPressAlreadyFired_) {
+      // long press was already fired while button was held, skip
+    } else if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
       if(cShortPressCB_ != nullptr) {
         cShortPressCB_();
-      } 
+      }
     } else if(cLongPressCB_ != nullptr){
       cLongPressCB_();
     }
-  } else if(millis() - cms_ >= longPressThresh_ && cLongPressCB_ != nullptr) {
+  } else if(!cLongPressAlreadyFired_ && millis() - cms_ >= longPressThresh_ && cLongPressCB_ != nullptr) {
     cLongPressCB_();
   }
+  cLongPressAlreadyFired_ = false;
 }
 
 void RInput::processEncoder() {
