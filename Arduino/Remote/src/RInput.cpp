@@ -174,6 +174,7 @@ RInput::RInput(): joyHFilter_(100, 0.01), joyVFilter_(100, 0.01) {
   charging = false;
   battPrev_ = 0.0f;
   lastBattCheckMs_ = 0;
+  cLongPressAlreadyFired_ = false;
   imu_.setRotationAroundZ(bb::IMU::ROTATE_180);
 }
 
@@ -374,6 +375,13 @@ void RInput::update() {
       }
     }
   }
+
+  // Fire confirm long press immediately when threshold is reached (don't wait for release)
+  if(buttons[BUTTON_CONFIRM] && !cLongPressAlreadyFired_ &&
+     millis() - cms_ >= longPressThresh_ && cLongPressCB_ != nullptr) {
+    cLongPressCB_();
+    cLongPressAlreadyFired_ = true;
+  }
 }
 
 float RInput::secondsSinceLastMotion() {
@@ -426,6 +434,7 @@ void RInput::btnRightReleased() {
 
 void RInput::btnConfirmPressed() {
   cms_ = millis();
+  cLongPressAlreadyFired_ = false;
   if(cPressCB_ != nullptr && faceButtonsLocked_ == false) cPressCB_();
 }
 
@@ -433,16 +442,19 @@ void RInput::btnConfirmReleased() {
   if(faceButtonsLocked_ == false) {
     if(cReleaseCB_ != nullptr) cReleaseCB_();
 
-    if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
+    if(cLongPressAlreadyFired_) {
+      // long press was already fired while button was held, skip
+    } else if(millis() - cms_ < longPressThresh_ || cLongPressCB_ == nullptr) {
       if(cShortPressCB_ != nullptr) {
         cShortPressCB_();
-      } 
+      }
     } else if(cLongPressCB_ != nullptr){
       cLongPressCB_();
     }
-  } else if(millis() - cms_ >= longPressThresh_ && cLongPressCB_ != nullptr) {
+  } else if(!cLongPressAlreadyFired_ && millis() - cms_ >= longPressThresh_ && cLongPressCB_ != nullptr) {
     cLongPressCB_();
   }
+  cLongPressAlreadyFired_ = false;
 }
 
 void RInput::processEncoder() {

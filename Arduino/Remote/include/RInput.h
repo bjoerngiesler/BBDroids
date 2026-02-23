@@ -155,6 +155,7 @@ protected:
   std::function<void(float)> encTurnCB_;
 
   bool faceButtonsLocked_;
+  bool cLongPressAlreadyFired_;
 
   float battPrev_;
   unsigned long lastBattCheckMs_;
