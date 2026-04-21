@@ -18,7 +18,7 @@ bb::Encoder input[2] = {bb::Encoder(PIN_ENC_A_1, PIN_ENC_B_1), bb::Encoder(PIN_E
 
 // Values for D-O. This gives about 0.14mm per tick.
 static const float WHEEL_CIRCUMFERENCE = 722.566310325652445;
-static const float WHEEL_TICKS_PER_TURN = 979.2 * (97.0/18.0); // 979 ticks per one turn of the drive gear, 18 teeth on the drive gear, 96 teeth on the main gear.
+static const float WHEEL_TICKS_PER_TURN = 48 * 20.4 * (97.0/18.0); // 48CPR Encoder, 20.4:1 gearbox, 18 teeth on the drive gear, 96 teeth on the main gear.
 float speedKp = 0.13, speedKi = 0.8, speedKd = 0.0;
 float speedCutoff = 25;
 float posKp = 0.05, posKi = 0.0, posKd = 0.0;

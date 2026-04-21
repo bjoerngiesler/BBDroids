@@ -2,6 +2,7 @@
 #include <BBConsole.h>
 
 #if defined(ARDUINO_CYTRON_MOTION_2350_PRO)
+namespace enc {
 static const uint8_t NUM_ENC_SLOTS = 10;
 
 struct EncDescr {
@@ -49,6 +50,7 @@ static inline void isr6() {isr(6);}
 static inline void isr7() {isr(7);}
 static inline void isr8() {isr(8);}
 static inline void isr9() {isr(9);}
+}; // namespace enc
 #endif // ARDUINO_CYTRON_MOTION_2350_PRO
 
 bb::Encoder::Encoder(uint8_t pin_enc_a, uint8_t pin_enc_b, InputMode mode, Unit unit): 
@@ -71,65 +73,66 @@ bb::Encoder::Encoder(uint8_t pin_enc_a, uint8_t pin_enc_b, InputMode mode, Unit 
   pinMode(pinEncA_, INPUT);
   pinMode(pinEncB_, INPUT);
 
-  for(enc_ = 0; encDescr_[enc_].taken == true; enc_++);
-  if(enc_ >= NUM_ENC_SLOTS) return; // Should raise an exception here, but...
+  for(enc_ = 0; enc::encDescr_[enc_].taken == true; enc_++);
+  if(enc_ >= enc::NUM_ENC_SLOTS) return; // Should raise an exception here, but...
 
+  bb::printf("Setting up ISRs for slot %d\n", enc_);
   switch(enc_) {
   case 0:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr0, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr0, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr0, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr0, CHANGE);
     break;
   case 1:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr1, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr1, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr1, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr1, CHANGE);
     break;
   case 2:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr2, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr2, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr2, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr2, CHANGE);
     break;
   case 3:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr3, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr3, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr3, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr3, CHANGE);
     break;
   case 4:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr4, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr4, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr4, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr4, CHANGE);
     break;
   case 5:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr5, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr5, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr5, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr5, CHANGE);
     break;
   case 6:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr6, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr6, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr6, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr6, CHANGE);
     break;
   case 7:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr7, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr7, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr7, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr7, CHANGE);
     break;
   case 8:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr8, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr8, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr8, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr8, CHANGE);
     break;
   case 9:
-    attachInterrupt(digitalPinToInterrupt(pinEncA_), isr9, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(pinEncB_), isr9, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncA_), enc::isr9, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(pinEncB_), enc::isr9, CHANGE);
     break;
   default:
     bb::printf("Encoder ISR table full\n");
   }
-  encDescr_[enc_].pinA = pin_enc_a;
-  encDescr_[enc_].pinB = pin_enc_b;
-  encDescr_[enc_].taken = true;
+  enc::encDescr_[enc_].pinA = pin_enc_a;
+  enc::encDescr_[enc_].pinB = pin_enc_b;
+  enc::encDescr_[enc_].taken = true;
 #endif
 }
 
 bb::Encoder::~Encoder() {
 #if defined(ARDUINO_CYTRON_MOTION_2350_PRO)
-  if(enc_ < NUM_ENC_SLOTS) {
+  if(enc_ < enc::NUM_ENC_SLOTS) {
     detachInterrupt(pinEncA_);
     detachInterrupt(pinEncB_);
-    encDescr_[enc_].taken = false;
+    enc::encDescr_[enc_].taken = false;
   }
 #endif
 }
@@ -144,7 +147,7 @@ void bb::Encoder::setUnit(Encoder::Unit unit) {
 
 bb::Result bb::Encoder::update() {
 #if defined(ARDUINO_CYTRON_MOTION_2350_PRO)
-  unsigned long ticks = encDescr_[enc_].value; // FIXME
+  unsigned long ticks = enc::encDescr_[enc_].value; // FIXME
 #else
   unsigned long ticks = enc_.read();
 #endif

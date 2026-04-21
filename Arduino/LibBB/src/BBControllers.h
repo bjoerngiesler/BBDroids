@@ -24,6 +24,8 @@ class PIDController: public ControlOutput {
 public:
   PIDController(ControlInput& input, ControlOutput& output);
 
+  void initialize();
+
   void reset(); // reset aggregated errors
   
   virtual void update(void);

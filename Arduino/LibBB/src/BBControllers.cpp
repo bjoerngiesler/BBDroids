@@ -18,7 +18,8 @@ bb::PIDController::PIDController(ControlInput& input, ControlOutput& output):
   setControlParameters(0.0f, 0.0f, 0.0f);
   setIUnbounded();
   setControlUnbounded();
-  setGoal(input_.present());
+
+  goal_ = 0;
   deadbandMin_ = deadbandMax_ = 0;
   errDeadbandMin_ = errDeadbandMax_ = 0;
   controlOffset_ = 0;

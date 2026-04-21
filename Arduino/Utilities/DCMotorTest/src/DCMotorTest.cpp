@@ -6,8 +6,8 @@ using namespace bb;
 static const uint8_t PIN_DISABLE = 255;
 
 //#include "ConfigBB8.h"
-#include "ConfigDO.h"
-//#include "ConfigSerf.h"
+//#include "ConfigDO.h"
+#include "ConfigSerf.h"
 
 // --------------------------------------------------
 
@@ -162,7 +162,7 @@ public:
           if(outputMode == OUTPUT_SERIALPLOTTER) {
             Console::console.printfBroadcast(",Speed%d:%f", i, input[i].present(bb::Encoder::INPUT_SPEED));
           } else {
-            Console::console.printfBroadcast(" %f %f", 
+            Console::console.printfBroadcast(" x%f %f", 
                                             input[i].present(bb::Encoder::INPUT_SPEED, true),
                                             input[i].present(bb::Encoder::INPUT_SPEED));
           }

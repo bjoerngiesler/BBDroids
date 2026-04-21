@@ -47,7 +47,7 @@ bb::Encoder input[2] = {bb::Encoder(PIN_ENC_A_1, PIN_ENC_B_1), bb::Encoder(PIN_E
 DCMotor motor[2] = { DCMotor(PIN_PWM_A_1, PIN_PWM_B_1), DCMotor(PIN_PWM_A_2, PIN_PWM_B_2) };
 
 static const float WHEEL_CIRCUMFERENCE = 251.32741229;
-static const float WHEEL_TICKS_PER_TURN = 979.2; // 979 ticks per one turn of the drive gear, 18 teeth on the drive gear, 96 teeth on the main gear.
+static const float WHEEL_TICKS_PER_TURN = 48*47; // 48CPR * 47:1 gearbox
 float speedKp = 0.22, speedKi = 1, speedKd = 0.0;
 float speedCutoff = 25;
 float posKp = 0.05, posKi = 0.0, posKd = 0.0;
