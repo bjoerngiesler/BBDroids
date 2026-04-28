@@ -13,7 +13,8 @@ DOSound::DOSound(uint8_t volume, bool debug) {
   dumbMode_ = false;
   fileCount_ = -1;
   ser_ = nullptr;
-  volume_ = volume;
+  volume_ = 20;
+  //volume_ = volume;
   debug_ = debug;
 }
 
@@ -150,6 +151,7 @@ bool DOSound::playSystemSound(int snd) {
 }
 
 bool DOSound::setVolume(uint8_t vol) {
+  vol = 30;
   if(!available_) return false;
   if(vol == volume_) return false;
   for(int i=0; i<DOSOUND_REPEATS; i++) {
@@ -168,12 +170,18 @@ bool DOSound::checkSDCard() {
 
   int fc = -1;
   for(int i=0; i<DOSOUND_REPEATS; i++) {
+#if defined(DFPLAYERMINI_FAST)
     int fc_ = dfp_.numSdTracks();
+#else
+    int fc_ = dfp_.readFileCounts();
+#endif
     if(fc_ != -1) {
       fc = fc_;
       break;
     }
+#if defined(DFPLAYERMINI_FAST)
     dfp_.printError();
+#endif
     delayMicroseconds(DOSOUND_DELAY_US);
   }
 
@@ -186,7 +194,11 @@ bool DOSound::checkSDCard() {
     bb::printf("SD card inserted!\n");
     bb::printf("    %d overall files\n", fileCount_);
     for(unsigned int i=1; i<=8; i++) {
+#if defined(DFPLAYERMINI_FAST)
       int num = dfp_.numTracksInFolder(i);
+#else
+      int num = dfp_.readFileCountsInFolder(i);
+#endif
       bb::printf("    %d files in folder %d\n", num, i);
       if(num > 0)
         folders_[i] = {unsigned(num), 0};
