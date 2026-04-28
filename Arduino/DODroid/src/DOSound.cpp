@@ -10,7 +10,11 @@ DOSound DOSound::sound;
 
 DOSound::DOSound(uint8_t volume, bool debug) {
   available_ = false;
+#if defined(ALWAYS_DUMB_MODE)
+  dumbMode_ = true;
+#else
   dumbMode_ = false;
+#endif
   fileCount_ = -1;
   ser_ = nullptr;
   volume_ = 20;
@@ -164,7 +168,6 @@ bool DOSound::setVolume(uint8_t vol) {
 
 bool DOSound::checkSDCard() {
   if(dumbMode_) {
-    bb::printf("Dumb mode, not checking SD card\n");
     return false;
   }
 

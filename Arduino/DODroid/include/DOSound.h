@@ -10,6 +10,8 @@
 #else
 #include <DFRobotDFPlayerMini.h>
 #endif 
+#define ALWAYS_DUMB_MODE
+
 #include <map>
 
 #define CHECK_SDCARD
