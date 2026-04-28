@@ -136,7 +136,7 @@ uint64_t bb::Runloop::millisSinceStart() {
 void* bb::Runloop::scheduleTimedCallback(uint64_t ms, std::function<void(void)> cb, bool oneshot) {
 	TimedCallback c = {millis() + ms, ms, oneshot, cb};
 	timedCallbacks_.push_back(c);
-	return (void*)&(*timedCallbacks_.end());
+	return &timedCallbacks_.back();
 }
 
 bb::Result bb::Runloop::cancelTimedCallback(void* handle) {
