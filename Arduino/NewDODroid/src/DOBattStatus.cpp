@@ -40,6 +40,8 @@ bool DOBattStatus::updateVoltage() {
 #else 
   voltage_ = ina.getBusVoltage_V();
 #endif
+
+
   if(isnan(voltage_) || !isfinite(voltage_)) {
     available_ = false;
     voltage_ = -1;

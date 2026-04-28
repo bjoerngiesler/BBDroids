@@ -3,7 +3,13 @@
 
 #include <Arduino.h>
 #include <wiring_private.h>
+
+//#define DFPLAYERMINI_FAST
+#if defined(DFPLAYERMINI_FAST)
 #include <DFPlayerMini_Fast.h>
+#else
+#include <DFRobotDFPlayerMini.h>
+#endif 
 #include <map>
 
 #define CHECK_SDCARD
@@ -30,7 +36,11 @@ public:
   bool setVolume(uint8_t vol);
 
 private:
+#if defined(DFPLAYERMINI_FAST)
   DFPlayerMini_Fast dfp_;
+#else
+  DFRobotDFPlayerMini dfp_;
+#endif
   bool available_;
 
   struct FolderContents {
