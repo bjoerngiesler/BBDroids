@@ -1,6 +1,6 @@
 # BBDroids
 
-Code for BBDroids, the Bavarian Droid Builders' Droid Control System, currently for BB-8 and D-O. You can call this an "operating system" if you like. Please refer to [the Wiki](https://github.com/bjoerngiesler/BB8/wiki/00-Home) for reference and documentation.
+Code for BBDroids, the Bavarian Droid Builders' Droid Control System, currently for BB-8 and D-O. You can call this an "operating system" if you like. Please refer to [the Wiki](https://github.com/bjoerngiesler/BB8/wiki) for reference and documentation.
 
 Hardware concept, layout and realization by Felix Beyer, software concept and realization by Björn Giesler.
 
