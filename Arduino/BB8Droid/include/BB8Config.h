@@ -14,11 +14,13 @@ static const float BODY_CIRCUMFERENCE             = 2*M_PI*253.0;
 static const float DRIVE_MOTOR_TICKS_PER_TURN     = 4776.384;
 static const float DRIVE_MOTOR_MAX_SPEED_MM_PER_S = 2000.0;
 static const float ROLL_REDUCTION                 = 80.0/22.0;
+static const float DOME_ROLL_REDUCTION            = 2.0;  // dome roll servo degrees per degree of dome motion around sphere center
+static const float ROLL_RATE_FILTER_CUTOFF        = 15.0; // Hz, low-pass on gyro roll rate used for damping
 
 struct BB8Params {
   // Motion Limits
   float bodyRollRange     = 25.0; // in the station don't go beyond 25, in the droid 30 is OK
-  float bodyRollOffset    = -15;
+  float bodyRollOffset    = 0;
   float bodyRollVel       = 500;
   float bodyRollAccel     = 30;
   float domePitchRange    = 45.0;
@@ -40,9 +42,14 @@ struct BB8Params {
   float balKi              = 0;
   float balKd              = 0.2;
 
-  float rollKp             = 2;
+  // Roll controller, all in body degrees (gear reduction applied at the output):
+  // tilt = rollKff*goal + rollKp*err + rollKi*int(err) - rollKd*gyroRate
+  // Note: old rollKp=2 was in servo degrees, equivalent to ~0.55 here.
+  float rollKp             = 0.3;
   float rollKi             = 0;
-  float rollKd             = 0;
+  float rollKd             = 0.1;  // deg tilt per deg/s of measured roll rate
+  float rollKff            = 0.0;  // 1.0 = same open-loop lean as roll_direct. Off by default because
+                                   // the right value depends on mass distribution - tune on hardware.
 
   float autoPosKp          = 0;
   float autoPosKi          = 0;
@@ -75,7 +82,7 @@ struct BB8Params {
   float faSpeedSPToDome      = -.01;
   float faRollSPToDome       = -.5;
   float faDomePitchToWeight  = .5;
-  float faDomeRollToWeight   = .5;
+  float faDomeRollToWeight   = 0;      // ~ (m_dome*r_dome)/(m_weight*l), sign included. Calibrate with roll_ki, see roll_debug.
 };
 
 static const int DOME_HEADING_SERVO  = 1;

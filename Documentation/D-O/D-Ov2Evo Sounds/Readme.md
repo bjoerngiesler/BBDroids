@@ -1,0 +1,1 @@
+Please unpack and copy the folders "01" up to "04" to an SD card. Afterwards make sure there are no dotfiles on the SD card if you're on Linux or Mac. Move only the folders, not this file!

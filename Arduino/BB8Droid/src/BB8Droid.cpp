@@ -8,9 +8,6 @@
 BB8 BB8::bb8;
 BB8Params BB8::params_;
 
-//#define ROLL_VELOCITY
-#define ROLL_POSITION
-
 static float minPwmFreq = 200.0f;
 static float maxPwmFreq = 500.0f;
 static std::map<uint8_t, SAMD_PWM*> pwms;
@@ -33,20 +30,16 @@ static void customAnalogWrite(uint8_t pin, uint8_t dutycycle) {
 
 
 BB8::BB8(): 
-    imu_(IMU_ADDR),
+    imu_(),
     driveMotor_(P_DRIVE_A, P_DRIVE_B, P_DRIVE_PWM, P_DRIVE_EN),
     yawMotor_(P_YAW_A, P_YAW_B, P_YAW_PWM, P_YAW_EN),
     driveEncoder_(P_DRIVEENC_A, P_DRIVEENC_B, bb::Encoder::INPUT_SPEED, bb::Encoder::UNIT_MILLIMETERS),
     balanceInput_(imu_, IMUControlInput::IMU_PITCH),
     rollInput_(imu_, IMUControlInput::IMU_ROLL, false),
-#if defined(ROLL_VELOCITY)
-    rollOutput_(BODY_ROLL_SERVO, 0, Servos::CONTROL_VELOCITY),
-#elif defined(ROLL_POSITION)
     rollOutput_(BODY_ROLL_SERVO, 0, Servos::CONTROL_POSITION),
-#endif
     driveController_(driveEncoder_, driveMotor_),
     balanceController_(balanceInput_, driveController_),
-    rollController_(rollInput_, rollOutput_),
+    rollController_(rollInput_, rollOutput_, imu_),
     posControlOutput_(balanceController_),
     autoPosController_(driveEncoder_, posControlOutput_),
     posController_(driveEncoder_, posControlOutput_),
@@ -100,9 +93,10 @@ Result BB8::initialize() {
   addParameter("bal_ki", "Integral constant for drive balance controller", params_.balKi);
   addParameter("bal_kd", "Derivative constant for drive balance controller", params_.balKd);
 
-  addParameter("roll_kp", "Proportional constant for roll controller", params_.rollKp);
-  addParameter("roll_ki", "Integral constant for roll controller", params_.rollKi);
-  addParameter("roll_kd", "Derivative constant for roll controller", params_.rollKd);
+  addParameter("roll_kp", "Roll controller P gain (deg body tilt per deg roll error)", params_.rollKp);
+  addParameter("roll_ki", "Roll controller I gain (deg body tilt per deg*s roll error)", params_.rollKi);
+  addParameter("roll_kd", "Roll controller damping on gyro roll rate (deg body tilt per deg/s)", params_.rollKd);
+  addParameter("roll_kff", "Roll controller feedforward from roll goal (1.0 = like roll_direct)", params_.rollKff);
 
   addParameter("auto_pos_kp", "Proportional constant for position PID controller", params_.autoPosKp, -INT_MAX, INT_MAX);
   addParameter("auto_pos_ki", "Integrative constant for position PID controller", params_.autoPosKi, -INT_MAX, INT_MAX);
@@ -132,7 +126,7 @@ Result BB8::initialize() {
   addParameter("fa_speed_sp_to_dome", "Factor to add forward speed setpoint to dome pitch", params_.faSpeedSPToDome);
   addParameter("fa_roll_sp_to_dome", "Factor to add roll setpoint to dome roll", params_.faRollSPToDome);
   addParameter("fa_dome_pitch_to_weight", "Factor to add dome pitch to weight fwd/back setpoint", params_.faDomePitchToWeight);
-  addParameter("fa_dome_roll_to_weight", "Factor to add roll setpoint to dome roll", params_.faDomeRollToWeight);
+  addParameter("fa_dome_roll_to_weight", "Counterweight tilt per degree of measured dome roll, both around sphere center (0 = off)", params_.faDomeRollToWeight);
 
   configureTimers();
   driveMotor_.setCustomAnalogWrite(&customAnalogWrite);
@@ -143,13 +137,10 @@ Result BB8::initialize() {
   balanceController_.setRamp(100);
   //balanceController_.setDebug(true);
   rollController_.setAutoUpdate(false);
-#if defined(ROLL_POSITION)
-  rollController_.setControlOffset(180.0);
-#endif
+  rollController_.setControlOffset(0.0);
+  rollController_.setOutputMapping(ROLL_REDUCTION, 180.0); // same mapping as roll_direct
   rollController_.setGoal(0.0);
   //rollController_.setRamp(30);  
-
-  imu_.setRotationAroundZ(bb::IMU::ROTATE_90);
 
   setPacketSource(PACKET_SOURCE_DROID);
 
@@ -166,7 +157,9 @@ Result BB8::start(ConsoleStream *stream) {
   memset((uint8_t *)&lastPacket_, 0, sizeof(lastPacket_));
   packetTimeout_ = 0;
 
-  imu_.begin();
+  imu_.begin(IMU_ADDR);
+  imu_.setRotationAroundZ(bb::IMU::ROTATE_90);
+
   BB8BattStatus::batt.begin();
 
   operationStatus_ = selfTest();
@@ -189,11 +182,7 @@ Result BB8::start(ConsoleStream *stream) {
   setControlParameters();
   annealH_ = annealP_ = annealR_ = 0;
 
-#if defined(ROLL_VELOCITY)
-  bb::Servos::servos.setControlMode(BODY_ROLL_SERVO, bb::Servos::CONTROL_VELOCITY);
-#elif defined(ROLL_POSITION)
   bb::Servos::servos.setControlMode(BODY_ROLL_SERVO, bb::Servos::CONTROL_POSITION);
-#endif
   bb::Servos::servos.switchTorque(bb::Servos::ID_ALL, true);
 
   return RES_OK;
@@ -288,9 +277,25 @@ Result BB8::stepDriveMotor() {
   return RES_OK;
 }
 
+float BB8::domeRollAngle() {
+  // Measured (not commanded) dome roll, so the counterweight follows the dome's
+  // real motion including servo lag and external pushes. Degrees around the
+  // sphere center, relative to the frame.
+  if(!servosOK_ || !Servos::servos.isStarted()) return 0.0f;
+  float servoDeg = Servos::servos.presentPos(DOME_ROLL_SERVO) - params_.domeRollOffset - 180.0f;
+  return servoDeg / DOME_ROLL_REDUCTION;
+}
+
 Result BB8::stepRollMotor() {
-  if(params_.rollDirect == false)
+  // Counterweight tilt that keeps the combined CoM in place when the dome moves sideways.
+  float headTilt = params_.faDomeRollToWeight * domeRollAngle();
+
+  if(params_.rollDirect) {
+    Servos::servos.setGoalPos(BODY_ROLL_SERVO, (rollController_.goal() + headTilt) * ROLL_REDUCTION + 180.0);
+  } else {
+    rollController_.setHeadCompensation(headTilt);
     rollController_.update();
+  }
   float load = Servos::servos.load(BODY_ROLL_SERVO);
   if(load > maxRollLoad_) maxRollLoad_ = load;
   return RES_OK;
@@ -383,19 +388,12 @@ void BB8::setControlParameters() {
   balanceController_.setControlParameters(params_.balKp, params_.balKi, params_.balKd);
   balanceController_.reset();
 
-  if(params_.rollDebug) rollController_.setDebug(true);
-  else rollController_.setDebug(false);
-
-  rollController_.setControlParameters(params_.rollKp, params_.rollKi, params_.rollKd);
+  rollController_.setRollDebug(params_.rollDebug);
+  rollController_.setRollParameters(params_.rollKp, params_.rollKi, params_.rollKd, params_.rollKff);
   rollController_.setIBounds(-params_.rollIMax, params_.rollIMax);
   rollController_.setInhibit(params_.rollInhibit);
-#if defined(ROLL_VELOCITY)
-  rollController_.setControlBounds(-params_.rollServoVel, params_.rollServoVel);
-  rollController_.setRamp(params_.rollServoAccel);
-#else
   rollController_.setControlUnbounded();
   rollController_.setRamp(0.0);
-#endif
   rollController_.reset();
 
   autoPosController_.setControlParameters(params_.autoPosKp, params_.autoPosKi, params_.autoPosKd);
@@ -676,10 +674,8 @@ Result BB8::incomingControlPacket(const HWAddress& srcAddr, PacketSource source,
     }
 
     float bodyRollInput = -packet.getAxis(0) * params_.rollAngleMax;
-    if(params_.rollDirect) Servos::servos.setGoalPos(BODY_ROLL_SERVO, bodyRollInput * ROLL_REDUCTION + 180.0);
-    else {
-      rollController_.setGoal(bodyRollInput);
-    }
+    // In roll_direct mode the servo is commanded from stepRollMotor() using this goal.
+    rollController_.setGoal(bodyRollInput);
 
     if(packet.button3) {
       remoteR_ = packet.getAxis(2, ControlPacket::UNIT_DEGREES_CENTERED);

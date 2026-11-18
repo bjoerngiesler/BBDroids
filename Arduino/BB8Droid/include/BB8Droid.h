@@ -5,7 +5,7 @@
 #include <Adafruit_NeoPixel.h>
 
 #include "BB8Config.h"
-#include "BB8PosControlOutput.h"
+#include "BB8Controllers.h"
 
 using namespace bb;
 
@@ -81,6 +81,7 @@ public:
 protected:
   void setControlParameters();
   void setServoParameters();
+  float domeRollAngle();
 
   float driveSpeedGoal_, bodyRollGoal_, domePitchGoal_, domeRollGoal_;
   float maxRollLoad_;
@@ -119,7 +120,8 @@ protected:
   bb::Encoder driveEncoder_;
   bb::IMUControlInput balanceInput_, rollInput_;
   bb::ServoControlOutput rollOutput_;
-  bb::PIDController driveController_, balanceController_, rollController_;
+  bb::PIDController driveController_, balanceController_;
+  BB8RollController rollController_;
   BB8PosCtrlOutput posControlOutput_;
   bb::PIDController autoPosController_, posController_; 
   float posControllerZero_;

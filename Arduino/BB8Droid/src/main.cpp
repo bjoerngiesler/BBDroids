@@ -35,8 +35,8 @@ void initializeSubsystems() {
   ConfigStorage::storage.initialize();
   Runloop::runloop.initialize();
   Console::console.initialize();
-  WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
-  WifiServer::server.setOTANameAndPassword("BB8-$MAC", "password");
+  //WifiServer::server.initialize(WIFI_SSID, WIFI_WPA_KEY, WIFI_AP_MODE, DEFAULT_UDP_PORT, DEFAULT_TCP_PORT);
+  //WifiServer::server.setOTANameAndPassword("BB8-$MAC", "password");
 
   XBee::xbee.initialize(DEFAULT_CHAN, DEFAULT_PAN, 230400, serialTXSerial);
   XBee::xbee.setDebugFlags((XBee::DebugFlags)(XBee::DEBUG_PROTOCOL|XBee::DEBUG_XBEE_COMM));
@@ -51,13 +51,13 @@ void initializeSubsystems() {
 
 void startSubsystems() {
   Console::console.start();
-  WifiServer::server.start();
+  //WifiServer::server.start();
   XBee::xbee.addPacketReceiver(&BB8::bb8);
   XBee::xbee.start();
   XBee::xbee.setAPIMode(true);
   bb::Servos::servos.start();
   BB8::bb8.start();
-  if (!WifiServer::server.isStarted()) WifiServer::server.start();
+  // if (!WifiServer::server.isStarted()) WifiServer::server.start();
 }
 
 void setup() {
