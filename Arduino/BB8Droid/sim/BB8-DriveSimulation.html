@@ -108,7 +108,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         <button id="bReset">Restart</button>
         <select id="sSpeed" aria-label="Time scale"><option value="1">Real time</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option><option value="0.1">0.1×</option></select>
       </div>
-      <p class="hint">Keyboard: <kbd>W</kbd> accelerate, <kbd>S</kbd> brake/reverse, <kbd>A</kbd><kbd>D</kbd> steer left/right, <kbd>Space</kbd> pause. Releasing returns to 0 with the same ramp. Head with the right stick.</p>
+      <p class="hint">Keyboard: <kbd>W</kbd> accelerate, <kbd>S</kbd> brake/reverse, <kbd>A</kbd><kbd>D</kbd> steer left/right, <kbd>Space</kbd> pause. Releasing returns to 0 with the same ramp. Head with the right stick: pressing it acts as button 3, after release the head is held for fa_dome_anneal_delay and then returns to center over fa_dome_anneal_time.</p>
       <div class="row"><label for="keyAccel">Keyboard acceleration <small>m/s² (setpoint)</small></label><input type="number" id="keyAccel" min="0.1" max="5" step="0.1" value="2.0"></div>
     </div>
 
@@ -253,6 +253,9 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       driveSpeedMax: 3000, driveSpeedDeadband: 0.01, rollAngleMax: 20,
       bodyRollRange: 25, bodyRollVel: 500, bodyRollAccel: 60,
       domePitchRange: 45, domePitchVel: 100, domeRollRange: 20, domeRollVel: 100,
+      faDomeAnnealDelay: 0.3, // s  after the head stick is released (button3), hold the head this long ...
+      faDomeAnnealTime: 0.5,  // s  ... then return it linearly to center over this time
+      rollInhibit: false,     // roll controller keeps updating but does not command the servo
       domePitchReduction: 2.0, // assumption (only DOME_ROLL_REDUCTION is defined in the code)
       // Head compensation and feedforward: the "ideal" set, same defaults as the firmware (BB8Config.h).
       // faDomeRollToWeight / faDomePitchToWeight are the static ideals for the default masses
@@ -261,6 +264,8 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       driveAccelLimit: 2000, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max
       faAccelToDome: 15,   // deg head (around the sphere center) per m/s^2 of commanded acceleration
       domeAccelTau: 0.5,   // s  low-pass on the commanded acceleration for the head
+      autoShareClamp: true, // clamp the automatic head share to dome_pitch_range before subtracting it (dome_comp_remote_only)
+      faDomeSPAccel: 0,    // servo deg per mm/s of (ramped speed setpoint - measured speed), like D-O's faNeckSPAccel. Uses the encoder -> feedback.
       rollReduction: 1.0,      // servo degrees per pendulum degree (firmware ROLL_REDUCTION, previously 80/22)
       rollGoalRamp: 0,     // deg/s ramp on the roll setpoint (0 = off), acts on the error AND the feedforward
       rollShaper: 0,       // 0 = off, 1 = ZV, 2 = ZVD (input shaper on the roll setpoint)
@@ -308,7 +313,10 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       this.rq = [0, 0, 0]; this.rqd = [0, 0, 0];
       // World: position (X forward at start, Z right), heading psi (positive = to the right)
       this.wX = 0; this.wZ = 0; this.psi = 0; this.psiDot = 0; this.aLat = 0; this.trail = [[0, 0]]; this.trailAcc = 0;
-      this.input = { vel: 0, roll: 0, headP: 0, headR: 0, driveOn: true };
+      // headHeld corresponds to button3 on the remote: while held, the head follows headP/headR directly;
+      // when released, the head offset is held for faDomeAnnealDelay and then annealed to 0 (BB8::stepDome()).
+      this.input = { vel: 0, roll: 0, headP: 0, headR: 0, headHeld: true, driveOn: true };
+      this.remoteP = 0; this.remoteR = 0; this.annealP = 0; this.annealR = 0; this.annealT = 0;
       // Firmware state
       this.drive = new PID(); this.bal = new PID(); this.roll = new PID();
       this.imuPitchF = new LowPassFilter(p.imuFilterCutoff, 100);
@@ -320,7 +328,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       this.rollServo = new ServoProfile(); this.domePServo = new ServoProfile(); this.domeRServo = new ServoProfile();
       this.rollServoGoal = 180; this.domePGoal = 180; this.domeRGoal = 180;
       this.applyParams();
-      this.ctrlAcc = 0; this.lastPitchCmd = 0; this.velRamped = 0; this.accelCmdF = 0; this.retTimer = 0; this.prevRollGoal = 0; this.retGoalStart = 0; this.retIStart = 0; this.rollReturning = false; this.goalHist = []; this.goalRamped = 0; this.rollLoad = 0; this.rollLoadPeak = 0;
+      this.ctrlAcc = 0; this.speedErr = 0; this.lastPitchCmd = 0; this.velRamped = 0; this.accelCmdF = 0; this.retTimer = 0; this.prevRollGoal = 0; this.retGoalStart = 0; this.retIStart = 0; this.rollReturning = false; this.goalHist = []; this.goalRamped = 0; this.rollLoad = 0; this.rollLoadPeak = 0;
       this.log = [];
     }
 
@@ -370,10 +378,16 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       const aCmd = (this.velRamped - velPrev) / dt / 1000;
       this.accelCmdF += (aCmd - this.accelCmdF) * Math.min(1, dt / Math.max(dt, p.domeAccelTau));
       this.bal.offset = vel;
+      // Speed error as on D-O (faNeckSPAccel): how far the droid lags behind the ramped setpoint
+      this.speedErr = this.bal.offset - this.encSpeedFilt;
       // Dome pitch compensation: balance setpoint = expected pendulum position for the measured dome pitch
       // Compensation only on the remote share of the head (measured position minus automatic shares)
-      const autoP = p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * this.lastPitchCmd + p.faAccelToDome * p.domePitchReduction * this.accelCmdF;
-      const domePitchMeas = ((this.domePServo.pos - 180) - (p.domeCompRemoteOnly ? autoP : 0)) / p.domePitchReduction;
+      const autoP = p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * this.lastPitchCmd + p.faAccelToDome * p.domePitchReduction * this.accelCmdF
+        + p.faDomeSPAccel * this.speedErr;
+      // The servo can only realize the automatic share up to its range; subtracting more would make a saturated
+      // head look like a remote "head back" command and shift the balance setpoint the wrong way.
+      const autoPReal = p.autoShareClamp ? Math.max(-p.domePitchRange, Math.min(p.domePitchRange, autoP)) : autoP;
+      const domePitchMeas = ((this.domePServo.pos - 180) - (p.domeCompRemoteOnly ? autoPReal : 0)) / p.domePitchReduction;
       this.bal.goal = p.faDomePitchToWeight * domePitchMeas;
       if (!inp.driveOn) {
         this.pwm = 0; this.bal.reset(); this.drive.reset(); this.speedSP = 0;
@@ -423,13 +437,21 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         this.rollKdEff = (p.rollKdSpeed > 0 && vAbs > p.rollKdSpeed) ? p.rollKd * p.rollKdSpeed / vAbs : p.rollKd;
         this.tilt = p.rollKff * this.roll.goal + this.headTilt + v - this.rollKdEff * this.rate;
       }
-      this.rollServoGoal = 180 + p.rollReduction * this.tilt;
+      if (!(p.rollInhibit && !p.rollDirect)) this.rollServoGoal = 180 + p.rollReduction * this.tilt;
 
       // --- stepDome
       this.lastPitchCmd = pitch;
-      this.domePGoal = 180 + inp.headP + p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * pitch
-        + p.faAccelToDome * p.domePitchReduction * this.accelCmdF;
-      this.domeRGoal = 180 + inp.headR + p.faRollSPToDome * this.roll.goal;
+      if (inp.headHeld) {
+        this.remoteP = inp.headP; this.remoteR = inp.headR; this.annealT = this.t;
+        const n = Math.max(p.faDomeAnnealTime, dt) / dt;
+        this.annealP = Math.abs(this.remoteP) / n; this.annealR = Math.abs(this.remoteR) / n;
+      } else if (this.t > this.annealT + p.faDomeAnnealDelay) {
+        const ann = (v, a) => v > 0.5 ? Math.max(0, v - a) : v < -0.5 ? Math.min(0, v + a) : 0;
+        this.remoteP = ann(this.remoteP, this.annealP); this.remoteR = ann(this.remoteR, this.annealR);
+      }
+      this.domePGoal = 180 + this.remoteP + p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * pitch
+        + p.faAccelToDome * p.domePitchReduction * this.accelCmdF + p.faDomeSPAccel * this.speedErr;
+      this.domeRGoal = 180 + this.remoteR + p.faRollSPToDome * this.roll.goal;
     }
 
     // ------------------------------------------------------------ Physics
@@ -563,6 +585,7 @@ const P = [
   ['driveSpeedKd','drive_speed_kd',0,0.05,0.001,'ctrl',''],
   ['driveIBound','drive_speed_imax: max. I share',0,255,5,'ctrl','PWM'],
   ['driveSpeedMax','drive_speed_max',200,3000,50,'ctrl','mm/s'],
+  ['driveSpeedDeadband','drive_speed_deadband (stick units)',0,0.2,0.005,'ctrl',''],
   ['#Balance controller (bal_*)'],
   ['balKp','bal_kp',0,80,0.5,'ctrl','(mm/s)/°'],
   ['balKi','bal_ki',0,50,0.5,'ctrl',''],
@@ -574,6 +597,7 @@ const P = [
   ['rollKff','roll_kff',0,2,0.05,'ctrl',''],
   ['rollKdSpeed','roll_kd_speed: reduce roll_kd above this speed (0 = off)',0,3000,50,'ctrl','mm/s'],
   ['rollAngleMax','roll_angle_max',5,30,1,'ctrl','°'],
+  ['rollIMax','roll_imax: max. I error',0,200,1,'ctrl','°·s'],
   ['rollReduction','Roll servo reduction (ROLL_REDUCTION)',1,4,0.01,'ctrl','°/°'],
   ['rollIBleed','roll_ibleed_tau: I bleed when steering back (0 = off)',0,2,0.05,'ctrl','s'],
   ['rollReturnWindow','roll_return_window: window after a stick move',0.2,5,0.1,'ctrl','s'],
@@ -581,9 +605,16 @@ const P = [
   ['rollShaper','roll_shaper: input shaper (0 off, 1 ZV, 2 ZVD)',0,2,1,'ctrl',''],
   ['rollShaperT','roll_shaper_t: shaper period',1,4,0.05,'ctrl','s'],
   ['rollGoalRamp','Setpoint ramp (0 = off), experiment',0,100,1,'ctrl','°/s'],
+  ['rollDirect','roll_direct','chk','ctrl'],
+  ['rollInhibit','roll_inhibit: controller runs, servo not commanded','chk','ctrl'],
+  ['#Servo limits (body_roll_*, dome_*)'],
+  ['bodyRollRange','body_roll_range: ± pendulum tilt',5,45,1,'ctrl','°'],
   ['bodyRollAccel','body_roll_accel (0 = unlimited)',0,1000,5,'ctrl','DXL'],
   ['bodyRollVel','body_roll_vel (0 = unlimited)',0,1000,10,'ctrl','DXL'],
-  ['rollDirect','roll_direct','chk','ctrl'],
+  ['domePitchRange','dome_pitch_range: ± servo degrees',5,90,1,'ctrl','°'],
+  ['domePitchVel','dome_pitch_vel (0 = unlimited)',0,500,5,'ctrl','DXL'],
+  ['domeRollRange','dome_roll_range: ± servo degrees',5,60,1,'ctrl','°'],
+  ['domeRollVel','dome_roll_vel (0 = unlimited)',0,500,5,'ctrl','DXL'],
   ['#Head feedforward and compensation (fa_*)'],
   ['faSpeedSPToDome','fa_speed_sp_to_dome',-0.05,0.05,0.001,'ctrl','°/(mm/s)'],
   ['faRollSPToDome','fa_roll_sp_to_dome',-2,2,0.05,'ctrl',''],
@@ -593,6 +624,9 @@ const P = [
   ['driveAccelLimit','drive_accel_max: speed setpoint ramp (0 = off)',0,5000,50,'ctrl','mm/s²'],
   ['faAccelToDome','fa_accel_to_dome: head per commanded acceleration',0,40,0.5,'ctrl','°/(m/s²)'],
   ['domeAccelTau','dome_accel_tau: low-pass on head feedforward',0.05,2,0.05,'ctrl','s'],
+  ['faDomeSPAccel','fa_dome_sp_accel: head per speed error (setpoint − measured), like D-O',-0.03,0.03,0.0005,'ctrl','°/(mm/s)'],
+  ['faDomeAnnealDelay','fa_dome_anneal_delay: hold head after release',0,3,0.05,'ctrl','s'],
+  ['faDomeAnnealTime','fa_dome_anneal_time: return head to center',0.05,5,0.05,'ctrl','s'],
   ['domeCompRemoteOnly','dome_comp_remote_only: compensate the remote share of the head only','chk','ctrl'],
   ['encoderQuantize','Encoder quantization','chk','mech'],
   ['turning','Cornering (yaw from lean, centrifugal force)','chk','mech'],
@@ -904,6 +938,7 @@ function loop(now) {
   updateKeys(dtReal);
   sim.input.vel = stick.v; sim.input.roll = stick.r;
   sim.input.headP = stick.hp * sim.p.domePitchRange; sim.input.headR = stick.hr * sim.p.domeRollRange;
+  sim.input.headHeld = padState.padHead.active || $('latch').checked; // head pad pressed = button3 held
   if (!paused) {
     acc += dtReal * timeScale; const n = Math.floor(acc / 0.001);
     if (n > 0) { sim.advance(n * 0.001); acc -= n * 0.001; }
@@ -913,7 +948,7 @@ function loop(now) {
     let x = stick[st.kx], y = stick[st.ky]; const mq = Math.max(Math.abs(x), Math.abs(y)), hq = Math.hypot(x, y); if (hq > 1e-9) { x *= mq / hq; y *= mq / hq; } st.knob.style.transform = `translate(${x * 118}%, ${-y * 118}%)`;
   }
   $('capV').textContent = stick.v.toFixed(2); $('capR').textContent = stick.r.toFixed(2);
-  $('capHP').textContent = `${sim.input.headP.toFixed(0)}°`; $('capHR').textContent = `${sim.input.headR.toFixed(0)}°`;
+  $('capHP').textContent = `${sim.remoteP.toFixed(0)}°`; $('capHR').textContent = `${sim.remoteR.toFixed(0)}°`;
   update3d();
   drawRiss($('cSide'), true); drawRiss($('cFront'), false);
   if (frame++ % 2 === 0) PLOTS.forEach(drawPlot);

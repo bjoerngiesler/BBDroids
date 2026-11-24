@@ -108,7 +108,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         <button id="bReset">Restart</button>
         <select id="sSpeed" aria-label="Time scale"><option value="1">Real time</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option><option value="0.1">0.1×</option></select>
       </div>
-      <p class="hint">Keyboard: <kbd>W</kbd> accelerate, <kbd>S</kbd> brake/reverse, <kbd>A</kbd><kbd>D</kbd> steer left/right, <kbd>Space</kbd> pause. Releasing returns to 0 with the same ramp. Head with the right stick.</p>
+      <p class="hint">Keyboard: <kbd>W</kbd> accelerate, <kbd>S</kbd> brake/reverse, <kbd>A</kbd><kbd>D</kbd> steer left/right, <kbd>Space</kbd> pause. Releasing returns to 0 with the same ramp. Head with the right stick: pressing it acts as button 3, after release the head is held for fa_dome_anneal_delay and then returns to center over fa_dome_anneal_time.</p>
       <div class="row"><label for="keyAccel">Keyboard acceleration <small>m/s² (setpoint)</small></label><input type="number" id="keyAccel" min="0.1" max="5" step="0.1" value="2.0"></div>
     </div>
 
@@ -168,6 +168,7 @@ const P = [
   ['driveSpeedKd','drive_speed_kd',0,0.05,0.001,'ctrl',''],
   ['driveIBound','drive_speed_imax: max. I share',0,255,5,'ctrl','PWM'],
   ['driveSpeedMax','drive_speed_max',200,3000,50,'ctrl','mm/s'],
+  ['driveSpeedDeadband','drive_speed_deadband (stick units)',0,0.2,0.005,'ctrl',''],
   ['#Balance controller (bal_*)'],
   ['balKp','bal_kp',0,80,0.5,'ctrl','(mm/s)/°'],
   ['balKi','bal_ki',0,50,0.5,'ctrl',''],
@@ -179,6 +180,7 @@ const P = [
   ['rollKff','roll_kff',0,2,0.05,'ctrl',''],
   ['rollKdSpeed','roll_kd_speed: reduce roll_kd above this speed (0 = off)',0,3000,50,'ctrl','mm/s'],
   ['rollAngleMax','roll_angle_max',5,30,1,'ctrl','°'],
+  ['rollIMax','roll_imax: max. I error',0,200,1,'ctrl','°·s'],
   ['rollReduction','Roll servo reduction (ROLL_REDUCTION)',1,4,0.01,'ctrl','°/°'],
   ['rollIBleed','roll_ibleed_tau: I bleed when steering back (0 = off)',0,2,0.05,'ctrl','s'],
   ['rollReturnWindow','roll_return_window: window after a stick move',0.2,5,0.1,'ctrl','s'],
@@ -186,9 +188,16 @@ const P = [
   ['rollShaper','roll_shaper: input shaper (0 off, 1 ZV, 2 ZVD)',0,2,1,'ctrl',''],
   ['rollShaperT','roll_shaper_t: shaper period',1,4,0.05,'ctrl','s'],
   ['rollGoalRamp','Setpoint ramp (0 = off), experiment',0,100,1,'ctrl','°/s'],
+  ['rollDirect','roll_direct','chk','ctrl'],
+  ['rollInhibit','roll_inhibit: controller runs, servo not commanded','chk','ctrl'],
+  ['#Servo limits (body_roll_*, dome_*)'],
+  ['bodyRollRange','body_roll_range: ± pendulum tilt',5,45,1,'ctrl','°'],
   ['bodyRollAccel','body_roll_accel (0 = unlimited)',0,1000,5,'ctrl','DXL'],
   ['bodyRollVel','body_roll_vel (0 = unlimited)',0,1000,10,'ctrl','DXL'],
-  ['rollDirect','roll_direct','chk','ctrl'],
+  ['domePitchRange','dome_pitch_range: ± servo degrees',5,90,1,'ctrl','°'],
+  ['domePitchVel','dome_pitch_vel (0 = unlimited)',0,500,5,'ctrl','DXL'],
+  ['domeRollRange','dome_roll_range: ± servo degrees',5,60,1,'ctrl','°'],
+  ['domeRollVel','dome_roll_vel (0 = unlimited)',0,500,5,'ctrl','DXL'],
   ['#Head feedforward and compensation (fa_*)'],
   ['faSpeedSPToDome','fa_speed_sp_to_dome',-0.05,0.05,0.001,'ctrl','°/(mm/s)'],
   ['faRollSPToDome','fa_roll_sp_to_dome',-2,2,0.05,'ctrl',''],
@@ -198,6 +207,9 @@ const P = [
   ['driveAccelLimit','drive_accel_max: speed setpoint ramp (0 = off)',0,5000,50,'ctrl','mm/s²'],
   ['faAccelToDome','fa_accel_to_dome: head per commanded acceleration',0,40,0.5,'ctrl','°/(m/s²)'],
   ['domeAccelTau','dome_accel_tau: low-pass on head feedforward',0.05,2,0.05,'ctrl','s'],
+  ['faDomeSPAccel','fa_dome_sp_accel: head per speed error (setpoint − measured), like D-O',-0.03,0.03,0.0005,'ctrl','°/(mm/s)'],
+  ['faDomeAnnealDelay','fa_dome_anneal_delay: hold head after release',0,3,0.05,'ctrl','s'],
+  ['faDomeAnnealTime','fa_dome_anneal_time: return head to center',0.05,5,0.05,'ctrl','s'],
   ['domeCompRemoteOnly','dome_comp_remote_only: compensate the remote share of the head only','chk','ctrl'],
   ['encoderQuantize','Encoder quantization','chk','mech'],
   ['turning','Cornering (yaw from lean, centrifugal force)','chk','mech'],
@@ -509,6 +521,7 @@ function loop(now) {
   updateKeys(dtReal);
   sim.input.vel = stick.v; sim.input.roll = stick.r;
   sim.input.headP = stick.hp * sim.p.domePitchRange; sim.input.headR = stick.hr * sim.p.domeRollRange;
+  sim.input.headHeld = padState.padHead.active || $('latch').checked; // head pad pressed = button3 held
   if (!paused) {
     acc += dtReal * timeScale; const n = Math.floor(acc / 0.001);
     if (n > 0) { sim.advance(n * 0.001); acc -= n * 0.001; }
@@ -518,7 +531,7 @@ function loop(now) {
     let x = stick[st.kx], y = stick[st.ky]; const mq = Math.max(Math.abs(x), Math.abs(y)), hq = Math.hypot(x, y); if (hq > 1e-9) { x *= mq / hq; y *= mq / hq; } st.knob.style.transform = `translate(${x * 118}%, ${-y * 118}%)`;
   }
   $('capV').textContent = stick.v.toFixed(2); $('capR').textContent = stick.r.toFixed(2);
-  $('capHP').textContent = `${sim.input.headP.toFixed(0)}°`; $('capHR').textContent = `${sim.input.headR.toFixed(0)}°`;
+  $('capHP').textContent = `${sim.remoteP.toFixed(0)}°`; $('capHR').textContent = `${sim.remoteR.toFixed(0)}°`;
   update3d();
   drawRiss($('cSide'), true); drawRiss($('cFront'), false);
   if (frame++ % 2 === 0) PLOTS.forEach(drawPlot);
