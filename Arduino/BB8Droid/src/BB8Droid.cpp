@@ -349,7 +349,12 @@ float BB8::domePitchAngle() {
   if(!servosOK_ || !Servos::servos.isStarted()) return 0.0f;
   float servoDeg = Servos::servos.presentPos(DOME_PITCH_SERVO) - params_.domePitchOffset - 180.0f;
   if(params_.domeCompRemoteOnly) {
-    servoDeg -= params_.faSpeedSPToDome*balanceController_.controlOffset() + params_.faAccelToDome*DOME_PITCH_REDUCTION*accelCmdFilt_;
+    float autoShare = params_.faSpeedSPToDome*balanceController_.controlOffset() + params_.faAccelToDome*DOME_PITCH_REDUCTION*accelCmdFilt_;
+    // The servo can only realize the automatic share up to its range. Subtracting more would make a head
+    // that sits at its limit look like a remote "head back" command, and fa_dome_pitch_to_weight would then
+    // push the pendulum further forward during strong acceleration (sim/README.md, section 6.4).
+    autoShare = constrain(autoShare, -params_.domePitchRange, params_.domePitchRange);
+    servoDeg -= autoShare;
   }
   return servoDeg / DOME_PITCH_REDUCTION;
 }

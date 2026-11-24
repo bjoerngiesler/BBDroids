@@ -246,9 +246,9 @@ The disturbances are full and half head swings, ±5° and ±10° roll-stick slal
 
 | Björn's scenario (`check.js`): full speed, head right 3 s, head left 3 s, stop | max lean driving | after stop | roll servo load |
 |---|---|---|---|
-| before | 36° | 56° | 100% |
+| before | 35° | 84° | 100% |
 | kd scheduling only | 3.6° | 2.1° | 24% |
-| `body_roll_accel` 60 only | 54° | 76° | 100% |
+| `body_roll_accel` 60 only | 43° | 67° | 100% |
 | **new defaults** | 3.3° | 1.9° | 20% |
 
 **Limits of the model**, important here:
@@ -269,15 +269,15 @@ At full throttle with `drive_speed_max` = 3000 mm/s and a ramp of 2000 mm/s², t
 |---|---|---|---|---|---|
 | old head settings, old I bound (≤ 153 PWM) | 1852 mm/s | 34° | 74° | 198 | 52° back |
 | old head settings, new I bound (≤ 255 PWM) | 2074 mm/s | 37° | 74° | 221 | 54° back |
-| new defaults, old I bound | 2167 mm/s | 13° | 68° | 231 | 2° fwd |
-| **new defaults, new I bound** | 2401 mm/s | 16° | 69° | 255 | 1° back |
+| new defaults, old I bound | 2167 mm/s | 13° | 56° | 231 | 2° fwd |
+| **new defaults, new I bound** | 2401 mm/s | 16° | 56° | 255 | 1° back |
 
 Conclusions:
 
 - **The head feedforward is the bigger lever, not the I bound.** With the old settings the head lies far back at speed, so the pendulum has to swing far forward to compensate, and the balance controller takes a lot off the setpoint. With the head held upright, the steady pendulum angle drops from about 35° to about 15°.
 - **The I bound** adds about 10% and makes `drive_speed_imax` mean what its name says.
 - **Don't simply remove the balance deduction.** An I term in the balance controller (`bal_ki`) tries to regulate the physically required pendulum angle to 0 and brakes the droid. A cleaner fix would be a speed-dependent feedforward on the balance setpoint, i.e. the expected pendulum angle for the rolling resistance at speed v. That requires measuring the rolling resistance first. (A high-pass in front of the balance controller let the pendulum swing past 90° in the earlier model, so it is not a solution either.)
-- **The pendulum swings up to about 70° while accelerating at full throttle**, in every configuration. That is a reason not to set `drive_speed_max` above about 2000 mm/s until the motor data and rolling resistance are known.
+- **The pendulum swings far forward while accelerating at full throttle**: 74° with the old head settings, 56° with the new defaults (section 6.4). That is a reason not to set `drive_speed_max` above about 2000 mm/s until the motor data and rolling resistance are known.
 
 All figures depend strongly on the estimated rolling resistance (3 N/(m/s)) and the estimated motor data.
 
@@ -330,13 +330,49 @@ No signal goes through the IMU or the encoder, so there is no feedback.
 
 | Stick step to half speed (1.5 m/s) | old firmware head settings | IMU tracking (rejected) | **Feedforward (new defaults)** |
 |---|---|---|---|
-| Pendulum deflection | 46° | 35° | 33° |
-| Head when pulling away | 56° back | 8° fwd / 23° back | 3° fwd / 12° back |
+| Pendulum deflection | 46° | 35° | 30° |
+| Head when pulling away | 56° back | 8° fwd / 23° back | 3° fwd / 8° back |
 | Head at constant speed | 28° back | 2° fwd | 1° back |
 | Head when braking | 28° back, then 28° fwd | 12° back / 25° fwd | 4° back / 2° fwd |
 | Stopped after release | 2.3 s | 2.4 s | 1.9 s |
 
-With the corrected (stiffer) speed loop, the pendulum swings forward sharply when pulling away, and a feedforward from the ramped setpoint can't completely keep up: the head briefly drops back by about 12°. Braking is almost neutral. A grid over `fa_accel_to_dome` 10–35, `dome_accel_tau` 0.1–0.5 s and `fa_speed_sp_to_dome` 0.005–0.015, checked over all mass variants, confirmed 15 / 0.5 s / 0.01 as the best combination (worst case over the variants 16.5° of head deflection). Ways to improve further: a separate factor for pulling away, or a gentler `drive_accel_max`.
+With the corrected (stiffer) speed loop, the pendulum swings forward sharply when pulling away, and a feedforward from the ramped setpoint can't completely keep up: the head briefly drops back by about 8° (12° before the clamp fix in section 6.4). Braking is almost neutral. A grid over `fa_accel_to_dome` 10–35, `dome_accel_tau` 0.1–0.5 s and `fa_speed_sp_to_dome` 0.005–0.015, checked over all mass variants (before the clamp fix), confirmed 15 / 0.5 s / 0.01 as the best combination (worst case over the variants 16.5° of head deflection). Ways to improve further: see section 6.4.
+
+### 6.4 Strong acceleration: head at its range limit
+
+**Observation (Björn):** when accelerating strongly, the head comes forward relative to the pendulum, but only slightly. The pendulum drives forward hard, so the head ends up thrown back. Once the droid reaches its target speed, the effect almost disappears.
+
+**In the simulation** (full stick, before the fix below), the head is commanded far more forward than it can go: 50–86 servo degrees, while `dome_pitch_range` stops the dome pitch servo at 45 servo degrees (about 22° around the sphere center, with the assumed `DOME_PITCH_REDUCTION` of 2). The head reaches that limit about 0.5 s after the stick step. From then on, the pendulum keeps swinging forward (up to 69°) and takes the head back with it, to 49° behind vertical. The underlying cause is the speed ramp: 2000 mm/s² is more than the drive delivers (about 1.2 m/s² in the simulation), so the real speed falls up to 1.5 m/s behind the setpoint, and the balance loop lets the pendulum swing far forward to catch up.
+
+**Fix: clamp the automatic head share** (firmware `domePitchAngle()` and simulation). With `dome_comp_remote_only`, the automatic head feedforward is subtracted from the measured head position, so that only the remote share is compensated. If the servo is at its limit, the measured position is smaller than the commanded automatic share, and the difference looked like a large remote "head back" command. `fa_dome_pitch_to_weight` answered it by pushing the pendulum further forward. The automatic share is now clamped to ±`dome_pitch_range` before it is subtracted.
+
+| | before the clamp | with the clamp |
+|---|---|---|
+| Half throttle (1.5 m/s): head drops back | 12° | 8° |
+| Full throttle: pendulum peak | 69° | 56° |
+| Full throttle: head drops back | 49° | 36° |
+
+**D-O style feedforward `fa_dome_sp_accel` (simulation only, default 0).** Head pitch in servo degrees per mm/s of speed error (ramped setpoint − measured speed), like D-O's `faNeckSPAccel`. Unlike D-O it isn't zeroed at setpoint 0, so it also acts while braking. It uses the encoder, so it is feedback, not pure feedforward. Exploratory runs with the clamp:
+
+| `fa_dome_sp_accel` | stick 0.3: head back | stick 0.5: head fwd / back, at cruise | stick 1.0: head fwd / back, at cruise |
+|---|---|---|---|
+| 0 | 3° | 3° / 8°, −1° | 4° / 36°, −3° |
+| 0.01 | 0° | 4° / 8°, 0° | 12° / 36°, +2° |
+| 0.03 | 0° | 8° / 7°, +3° | 23° / 35°, +11° |
+
+It helps at gentle throttle. Under strong acceleration the head is already at its limit, so it can't take the head any further forward. When the droid can't reach the setpoint (full stick with `drive_speed_max` 3000), the speed error never disappears and the head stays tilted forward at cruise.
+
+**What actually helps under strong acceleration is a gentler speed ramp**, closer to what the drive can deliver. Exploratory runs with the clamp, `drive_speed_max` 2000 as in the firmware, full stick:
+
+| `drive_accel_max` | pendulum peak | head drops back | time to stop |
+|---|---|---|---|
+| 2000 (default) | 39° | 17° | 2.2 s |
+| 1500 | 33° | 12° | 2.4 s |
+| 1200 | 29° | 7° | 2.7 s |
+| 1000 | 25° | 4° | 3.0 s |
+| 800 | 22° | 3° | 3.4 s |
+
+The default stays at 2000 for now. More `dome_pitch_range`, if the mechanics allow it, would also give the head more room.
 
 ---
 
@@ -350,6 +386,7 @@ With the corrected (stiffer) speed loop, the pendulum swings forward sharply whe
 | `BB8Controllers.h/.cpp` | `BB8RollController`: speed-scheduled gyro damping (`setKdSpeedScheduling()`, `setSpeed()`), I bleed when steering back, optional ZV/ZVD shaper with a ring buffer (401 values, 4 s at 100 Hz), `setRollGoal()`/`rawGoal()`. Shaping happens in `update()`, the ramp stays 0. No second call to `input_.present()`. |
 | `BB8Droid.h` | members `velGoal_`, `velRamped_`, `accelCmdFilt_`; method `domePitchAngle()` |
 | `BB8Droid.cpp` | setpoint ramp and commanded acceleration in `stepDriveMotor()`; balance setpoint = `fa_dome_pitch_to_weight` × `domePitchAngle()`; head feedforward in `stepDome()`; balance ramp 0; I bound of the speed controller on the I share in PWM, including `controlGain()` (`drive_speed_imax`); roll setpoint via `setRollGoal()`; measured encoder speed passed to the roll controller every cycle; `roll_direct` and `fa_roll_sp_to_dome` use the unshaped setpoint |
+| `BB8Droid.cpp` (clamp fix) | `domePitchAngle()` clamps the automatic head share to ±`dome_pitch_range` before subtracting it (section 6.4) |
 | `BB8Droid.cpp` (other fixes) | remote loss (> 500 ms) also returns the roll setpoint to 0 and releases the dome; `stop()` switches the drive and servo torque off; console `mode` goes through `setMode()` (`off` switches the drive and torque off, leaving `off` switches torque back on, no drive toggle in `MODE_OFF`); running status shows the last primary packet |
 
 ### 7.2 New and changed parameters
@@ -413,7 +450,6 @@ The defaults now contain compensation values whose signs come from the simulatio
   - position modes
   - dynamics of the dome heading and the head magnets
   - yaw rate leaking into the roll gyro when the frame pitches (section 3.7)
-  - range limits of the dome pitch servo interacting with the feedforward (at high acceleration plus high speed, the commanded dome pitch can hit `dome_pitch_range`, after which `dome_comp_remote_only` subtracts more than the servo actually does)
 
 ## 10. Open items
 
@@ -423,7 +459,7 @@ The defaults now contain compensation values whose signs come from the simulatio
 4. Measure rolling resistance (coast-down test). Afterwards, optionally add a speed-dependent feedforward on the balance setpoint (section 4).
 5. Fix the position controllers (section 2, item 10).
 6. Set `body_roll_vel` to a realistic value (XM430-W350: about 200 units ≈ 275°/s).
-7. Head drops back about 12° when pulling away: a separate factor for pulling away, or a gentler acceleration ramp (section 6.3).
+7. Head drops back when pulling away hard (section 6.4): decide on a lower `drive_accel_max` (about 1000–1200) and whether to add `fa_dome_sp_accel` to the firmware. Measure `DOME_PITCH_REDUCTION`, which sets how far the head can actually go.
 8. Verify roll stability at speed on the hardware (section 3.7, commissioning step 4). If needed, model the yaw-into-roll-gyro coupling and retune `roll_kd_speed`.
 
 ## 11. Using and extending the simulation
@@ -435,5 +471,7 @@ The defaults now contain compensation values whose signs come from the simulatio
   - "Roll set ZVD + I bleed"
   - "Ideal head compensation for these masses": recomputes the compensation for the masses entered and sets the feedforward
   - "Defaults": the controller parameters as in the firmware
+- **Head stick:** pressing the right pad counts as holding button 3. After release, the head is held for `fa_dome_anneal_delay` and then returns to center over `fa_dome_anneal_time`, as in the firmware.
+- **Simulation-only parameters** (not in the firmware): `fa_dome_sp_accel` (section 6.4), `fa_pitch_to_dome` (rejected, section 6.2), `roll_kp` on the way back, and the roll setpoint ramp.
 - **Reproduce the figures:** `node check.js` and `node robustness.js`, or `./check-jsc.sh` and `./check-jsc.sh robustness.js` on a Mac without Node.
 - **Rebuild the HTML** after changes to `sim.js` or `page.html`: `python3 build.py` (CDN variant). For the offline variant, put `three.min.js` r128 next to the script and run `python3 build.py --offline` (see the comment in `build.py`).
