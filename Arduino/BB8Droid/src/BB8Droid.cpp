@@ -68,7 +68,7 @@ BB8::BB8():
   setLED(LED_DRIVE, OFF);
   commLEDOn_ = false;
   msLastLeftCtrlPacket_ = msLastRightCtrlPacket_ = msLastPrimaryCtrlPacket_ = 0;
-  velGoal_ = velRamped_ = accelCmdFilt_ = 0;
+  velGoal_ = velRamped_ = accelCmdFilt_ = speedErr_ = 0;
 }
 
 Result BB8::initialize() {
@@ -137,6 +137,7 @@ Result BB8::initialize() {
   addParameter("fa_dome_roll_to_weight", "Counterweight tilt per degree of measured dome roll, both around sphere center (0 = off)", params_.faDomeRollToWeight);
   addParameter("fa_accel_to_dome", "Dome pitch (deg around sphere center) per m/s^2 commanded acceleration (0 = off)", params_.faAccelToDome);
   addParameter("dome_accel_tau", "Low-pass time constant (s) on commanded acceleration for fa_accel_to_dome", params_.domeAccelTau);
+  addParameter("fa_dome_sp_accel", "Dome pitch (servo deg) per mm/s of speed error, setpoint minus measured (0 = off)", params_.faDomeSPAccel);
   addParameter("dome_comp_remote_only", "fa_dome_pitch_to_weight acts only on the remote share of dome pitch", params_.domeCompRemoteOnly);
 
   configureTimers();
@@ -300,7 +301,7 @@ Result BB8::stepDriveMotor() {
 
   if(driveMode_ == DRIVE_OFF) {
     driveMotor_.set(0);
-    velRamped_ = accelCmdFilt_ = 0;
+    velRamped_ = accelCmdFilt_ = speedErr_ = 0;
     return RES_OK;
   }
 
@@ -321,6 +322,8 @@ Result BB8::stepDriveMotor() {
   }
   float alpha = (params_.domeAccelTau > dt) ? dt / params_.domeAccelTau : 1.0f;
   accelCmdFilt_ += (aCmd - accelCmdFilt_) * alpha;
+  // How far the droid lags behind the ramped setpoint (D-O's accelSP), for fa_dome_sp_accel.
+  speedErr_ = balanceController_.controlOffset() - driveEncoder_.presentSpeed();
 
   // Dome pitch compensation: shift the balance setpoint to the pendulum pitch that keeps the
   // combined CoM in place for the measured dome pitch, so moving the head does not make the droid drive.
@@ -349,7 +352,8 @@ float BB8::domePitchAngle() {
   if(!servosOK_ || !Servos::servos.isStarted()) return 0.0f;
   float servoDeg = Servos::servos.presentPos(DOME_PITCH_SERVO) - params_.domePitchOffset - 180.0f;
   if(params_.domeCompRemoteOnly) {
-    float autoShare = params_.faSpeedSPToDome*balanceController_.controlOffset() + params_.faAccelToDome*DOME_PITCH_REDUCTION*accelCmdFilt_;
+    float autoShare = params_.faSpeedSPToDome*balanceController_.controlOffset() + params_.faAccelToDome*DOME_PITCH_REDUCTION*accelCmdFilt_
+                    + params_.faDomeSPAccel*speedErr_;
     // The servo can only realize the automatic share up to its range. Subtracting more would make a head
     // that sits at its limit look like a remote "head back" command, and fa_dome_pitch_to_weight would then
     // push the pendulum further forward during strong acceleration (sim/README.md, section 6.4).
@@ -387,7 +391,7 @@ Result BB8::stepDome() {
   // Dome pitch feedforward from the (ramped) speed setpoint and the commanded acceleration only -
   // deliberately not from the IMU, which would close a loop via head reaction and pitch.
   float domePitch = 180 + remoteP_ + params_.faSpeedSPToDome*balanceController_.controlOffset()
-                        + params_.faAccelToDome*DOME_PITCH_REDUCTION*accelCmdFilt_;
+                        + params_.faAccelToDome*DOME_PITCH_REDUCTION*accelCmdFilt_ + params_.faDomeSPAccel*speedErr_;
   float domeRoll = 180 + remoteR_ + params_.faRollSPToDome*rollController_.rawGoal();
   float domeHeading = 180 + remoteH_;
 
@@ -650,7 +654,7 @@ void BB8::switchDrive(DriveMode mode) {
   balanceController_.reset();
   balanceController_.setControlOffset(0);
   balanceController_.setGoal(0);
-  velGoal_ = velRamped_ = accelCmdFilt_ = 0;
+  velGoal_ = velRamped_ = accelCmdFilt_ = speedErr_ = 0;
 
   autoPosController_.reset();
   autoPosController_.setPresentAsGoal();

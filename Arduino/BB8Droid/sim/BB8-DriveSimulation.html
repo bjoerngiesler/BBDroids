@@ -261,7 +261,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       // faDomeRollToWeight / faDomePitchToWeight are the static ideals for the default masses
       // (see idealDomeRollToWeight() / idealDomePitchToWeight()); recompute them when the masses change.
       faSpeedSPToDome: 0.01, faRollSPToDome: -0.5, faDomeRollToWeight: -0.46, faDomePitchToWeight: -0.85, faPitchToDome: 0, domeCompRemoteOnly: true,
-      driveAccelLimit: 2000, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max
+      driveAccelLimit: 1200, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max
       faAccelToDome: 15,   // deg head (around the sphere center) per m/s^2 of commanded acceleration
       domeAccelTau: 0.5,   // s  low-pass on the commanded acceleration for the head
       autoShareClamp: true, // clamp the automatic head share to dome_pitch_range before subtracting it (dome_comp_remote_only)
@@ -379,7 +379,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       this.accelCmdF += (aCmd - this.accelCmdF) * Math.min(1, dt / Math.max(dt, p.domeAccelTau));
       this.bal.offset = vel;
       // Speed error as on D-O (faNeckSPAccel): how far the droid lags behind the ramped setpoint
-      this.speedErr = this.bal.offset - this.encSpeedFilt;
+      this.speedErr = inp.driveOn ? this.bal.offset - this.encSpeedFilt : 0; // 0 with the drive off, as in the firmware
       // Dome pitch compensation: balance setpoint = expected pendulum position for the measured dome pitch
       // Compensation only on the remote share of the head (measured position minus automatic shares)
       const autoP = p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * this.lastPitchCmd + p.faAccelToDome * p.domePitchReduction * this.accelCmdF
@@ -664,10 +664,10 @@ function buildParams() {
   updIdeal();
 }
 function updIdeal() {
-  $('idealHint').textContent = `Static ideal for the current masses: fa_dome_roll_to_weight ≈ ${sim.idealDomeRollToWeight().toFixed(2)} (−mh·L / (mp·l)), fa_dome_pitch_to_weight ≈ ${sim.idealDomePitchToWeight().toFixed(2)} (−mh·L / (mp·l − mh·L), the head swings with the pendulum frame). Signs are in the simulation's convention. The defaults (same as the firmware) contain these values for the default masses; the button recomputes them for the masses set above and also sets the head feedforward from the joystick setpoint: ramp 2000 mm/s², fa_accel_to_dome 15, low-pass 0.5 s, fa_speed_sp_to_dome +0.01, compensation on the remote share only.`;
+  $('idealHint').textContent = `Static ideal for the current masses: fa_dome_roll_to_weight ≈ ${sim.idealDomeRollToWeight().toFixed(2)} (−mh·L / (mp·l)), fa_dome_pitch_to_weight ≈ ${sim.idealDomePitchToWeight().toFixed(2)} (−mh·L / (mp·l − mh·L), the head swings with the pendulum frame). Signs are in the simulation's convention. The defaults (same as the firmware) contain these values for the default masses; the button recomputes them for the masses set above and also sets the head feedforward from the joystick setpoint: ramp 1200 mm/s², fa_accel_to_dome 15, low-pass 0.5 s, fa_speed_sp_to_dome +0.01, compensation on the remote share only.`;
 }
 buildParams();
-$('bIdeal').onclick = () => { sim.p.faDomeRollToWeight = +sim.idealDomeRollToWeight().toFixed(2); sim.p.faDomePitchToWeight = +sim.idealDomePitchToWeight().toFixed(2); Object.assign(sim.p, {faPitchToDome: 0, faSpeedSPToDome: 0.01, faAccelToDome: 15, domeAccelTau: 0.5, driveAccelLimit: 2000, domeCompRemoteOnly: true}); sim.applyParams(); save(); buildParams(); };
+$('bIdeal').onclick = () => { sim.p.faDomeRollToWeight = +sim.idealDomeRollToWeight().toFixed(2); sim.p.faDomePitchToWeight = +sim.idealDomePitchToWeight().toFixed(2); Object.assign(sim.p, {faPitchToDome: 0, faSpeedSPToDome: 0.01, faAccelToDome: 15, domeAccelTau: 0.5, driveAccelLimit: 1200, domeCompRemoteOnly: true}); sim.applyParams(); save(); buildParams(); };
 $('bRollOpt').onclick = () => { Object.assign(sim.p, {rollKp: 0.5, rollKi: 0.4, rollKd: 0.4, rollKff: 0, bodyRollAccel: 30, rollDirect: false, rollShaper: 0, rollGoalRamp: 0, rollReduction: 1, rollIBleed: 0.4, rollReturnWindow: 1.5, rollKpReturn: 0}); sim.applyParams(); save(); buildParams(); };
 $('bRollFast').onclick = () => { Object.assign(sim.p, {rollKp: 0.85, rollKi: 1.3, rollKd: 0.3, rollKff: 0, bodyRollAccel: 30, rollDirect: false, rollShaper: 2, rollShaperT: 2.3, rollGoalRamp: 0, rollReduction: 1, rollIBleed: 0.4, rollReturnWindow: 1.5, rollKpReturn: 0}); sim.applyParams(); save(); buildParams(); };
 $('bDefaults').onclick = () => { const d = defaultParams(); for (const e of P) if (secs.ctrl && e[5] === 'ctrl' || e[3] === 'ctrl') sim.p[e[0]] = d[e[0]]; sim.applyParams(); save(); buildParams(); };

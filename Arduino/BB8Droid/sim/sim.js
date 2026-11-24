@@ -114,7 +114,7 @@
       // faDomeRollToWeight / faDomePitchToWeight are the static ideals for the default masses
       // (see idealDomeRollToWeight() / idealDomePitchToWeight()); recompute them when the masses change.
       faSpeedSPToDome: 0.01, faRollSPToDome: -0.5, faDomeRollToWeight: -0.46, faDomePitchToWeight: -0.85, faPitchToDome: 0, domeCompRemoteOnly: true,
-      driveAccelLimit: 2000, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max
+      driveAccelLimit: 1200, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max
       faAccelToDome: 15,   // deg head (around the sphere center) per m/s^2 of commanded acceleration
       domeAccelTau: 0.5,   // s  low-pass on the commanded acceleration for the head
       autoShareClamp: true, // clamp the automatic head share to dome_pitch_range before subtracting it (dome_comp_remote_only)
@@ -232,7 +232,7 @@
       this.accelCmdF += (aCmd - this.accelCmdF) * Math.min(1, dt / Math.max(dt, p.domeAccelTau));
       this.bal.offset = vel;
       // Speed error as on D-O (faNeckSPAccel): how far the droid lags behind the ramped setpoint
-      this.speedErr = this.bal.offset - this.encSpeedFilt;
+      this.speedErr = inp.driveOn ? this.bal.offset - this.encSpeedFilt : 0; // 0 with the drive off, as in the firmware
       // Dome pitch compensation: balance setpoint = expected pendulum position for the measured dome pitch
       // Compensation only on the remote share of the head (measured position minus automatic shares)
       const autoP = p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * this.lastPitchCmd + p.faAccelToDome * p.domePitchReduction * this.accelCmdF

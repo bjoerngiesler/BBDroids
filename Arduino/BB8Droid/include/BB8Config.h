@@ -69,7 +69,8 @@ struct BB8Params {
   bool autoPosControl      = false;
 
   float driveSpeedDeadband = 0.01f;
-  float driveAccelMax      = 2000;   // mm/s^2 ramp on the speed setpoint from the remote (0 = off). Also defines the commanded acceleration for the dome feedforward.
+  float driveAccelMax      = 1200;   // mm/s^2 ramp on the speed setpoint from the remote (0 = off). Also defines the commanded acceleration for the dome feedforward.
+                                     // Was 2000, which is more than the drive delivers: the pendulum swings far forward and throws the head back (sim/README.md, 6.4).
   float driveSpeedIMax     = 255;    // Max I share of the drive speed controller in PWM: errI is bounded to +-driveSpeedIMax/(driveSpeedKi*encoder controlGain) (was a fixed errI bound of 255 = ~153 PWM incl. controlGain).
   float driveSpeedMax      = DRIVE_MOTOR_MAX_SPEED_MM_PER_S;
   float rollAngleMax       = 20.0;
@@ -101,6 +102,8 @@ struct BB8Params {
                                        // Ideal -(m_head*L)/(m_weight*l - m_head*L). Was .5 but unused.
   float faAccelToDome        = 15;     // Dome pitch (deg around sphere center) per m/s^2 of commanded acceleration (pure feedforward, no IMU).
   float domeAccelTau         = 0.5;    // s, low-pass on commanded acceleration for faAccelToDome
+  float faDomeSPAccel        = 0;      // Dome pitch (servo deg) per mm/s of speed error (ramped setpoint - measured speed), like D-O's faNeckSPAccel.
+                                       // Uses the encoder, so it is feedback. 0 = off; sign in sim convention not verified (sim/README.md, 6.4).
   bool  domeCompRemoteOnly   = true;   // faDomePitchToWeight acts only on the remote share of the dome pitch, not on the automatic feedforward
   float faDomeRollToWeight   = -.46;   // Counterweight tilt per deg of measured dome roll, both around sphere center. Ideal -(m_head*L)/(m_weight*l). Was 0.
 };

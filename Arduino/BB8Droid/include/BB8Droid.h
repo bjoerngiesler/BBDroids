@@ -128,6 +128,7 @@ protected:
 
   float remoteP_, remoteH_, remoteR_;
   float velGoal_, velRamped_, accelCmdFilt_; // speed setpoint from remote, ramped setpoint, low-passed commanded acceleration (m/s^2)
+  float speedErr_;                           // ramped speed setpoint minus measured speed (mm/s), 0 with the drive off
   float annealP_, annealH_, annealR_, annealTime_;
 
   Adafruit_NeoPixel statusPixels_;
