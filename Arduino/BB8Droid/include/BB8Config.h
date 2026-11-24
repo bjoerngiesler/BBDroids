@@ -13,8 +13,9 @@ static const uint8_t       DROID_ID = 0;
 static const float BODY_CIRCUMFERENCE             = 2*M_PI*253.0;
 static const float DRIVE_MOTOR_TICKS_PER_TURN     = 4776.384;
 static const float DRIVE_MOTOR_MAX_SPEED_MM_PER_S = 2000.0;
-static const float ROLL_REDUCTION                 = 80.0/22.0;
+static const float ROLL_REDUCTION                 = 1.0;  // servo degrees per degree of pendulum tilt. Servo now coupled 1:1 (old cable drive was 80/22).
 static const float DOME_ROLL_REDUCTION            = 2.0;  // dome roll servo degrees per degree of dome motion around sphere center
+static const float DOME_PITCH_REDUCTION           = 2.0;  // ASSUMPTION (same as roll) - dome pitch servo degrees per degree of dome motion around sphere center. Please measure.
 static const float ROLL_RATE_FILTER_CUTOFF        = 15.0; // Hz, low-pass on gyro roll rate used for damping
 
 struct BB8Params {
@@ -22,7 +23,7 @@ struct BB8Params {
   float bodyRollRange     = 25.0; // in the station don't go beyond 25, in the droid 30 is OK
   float bodyRollOffset    = 0;
   float bodyRollVel       = 500;
-  float bodyRollAccel     = 30;
+  float bodyRollAccel     = 60;    // was 30. 60 together with rollKdSpeed keeps the roll loop stable when cornering at speed (sim/README.md, 3.7)
   float domePitchRange    = 45.0;
   float domePitchOffset   = 0.0;
   float domePitchVel      = 100;
@@ -45,9 +46,11 @@ struct BB8Params {
   // Roll controller, all in body degrees (gear reduction applied at the output):
   // tilt = rollKff*goal + rollKp*err + rollKi*int(err) - rollKd*gyroRate
   // Note: old rollKp=2 was in servo degrees, equivalent to ~0.55 here.
-  float rollKp             = 0.3;
-  float rollKi             = 0;
-  float rollKd             = 0.1;  // deg tilt per deg/s of measured roll rate
+  // Tuned in simulation for ROLL_REDUCTION=1, body_roll_accel=30, pendulum 4.5kg@155mm, head ~1kg (see sim/README.md).
+  float rollKp             = 0.5;
+  float rollKi             = 0.4;
+  float rollKd             = 0.4;  // deg tilt per deg/s of measured roll rate
+  float rollKdSpeed        = 1000; // mm/s, above this measured speed rollKd is scaled by rollKdSpeed/|speed| (0 = off)
   float rollKff            = 0.0;  // 1.0 = same open-loop lean as roll_direct. Off by default because
                                    // the right value depends on mass distribution - tune on hardware.
 
@@ -66,10 +69,20 @@ struct BB8Params {
   bool autoPosControl      = false;
 
   float driveSpeedDeadband = 0.01f;
+  float driveAccelMax      = 2000;   // mm/s^2 ramp on the speed setpoint from the remote (0 = off). Also defines the commanded acceleration for the dome feedforward.
+  float driveSpeedIMax     = 255;    // Max I share of the drive speed controller in PWM: errI is bounded to +-driveSpeedIMax/(driveSpeedKi*encoder controlGain) (was a fixed errI bound of 255 = ~153 PWM incl. controlGain).
   float driveSpeedMax      = DRIVE_MOTOR_MAX_SPEED_MM_PER_S;
   float rollAngleMax       = 20.0;
 
   float rollIMax            = 50;
+  // Faster return to upright: when the roll goal moves towards zero, bleed the I state towards the share
+  // that belongs to the new goal with this time constant. Only active for rollReturnWindow seconds after
+  // the stick moved towards center, so steady disturbances are still integrated away. 0 = off.
+  float rollIBleedTau       = 0.4;   // s
+  float rollReturnWindow    = 1.5;   // s
+  // Optional input shaper on the roll goal (0 = off, 1 = ZV, 2 = ZVD), tuned to the rocking period.
+  int   rollShaper          = 0;
+  float rollShaperT         = 2.3;   // s, max 4 s at 100 Hz
   float rollTorquePercent   = 90;
 
   bool domeHeadingServoReverse = true;
@@ -79,10 +92,17 @@ struct BB8Params {
 
   float faDomeAnnealTime     = .5;     // Time it takes for all head axes ot return to 0 after control has been relinquished.
   float faDomeAnnealDelay    = .3;     // Delay before we anneal the head position if button is released
-  float faSpeedSPToDome      = -.01;
+  // Head compensation and feedforward: the "ideal" set from the simulation (sim/README.md, section 5/6), for
+  // pendulum 4.5 kg @ 155 mm and an ESTIMATED head of 1 kg @ 320 mm. Signs are in the simulation's convention
+  // and NOT verified on hardware - check them first (sim/README.md, section 8) and recompute after weighing the head.
+  float faSpeedSPToDome      = .01;    // Dome pitch (servo deg) per mm/s of speed setpoint. Keeps the head upright at constant speed. Was -.01.
   float faRollSPToDome       = -.5;
-  float faDomePitchToWeight  = .5;
-  float faDomeRollToWeight   = 0;      // ~ (m_dome*r_dome)/(m_weight*l), sign included. Calibrate with roll_ki, see roll_debug.
+  float faDomePitchToWeight  = -.85;   // Balance setpoint shift (deg pendulum pitch) per deg of measured dome pitch around sphere center.
+                                       // Ideal -(m_head*L)/(m_weight*l - m_head*L). Was .5 but unused.
+  float faAccelToDome        = 15;     // Dome pitch (deg around sphere center) per m/s^2 of commanded acceleration (pure feedforward, no IMU).
+  float domeAccelTau         = 0.5;    // s, low-pass on commanded acceleration for faAccelToDome
+  bool  domeCompRemoteOnly   = true;   // faDomePitchToWeight acts only on the remote share of the dome pitch, not on the automatic feedforward
+  float faDomeRollToWeight   = -.46;   // Counterweight tilt per deg of measured dome roll, both around sphere center. Ideal -(m_head*L)/(m_weight*l). Was 0.
 };
 
 static const int DOME_HEADING_SERVO  = 1;

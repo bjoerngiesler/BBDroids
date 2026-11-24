@@ -82,13 +82,13 @@ protected:
   void setControlParameters();
   void setServoParameters();
   float domeRollAngle();
+  float domePitchAngle();
 
   float driveSpeedGoal_, bodyRollGoal_, domePitchGoal_, domeRollGoal_;
   float maxRollLoad_;
   bool pwmControl_;
 
   ConfigStorage::HANDLE paramsHandle_;
-  bb::ControlPacket lastPacket_;
   int packetTimeout_;
 
   int numLeftCtrlPackets_, numRightCtrlPackets_;
@@ -127,6 +127,7 @@ protected:
   float posControllerZero_;
 
   float remoteP_, remoteH_, remoteR_;
+  float velGoal_, velRamped_, accelCmdFilt_; // speed setpoint from remote, ramped setpoint, low-passed commanded acceleration (m/s^2)
   float annealP_, annealH_, annealR_, annealTime_;
 
   Adafruit_NeoPixel statusPixels_;

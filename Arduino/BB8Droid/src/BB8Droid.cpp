@@ -68,6 +68,7 @@ BB8::BB8():
   setLED(LED_DRIVE, OFF);
   commLEDOn_ = false;
   msLastLeftCtrlPacket_ = msLastRightCtrlPacket_ = msLastPrimaryCtrlPacket_ = 0;
+  velGoal_ = velRamped_ = accelCmdFilt_ = 0;
 }
 
 Result BB8::initialize() {
@@ -97,6 +98,11 @@ Result BB8::initialize() {
   addParameter("roll_ki", "Roll controller I gain (deg body tilt per deg*s roll error)", params_.rollKi);
   addParameter("roll_kd", "Roll controller damping on gyro roll rate (deg body tilt per deg/s)", params_.rollKd);
   addParameter("roll_kff", "Roll controller feedforward from roll goal (1.0 = like roll_direct)", params_.rollKff);
+  addParameter("roll_kd_speed", "Roll: above this speed (mm/s), roll_kd is scaled by roll_kd_speed/|speed| (0 = off)", params_.rollKdSpeed);
+  addParameter("roll_ibleed_tau", "Roll: time constant for bleeding the I state when returning towards zero (0 = off)", params_.rollIBleedTau);
+  addParameter("roll_return_window", "Roll: seconds after a stick move towards center during which the I bleed is active", params_.rollReturnWindow);
+  addParameter("roll_shaper", "Roll goal input shaper: 0 = off, 1 = ZV, 2 = ZVD", params_.rollShaper, 0, 2);
+  addParameter("roll_shaper_t", "Roll goal input shaper period in seconds (max 4)", params_.rollShaperT, 0, 4);
 
   addParameter("auto_pos_kp", "Proportional constant for position PID controller", params_.autoPosKp, -INT_MAX, INT_MAX);
   addParameter("auto_pos_ki", "Integrative constant for position PID controller", params_.autoPosKi, -INT_MAX, INT_MAX);
@@ -112,6 +118,8 @@ Result BB8::initialize() {
   addParameter("auto_pos_control", "Automatically switch to position control", params_.autoPosControl);
 
   addParameter("drive_speed_deadband", "Deadband for drive speed controller", params_.driveSpeedDeadband);
+  addParameter("drive_accel_max", "Ramp on the remote speed setpoint in mm/s^2 (0 = off)", params_.driveAccelMax);
+  addParameter("drive_speed_imax", "Max I share of the drive speed controller in PWM (bounds ki*errI)", params_.driveSpeedIMax);
   addParameter("drive_speed_max", "Max speed for drive controller", params_.driveSpeedMax);
   addParameter("roll_angle_max", "Maximum roll angle settable by remote", params_.rollAngleMax);
 
@@ -125,8 +133,11 @@ Result BB8::initialize() {
 
   addParameter("fa_speed_sp_to_dome", "Factor to add forward speed setpoint to dome pitch", params_.faSpeedSPToDome);
   addParameter("fa_roll_sp_to_dome", "Factor to add roll setpoint to dome roll", params_.faRollSPToDome);
-  addParameter("fa_dome_pitch_to_weight", "Factor to add dome pitch to weight fwd/back setpoint", params_.faDomePitchToWeight);
+  addParameter("fa_dome_pitch_to_weight", "Balance setpoint shift (deg pendulum) per deg of measured dome pitch around sphere center (0 = off)", params_.faDomePitchToWeight);
   addParameter("fa_dome_roll_to_weight", "Counterweight tilt per degree of measured dome roll, both around sphere center (0 = off)", params_.faDomeRollToWeight);
+  addParameter("fa_accel_to_dome", "Dome pitch (deg around sphere center) per m/s^2 commanded acceleration (0 = off)", params_.faAccelToDome);
+  addParameter("dome_accel_tau", "Low-pass time constant (s) on commanded acceleration for fa_accel_to_dome", params_.domeAccelTau);
+  addParameter("dome_comp_remote_only", "fa_dome_pitch_to_weight acts only on the remote share of dome pitch", params_.domeCompRemoteOnly);
 
   configureTimers();
   driveMotor_.setCustomAnalogWrite(&customAnalogWrite);
@@ -134,13 +145,15 @@ Result BB8::initialize() {
   driveController_.setAutoUpdate(false);
   //driveController_.setDebug(true);
   balanceController_.setAutoUpdate(false);
-  balanceController_.setRamp(100);
+  // Ramp must be 0: the balance goal is set every cycle (dome pitch compensation), and with a ramp
+  // setGoal() resets the internal setpoint to the present pitch each time. Speed ramp: drive_accel_max.
+  balanceController_.setRamp(0);
   //balanceController_.setDebug(true);
   rollController_.setAutoUpdate(false);
   rollController_.setControlOffset(0.0);
   rollController_.setOutputMapping(ROLL_REDUCTION, 180.0); // same mapping as roll_direct
+  rollController_.setRollGoal(0.0);
   rollController_.setGoal(0.0);
-  //rollController_.setRamp(30);  
 
   setPacketSource(PACKET_SOURCE_DROID);
 
@@ -154,7 +167,7 @@ Result BB8::start(ConsoleStream *stream) {
   mode_ = MODE_SPEED_ROLL_CONTROL;
   bb::XBee::xbee.addPacketReceiver(this);
   packetsReceived_ = packetsMissed_ = 0;
-  memset((uint8_t *)&lastPacket_, 0, sizeof(lastPacket_));
+  memset((uint8_t *)&lastPrimaryCtrlPacket_, 0, sizeof(lastPrimaryCtrlPacket_));
   packetTimeout_ = 0;
 
   imu_.begin(IMU_ADDR);
@@ -193,6 +206,18 @@ Result BB8::stop(ConsoleStream *stream) {
   started_ = false;
   operationStatus_ = RES_SUBSYS_NOT_STARTED;
   bb::XBee::xbee.removePacketReceiver(this);
+
+  // step() is no longer called once stopped, so nothing would update the motor or servos anymore -
+  // make sure we don't leave the drive running at its last PWM.
+  switchDrive(DRIVE_OFF);
+  driveMotor_.set(0);
+  driveMotor_.setEnabled(false);
+  if(bb::Servos::servos.isStarted()) {
+    bb::Servos::servos.switchTorque(DOME_HEADING_SERVO, false);
+    bb::Servos::servos.switchTorque(DOME_ROLL_SERVO, false);
+    bb::Servos::servos.switchTorque(DOME_PITCH_SERVO, false);
+    bb::Servos::servos.switchTorque(BODY_ROLL_SERVO, false);
+  }
   return RES_OK;
 }
 
@@ -260,15 +285,46 @@ bb::Result BB8::stepIfNotStarted() {
 
 Result BB8::stepDriveMotor() {
   unsigned long timeSinceLastPrimary = WRAPPEDDIFF(millis(), msLastPrimaryCtrlPacket_, ULONG_MAX);
-  if(timeSinceLastPrimary > 500 && driveMode_ != DRIVE_OFF) {
-    LOG(LOG_INFO, "No control packet from primary in %ldms. Switching drive off.\n", timeSinceLastPrimary);
-    switchDrive(DRIVE_OFF);
+  if(timeSinceLastPrimary > 500) {
+    if(driveMode_ != DRIVE_OFF) {
+      LOG(LOG_INFO, "No control packet from primary in %ldms. Switching drive off.\n", timeSinceLastPrimary);
+      switchDrive(DRIVE_OFF);
+    }
+    // Remote lost: bring the body back upright and release the dome, so stepDome() anneals it
+    // back to center instead of holding the last remote pose (button3 would otherwise stay "held").
+    rollController_.setRollGoal(0.0f);
+    lastPrimaryCtrlPacket_.button3 = false;
   }
+
+  float dt = Runloop::runloop.cycleTimeSeconds();
 
   if(driveMode_ == DRIVE_OFF) {
     driveMotor_.set(0);
+    velRamped_ = accelCmdFilt_ = 0;
     return RES_OK;
   }
+
+  // Speed setpoint ramp and commanded acceleration (pure feedforward from the remote, no IMU involved).
+  float aCmd = 0;
+  if(driveMode_ == DRIVE_VEL) {
+    float velPrev = velRamped_;
+    if(params_.driveAccelMax > 0) {
+      float m = params_.driveAccelMax * dt;
+      velRamped_ += constrain(velGoal_ - velRamped_, -m, m);
+    } else {
+      velRamped_ = velGoal_;
+    }
+    if(dt > 0) aCmd = (velRamped_ - velPrev) / dt / 1000.0f; // m/s^2
+    balanceController_.setControlOffset(velRamped_);
+  } else {
+    velRamped_ = balanceController_.controlOffset();
+  }
+  float alpha = (params_.domeAccelTau > dt) ? dt / params_.domeAccelTau : 1.0f;
+  accelCmdFilt_ += (aCmd - accelCmdFilt_) * alpha;
+
+  // Dome pitch compensation: shift the balance setpoint to the pendulum pitch that keeps the
+  // combined CoM in place for the measured dome pitch, so moving the head does not make the droid drive.
+  balanceController_.setGoal(params_.faDomePitchToWeight * domePitchAngle());
 
   balanceController_.update();
   driveController_.update();
@@ -286,14 +342,28 @@ float BB8::domeRollAngle() {
   return servoDeg / DOME_ROLL_REDUCTION;
 }
 
+float BB8::domePitchAngle() {
+  // Measured dome pitch around the sphere center, relative to the frame. With domeCompRemoteOnly,
+  // the automatic feedforward share (speed and acceleration) is subtracted, so only the remote
+  // head command is compensated - otherwise the compensation would fight acceleration and braking.
+  if(!servosOK_ || !Servos::servos.isStarted()) return 0.0f;
+  float servoDeg = Servos::servos.presentPos(DOME_PITCH_SERVO) - params_.domePitchOffset - 180.0f;
+  if(params_.domeCompRemoteOnly) {
+    servoDeg -= params_.faSpeedSPToDome*balanceController_.controlOffset() + params_.faAccelToDome*DOME_PITCH_REDUCTION*accelCmdFilt_;
+  }
+  return servoDeg / DOME_PITCH_REDUCTION;
+}
+
 Result BB8::stepRollMotor() {
   // Counterweight tilt that keeps the combined CoM in place when the dome moves sideways.
   float headTilt = params_.faDomeRollToWeight * domeRollAngle();
 
   if(params_.rollDirect) {
-    Servos::servos.setGoalPos(BODY_ROLL_SERVO, (rollController_.goal() + headTilt) * ROLL_REDUCTION + 180.0);
+    Servos::servos.setGoalPos(BODY_ROLL_SERVO, (rollController_.rawGoal() + headTilt) * ROLL_REDUCTION + 180.0);
   } else {
     rollController_.setHeadCompensation(headTilt);
+    // Measured speed (not the setpoint): when braking, the setpoint drops before the droid slows down.
+    rollController_.setSpeed(driveEncoder_.presentSpeed());
     rollController_.update();
   }
   float load = Servos::servos.load(BODY_ROLL_SERVO);
@@ -309,8 +379,11 @@ Result BB8::stepDome() {
 
   LOG(LOG_DEBUG, "R:%f P:%f H:%f AX:%f AY:%f AZ:%f DR:%f DP:%f DH:%f\n", r, p, h, ax, ay, az, dr, dp, dh);
 
-  float domePitch = 180 + remoteP_ + params_.faSpeedSPToDome*balanceController_.controlOffset();
-  float domeRoll = 180 + remoteR_ + params_.faRollSPToDome*rollController_.goal();
+  // Dome pitch feedforward from the (ramped) speed setpoint and the commanded acceleration only -
+  // deliberately not from the IMU, which would close a loop via head reaction and pitch.
+  float domePitch = 180 + remoteP_ + params_.faSpeedSPToDome*balanceController_.controlOffset()
+                        + params_.faAccelToDome*DOME_PITCH_REDUCTION*accelCmdFilt_;
+  float domeRoll = 180 + remoteR_ + params_.faRollSPToDome*rollController_.rawGoal();
   float domeHeading = 180 + remoteH_;
 
   if(servosOK_) {
@@ -352,13 +425,20 @@ Result BB8::stepDome() {
 
 Result BB8::setMode(BB8::Mode mode) {
   if (mode_ == mode) return RES_OK;
+  Mode oldMode = mode_;
   mode_ = mode;
 
   if (mode_ == MODE_OFF) {
+    switchDrive(DRIVE_OFF);
     bb::Servos::servos.switchTorque(DOME_HEADING_SERVO, false);
     bb::Servos::servos.switchTorque(DOME_ROLL_SERVO, false);
     bb::Servos::servos.switchTorque(DOME_PITCH_SERVO, false);
     bb::Servos::servos.switchTorque(BODY_ROLL_SERVO, false);
+  } else if (oldMode == MODE_OFF) {
+    bb::Servos::servos.switchTorque(DOME_HEADING_SERVO, true);
+    bb::Servos::servos.switchTorque(DOME_ROLL_SERVO, true);
+    bb::Servos::servos.switchTorque(DOME_PITCH_SERVO, true);
+    bb::Servos::servos.switchTorque(BODY_ROLL_SERVO, true);
   }
 
   driveController_.reset();
@@ -382,14 +462,27 @@ void BB8::setControlParameters() {
   driveEncoder_.setUnit(bb::Encoder::UNIT_MILLIMETERS);
 
   driveController_.setControlParameters(params_.driveSpeedKp, params_.driveSpeedKi, params_.driveSpeedKd);
-  driveController_.setIBounds(-255, 255);
+  // Bound the I share (ki*errI) to drive_speed_imax PWM, not the raw I error. With the old fixed
+  // bound of 255 on errI, the I share was limited to ki*255 = 51 PWM, capping the top speed.
+  if(params_.driveSpeedKi > 0) {
+    // PIDController multiplies the whole control term by input_.controlGain(), which for the encoder in
+    // UNIT_MILLIMETERS is 1/mmPerTick (~3.0), so that factor has to go into the bound as well.
+    float errIMax = params_.driveSpeedIMax / (params_.driveSpeedKi * driveEncoder_.controlGain());
+    driveController_.setIBounds(-errIMax, errIMax);
+  } else {
+    driveController_.setIBounds(0, 0);
+  }
   driveController_.reset();
 
   balanceController_.setControlParameters(params_.balKp, params_.balKi, params_.balKd);
+  balanceController_.setRamp(0);
   balanceController_.reset();
 
   rollController_.setRollDebug(params_.rollDebug);
   rollController_.setRollParameters(params_.rollKp, params_.rollKi, params_.rollKd, params_.rollKff);
+  rollController_.setReturnParameters(params_.rollIBleedTau, params_.rollReturnWindow);
+  rollController_.setKdSpeedScheduling(params_.rollKdSpeed);
+  rollController_.setShaper(params_.rollShaper, params_.rollShaperT);
   rollController_.setIBounds(-params_.rollIMax, params_.rollIMax);
   rollController_.setInhibit(params_.rollInhibit);
   rollController_.setControlUnbounded();
@@ -480,6 +573,7 @@ Result BB8::servoTest(ConsoleStream *stream) {
     Console::console.printfBroadcast("Homing body roll servo failed!\n");
     return RES_SUBSYS_HW_DEPENDENCY_MISSING;
   }   
+  rollController_.setRollGoal(0.0);
   rollController_.setGoal(0.0);
 
   if(bb::Servos::servos.home(DOME_PITCH_SERVO, 5.0, 50, stream) != RES_OK) {
@@ -551,6 +645,7 @@ void BB8::switchDrive(DriveMode mode) {
   balanceController_.reset();
   balanceController_.setControlOffset(0);
   balanceController_.setGoal(0);
+  velGoal_ = velRamped_ = accelCmdFilt_ = 0;
 
   autoPosController_.reset();
   autoPosController_.setPresentAsGoal();
@@ -633,7 +728,8 @@ Result BB8::incomingControlPacket(const HWAddress& srcAddr, PacketSource source,
     msLastPrimaryCtrlPacket_ = millis();
     
     // Joystick button toggles drive mode: OFF/VEL or OFF/AUTO_POS (if enabled)
-    if(packet.button4 && !lastPrimaryCtrlPacket_.button4) {
+    // Not in MODE_OFF - there the drive stays off until the mode is changed.
+    if(packet.button4 && !lastPrimaryCtrlPacket_.button4 && mode_ != MODE_OFF) {
       if(driveMode_ == DRIVE_OFF || driveMode_ == DRIVE_POS) {
         switchDrive(params_.autoPosControl == true ? DRIVE_AUTO_POS : DRIVE_VEL);
       } else {
@@ -664,7 +760,7 @@ Result BB8::incomingControlPacket(const HWAddress& srcAddr, PacketSource source,
           vel *= params_.driveSpeedMax;
         }
 
-        balanceController_.setControlOffset(vel);
+        velGoal_ = vel; // ramped and applied in stepDriveMotor()
       } else if(driveMode_ == DRIVE_POS) {
         float posDelta = packet.getAxis(1) * 1000;
         posController_.setGoal(posControllerZero_ + posDelta);
@@ -675,7 +771,7 @@ Result BB8::incomingControlPacket(const HWAddress& srcAddr, PacketSource source,
 
     float bodyRollInput = -packet.getAxis(0) * params_.rollAngleMax;
     // In roll_direct mode the servo is commanded from stepRollMotor() using this goal.
-    rollController_.setGoal(bodyRollInput);
+    rollController_.setRollGoal(bodyRollInput);
 
     if(packet.button3) {
       remoteR_ = packet.getAxis(2, ControlPacket::UNIT_DEGREES_CENTERED);
@@ -776,29 +872,16 @@ Result BB8::handleConsoleCommand(const std::vector<String> &words, ConsoleStream
           if (stream) stream->printf("unknown\n");
           break;
       }
+      return RES_OK;
     } else if (words.size() == 2) {
-      if (words[1] == "off") {
-        mode_ = MODE_OFF;
-        return RES_OK;
-      } else if (words[1] == "roll") {
-        mode_ = MODE_ROLL_CONTROL_ONLY;
-        return RES_OK;
-      } else if (words[1] == "speed") {
-        mode_ = MODE_SPEED_CONTROL_ONLY;
-        return RES_OK;
-      } else if (words[1] == "speed_roll") {
-        mode_ = MODE_SPEED_ROLL_CONTROL;
-        return RES_OK;
-      } else if (words[1] == "pos") {
-        mode_ = MODE_POS_CONTROL;
-        return RES_OK;
-      } else if (words[1] == "kiosk") {
-        mode_ = MODE_KIOSK;
-        return RES_OK;
-      } else if (words[1] == "calib") {
-        mode_ = MODE_CALIB;
-        return RES_OK;
-      } else return RES_CMD_INVALID_ARGUMENT;
+      if (words[1] == "off") return setMode(MODE_OFF);
+      else if (words[1] == "roll") return setMode(MODE_ROLL_CONTROL_ONLY);
+      else if (words[1] == "speed") return setMode(MODE_SPEED_CONTROL_ONLY);
+      else if (words[1] == "speed_roll") return setMode(MODE_SPEED_ROLL_CONTROL);
+      else if (words[1] == "pos") return setMode(MODE_POS_CONTROL);
+      else if (words[1] == "kiosk") return setMode(MODE_KIOSK);
+      else if (words[1] == "calib") return setMode(MODE_CALIB);
+      else return RES_CMD_INVALID_ARGUMENT;
     } else
       return RES_CMD_INVALID_ARGUMENT_COUNT;
   }
@@ -827,14 +910,14 @@ void BB8::printCurrentSystemStatus(ConsoleStream *stream) {
   float r, p, h;
   imu_.getFilteredPRH(p, r, h);
   String str = "Buttons: ";
-  lastPacket_.button0 ? str += 'X' : str += '_';
-  lastPacket_.button1 ? str += 'X' : str += '_';
-  lastPacket_.button2 ? str += 'X' : str += '_';
-  lastPacket_.button3 ? str += 'X' : str += '_';
-  lastPacket_.button4 ? str += 'X' : str += '_';
+  lastPrimaryCtrlPacket_.button0 ? str += 'X' : str += '_';
+  lastPrimaryCtrlPacket_.button1 ? str += 'X' : str += '_';
+  lastPrimaryCtrlPacket_.button2 ? str += 'X' : str += '_';
+  lastPrimaryCtrlPacket_.button3 ? str += 'X' : str += '_';
+  lastPrimaryCtrlPacket_.button4 ? str += 'X' : str += '_';
   str += " Axes: ";
   for (int i = 0; i < 5; i++) {
-    str += lastPacket_.getAxis(i);
+    str += lastPrimaryCtrlPacket_.getAxis(i);
     str += " ";
   }
 
