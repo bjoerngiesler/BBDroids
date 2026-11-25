@@ -9,7 +9,10 @@ cat > "$SHIM" <<JS
 var module = { exports: {} };
 load('sim.js');
 var __sim = module.exports;
-var require = function () { return __sim; };
+module = { exports: {} };
+load('cary.js');
+var __cary = module.exports;
+var require = function (name) { return name.indexOf('cary') >= 0 ? __cary : __sim; };
 var console = { log: function () { print(Array.prototype.join.call(arguments, ' ')); } };
 load('$SCRIPT');
 JS

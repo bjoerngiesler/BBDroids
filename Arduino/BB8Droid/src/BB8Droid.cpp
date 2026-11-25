@@ -119,6 +119,7 @@ Result BB8::initialize() {
 
   addParameter("drive_speed_deadband", "Deadband for drive speed controller", params_.driveSpeedDeadband);
   addParameter("drive_accel_max", "Ramp on the remote speed setpoint in mm/s^2 (0 = off)", params_.driveAccelMax);
+  addParameter("drive_decel_max", "Ramp while braking in mm/s^2 (0 = same as drive_accel_max)", params_.driveDecelMax);
   addParameter("drive_speed_imax", "Max I share of the drive speed controller in PWM (bounds ki*errI)", params_.driveSpeedIMax);
   addParameter("drive_speed_max", "Max speed for drive controller", params_.driveSpeedMax);
   addParameter("roll_angle_max", "Maximum roll angle settable by remote", params_.rollAngleMax);
@@ -309,8 +310,11 @@ Result BB8::stepDriveMotor() {
   float aCmd = 0;
   if(driveMode_ == DRIVE_VEL) {
     float velPrev = velRamped_;
-    if(params_.driveAccelMax > 0) {
-      float m = params_.driveAccelMax * dt;
+    // Braking (setpoint shrinking towards or through zero) uses drive_decel_max if set (sim/README.md, 6.5).
+    bool braking = fabs(velGoal_) < fabs(velRamped_) || velGoal_ * velRamped_ < 0;
+    float rampMax = (braking && params_.driveDecelMax > 0) ? params_.driveDecelMax : params_.driveAccelMax;
+    if(rampMax > 0) {
+      float m = rampMax * dt;
       velRamped_ += constrain(velGoal_ - velRamped_, -m, m);
     } else {
       velRamped_ = velGoal_;

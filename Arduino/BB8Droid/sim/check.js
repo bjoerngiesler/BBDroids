@@ -1,11 +1,12 @@
 // Reproduces the figures in README.md with the simulation core sim.js.
 // Usage: node check.js   (without Node on macOS: ./check-jsc.sh)
 const {BB8Sim, R2D} = require('./sim.js');
+const {CarySim} = require('./cary.js');
 
 // Head/drive settings of the firmware before the simulation work. The simulation defaults are now the
 // "ideal" head set (same as BB8Config.h), so comparisons against the old firmware spell these out.
 const FW_OLD = {faSpeedSPToDome: -0.01, faDomeRollToWeight: 0, faDomePitchToWeight: 0, faAccelToDome: 0, domeAccelTau: 0.2,
-                driveAccelLimit: 0, domeCompRemoteOnly: false, faPitchToDome: 0};
+                driveAccelLimit: 0, driveDecelLimit: 0, domeCompRemoteOnly: false, faPitchToDome: 0};
 
 const ROLL_FW  = {rollKp: 0.3, rollKi: 0, rollKd: 0.1, rollIBleed: 0};
 const ROLL_REC = {rollKp: 0.5, rollKi: 0.4, rollKd: 0.4, rollIBleed: 0};
@@ -34,7 +35,7 @@ function headStand(o) {
   return {drift: s.pq[0] - x0, v: s.pqd[0] * 1000, maxLean: ml};
 }
 function accelHead(o) {
-  const s = new BB8Sim(o); const r = {accFwd: 0, accBack: 0, cruise: 0, brkBack: 0, brkFwd: 0, pend: 0, stop: null};
+  const s = new BB8Sim({driveSpeedMax: 3000, ...o}); const r = {accFwd: 0, accBack: 0, cruise: 0, brkBack: 0, brkFwd: 0, pend: 0, stop: null};
   for (let i = 0; i < 1100; i++) { const t = i * 0.01; s.input.vel = (t > 0.5 && t < 5) ? 0.5 : 0; s.advance(0.01);
     const a = s.pq[2] * R2D; r.pend = Math.max(r.pend, Math.abs(s.pitchDeg()));
     if (t < 5) { r.accFwd = Math.max(r.accFwd, a); r.accBack = Math.max(r.accBack, -a); if (t > 4.5) r.cruise = a; }
@@ -44,7 +45,7 @@ function accelHead(o) {
 const f = (x, d = 1) => (x === null || x === undefined) ? '-' : x.toFixed(d);
 
 for (const [title, base] of [['new defaults (ideal head set)', {}], ['old firmware head settings', FW_OLD]]) {
-  console.log(`=== Roll step 10 deg (1:1, pendulum 4.5 kg @ 155 mm, head 1 kg), ${title} ===`);
+  console.log(`=== Roll step 10 deg (1:1, pendulum 4.5 kg @ 155 mm, measured head 0.75 kg @ 295 mm), ${title} ===`);
   for (const [n, o] of [['firmware default 0.3/0/0.1', ROLL_FW], ['recommended 0.5/0.4/0.4', ROLL_REC], ['ZVD 2.3s + 0.85/1.3/0.3', ROLL_ZVD]]) {
     const r = rollStep({...base, ...o}); let wts = 0, wov = 0, wl = 0;
     for (const v of VARIANTS) for (const amp of [10, 20]) { const q = rollStep({...base, ...o, ...v}, amp); wts = Math.max(wts, q.ts); wov = Math.max(wov, q.over); wl = Math.max(wl, q.load); }
@@ -71,12 +72,12 @@ console.log('\n=== Top speed (full throttle, drive_speed_max 3000, ramp 2000 mm/
 // Old firmware: errI <= 255, I share = controlGain*ki*errI <= 3.0*0.2*255 ~ 153 PWM
 const OLD_IB = 255 * 0.2 * 4776.384 / (2 * Math.PI * 253);
 for (const [hn, base] of [['old head settings', FW_OLD], ['new defaults', {}]])
-  for (const [n, ib] of [[`old I bound (errI <= 255 -> I share <= ${OLD_IB.toFixed(0)} PWM)`, OLD_IB], ['new: I share <= 255 PWM', 255]]) { const s = new BB8Sim({...base, driveIBound: ib, driveAccelLimit: 2000}); s.input.vel = 1; let pm = 0; for (let i = 0; i < 1500; i++) { s.advance(0.01); pm = Math.max(pm, Math.abs(s.pitchDeg())); } console.log(`${hn.padEnd(18)} ${n.padEnd(46)} ${f(s.pqd[0] * 1000, 0)} mm/s, PWM ${f(s.pwm, 0)}, pendulum steady ${f(s.pitchDeg(), 0)} deg, max ${f(pm, 0)} deg, head ${f(s.pq[2] * R2D, 0)} deg`); }
+  for (const [n, ib] of [[`old I bound (errI <= 255 -> I share <= ${OLD_IB.toFixed(0)} PWM)`, OLD_IB], ['new: I share <= 255 PWM', 255]]) { const s = new BB8Sim({...base, driveSpeedMax: 3000, driveIBound: ib, driveAccelLimit: 2000}); s.input.vel = 1; let pm = 0; for (let i = 0; i < 1500; i++) { s.advance(0.01); pm = Math.max(pm, Math.abs(s.pitchDeg())); } console.log(`${hn.padEnd(18)} ${n.padEnd(46)} ${f(s.pqd[0] * 1000, 0)} mm/s, PWM ${f(s.pwm, 0)}, pendulum steady ${f(s.pitchDeg(), 0)} deg, max ${f(pm, 0)} deg, head ${f(s.pq[2] * R2D, 0)} deg`); }
 console.log('\n=== Cornering (10 deg lean, 0.75 m/s setpoint), new defaults ===');
 { const s = new BB8Sim(ROLL_REC); s.input.vel = 0.25; s.advance(3); s.input.roll = 0.5; s.advance(8); console.log(`v ${f(s.pqd[0] * 1000, 0)} mm/s, lean ${f(s.leanDeg())} deg, radius ${f(s.pqd[0] / s.psiDot, 2)} m (R/sin rho = ${f(s.p.R / Math.sin(s.leanDeg() / R2D), 2)} m)`); }
 console.log('\n=== Full speed, head fully right for 3 s, then fully left for 3 s, then stop (no roll input) ===');
 function headSwingStop(o) {
-  const s = new BB8Sim(o); let md = 0, ms = 0, ml = 0;
+  const s = new BB8Sim({driveSpeedMax: 3000, ...o}); let md = 0, ms = 0, ml = 0;
   for (let i = 0; i < 1800; i++) { const t = i * 0.01; s.input.vel = t < 10 ? 1 : 0;
     s.input.headR = (t >= 4 && t < 7) ? s.p.domeRollRange : (t >= 7 && t < 10) ? -s.p.domeRollRange : 0;
     s.advance(0.01); const l = Math.abs(s.leanDeg()); if (t < 10) md = Math.max(md, l); else ms = Math.max(ms, l); ml = Math.max(ml, s.rollLoad); }
@@ -85,4 +86,34 @@ function headSwingStop(o) {
 for (const [n, o] of [['body_roll_accel 30, no kd scheduling (before)', {bodyRollAccel: 30, rollKdSpeed: 0}],
                       ['kd scheduling only', {bodyRollAccel: 30}], ['body_roll_accel 60 only', {rollKdSpeed: 0}], ['new defaults (60 + roll_kd_speed 1000)', {}]]) {
   const r = headSwingStop(o); console.log(`${n.padEnd(46)} max lean driving ${f(r.md)} deg, after stop ${f(r.ms)} deg, roll servo load ${f(r.ml, 0)}%`);
+}
+
+// ---- Dome magnet shear and braking (README section 6.5). Measured head, capacity domeHoldG = 1.2 x shell weight.
+const MEAS = {}; // measured head = defaults now
+// full stick from t = 0.5 s, release at 8 s; braking metrics from the release
+function accelBrake(sim) {
+  let vMax = 0, t90 = null, stopT = null, x0 = null, dist = 0, sA = 0, sB = 0, hd = 0;
+  const vs = [];
+  for (let i = 0; i < 1600; i++) { const t = i * 0.01; sim.input.vel = (t >= 0.5 && t < 8) ? 1 : 0; sim.advance(0.01);
+    const v = sim.pqd[0]; vs.push([t, v]); hd = Math.max(hd, Math.abs(sim.pq[2] * R2D));
+    if (t < 8) { vMax = Math.max(vMax, v); sA = Math.max(sA, sim.shearUse); }
+    else { if (x0 === null) x0 = sim.pq[0]; sB = Math.max(sB, sim.shearUse); if (stopT === null && Math.abs(v) < 0.05) { stopT = t - 8; dist = sim.pq[0] - x0; } } }
+  for (const [t, v] of vs) if (t90 === null && t >= 0.5 && v >= 0.9 * vMax) t90 = t - 0.5;
+  return {vMax, t90, stopT, dist, sA: sA * 100, sB: sB * 100, hd};
+}
+console.log('\n=== Dome magnet shear: head swung fully forward/back (3 s each), measured head, capacity 1.2 x shell weight ===');
+function headSwingShear(o, vel) {
+  const s = new BB8Sim(o); let sh = 0;
+  for (let i = 0; i < 1800; i++) { const t = i * 0.01; s.input.vel = t < 10 ? vel : 0;
+    s.input.headP = ((t >= 4 && t < 7) ? 1 : (t >= 7 && t < 10) ? -1 : 0) * s.p.domePitchRange; s.advance(0.01); sh = Math.max(sh, s.shearUse); }
+  return sh * 100;
+}
+for (const [n, o] of [['current settings', MEAS], ['shear limiter proposal (+-70 deg dome, 15 deg limit, 30 deg/s)', {...MEAS, domePitchRange: 140, domeRollRange: 140, domeWorldMax: 15, domeLeanCenter: true, domeRemoteRate: 30}]])
+  console.log(`${n.padEnd(62)} standstill ${f(headSwingShear(o, 0), 0)}%, full stick ${f(headSwingShear({...o, driveSpeedMax: 2000}, 1), 0)}% of capacity`);
+console.log('\n=== Acceleration and braking from about 2.1 m/s, measured head ===');
+for (const [n, mk] of [['Cary V1, speed level 3', () => new CarySim({speedLevel: 3})],
+                       ['BBDroids 2450, ramps 1200 both ways (before)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450, driveDecelLimit: 0})],
+                       ['BBDroids 2450, accel 1200 / decel 3000 (defaults)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450})]]) {
+  const r = accelBrake(mk());
+  console.log(`${n.padEnd(46)} top ${f(r.vMax * 1000, 0)} mm/s, 0->90% ${f(r.t90)} s | stop ${f(r.stopT)} s, ${f(r.dist, 2)} m | dome shear ${f(r.sA, 0)}% accel / ${f(r.sB, 0)}% brake | head max ${f(r.hd, 0)} deg`);
 }

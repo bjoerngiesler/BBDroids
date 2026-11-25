@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BB-8 drive comparison: BBDroids vs Cary Christie V1</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+
+/* VOICE: Werkstatt-Instrument, sachlich, präzise, mit BB-8-Farben
+   IDEA: Bedienpult eines Prüfstands: Live-Ansichten links, Fernbedienung und Parameter rechts
+   PICTURE: 3D-Ansicht des Droiden schräg von oben, darunter Seiten- und Vorderriss
+   COLOUR and TYPE: BB-8-Weiß, Orange #e8742a, Stahlgrau; Barlow / Barlow Semi Condensed
+   LAYOUT: Zwei Spalten (Ansichten | Pult), unter 960px gestapelt */
+:root{color-scheme:light dark;
+  --bg:light-dark(#eef0f2,#121519);--panel:light-dark(#ffffff,#1b1f25);--ink:light-dark(#1b1f24,#e9ebee);
+  --mute:light-dark(#5d6670,#9aa3ad);--line:light-dark(#d5d9de,#2c323a);--or:#e8742a;--or2:light-dark(#c75a14,#ff9a52);
+  --steel:light-dark(#4b5560,#aeb7c1);--blue:light-dark(#2867c9,#6ea8ff);--green:light-dark(#178a55,#4fd08f);--violet:light-dark(#7a4bc4,#b591f0);
+  --view:light-dark(#f7f8f9,#171b20)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip}
+header{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;padding:16px max(2vw,14px) 8px}
+h1{font:700 30px/1.05 "Barlow Semi Condensed",Barlow,system-ui,sans-serif,Barlow,sans-serif;margin:0;letter-spacing:-.01em}
+h1 span{color:var(--or)}
+header p{margin:0;color:var(--mute)}
+main{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:0 max(2vw,14px) 24px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.views{display:grid;gap:14px;align-content:start}
+.v3d{position:relative;height:clamp(300px,46vh,500px);overflow:hidden}
+.v3d canvas{display:block;width:100%;height:100%;border-radius:10px}
+.vlabel{position:absolute;left:12px;top:10px;font:600 13px "Barlow Semi Condensed",Barlow,system-ui,sans-serif;color:var(--mute);background:color-mix(in srgb,var(--panel) 80%,transparent);padding:2px 8px;border-radius:6px}
+.camb{position:absolute;left:10px;bottom:10px;min-height:36px;background:color-mix(in srgb,var(--panel) 85%,transparent)}
+.readout{position:absolute;right:10px;top:10px;display:grid;grid-template-columns:auto auto;gap:0 12px;font:500 13px Barlow,system-ui,sans-serif;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:8px 12px;border-radius:8px;border:1px solid var(--line)}
+.readout b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.riss{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.fig{position:relative;height:280px}.fig canvas{position:absolute;inset:0;width:100%;height:100%}
+.plots{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.plot{padding:8px 10px 6px}
+.plot h3{margin:0;font:600 14px "Barlow Semi Condensed",Barlow,system-ui,sans-serif}
+.leg{display:flex;flex-wrap:wrap;gap:2px 12px;font-size:13px;color:var(--mute)}
+.leg i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px}
+.plot .fig{height:150px}
+aside{display:grid;gap:14px;align-content:start;align-self:start}
+.sec{padding:12px 14px}
+.sec h2{margin:0 0 8px;font:700 17px "Barlow Semi Condensed",Barlow,system-ui,sans-serif}
+.pads{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.pad{position:relative;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,var(--view) 55%,color-mix(in srgb,var(--steel) 18%,var(--view)));border:1px solid var(--line);touch-action:none;cursor:grab}
+.pad::before,.pad::after{content:"";position:absolute;background:var(--line)}
+.pad::before{left:50%;top:8%;bottom:8%;width:1px}.pad::after{top:50%;left:8%;right:8%;height:1px}
+.knob{position:absolute;width:34%;height:34%;border-radius:50%;left:33%;top:33%;background:radial-gradient(circle at 35% 30%,#fff,#dfe2e6 60%,#b9bfc6);border:3px solid var(--or);box-shadow:0 3px 8px #0004;z-index:1;pointer-events:none}
+.padcap{text-align:center;font-size:13px;color:var(--mute);margin-top:4px}
+.padcap b{color:var(--ink);font-variant-numeric:tabular-nums}
+.btns{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+button,select{font:600 14px Barlow,system-ui,sans-serif;min-height:40px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--view);color:var(--ink);cursor:pointer}
+button.on{background:var(--or);border-color:var(--or);color:#fff}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.hint{font-size:13px;color:var(--mute);margin:8px 0 0}
+kbd{font:600 12px Barlow,system-ui,sans-serif;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 4px;background:var(--view)}
+.row{display:grid;grid-template-columns:minmax(0,1fr) 92px;align-items:center;gap:4px 10px;margin:6px 0}
+.row label{font-size:14px}.row label small{color:var(--mute)}
+.row input[type=range]{grid-column:1/-1;width:100%;accent-color:var(--or);height:22px;margin:0}
+.row input[type=number]{width:92px;font:500 15px Barlow,system-ui,sans-serif;padding:4px 6px;border:1px solid var(--line);border-radius:6px;background:var(--view);color:var(--ink);text-align:right}
+.chk{display:flex;align-items:center;gap:8px;margin:8px 0;font-size:14px}
+.chk input{width:18px;height:18px;accent-color:var(--or)}
+details{border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
+summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sans-serif;padding:4px 0;min-height:32px}
+.grp{font:600 13px Barlow,system-ui,sans-serif;color:var(--or2);margin:10px 0 0}
+.model{font-size:14px}.model p{margin:6px 0}
+@media(max-width:960px){main{grid-template-columns:minmax(0,1fr)}.views{display:contents}.v3d{order:1}.riss{order:2}aside{order:3}.plots{order:4}}
+@media(max-width:600px){.riss,.plots{grid-template-columns:minmax(0,1fr)}h1{font-size:26px}.readout{font-size:12px;padding:6px 8px}}
+
+:root{--cB:light-dark(#d4621c,#ff9a52);--cC:light-dark(#2867c9,#6ea8ff)}
+.v3row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.v3row .v3d{height:clamp(240px,32vh,360px)}
+.riss4{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
+.riss4 .fig{height:240px}
+.tag{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:baseline}
+.readout{grid-template-columns:auto auto auto}
+.readout .hd{font-weight:700;text-align:right}
+.sec h2 .tag{width:12px;height:12px}
+.quick{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-top:10px}
+.quick label{font-size:13px;color:var(--mute);display:grid;gap:2px}
+.quick select,.quick input{width:100%}
+.quick input{font:500 15px Barlow,system-ui,sans-serif;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--view);color:var(--ink);min-height:40px}
+</style>
+</head>
+<body>
+<header>
+  <h1>BB-8 drives <span>side by side</span></h1>
+  <p><span class="tag" style="background:var(--cB)"></span>BBDroids BB8Droid (current repo sim) · <span class="tag" style="background:var(--cC)"></span>Cary Christie V1, firmware V1.4.9 · same sticks for both · same physics core</p>
+</header>
+<main>
+  <div class="views">
+    <div class="card v3d" id="v3d"><span class="vlabel">3D combined · BBDroids left lane, Cary right lane</span>
+      <div class="readout" id="readout"></div><button id="bCam" class="camb">Cameras: fixed</button></div>
+    <div class="v3row">
+      <div class="card v3d" id="v3dB"><span class="vlabel" style="color:var(--cB)">BBDroids, following</span></div>
+      <div class="card v3d" id="v3dC"><span class="vlabel" style="color:var(--cC)">Cary V1, following</span></div>
+    </div>
+    <div class="riss4">
+      <div class="card"><div class="fig"><canvas id="cSideB"></canvas></div></div>
+      <div class="card"><div class="fig"><canvas id="cSideC"></canvas></div></div>
+      <div class="card"><div class="fig"><canvas id="cFrontB"></canvas></div></div>
+      <div class="card"><div class="fig"><canvas id="cFrontC"></canvas></div></div>
+    </div>
+    <div class="plots">
+      <div class="card plot"><h3>Speed over ground [mm/s]</h3><div class="leg" id="leg0"></div><div class="fig"><canvas id="p0"></canvas></div></div>
+      <div class="card plot"><h3>Pendulum pitch [°]</h3><div class="leg" id="leg1"></div><div class="fig"><canvas id="p1"></canvas></div></div>
+      <div class="card plot"><h3>Head pitch, absolute [°] (+ = forward)</h3><div class="leg" id="leg2"></div><div class="fig"><canvas id="p2"></canvas></div></div>
+      <div class="card plot"><h3>Lean left/right [°]</h3><div class="leg" id="leg3"></div><div class="fig"><canvas id="p3"></canvas></div></div>
+      <div class="card plot" style="grid-column:1/-1"><h3>Dome magnet shear [× shell weight] <small style="font-weight:500;color:var(--mute)">(1 = dome held sideways at 90°; dashed: magnet capacity, domeHoldG)</small></h3><div class="leg" id="leg4"></div><div class="fig"><canvas id="p4"></canvas></div></div>
+    </div>
+  </div>
+
+  <aside>
+    <div class="card sec">
+      <h2>Remote (drives both)</h2>
+      <div class="pads">
+        <div><div class="pad" id="padHead"><div class="knob"></div></div>
+          <div class="padcap">Head stick: fwd <b id="capHP">0.00</b> · side <b id="capHR">0.00</b></div></div>
+        <div><div class="pad" id="padDrive"><div class="knob"></div></div>
+          <div class="padcap">Drive stick: speed <b id="capV">0.00</b> · lean <b id="capR">0.00</b></div></div>
+      </div>
+      <label class="chk"><input type="checkbox" id="latch"> Sticks stay where released</label>
+      <div class="btns">
+        <button id="bPause">Pause</button>
+        <button id="bReset">Restart both</button>
+        <select id="sSpeed" aria-label="Time scale"><option value="1">Real time</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option><option value="0.1">0.1×</option></select>
+      </div>
+      <div class="quick">
+        <label>BBDroids drive_speed_max [mm/s]<input type="number" id="qBBmax" min="200" max="3000" step="50"></label>
+        <label>Cary speed level (R3)<select id="sLevel"><option value="1">1 (DRIVESPEED1)</option><option value="2">2 (DRIVESPEED2)</option><option value="3">3 (DRIVESPEED3)</option></select></label>
+        <label>Keyboard stick travel [s, 0 → full]<input type="number" id="keySlew" min="0" max="3" step="0.05" value="0.25"></label>
+        <label>Cary spin speed (X+A)<select id="sSpin"><option value="1">Spin speed 1</option><option value="2">Spin speed 2</option></select></label>
+      </div>
+      <div class="btns">
+        <button id="bDriveB" class="on">BBDroids: drive on</button>
+        <button id="bDrive" class="on">Cary Start: drive on</button>
+        <button id="bGyro" class="on">Cary Back: gyro on</button>
+        <button id="bHeadGyro">Cary X+B: head stab. off</button>
+        <button id="bSpinL">Cary L1 spin</button><button id="bSpinR">Cary R1 spin</button>
+      </div>
+      <p class="hint">Keyboard: <kbd>W</kbd>/<kbd>S</kbd> forward/back, <kbd>A</kbd>/<kbd>D</kbd> lean left/right, <kbd>Q</kbd>/<kbd>E</kbd> Cary spin on spot, <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> Cary speed level, <kbd>Space</kbd> pause. Both droids get the same stick values; each firmware maps them its own way (BBDroids: stick × drive_speed_max and × roll_angle_max; Cary: dead zone 7500, full scale at 67 % deflection, × DRIVESPEEDx and × BODY_TILT_MAX). Defaults on this page: BBDroids 2000 mm/s (firmware value), measured head 0.75 kg at 295 mm with matching compensation, Cary speed level 3 (about 2.1 m/s), so the top speeds are comparable.</p>
+    </div>
+
+    <div class="card sec">
+      <h2><span class="tag" style="background:var(--cB)"></span>BBDroids BB-8</h2>
+      <div id="bbMain"></div>
+      <details><summary>Mechanics, drive motor, servos</summary><div id="bbMech"></div></details>
+      <details><summary>Firmware parameters</summary><div id="bbCtrl"></div>
+        <div class="btns"><button id="bIdeal">Ideal head compensation for these masses</button><button id="bShear">Dome ±70° + shear limiter (proposal)</button><button id="bDefB">Firmware defaults</button></div></details>
+    </div>
+
+    <div class="card sec">
+      <h2><span class="tag" style="background:var(--cC)"></span>Cary Christie V1</h2>
+      <div id="cMain"></div>
+      <details><summary>Mechanics, drive motor, servos</summary><div id="cMech"></div></details>
+      <details><summary>Firmware / EEPROM parameters</summary><div id="cCtrl"></div>
+        <div class="btns"><button id="bDefC">Firmware defaults (firstRunSetup)</button></div></details>
+    </div>
+
+    <div class="card sec model">
+      <h2>Model</h2>
+      <p>Both droids run on the same planar physics core (pitch and roll planes, shell + pendulum + head, cornering with ψ̇ = (v/R)·sin ρ, 1&nbsp;kHz). Drive motor, rolling resistance and shell values are equal by default, so differences come from masses and control.</p>
+      <p>BBDroids: the sim from <code>Arduino/BB8Droid/sim</code> (built from the current <code>sim.js</code>), firmware replica at 100&nbsp;Hz with balance → speed → PWM cascade, roll PID with gyro damping, I bleed and head feedforward. Cary: BB8_Drive_System V1.4.9 at 50&nbsp;Hz, open-loop Sabertooth voltage with a P term on pitch and VarSpeedServo ramp, P-only body tilt on a Maestro hobby servo. Cary assumptions: 90° servo travel and 3:1 gearing for tilt and head, kinematic spin on spot.</p>
+    </div>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/*SIMJS*/
+</script>
+<script>
+/*CARYJS*/
+</script>
+<script>
+{
+const $ = id => document.getElementById(id);
+const {BB8Sim} = window.BB8, {CarySim} = window.CARY;
+const D2R = Math.PI / 180, R2D = 180 / Math.PI;
+const P_BB = [
+  // [key, label, min, max, step, section, unit]
+  ['mp','Pendulum mass',0.5,15,0.1,'main','kg'],
+  ['l','Pendulum distance below sphere center',0.02,0.23,0.005,'main','m'],
+  ['mh','Head mass',0,3,0.05,'main','kg'],
+  ['ms','Sphere shell mass',0.5,10,0.1,'mech','kg'],
+  ['L','Head CoM distance above sphere center',0.26,0.45,0.005,'mech','m'],
+  ['cRoll','Rolling resistance (viscous)',0,20,0.1,'mech','N/(m/s)'],
+  ['bBear','Drive bearing friction',0,1,0.01,'mech','Nm/(rad/s)'],
+  ['tauStall','Motor: stall torque at output',2,80,0.5,'mech','Nm'],
+  ['vNoLoad','Motor: no-load speed at PWM 255',500,5000,50,'mech','mm/s'],
+  ['servoStall','Servo stall torque (XM430-W350 @12V: 4.1)',0.5,10,0.1,'mech','Nm'],
+  ['servoNoLoad','Servo no-load speed (XM430-W350 @12V: 46)',10,100,1,'mech','rpm'],
+  ['servoF','Servo bandwidth',0.5,15,0.1,'mech','Hz'],
+  ['servoZeta','Servo damping ratio',0.1,2,0.05,'mech',''],
+  ['domePitchReduction','Dome pitch servo reduction (assumption)',0.5,4,0.1,'mech','°/°'],
+  ['imuFilterCutoff','IMUControlInput low-pass',5,100,1,'mech','Hz'],
+  ['#Speed controller (drive_speed_*)'],
+  ['driveSpeedKp','drive_speed_kp',0,0.5,0.005,'ctrl','PWM/(mm/s)'],
+  ['driveSpeedKi','drive_speed_ki',0,2,0.01,'ctrl','PWM/mm'],
+  ['driveSpeedKd','drive_speed_kd',0,0.05,0.001,'ctrl',''],
+  ['driveIBound','drive_speed_imax: max. I share',0,255,5,'ctrl','PWM'],
+  ['driveSpeedMax','drive_speed_max',200,3000,50,'ctrl','mm/s'],
+  ['driveSpeedDeadband','drive_speed_deadband (stick units)',0,0.2,0.005,'ctrl',''],
+  ['#Balance controller (bal_*)'],
+  ['balKp','bal_kp',0,80,0.5,'ctrl','(mm/s)/°'],
+  ['balKi','bal_ki',0,50,0.5,'ctrl',''],
+  ['balKd','bal_kd',0,5,0.05,'ctrl',''],
+  ['#Roll controller (roll_*)'],
+  ['rollKp','roll_kp',0,3,0.01,'ctrl','°/°'],
+  ['rollKi','roll_ki',0,5,0.05,'ctrl','°/(°·s)'],
+  ['rollKd','roll_kd (gyro damping)',0,1,0.005,'ctrl','°/(°/s)'],
+  ['rollKff','roll_kff',0,2,0.05,'ctrl',''],
+  ['rollKdSpeed','roll_kd_speed: reduce roll_kd above this speed (0 = off)',0,3000,50,'ctrl','mm/s'],
+  ['rollAngleMax','roll_angle_max',5,30,1,'ctrl','°'],
+  ['rollIMax','roll_imax: max. I error',0,200,1,'ctrl','°·s'],
+  ['rollReduction','Roll servo reduction (ROLL_REDUCTION)',1,4,0.01,'ctrl','°/°'],
+  ['rollIBleed','roll_ibleed_tau: I bleed when steering back (0 = off)',0,2,0.05,'ctrl','s'],
+  ['rollReturnWindow','roll_return_window: window after a stick move',0.2,5,0.1,'ctrl','s'],
+  ['rollKpReturn','roll_kp on the way back (0 = same as roll_kp), experiment',0,3,0.05,'ctrl','°/°'],
+  ['rollShaper','roll_shaper: input shaper (0 off, 1 ZV, 2 ZVD)',0,2,1,'ctrl',''],
+  ['rollShaperT','roll_shaper_t: shaper period',1,4,0.05,'ctrl','s'],
+  ['rollGoalRamp','Setpoint ramp (0 = off), experiment',0,100,1,'ctrl','°/s'],
+  ['rollDirect','roll_direct','chk','ctrl'],
+  ['rollInhibit','roll_inhibit: controller runs, servo not commanded','chk','ctrl'],
+  ['#Servo limits (body_roll_*, dome_*)'],
+  ['bodyRollRange','body_roll_range: ± pendulum tilt',5,45,1,'ctrl','°'],
+  ['bodyRollAccel','body_roll_accel (0 = unlimited)',0,1000,5,'ctrl','DXL'],
+  ['bodyRollVel','body_roll_vel (0 = unlimited)',0,1000,10,'ctrl','DXL'],
+  ['domePitchRange','dome_pitch_range: ± servo degrees (×½ at the dome)',5,160,1,'ctrl','°'],
+  ['domePitchVel','dome_pitch_vel (0 = unlimited)',0,500,5,'ctrl','DXL'],
+  ['domeRollRange','dome_roll_range: ± servo degrees (×½ at the dome)',5,160,1,'ctrl','°'],
+  ['domeRollVel','dome_roll_vel (0 = unlimited)',0,500,5,'ctrl','DXL'],
+  ['#Head feedforward and compensation (fa_*)'],
+  ['faSpeedSPToDome','fa_speed_sp_to_dome',-0.05,0.05,0.001,'ctrl','°/(mm/s)'],
+  ['faRollSPToDome','fa_roll_sp_to_dome',-2,2,0.05,'ctrl',''],
+  ['faDomeRollToWeight','fa_dome_roll_to_weight',-3,3,0.01,'ctrl',''],
+  ['faDomePitchToWeight','fa_dome_pitch_to_weight',-3,3,0.01,'ctrl',''],
+  ['faPitchToDome','fa_pitch_to_dome: head follows IMU pitch (feedback, not recommended, not in firmware)',0,2,0.05,'ctrl','°/°'],
+  ['driveAccelLimit','drive_accel_max: speed setpoint ramp (0 = off)',0,5000,50,'ctrl','mm/s²'],
+  ['faAccelToDome','fa_accel_to_dome: head per commanded acceleration',0,40,0.5,'ctrl','°/(m/s²)'],
+  ['domeAccelTau','dome_accel_tau: low-pass on head feedforward',0.05,2,0.05,'ctrl','s'],
+  ['faDomeSPAccel','fa_dome_sp_accel: head per speed error (setpoint − measured), like D-O',-0.03,0.03,0.0005,'ctrl','°/(mm/s)'],
+  ['faDomeAnnealDelay','fa_dome_anneal_delay: hold head after release',0,3,0.05,'ctrl','s'],
+  ['faDomeAnnealTime','fa_dome_anneal_time: return head to center',0.05,5,0.05,'ctrl','s'],
+  ['driveDecelLimit','drive_decel_max: braking ramp (0 = same as drive_accel_max), not in firmware',0,5000,50,'ctrl','mm/s²'],
+  ['#Dome magnet shear (not in firmware)'],
+  ['domeShellMass','Dome shell mass (outer part on the magnets)',0.1,2,0.05,'mech','kg'],
+  ['domeShellL','Dome shell CoG above sphere centre',0.26,0.4,0.001,'mech','m'],
+  ['domeHoldG','Magnet shear capacity (1 = holds at 90°; measure!)',0.2,3,0.05,'ctrl','× weight'],
+  ['domeWorldMax','Shear limiter: dome apparent-tilt limit (0 = off; uses IMU feedback, see README 6.5)',0,70,1,'ctrl','°'],
+  ['domeLeanCenter','Shear limiter: centre the limit on the shear-free attitude atan(a/g)','chk','ctrl'],
+  ['domeRemoteRate','Slew limit on the remote head command (0 = off)',0,200,5,'ctrl','°/s'],
+  ['domePitchAccel','Dome pitch profile acceleration (0 = unset, sim 3000 °/s²)',0,300,5,'ctrl','DXL'],
+  ['domeRollAccel','Dome roll profile acceleration (0 = unset)',0,300,5,'ctrl','DXL'],
+  ['domeCompRemoteOnly','dome_comp_remote_only: compensate the remote share of the head only','chk','ctrl'],
+  ['encoderQuantize','Encoder quantization','chk','mech'],
+  ['turning','Cornering (yaw from lean, centrifugal force)','chk','mech'],
+];
+const P_CARY = [
+  // [key, label, min, max, step, section, unit]
+  ['mp','Counterweight incl. batteries (pendulum mass)',0.5,15,0.1,'main','kg'],
+  ['l','Counterweight distance below ball centre',0.02,0.23,0.005,'main','m'],
+  ['mh','Head mass',0,3,0.05,'main','kg'],
+  ['ms','Shell mass',0.5,10,0.1,'mech','kg'],
+  ['L','Head CoG above ball centre',0.26,0.45,0.005,'mech','m'],
+  ['cRoll','Rolling resistance (viscous)',0,20,0.1,'mech','N/(m/s)'],
+  ['bBear','Drive bearing friction',0,1,0.01,'mech','Nm/(rad/s)'],
+  ['tauStall','Drive motor: stall torque at the shell, full command',2,80,0.5,'mech','Nm'],
+  ['vNoLoad','Drive motor: no-load speed at full command',500,5000,50,'mech','mm/s'],
+  ['tiltServoTravel','Tilt servo travel over 1000–2000 µs',30,270,5,'mech','°'],
+  ['tiltGear','Tilt gearing servo : pendulum',0.5,6,0.1,'mech',':1'],
+  ['tiltServoStall','Tilt servo stall torque',0.2,10,0.1,'mech','Nm'],
+  ['tiltServoNoLoad','Tilt servo no-load speed',10,150,1,'mech','rpm'],
+  ['headServoTravel','Head servo travel over 1000–2000 µs',30,270,5,'mech','°'],
+  ['headGear','Head gearing servo : mast',0.5,6,0.1,'mech',':1'],
+  ['headServoStall','Head servo stall torque',0.1,5,0.05,'mech','Nm'],
+  ['headServoNoLoad','Head servo no-load speed',10,150,1,'mech','rpm'],
+  ['servoF','Servo position loop bandwidth',0.5,15,0.1,'mech','Hz'],
+  ['servoZeta','Servo damping ratio',0.1,2,0.05,'mech',''],
+  ['spinRateMax','Spin on spot: yaw rate at full command (assumption)',10,360,5,'mech','°/s'],
+  ['spinTau','Spin on spot: lag',0.02,2,0.02,'mech','s'],
+  ['pitchSign','IMU pitch sign (+1 stabilising, −1 = IsBodyPitchReversed wrong)',-1,1,2,'mech',''],
+  ['rollSign','IMU roll sign (+1 stabilising)',-1,1,2,'mech',''],
+  ['turning','Turning (yaw from lean, centrifugal load)','chk','mech'],
+  ['domeShellMass','Dome shell mass (shear estimate, assumption)',0.1,2,0.05,'mech','kg'],
+  ['domeShellL','Dome shell CoG above sphere centre',0.26,0.4,0.001,'mech','m'],
+  ['domeHoldG','Magnet shear capacity (1 = holds at 90°)',0.2,3,0.05,'mech','× weight'],
+  ['#Drive (PID2, Sabertooth)'],
+  ['driveSpeed1','DRIVESPEED1',0,90,1,'ctrl','/90'],
+  ['driveSpeed2','DRIVESPEED2',0,90,1,'ctrl','/90'],
+  ['driveSpeed3','DRIVESPEED3',0,90,1,'ctrl','/90'],
+  ['ramping1','RAMPINGSPEED1 (0 = no ramp)',0,90,1,'ctrl','4.5°/s'],
+  ['ramping2','RAMPINGSPEED2',0,90,1,'ctrl','4.5°/s'],
+  ['ramping3','RAMPINGSPEED3',0,90,1,'ctrl','4.5°/s'],
+  ['kp2','Pk2',0,10,0.05,'ctrl','/°'],
+  ['ki2','Ik2',0,10,0.05,'ctrl','/(°·s)'],
+  ['kd2','Dk2',0,2,0.01,'ctrl','·s'],
+  ['bodyPitchOffset','bodyPitchOffset',-10,10,0.1,'ctrl','°'],
+  ['driveDeadzone','BODYDEADZONE',0,20000,100,'ctrl','raw'],
+  ['#Body tilt (PID1, Maestro)'],
+  ['bodyTiltMax','BODY_TILT_MAX',0,90,1,'ctrl','servo°'],
+  ['leanSpeed','LEANSPEED (0 = unlimited)',0,255,1,'ctrl','4.5°/s'],
+  ['kp1','Pk1',0,10,0.05,'ctrl','/°'],
+  ['ki1','Ik1',0,10,0.05,'ctrl','/(°·s)'],
+  ['kd1','Dk1',0,2,0.01,'ctrl','·s'],
+  ['bodyRollOffset','bodyRollOffset',-10,10,0.1,'ctrl','°'],
+  ['#Head (PID3, Maestro)'],
+  ['headPanMax','HEAD_PAN_MAX',0,90,1,'ctrl','servo°'],
+  ['headTiltMax','HEAD_TILT_MAX',0,90,1,'ctrl','servo°'],
+  ['headSpeed','HEADSPEED (0 = unlimited)',0,255,1,'ctrl','4.5°/s'],
+  ['headAccel','HEADACCELERATION (0 = unlimited)',0,255,1,'ctrl',''],
+  ['kp3','Pk3',0,10,0.05,'ctrl','/°'],
+  ['ki3','Ik3',0,10,0.05,'ctrl',''],
+  ['kd3','Dk3',0,2,0.01,'ctrl',''],
+  ['headDeadzone','HEADDEADZONE',0,20000,100,'ctrl','raw'],
+  ['#Spin on spot'],
+  ['spinSpeed1','SPINSPEED1',0,90,1,'ctrl','/90'],
+  ['spinSpeed2','SPINSPEED2',0,90,1,'ctrl','/90'],
+  ['spinRamping','SPINRAMPING (spin-down ramp)',0,90,1,'ctrl','4.5°/s'],
+];
+
+// ------------------------------------------------------------ sims and parameter panels
+const load = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
+const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
+const simB = new BB8Sim(load('sbs-bb8-v4') || {}); // defaults = firmware defaults, measured head
+const simC = new CarySim(load('sbs-cary-v2') || {speedLevel: 3});
+const saveB = () => store('sbs-bb8-v4', simB.p), saveC = () => store('sbs-cary-v2', simC.p);
+const fmt = (v, st) => { const d = st >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(st))); return (+v).toFixed(d); };
+
+function buildParams(P, sim, secs, save, pre) {
+  for (const s of Object.values(secs)) s.innerHTML = '';
+  for (const e of P) {
+    if (e[0][0] === '#') { const h = document.createElement('div'); h.className = 'grp'; h.textContent = e[0].slice(1); secs.ctrl.appendChild(h); continue; }
+    const [k, lab, mn, mx, st, sec, unit] = e, id = pre + k;
+    const box = document.createElement('div');
+    if (mn === 'chk') {
+      box.className = 'chk'; box.innerHTML = `<input type="checkbox" id="p_${id}"><label for="p_${id}">${lab}</label>`;
+      secs[mx].appendChild(box);
+      const c = box.querySelector('input'); c.checked = !!sim.p[k];
+      c.onchange = () => { sim.p[k] = c.checked; sim.applyParams(); save(); };
+      continue;
+    }
+    box.className = 'row';
+    box.innerHTML = `<label for="n_${id}">${lab} <small>${unit}</small></label><input type="number" id="n_${id}" min="${mn}" max="${mx}" step="${st}"><input type="range" id="p_${id}" min="${mn}" max="${mx}" step="${st}" aria-label="${lab}">`;
+    secs[sec].appendChild(box);
+    const r = box.querySelector('input[type=range]'), n = box.querySelector('input[type=number]');
+    r.value = sim.p[k]; n.value = fmt(sim.p[k], st);
+    const set = v => { if (!isFinite(v)) return; sim.p[k] = v; sim.applyParams(); save(); syncQuick(); };
+    r.oninput = () => { n.value = fmt(r.value, st); set(+r.value); };
+    n.onchange = () => { r.value = n.value; set(+n.value); };
+  }
+}
+const secsB = {main: $('bbMain'), mech: $('bbMech'), ctrl: $('bbCtrl')}, secsC = {main: $('cMain'), mech: $('cMech'), ctrl: $('cCtrl')};
+const rebuildB = () => buildParams(P_BB, simB, secsB, saveB, 'b_'), rebuildC = () => buildParams(P_CARY, simC, secsC, saveC, 'c_');
+rebuildB(); rebuildC();
+$('bIdeal').onclick = () => { simB.p.faDomeRollToWeight = +simB.idealDomeRollToWeight().toFixed(2); simB.p.faDomePitchToWeight = +simB.idealDomePitchToWeight().toFixed(2); simB.applyParams(); saveB(); rebuildB(); };
+$('bShear').onclick = () => { Object.assign(simB.p, {domePitchRange: 140, domeRollRange: 140, domeWorldMax: 15, domeLeanCenter: true, domeRemoteRate: 30, domePitchAccel: 0, domeRollAccel: 0}); simB.applyParams(); saveB(); rebuildB(); };
+$('bDefB').onclick = () => { const d = window.BB8.defaultParams(); for (const e of P_BB) if (e[5] === 'ctrl' || e[3] === 'ctrl') simB.p[e[0]] = d[e[0]]; simB.p.driveSpeedMax = 2000; simB.p.faDomeRollToWeight = +simB.idealDomeRollToWeight().toFixed(2); simB.p.faDomePitchToWeight = +simB.idealDomePitchToWeight().toFixed(2); simB.applyParams(); saveB(); rebuildB(); syncQuick(); };
+$('bDefC').onclick = () => { const d = window.CARY.defaultParams(); for (const e of P_CARY) if (e[5] === 'ctrl' || e[3] === 'ctrl') simC.p[e[0]] = d[e[0]]; simC.applyParams(); saveC(); rebuildC(); };
+
+function syncQuick() {
+  $('qBBmax').value = simB.p.driveSpeedMax; $('sLevel').value = String(simC.p.speedLevel); $('sSpin').value = String(simC.p.spinLevel);
+  const t = (id, on, a, b) => { $(id).textContent = on ? a : b; $(id).classList.toggle('on', !!on); };
+  t('bDriveB', simB.input.driveOn, 'BBDroids: drive on', 'BBDroids: drive off');
+  t('bDrive', simC.p.driveEnabled, 'Cary Start: drive on', 'Cary Start: drive off');
+  t('bGyro', simC.p.gyroEnabled, 'Cary Back: gyro on', 'Cary Back: gyro off');
+  t('bHeadGyro', simC.p.headGyroEnabled, 'Cary X+B: head stab. on', 'Cary X+B: head stab. off');
+}
+$('qBBmax').onchange = e => { const v = +e.target.value; if (isFinite(v) && v > 0) { simB.p.driveSpeedMax = v; saveB(); rebuildB(); } };
+function setLevel(n) { simC.p.speedLevel = n; saveC(); syncQuick(); }
+$('sLevel').onchange = e => setLevel(+e.target.value);
+$('sSpin').onchange = e => { simC.p.spinLevel = +e.target.value; saveC(); };
+$('bDriveB').onclick = () => { simB.input.driveOn = !simB.input.driveOn; syncQuick(); };
+$('bDrive').onclick = () => { simC.p.driveEnabled = !simC.p.driveEnabled; saveC(); syncQuick(); };
+$('bGyro').onclick = () => { simC.p.gyroEnabled = !simC.p.gyroEnabled; saveC(); syncQuick(); };
+$('bHeadGyro').onclick = () => { simC.p.headGyroEnabled = !simC.p.headGyroEnabled; saveC(); syncQuick(); };
+syncQuick();
+
+// ------------------------------------------------------------ input
+const stick = {v: 0, r: 0, hp: 0, hr: 0};
+const padState = {};
+function setupPad(id, kx, ky) {
+  const pad = $(id), knob = pad.querySelector('.knob');
+  const st = padState[id] = {active: false, knob, kx, ky};
+  const move = ev => {
+    const b = pad.getBoundingClientRect(), rad = b.width / 2;
+    let x = (ev.clientX - b.left - rad) / (rad * 0.8), y = -(ev.clientY - b.top - rad) / (rad * 0.8);
+    const m = Math.hypot(x, y); if (m > 1) { x /= m; y /= m; }
+    const mx = Math.max(Math.abs(x), Math.abs(y)), f = mx > 1e-9 ? Math.hypot(x, y) / mx : 1;
+    stick[kx] = Math.max(-1, Math.min(1, x * f)); stick[ky] = Math.max(-1, Math.min(1, y * f));
+  };
+  pad.addEventListener('pointerdown', ev => { st.active = true; pad.setPointerCapture(ev.pointerId); move(ev); });
+  pad.addEventListener('pointermove', ev => { if (st.active) move(ev); });
+  const up = () => { st.active = false; if (!$('latch').checked) { stick[kx] = 0; stick[ky] = 0; } };
+  pad.addEventListener('pointerup', up); pad.addEventListener('pointercancel', up);
+}
+setupPad('padDrive', 'r', 'v'); setupPad('padHead', 'hr', 'hp');
+const keys = new Set();
+addEventListener('keydown', e => {
+  if ((e.target.tagName === 'INPUT' && ['number', 'text'].includes(e.target.type)) || e.target.tagName === 'SELECT') return;
+  if (e.code === 'Space') { e.preventDefault(); togglePause(); return; }
+  if (['KeyW','KeyS','KeyA','KeyD','KeyQ','KeyE'].includes(e.code)) { keys.add(e.code); e.preventDefault(); }
+  if (['Digit1','Digit2','Digit3'].includes(e.code)) setLevel(+e.code.slice(5));
+});
+addEventListener('keyup', e => keys.delete(e.code));
+addEventListener('blur', () => keys.clear());
+function keyAxis(k, pos, neg, rate, dt) {
+  const tgt = (keys.has(pos) ? 1 : 0) - (keys.has(neg) ? 1 : 0);
+  if (tgt === 0 && $('latch').checked) return;
+  const mx = rate * dt; stick[k] += Math.max(-mx, Math.min(mx, tgt - stick[k]));
+}
+let spinHeld = 0, spinBtn = 0;
+for (const [id, d] of [['bSpinL', -1], ['bSpinR', 1]]) {
+  const b = $(id);
+  b.addEventListener('pointerdown', () => { spinHeld = d; b.classList.add('on'); });
+  for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) b.addEventListener(ev, () => { if (spinHeld === d) spinHeld = 0; b.classList.remove('on'); });
+}
+function updateKeys(dt) {
+  const sl = Math.max(0, +$('keySlew').value), rate = sl > 0 ? 1 / sl : 1e9;
+  if (!padState.padDrive.active) { keyAxis('v', 'KeyW', 'KeyS', rate, dt); keyAxis('r', 'KeyD', 'KeyA', rate, dt); }
+  spinBtn = (keys.has('KeyE') || spinHeld === 1 ? 1 : 0) - (keys.has('KeyQ') || spinHeld === -1 ? 1 : 0);
+}
+let paused = false, timeScale = 1, camFollow = false;
+function togglePause() { paused = !paused; $('bPause').textContent = paused ? 'Resume' : 'Pause'; $('bPause').classList.toggle('on', paused); }
+$('bPause').onclick = togglePause;
+$('sSpeed').onchange = e => timeScale = +e.target.value;
+$('bCam').onclick = () => { camFollow = !camFollow; $('bCam').textContent = camFollow ? 'Cameras: behind' : 'Cameras: fixed'; };
+
+// ------------------------------------------------------------ colours
+const probe = document.createElement('span'); probe.style.display = 'none'; document.body.appendChild(probe);
+const css = n => { probe.style.color = `var(${n})`; return getComputedStyle(probe).color; };
+let C = {};
+const readColors = () => { C = {ink: css('--ink'), mute: css('--mute'), line: css('--line'), or: css('--or'), steel: css('--steel'), blue: css('--blue'), violet: css('--violet'), view: css('--view'), panel: css('--panel'), cB: css('--cB'), cC: css('--cC')}; };
+readColors();
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors);
+
+// ------------------------------------------------------------ 3D
+function makeView(id) {
+  const host = $(id), renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+  renderer.setPixelRatio(Math.min(2, devicePixelRatio)); host.prepend(renderer.domElement);
+  const cam = new THREE.PerspectiveCamera(38, 1, 0.05, 200), v = {host, renderer, cam};
+  new ResizeObserver(() => { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }).observe(host);
+  return v;
+}
+const vAll = makeView('v3d'), vB = makeView('v3dB'), vC = makeView('v3dC');
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.85));
+const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(2, 4, 1.5); scene.add(sun);
+const grid = new THREE.GridHelper(80, 160, 0x8a939d, 0xb9c0c7); scene.add(grid);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshBasicMaterial({color: 0xdde1e5, transparent: true, opacity: 0.35}));
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.001; scene.add(ground);
+const LANE = 0.6; // lateral start offset of each droid
+function ballTexture(ring) {
+  const c = document.createElement('canvas'); c.width = 1024; c.height = 512; const g = c.getContext('2d');
+  g.fillStyle = '#f5f3ee'; g.fillRect(0, 0, 1024, 512);
+  for (let i = 0; i < 4; i++) { const x = 128 + i * 256; g.lineWidth = 26; g.strokeStyle = ring; g.beginPath(); g.arc(x, 256, 92, 0, 7); g.stroke(); g.lineWidth = 8; g.strokeStyle = '#9aa3ad'; g.beginPath(); g.arc(x, 256, 41, 0, 7); g.stroke(); }
+  g.strokeStyle = ring; g.lineWidth = 18; g.beginPath(); g.moveTo(0, 60); g.lineTo(1024, 60); g.moveTo(0, 452); g.lineTo(1024, 452); g.stroke();
+  return new THREE.CanvasTexture(c);
+}
+function labelSprite(text, col) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d');
+  g.font = '700 64px Barlow, system-ui, sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.lineWidth = 10; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.strokeText(text, 256, 64); g.fillStyle = col; g.fillText(text, 256, 64);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: new THREE.CanvasTexture(c), depthTest: false})); sp.scale.set(1.0, 0.25, 1); sp.renderOrder = 5; return sp;
+}
+function makeDroid(sim, ring, accent, label, lane) {
+  const d = {sim, lane, quat: new THREE.Quaternion(), lastX: 0, lastZ: lane};
+  d.group = new THREE.Group(); scene.add(d.group);
+  d.ball = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), new THREE.MeshStandardMaterial({map: ballTexture(ring), transparent: true, opacity: 0.55, roughness: 0.5, depthWrite: false}));
+  d.ball.renderOrder = 2; scene.add(d.ball);
+  const steel = new THREE.MeshStandardMaterial({color: 0x55606b});
+  d.axle = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 12), steel); d.group.add(d.axle);
+  d.rod = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 10), steel); d.group.add(d.rod);
+  d.pend = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 16), new THREE.MeshStandardMaterial({color: accent, roughness: 0.4})); d.group.add(d.pend);
+  d.mast = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 10), new THREE.MeshStandardMaterial({color: 0x8a949e})); d.group.add(d.mast);
+  d.dome = new THREE.Group(); d.group.add(d.dome);
+  const dr = 0.15;
+  d.dome.add(new THREE.Mesh(new THREE.SphereGeometry(dr, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({color: 0xf5f3ee, roughness: 0.45})));
+  const band = new THREE.Mesh(new THREE.TorusGeometry(dr * 0.97, 0.012, 8, 48), new THREE.MeshStandardMaterial({color: accent})); band.rotation.x = Math.PI / 2; band.position.y = 0.035; d.dome.add(band);
+  const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 20, 14), new THREE.MeshStandardMaterial({color: 0x15181c, roughness: 0.15})); eye.position.set(dr * 0.82, 0.075, 0); d.dome.add(eye);
+  d.label = labelSprite(label, ring); scene.add(d.label);
+  d.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.24, 40), new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: 0.18}));
+  d.shadow.rotation.x = -Math.PI / 2; scene.add(d.shadow);
+  d.trailGeo = new THREE.BufferGeometry(); d.trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(1200 * 3), 3));
+  d.trail = new THREE.Line(d.trailGeo, new THREE.LineBasicMaterial({color: ring})); d.trail.frustumCulled = false; scene.add(d.trail);
+  return d;
+}
+const dB = makeDroid(simB, '#e8742a', 0xe8742a, 'BBDroids', -LANE), dC = makeDroid(simC, '#2867c9', 0x2867c9, 'Cary V1', LANE);
+const up = new THREE.Vector3(0, 1, 0);
+function updDroid(d) {
+  const sim = d.sim, p = sim.p, R = p.R;
+  const th = sim.pq[1], al = sim.pq[2], chi = sim.rq[1], ze = sim.rq[2], rho = sim.rq[0] / R;
+  const X = sim.wX, Z = sim.wZ + d.lane, psi = sim.psi;
+  d.group.position.set(X, R, Z); d.group.rotation.set(0, -psi, 0); d.ball.position.set(X, R, Z);
+  const dx = X - d.lastX, dz = Z - d.lastZ; d.lastX = X; d.lastZ = Z;
+  const dl = Math.hypot(dx, dz);
+  if (dl > 1e-7 && dl < 1) d.quat.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(dz / dl, 0, -dx / dl), dl / R));
+  d.ball.quaternion.copy(d.quat); d.ball.scale.setScalar(R);
+  const ax = new THREE.Vector3(0, -Math.sin(rho), Math.cos(rho));
+  d.axle.quaternion.setFromUnitVectors(up, ax); d.axle.scale.set(1, 2 * R * 0.96, 1);
+  const pd = new THREE.Vector3(Math.sin(th) * Math.cos(chi), -Math.cos(th) * Math.cos(chi), Math.sin(chi));
+  d.rod.quaternion.setFromUnitVectors(up, pd); d.rod.scale.set(1, p.l, 1); d.rod.position.copy(pd).multiplyScalar(p.l / 2);
+  d.pend.position.copy(pd).multiplyScalar(p.l); d.pend.scale.setScalar(0.025 + 0.022 * Math.cbrt(p.mp));
+  const md = new THREE.Vector3(-Math.sin(th), Math.cos(th) * Math.cos(rho), Math.sin(rho)).normalize();
+  d.mast.quaternion.setFromUnitVectors(up, md); d.mast.scale.set(1, R * 0.95, 1); d.mast.position.copy(md).multiplyScalar(R * 0.475);
+  const hd = new THREE.Vector3(Math.sin(al) * Math.cos(ze), Math.cos(al) * Math.cos(ze), Math.sin(ze)).normalize();
+  d.dome.position.copy(hd).multiplyScalar(R - 0.004); d.dome.quaternion.setFromUnitVectors(up, hd); d.dome.visible = p.mh > 0.001;
+  d.label.position.set(X, 2 * R + 0.35, Z);
+  d.shadow.position.set(X, 0.002, Z);
+  const tr = sim.trail, arr = d.trailGeo.attributes.position.array, n = Math.min(tr.length, 1200);
+  for (let i = 0; i < n; i++) { const q = tr[tr.length - n + i]; arr[3 * i] = q[0]; arr[3 * i + 1] = 0.004; arr[3 * i + 2] = q[1] + d.lane; }
+  arr[3 * (n - 1)] = X; arr[3 * (n - 1) + 2] = Z;
+  d.trailGeo.setDrawRange(0, n); d.trailGeo.attributes.position.needsUpdate = true;
+}
+function update3d() {
+  updDroid(dB); updDroid(dC);
+  const X = (simB.wX + simC.wX) / 2, Z = (simB.wZ - LANE + simC.wZ + LANE) / 2;
+  const sep = Math.hypot(simB.wX - simC.wX, simB.wZ - LANE - simC.wZ - LANE);
+  const k = Math.max(1, sep / 1.6);
+  const cam = vAll.cam;
+  if (camFollow) { const psi = (simB.psi + simC.psi) / 2, c = Math.cos(psi), s = Math.sin(psi), bx = -2.2 * k, bz = 0.6 * k; cam.position.set(X + bx * c - bz * s, 1.3 * k, Z + bx * s + bz * c); }
+  else cam.position.set(X - 2.6 * k, 2.4 * k, Z + 2.0 * k);
+  cam.lookAt(X, 0.2, Z);
+  grid.position.set(Math.round(X / 0.5) * 0.5, 0, Math.round(Z / 0.5) * 0.5); ground.position.set(X, -0.001, Z);
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  ground.material.color.set(dark ? 0x2a3038 : 0xdde1e5);
+  dB.label.visible = dC.label.visible = true;
+  vAll.renderer.render(scene, cam);
+  dB.label.visible = dC.label.visible = false;
+  // per-droid views: same camera offset as the single-droid pages, centred on that droid
+  for (const [v, sim, d] of [[vB, simB, dB], [vC, simC, dC]]) {
+    const x = sim.wX, z = sim.wZ + d.lane, R = sim.p.R;
+    if (camFollow) { const c = Math.cos(sim.psi), s = Math.sin(sim.psi), bx = -1.5, bz = 0.55; v.cam.position.set(x + bx * c - bz * s, 1.0, z + bx * s + bz * c); }
+    else v.cam.position.set(x - 2.0, 2.0, z + 1.6);
+    v.cam.lookAt(x, R * 0.8, z);
+    grid.position.set(Math.round(x / 0.5) * 0.5, 0, Math.round(z / 0.5) * 0.5); ground.position.set(x, -0.001, z);
+    v.renderer.render(scene, v.cam);
+  }
+}
+
+// ------------------------------------------------------------ elevations
+function prep(cv) {
+  const r = cv.parentElement.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio);
+  const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
+  if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+  const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, r.width, r.height);
+  return {g, W: r.width, H: r.height};
+}
+const domeR = 0.15;
+function drawRiss(cv, side, sim, name, col) {
+  const {g, W, H} = prep(cv); const p = sim.p, R = p.R;
+  const s = Math.min(H / 0.84, W / 0.95), gy = H - 24, cx = W / 2, cy = gy - R * s;
+  const flip = side ? 1 : -1;
+  const P2 = (u, z) => [cx + flip * u * s, cy - z * s];
+  let pos, th, al, sph, pAng, frameUp;
+  if (side) { pos = sim.pq[0]; th = sim.pq[1]; pAng = th; al = sim.pq[2]; sph = -pos / R; frameUp = -th; }
+  else { pos = sim.rq[0]; pAng = sim.rq[1]; al = sim.rq[2]; sph = -pos / R; frameUp = pos / R; }
+  g.font = '600 13px "Barlow Semi Condensed",Barlow,system-ui,sans-serif'; g.textBaseline = 'top'; g.textAlign = 'left';
+  g.fillStyle = col; g.fillText(name, 10, 8);
+  g.fillStyle = C.mute; g.fillText(side ? '· side (from the right, front →)' : '· front (droid’s right ←)', 10 + g.measureText(name).width + 4, 8);
+  g.strokeStyle = C.steel; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, gy); g.lineTo(W, gy); g.stroke();
+  g.lineWidth = 1; g.strokeStyle = C.line; g.fillStyle = C.mute; g.font = '12px Barlow,system-ui,sans-serif'; g.textAlign = 'center';
+  const span = W / s / 2 + 0.3;
+  for (let k = Math.floor((pos - span) / 0.25); k <= Math.ceil((pos + span) / 0.25); k++) {
+    const [px] = P2(k * 0.25 - pos, 0);
+    g.beginPath(); g.moveTo(px, gy); g.lineTo(px, gy + (k % 4 === 0 ? 9 : 4)); g.stroke();
+    if (k % 4 === 0) g.fillText(`${k * 0.25} m`, px, gy + 10);
+  }
+  g.fillStyle = C.view; g.strokeStyle = C.steel; g.lineWidth = 2; g.beginPath(); g.arc(cx, cy, R * s, 0, 7); g.fill(); g.stroke();
+  g.strokeStyle = col; g.lineWidth = 3;
+  for (let i = 0; i < 4; i++) { const a = sph + i * Math.PI / 2, ux = Math.sin(a), uz = -Math.cos(a); const [x0, y0] = P2(ux * R * 0.78, uz * R * 0.78), [x1, y1] = P2(ux * R * 0.95, uz * R * 0.95); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
+  g.strokeStyle = C.steel; g.lineWidth = 2;
+  const [mx, my] = P2(Math.sin(frameUp) * R * 0.92, Math.cos(frameUp) * R * 0.92);
+  g.beginPath(); g.moveTo(cx, cy); g.lineTo(mx, my); g.stroke();
+  if (!side) { const a = frameUp, [a0, b0] = P2(-Math.cos(a) * R * 0.95, Math.sin(a) * R * 0.95), [a1, b1] = P2(Math.cos(a) * R * 0.95, -Math.sin(a) * R * 0.95); g.lineWidth = 4; g.beginPath(); g.moveTo(a0, b0); g.lineTo(a1, b1); g.stroke(); }
+  const [px, py] = P2(p.l * Math.sin(pAng), -p.l * Math.cos(pAng));
+  g.lineWidth = 3; g.strokeStyle = C.ink; g.beginPath(); g.moveTo(cx, cy); g.lineTo(px, py); g.stroke();
+  g.fillStyle = col; g.beginPath(); g.arc(px, py, (0.02 + 0.016 * Math.cbrt(p.mp)) * s, 0, 7); g.fill();
+  if (p.mh > 0.001) {
+    const [dx, dy] = P2(Math.sin(al) * R, Math.cos(al) * R);
+    g.save(); g.translate(dx, dy); g.rotate(flip * al);
+    g.fillStyle = C.panel; g.strokeStyle = C.steel; g.lineWidth = 2; g.beginPath(); g.arc(0, 0, domeR * s, Math.PI, 0); g.closePath(); g.fill(); g.stroke();
+    g.strokeStyle = col; g.lineWidth = 3; g.beginPath(); g.moveTo(-domeR * s * 0.96, -0.035 * s); g.lineTo(domeR * s * 0.96, -0.035 * s); g.stroke();
+    g.fillStyle = '#15181c'; g.beginPath(); g.arc(side ? domeR * s * 0.55 : 0, -0.08 * s, 0.03 * s, 0, 7); g.fill();
+    g.restore();
+  }
+  const mt = p.ms + p.mp + p.mh;
+  const cu = (p.mp * p.l * Math.sin(pAng) + p.mh * p.L * Math.sin(al)) / mt, cz = (-p.mp * p.l * Math.cos(pAng) + p.mh * p.L * Math.cos(al)) / mt;
+  const [sx, sy] = P2(cu, cz);
+  g.strokeStyle = C.blue; g.lineWidth = 1.5; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx, gy); g.stroke(); g.setLineDash([]);
+  g.fillStyle = C.blue; g.beginPath(); g.arc(sx, sy, 4, 0, 7); g.fill();
+  g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.font = '500 13px Barlow,system-ui,sans-serif'; g.fillStyle = C.ink;
+  const lines = side ? [`Pendulum ${(th * R2D).toFixed(1)}°`, `Head ${(al * R2D).toFixed(1)}°`, `v ${(sim.pqd[0] * 1000).toFixed(0)} mm/s`]
+    : [`Lean ${sim.leanDeg().toFixed(1)}°`, `Pendulum rel. ${(sim.rollTiltRel() * R2D).toFixed(1)}°`, `Head ${(al * R2D).toFixed(1)}°`];
+  lines.forEach((t, i) => g.fillText(t, 10, 40 + i * 16));
+}
+
+// ------------------------------------------------------------ overlaid plots (sampled per frame)
+const LOG = [];
+function logSample() {
+  LOG.push({t: simB.t, vB: simB.pqd[0] * 1000, vC: simC.pqd[0] * 1000, pB: simB.pitchDeg(), pC: simC.pitchDeg(),
+    hB: simB.pq[2] * R2D, hC: simC.pq[2] * R2D, lB: simB.leanDeg(), lC: simC.leanDeg(), sB: simB.shearG, sC: simC.shearG});
+  while (LOG.length && LOG[LOG.length - 1].t - LOG[0].t > 12) LOG.shift();
+}
+const PLOTS = [['p0', 'leg0', 'vB', 'vC'], ['p1', 'leg1', 'pB', 'pC'], ['p2', 'leg2', 'hB', 'hC'], ['p3', 'leg3', 'lB', 'lC'], ['p4', 'leg4', 'sB', 'sC', true]];
+for (const [, leg] of PLOTS) $(leg).innerHTML = '<span><i style="background:var(--cB)"></i>BBDroids</span><span><i style="background:var(--cC)"></i>Cary V1</span>';
+const nice = v => { const e = Math.pow(10, Math.floor(Math.log10(v))); const m = v / e; return [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10].find(k => m <= k) * e; };
+function drawPlot([id, , kB, kC, pos]) {
+  const {g, W, H} = prep($(id)); if (!LOG.length) return;
+  const tEnd = LOG[LOG.length - 1].t, T = 10, t0 = tEnd - T, data = LOG.filter(d => d.t >= t0);
+  let m = 1; for (const d of data) m = Math.max(m, Math.abs(d[kB]), Math.abs(d[kC])); if (pos) m = Math.max(m, simB.p.domeHoldG, simC.p.domeHoldG); m = nice(m * 1.05);
+  const lo = pos ? 0 : -m;
+  const L = 40, Rr = 6, Tp = 6, B = 18;
+  const X = t => L + (t - t0) / T * (W - L - Rr), Y = v => Tp + (m - v) / (m - lo) * (H - Tp - B);
+  g.font = '12px Barlow,system-ui,sans-serif'; g.fillStyle = C.mute; g.strokeStyle = C.line; g.lineWidth = 1; g.textAlign = 'right'; g.textBaseline = 'middle';
+  for (const v of pos ? [0, m / 4, m / 2, 3 * m / 4, m] : [-m, -m / 2, 0, m / 2, m]) { const y = Y(v); g.beginPath(); g.moveTo(L, y); g.lineTo(W - Rr, y); g.stroke(); g.fillText(+v.toPrecision(3), L - 5, y); }
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  for (let t = Math.ceil(t0 / 2) * 2; t <= tEnd; t += 2) if (t >= 0) g.fillText(`${t} s`, X(t), H - B + 3);
+  if (pos) for (const [sim, c] of [[simB, C.cB], [simC, C.cC]]) { const y = Y(sim.p.domeHoldG); g.strokeStyle = c; g.lineWidth = 1.5; g.setLineDash([6, 4]); g.beginPath(); g.moveTo(L, y); g.lineTo(W - Rr, y); g.stroke(); g.setLineDash([]); }
+  for (const [k, c] of [[kB, C.cB], [kC, C.cC]]) { g.strokeStyle = c; g.lineWidth = 2; g.beginPath(); data.forEach((d, i) => { const x = X(d.t), y = Y(d[k]); i ? g.lineTo(x, y) : g.moveTo(x, y); }); g.stroke(); }
+}
+
+// ------------------------------------------------------------ restart and main loop
+$('bReset').onclick = () => {
+  simB.reset(); simC.reset(); Object.keys(stick).forEach(k => stick[k] = 0); LOG.length = 0;
+  for (const d of [dB, dC]) { d.quat.identity(); d.lastX = 0; d.lastZ = d.lane; }
+  syncQuick();
+};
+const readout = $('readout');
+const hdg = s => `${(((s.psi * R2D) % 360 + 540) % 360 - 180).toFixed(0)}°`;
+let last = performance.now(), acc = 0, frame = 0;
+function loop(now) {
+  const dtReal = Math.min(0.05, (now - last) / 1000); last = now;
+  updateKeys(dtReal);
+  simB.input.vel = stick.v; simB.input.roll = stick.r;
+  simB.input.headP = stick.hp * simB.p.domePitchRange; simB.input.headR = stick.hr * simB.p.domeRollRange;
+  simB.input.headHeld = padState.padHead.active || $('latch').checked;
+  simC.input.vel = stick.v; simC.input.roll = stick.r; simC.input.headP = stick.hp; simC.input.headR = stick.hr; simC.input.spin = spinBtn;
+  if (!paused) {
+    acc += dtReal * timeScale; const n = Math.floor(acc / 0.001);
+    if (n > 0) { simB.advance(n * 0.001); simC.advance(n * 0.001); acc -= n * 0.001; logSample(); }
+  }
+  for (const st of Object.values(padState)) {
+    let x = stick[st.kx], y = stick[st.ky]; const mq = Math.max(Math.abs(x), Math.abs(y)), hq = Math.hypot(x, y); if (hq > 1e-9) { x *= mq / hq; y *= mq / hq; } st.knob.style.transform = `translate(${x * 118}%, ${-y * 118}%)`;
+  }
+  $('capV').textContent = stick.v.toFixed(2); $('capR').textContent = stick.r.toFixed(2); $('capHP').textContent = stick.hp.toFixed(2); $('capHR').textContent = stick.hr.toFixed(2);
+  update3d();
+  drawRiss($('cSideB'), true, simB, 'BBDroids', C.cB); drawRiss($('cSideC'), true, simC, 'Cary V1', C.cC);
+  drawRiss($('cFrontB'), false, simB, 'BBDroids', C.cB); drawRiss($('cFrontC'), false, simC, 'Cary V1', C.cC);
+  if (frame++ % 2 === 0) PLOTS.forEach(drawPlot);
+  const rows = [['', '<span style="color:var(--cB)">BBDroids</span>', '<span style="color:var(--cC)">Cary</span>'],
+    ['Speed', `${(simB.pqd[0] * 1000).toFixed(0)} mm/s`, `${(simC.pqd[0] * 1000).toFixed(0)} mm/s`],
+    ['Pendulum', `${simB.pitchDeg().toFixed(1)}°`, `${simC.pitchDeg().toFixed(1)}°`],
+    ['Head pitch', `${(simB.pq[2] * R2D).toFixed(1)}°`, `${(simC.pq[2] * R2D).toFixed(1)}°`],
+    ['Lean', `${simB.leanDeg().toFixed(1)}°`, `${simC.leanDeg().toFixed(1)}°`],
+    ['Roll servo load', `${(simB.rollLoad * 100).toFixed(0)} %`, `${(simC.tiltLoad * 100).toFixed(0)} %`],
+    ['Dome shear / peak', `${((simB.shearUse || 0) * 100).toFixed(0)} / ${((simB.shearPeak || 0) * 100).toFixed(0)} %`, `${((simC.shearUse || 0) * 100).toFixed(0)} / ${((simC.shearPeak || 0) * 100).toFixed(0)} %`],
+    ['Heading', hdg(simB), hdg(simC)],
+    ['Distance', `${simB.pq[0].toFixed(2)} m`, `${simC.pq[0].toFixed(2)} m`]];
+  readout.innerHTML = rows.map((r, i) => i === 0 ? `<span></span><b class="hd">${r[1]}</b><b class="hd">${r[2]}</b>` : `<span>${r[0]}</span><b>${r[1]}</b><b>${r[2]}</b>`).join('') + `<span>Time</span><b>${simB.t.toFixed(1)} s</b><b></b>`;
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>

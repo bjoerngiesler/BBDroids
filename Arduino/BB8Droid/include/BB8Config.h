@@ -71,6 +71,8 @@ struct BB8Params {
   float driveSpeedDeadband = 0.01f;
   float driveAccelMax      = 1200;   // mm/s^2 ramp on the speed setpoint from the remote (0 = off). Also defines the commanded acceleration for the dome feedforward.
                                      // Was 2000, which is more than the drive delivers: the pendulum swings far forward and throws the head back (sim/README.md, 6.4).
+  float driveDecelMax      = 3000;   // mm/s^2 ramp while braking (0 = same as driveAccelMax). With 1200 for braking too, the droid stopped
+                                     // about 30% later than the Cary Christie V1 drive; 3000 stops shorter than Cary at similar dome shear (sim/README.md, 6.5).
   float driveSpeedIMax     = 255;    // Max I share of the drive speed controller in PWM: errI is bounded to +-driveSpeedIMax/(driveSpeedKi*encoder controlGain) (was a fixed errI bound of 255 = ~153 PWM incl. controlGain).
   float driveSpeedMax      = DRIVE_MOTOR_MAX_SPEED_MM_PER_S;
   float rollAngleMax       = 20.0;
@@ -94,18 +96,18 @@ struct BB8Params {
   float faDomeAnnealTime     = .5;     // Time it takes for all head axes ot return to 0 after control has been relinquished.
   float faDomeAnnealDelay    = .3;     // Delay before we anneal the head position if button is released
   // Head compensation and feedforward: the "ideal" set from the simulation (sim/README.md, section 5/6), for
-  // pendulum 4.5 kg @ 155 mm and an ESTIMATED head of 1 kg @ 320 mm. Signs are in the simulation's convention
-  // and NOT verified on hardware - check them first (sim/README.md, section 8) and recompute after weighing the head.
+  // pendulum 4.5 kg @ 155 mm and the MEASURED head of 0.75 kg @ 295 mm. Signs are in the simulation's convention
+  // and NOT verified on hardware - check them first (sim/README.md, section 8) and recompute if the head changes.
   float faSpeedSPToDome      = .01;    // Dome pitch (servo deg) per mm/s of speed setpoint. Keeps the head upright at constant speed. Was -.01.
   float faRollSPToDome       = -.5;
-  float faDomePitchToWeight  = -.85;   // Balance setpoint shift (deg pendulum pitch) per deg of measured dome pitch around sphere center.
+  float faDomePitchToWeight  = -.46;   // Balance setpoint shift (deg pendulum pitch) per deg of measured dome pitch around sphere center.
                                        // Ideal -(m_head*L)/(m_weight*l - m_head*L). Was .5 but unused.
   float faAccelToDome        = 15;     // Dome pitch (deg around sphere center) per m/s^2 of commanded acceleration (pure feedforward, no IMU).
   float domeAccelTau         = 0.5;    // s, low-pass on commanded acceleration for faAccelToDome
   float faDomeSPAccel        = 0;      // Dome pitch (servo deg) per mm/s of speed error (ramped setpoint - measured speed), like D-O's faNeckSPAccel.
                                        // Uses the encoder, so it is feedback. 0 = off; sign in sim convention not verified (sim/README.md, 6.4).
   bool  domeCompRemoteOnly   = true;   // faDomePitchToWeight acts only on the remote share of the dome pitch, not on the automatic feedforward
-  float faDomeRollToWeight   = -.46;   // Counterweight tilt per deg of measured dome roll, both around sphere center. Ideal -(m_head*L)/(m_weight*l). Was 0.
+  float faDomeRollToWeight   = -.32;   // Counterweight tilt per deg of measured dome roll, both around sphere center. Ideal -(m_head*L)/(m_weight*l). Was 0.
 };
 
 static const int DOME_HEADING_SERVO  = 1;

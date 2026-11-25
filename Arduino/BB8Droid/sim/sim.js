@@ -83,11 +83,11 @@
       // Main parameters
       mp: 4.5,          // kg   pendulum mass (24 mono cells + motor + servo, Björn's estimate)
       l: 0.155,         // m    distance of the pendulum below the sphere center (Björn's estimate)
-      mh: 1.0,          // kg   head mass
+      mh: 0.75,         // kg   head mass (measured)
       // Further mechanics
       R: 0.253,         // m    sphere radius (BB8Config)
       ms: 3.0,          // kg   mass of the sphere shell (thin shell)
-      L: 0.32,          // m    distance of the head CoM above the sphere center
+      L: 0.295,         // m    distance of the head CoM above the sphere center (measured)
       cRoll: 3.0,       // N/(m/s)   rolling resistance (viscous)
       bBear: 0.05,      // Nm/(rad/s) bearing friction of the drive
       // Drive motor (referred to the output, sphere relative to pendulum)
@@ -103,7 +103,7 @@
       balKp: 25, balKi: 0, balKd: 0.2,
       rollKp: 0.5, rollKi: 0.4, rollKd: 0.4, rollKff: 0.0, rollIMax: 50,
       rollDirect: false,
-      driveSpeedMax: 3000, driveSpeedDeadband: 0.01, rollAngleMax: 20,
+      driveSpeedMax: 2000, driveSpeedDeadband: 0.01, rollAngleMax: 20,
       bodyRollRange: 25, bodyRollVel: 500, bodyRollAccel: 60,
       domePitchRange: 45, domePitchVel: 100, domeRollRange: 20, domeRollVel: 100,
       faDomeAnnealDelay: 0.3, // s  after the head stick is released (button3), hold the head this long ...
@@ -113,7 +113,16 @@
       // Head compensation and feedforward: the "ideal" set, same defaults as the firmware (BB8Config.h).
       // faDomeRollToWeight / faDomePitchToWeight are the static ideals for the default masses
       // (see idealDomeRollToWeight() / idealDomePitchToWeight()); recompute them when the masses change.
-      faSpeedSPToDome: 0.01, faRollSPToDome: -0.5, faDomeRollToWeight: -0.46, faDomePitchToWeight: -0.85, faPitchToDome: 0, domeCompRemoteOnly: true,
+      faSpeedSPToDome: 0.01, faRollSPToDome: -0.5, faDomeRollToWeight: -0.32, faDomePitchToWeight: -0.46, faPitchToDome: 0, domeCompRemoteOnly: true,
+      // Dome magnet coupling (shear): outer dome shell only, the inner magnet ring rides on the mast
+      domeShellMass: 0.6, domeShellL: 0.307, // kg, m from sphere center (Björn: 530 g + electronics, CoG ~30 % up)
+      domeHoldG: 1.2,      // magnet shear capacity in units of the shell's weight: 1.0 = holds exactly when the dome is at 90 deg.
+                           // Björn's estimate: holds at 90 deg with a little to spare (a light push pops it off) -> 1.2 (ASSUMPTION, measure!)
+      domePitchAccel: 0, domeRollAccel: 0, // DXL profile acceleration for the dome servos (0 = not set in firmware; sim uses 3000 °/s² as before)
+      domeRemoteRate: 0,  // deg/s at the dome: slew limit on the remote head command (0 = off)
+      domeWorldMax: 0,     // deg: limit on the dome's apparent tilt (0 = off)
+      domeLeanCenter: true, // centre the limit window on the shear-free attitude atan(a/g) instead of vertical
+      driveDecelLimit: 3000, // mm/s^2 separate ramp while braking (0 = same as driveAccelLimit), firmware drive_decel_max
       driveAccelLimit: 1200, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max
       faAccelToDome: 15,   // deg head (around the sphere center) per m/s^2 of commanded acceleration
       domeAccelTau: 0.5,   // s  low-pass on the commanded acceleration for the head
@@ -170,6 +179,8 @@
       // when released, the head offset is held for faDomeAnnealDelay and then annealed to 0 (BB8::stepDome()).
       this.input = { vel: 0, roll: 0, headP: 0, headR: 0, headHeld: true, driveOn: true };
       this.remoteP = 0; this.remoteR = 0; this.annealP = 0; this.annealR = 0; this.annealT = 0;
+      this.remPs = 0; this.remRs = 0; this.domeCenterP = 0; this.domeCenterR = 0;
+      this.shearP = this.shearR = this.shear = this.shearG = this.shearUse = this.shearPeak = 0;
       // Firmware state
       this.drive = new PID(); this.bal = new PID(); this.roll = new PID();
       this.imuPitchF = new LowPassFilter(p.imuFilterCutoff, 100);
@@ -225,7 +236,12 @@
       if (Math.abs(vel) <= p.driveSpeedDeadband) vel = 0; else vel *= p.driveSpeedMax;
       // Setpoint ramp and commanded acceleration (pure feedforward, no feedback)
       const velPrev = this.velRamped;
-      if (p.driveAccelLimit > 0) { const m = p.driveAccelLimit * dt; this.velRamped += Math.max(-m, Math.min(m, vel - this.velRamped)); }
+      if (p.driveAccelLimit > 0) {
+        // braking (|setpoint| shrinking towards / through zero) uses driveDecelLimit if set
+        const braking = Math.abs(vel) < Math.abs(this.velRamped) || vel * this.velRamped < 0;
+        const lim = braking && p.driveDecelLimit > 0 ? p.driveDecelLimit : p.driveAccelLimit;
+        const m = lim * dt; this.velRamped += Math.max(-m, Math.min(m, vel - this.velRamped));
+      }
       else this.velRamped = vel;
       vel = this.velRamped;
       const aCmd = (this.velRamped - velPrev) / dt / 1000;
@@ -302,9 +318,31 @@
         const ann = (v, a) => v > 0.5 ? Math.max(0, v - a) : v < -0.5 ? Math.min(0, v + a) : 0;
         this.remoteP = ann(this.remoteP, this.annealP); this.remoteR = ann(this.remoteR, this.annealR);
       }
-      this.domePGoal = 180 + this.remoteP + p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * pitch
+      // optional slew limit on the remote head share (servo deg/s)
+      if (p.domeRemoteRate > 0) { const mP = p.domeRemoteRate * p.domePitchReduction * dt, mR = p.domeRemoteRate * DOME_ROLL_REDUCTION * dt;
+        this.remPs = (this.remPs || 0) + Math.max(-mP, Math.min(mP, this.remoteP - (this.remPs || 0)));
+        this.remRs = (this.remRs || 0) + Math.max(-mR, Math.min(mR, this.remoteR - (this.remRs || 0))); }
+      else { this.remPs = this.remoteP; this.remRs = this.remoteR; }
+      this.domePGoal = 180 + this.remPs + p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * pitch
         + p.faAccelToDome * p.domePitchReduction * this.accelCmdF + p.faDomeSPAccel * this.speedErr;
-      this.domeRGoal = 180 + this.remoteR + p.faRollSPToDome * this.roll.goal;
+      this.domeRGoal = 180 + this.remRs + p.faRollSPToDome * this.roll.goal;
+      // Dome shear limiter: keep the dome's apparent tilt (world angle minus the shear-free angle) within ±domeWorldMax.
+      // Uses only signals the firmware has: dome goal, IMU pitch/roll, commanded acceleration, encoder speed.
+      this.domeCenterP = this.domeCenterR = 0;
+      if (p.domeWorldMax > 0) {
+        const red = p.domePitchReduction, m = p.domeWorldMax;
+        if (p.domeLeanCenter) {
+          this.domeCenterP = Math.atan(this.accelCmdF / G) * R2D;
+          const v = this.encSpeedFilt / 1000, aLat = v * v / p.R * Math.sin(lean * D2R);
+          this.domeCenterR = Math.atan(aLat / G) * R2D;
+        }
+        const relP = (this.domePGoal - 180) / red, worldP = relP - pitch;       // head abs = rel - frame pitch
+        const wP = Math.max(this.domeCenterP - m, Math.min(this.domeCenterP + m, worldP));
+        this.domePGoal = 180 + (wP + pitch) * red;
+        const relR = (this.domeRGoal - 180) / DOME_ROLL_REDUCTION, worldR = relR + lean; // head abs = rel + axle lean
+        const wR = Math.max(this.domeCenterR - m, Math.min(this.domeCenterR + m, worldR));
+        this.domeRGoal = 180 + (wR - lean) * DOME_ROLL_REDUCTION;
+      }
     }
 
     // ------------------------------------------------------------ Physics
@@ -316,6 +354,21 @@
       const ts = p.servoStall * red, ws = relRate * red, w0 = p.servoNoLoad * 2 * Math.PI / 60;
       const hi = Math.min(ts, ts * (1 - ws / w0)), lo = Math.max(-ts, -ts * (1 + ws / w0));
       return Math.max(lo, Math.min(hi, tau));
+    }
+
+    // Tangential (shear) force the magnets must apply to the outer dome shell, both planes, in N.
+    computeShear() {
+      const p = this.p, m = p.domeShellMass, Lo = p.domeShellL, tauM = this.tauM, tauR = this.tauR;
+      const ap = planarAcc(p, this.pq, this.pqd, this.forcesPitch(this.pq, this.pqd));
+      const ar = planarAcc(p, this.rq, this.rqd, this.forcesRoll(this.rq, this.rqd));
+      const al = this.pq[2], ze = this.rq[2], aLat = p.turning ? this.aLat : 0;
+      this.shearP = m * (ap[0] * Math.cos(al) + Lo * ap[2]) - m * G * Math.sin(al);
+      this.shearR = m * ((ar[0] + aLat) * Math.cos(ze) + Lo * ar[2]) - m * G * Math.sin(ze);
+      this.shear = Math.hypot(this.shearP, this.shearR);
+      this.shearG = this.shear / (m * G);              // in units of the shell's weight (1 = holding it sideways, 90 deg)
+      this.shearUse = this.shearG / p.domeHoldG;       // fraction of the magnet capacity
+      this.shearPeak = Math.max(this.shearPeak, this.shearUse);
+      this.tauM = tauM; this.tauR = tauR;              // forcesPitch/forcesRoll above overwrite these; keep the integrator's values
     }
 
     forcesPitch(q, qd) {
@@ -367,14 +420,15 @@
         // Servo profiles (position goals in servo degrees, limits as in BB8::setServoParameters)
         const rr = p.bodyRollRange * p.rollReduction;
         this.rollServo.step(Math.max(180 - rr, Math.min(180 + rr, this.rollServoGoal)), p.bodyRollVel * DXL_VEL, p.bodyRollAccel * DXL_ACC, h);
-        this.domePServo.step(Math.max(180 - p.domePitchRange, Math.min(180 + p.domePitchRange, this.domePGoal)), p.domePitchVel * DXL_VEL, 3000, h);
-        this.domeRServo.step(Math.max(180 - p.domeRollRange, Math.min(180 + p.domeRollRange, this.domeRGoal)), p.domeRollVel * DXL_VEL, 3000, h);
+        this.domePServo.step(Math.max(180 - p.domePitchRange, Math.min(180 + p.domePitchRange, this.domePGoal)), p.domePitchVel * DXL_VEL, p.domePitchAccel > 0 ? p.domePitchAccel * DXL_ACC : 3000, h);
+        this.domeRServo.step(Math.max(180 - p.domeRollRange, Math.min(180 + p.domeRollRange, this.domeRGoal)), p.domeRollVel * DXL_VEL, p.domeRollAccel > 0 ? p.domeRollAccel * DXL_ACC : 3000, h);
         // Cornering: yaw rate from axle lean (sphere without spin around the vertical at the contact point)
         const v = this.pqd[0], rho = this.rq[0] / p.R;
         this.psiDot = p.turning ? v / p.R * Math.sin(rho) : 0;
         this.aLat = v * this.psiDot;
         this.rk4(this.pq, this.pqd, this.forcesPitch, h);
         this.rk4(this.rq, this.rqd, this.forcesRoll, h);
+        this.computeShear();
         this.rollLoad = Math.abs(this.tauR || 0) / (p.servoStall * p.rollReduction);
         this.rollLoadPeak = Math.max(this.rollLoadPeak, this.rollLoad);
         this.psi += this.psiDot * h;

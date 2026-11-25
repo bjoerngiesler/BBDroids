@@ -29,5 +29,6 @@ for (const [name, o] of [['body_roll_accel 30, no kd scheduling (before)', {body
                          ['body_roll_accel 30 + roll_kd_speed 1000', {bodyRollAccel: 30}],
                          ['body_roll_accel 60, no kd scheduling', {rollKdSpeed: 0}],
                          ['new defaults (60 + roll_kd_speed 1000)', {}],
-                         ['new defaults, drive_speed_max 2000 (firmware)', {driveSpeedMax: 2000}]])
+                         ['new defaults, drive_speed_max 3000', {driveSpeedMax: 3000}],
+                         ['new defaults, 1 kg head estimate', {mh: 1.0, L: 0.32, faDomeRollToWeight: -0.46, faDomePitchToWeight: -0.85}]])
   console.log(`${name.padEnd(48)} ${sweep(o)}`);

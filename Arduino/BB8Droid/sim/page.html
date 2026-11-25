@@ -194,9 +194,9 @@ const P = [
   ['bodyRollRange','body_roll_range: ± pendulum tilt',5,45,1,'ctrl','°'],
   ['bodyRollAccel','body_roll_accel (0 = unlimited)',0,1000,5,'ctrl','DXL'],
   ['bodyRollVel','body_roll_vel (0 = unlimited)',0,1000,10,'ctrl','DXL'],
-  ['domePitchRange','dome_pitch_range: ± servo degrees',5,90,1,'ctrl','°'],
+  ['domePitchRange','dome_pitch_range: ± servo degrees',5,160,1,'ctrl','°'],
   ['domePitchVel','dome_pitch_vel (0 = unlimited)',0,500,5,'ctrl','DXL'],
-  ['domeRollRange','dome_roll_range: ± servo degrees',5,60,1,'ctrl','°'],
+  ['domeRollRange','dome_roll_range: ± servo degrees',5,160,1,'ctrl','°'],
   ['domeRollVel','dome_roll_vel (0 = unlimited)',0,500,5,'ctrl','DXL'],
   ['#Head feedforward and compensation (fa_*)'],
   ['faSpeedSPToDome','fa_speed_sp_to_dome',-0.05,0.05,0.001,'ctrl','°/(mm/s)'],
@@ -210,14 +210,24 @@ const P = [
   ['faDomeSPAccel','fa_dome_sp_accel: head per speed error (setpoint − measured), like D-O',-0.03,0.03,0.0005,'ctrl','°/(mm/s)'],
   ['faDomeAnnealDelay','fa_dome_anneal_delay: hold head after release',0,3,0.05,'ctrl','s'],
   ['faDomeAnnealTime','fa_dome_anneal_time: return head to center',0.05,5,0.05,'ctrl','s'],
+  ['driveDecelLimit','drive_decel_max: braking ramp (0 = same as drive_accel_max), not in firmware',0,5000,50,'ctrl','mm/s²'],
+  ['#Dome magnet shear (not in firmware)'],
+  ['domeShellMass','Dome shell mass (outer part on the magnets)',0.1,2,0.05,'mech','kg'],
+  ['domeShellL','Dome shell CoG above sphere centre',0.26,0.4,0.001,'mech','m'],
+  ['domeHoldG','Magnet shear capacity (1 = holds at 90°; measure!)',0.2,3,0.05,'ctrl','× weight'],
+  ['domeWorldMax','Shear limiter: dome apparent-tilt limit (0 = off; uses IMU feedback, see README 6.5)',0,70,1,'ctrl','°'],
+  ['domeLeanCenter','Shear limiter: centre the limit on the shear-free attitude atan(a/g)','chk','ctrl'],
+  ['domeRemoteRate','Slew limit on the remote head command (0 = off)',0,200,5,'ctrl','°/s'],
+  ['domePitchAccel','Dome pitch profile acceleration (0 = unset, sim 3000 °/s²)',0,300,5,'ctrl','DXL'],
+  ['domeRollAccel','Dome roll profile acceleration (0 = unset)',0,300,5,'ctrl','DXL'],
   ['domeCompRemoteOnly','dome_comp_remote_only: compensate the remote share of the head only','chk','ctrl'],
   ['encoderQuantize','Encoder quantization','chk','mech'],
   ['turning','Cornering (yaw from lean, centrifugal force)','chk','mech'],
 ];
 let stored = {};
-try { stored = JSON.parse(localStorage.getItem('bb8sim-params-v5') || '{}'); } catch (e) {}
+try { stored = JSON.parse(localStorage.getItem('bb8sim-params-v7') || '{}'); } catch (e) {}
 const sim = new BB8Sim(stored);
-const save = () => { try { localStorage.setItem('bb8sim-params-v5', JSON.stringify(sim.p)); } catch (e) {} };
+const save = () => { try { localStorage.setItem('bb8sim-params-v7', JSON.stringify(sim.p)); } catch (e) {} };
 const secs = {main: $('secMain'), mech: $('secMech'), ctrl: $('secCtrl')};
 const fmt = (v, st) => { const d = st >= 1 ? 0 : Math.min(3, Math.ceil(-Math.log10(st))); return (+v).toFixed(d); };
 
@@ -537,7 +547,7 @@ function loop(now) {
   if (frame++ % 2 === 0) PLOTS.forEach(drawPlot);
   const r = [['v over ground', `${(sim.pqd[0] * 1000).toFixed(0)} mm/s`], ['v encoder', `${sim.encSpeedFilt.toFixed(0)} mm/s`],
     ['Pitch (IMU)', `${sim.pitchDeg().toFixed(1)}°`], ['PWM', sim.pwm.toFixed(0)], ['Lean (IMU)', `${sim.leanDeg().toFixed(1)}°`],
-    ['Roll servo load', `${(sim.rollLoad * 100).toFixed(0)} % (max ${(sim.rollLoadPeak * 100).toFixed(0)} %)`], ['Heading', `${(((sim.psi * R2D) % 360 + 540) % 360 - 180).toFixed(0)}°`], ['Curve radius', Math.abs(sim.psiDot) > 1e-3 ? `${Math.abs(sim.pqd[0] / sim.psiDot).toFixed(2)} m` : '–'], ['Distance', `${sim.pq[0].toFixed(2)} m`], ['Time', `${sim.t.toFixed(1)} s`]];
+    ['Roll servo load', `${(sim.rollLoad * 100).toFixed(0)} % (max ${(sim.rollLoadPeak * 100).toFixed(0)} %)`], ['Dome shear', `${(sim.shearUse * 100).toFixed(0)} % of capacity (max ${(sim.shearPeak * 100).toFixed(0)} %)`], ['Heading', `${(((sim.psi * R2D) % 360 + 540) % 360 - 180).toFixed(0)}°`], ['Curve radius', Math.abs(sim.psiDot) > 1e-3 ? `${Math.abs(sim.pqd[0] / sim.psiDot).toFixed(2)} m` : '–'], ['Distance', `${sim.pq[0].toFixed(2)} m`], ['Time', `${sim.t.toFixed(1)} s`]];
   readout.innerHTML = r.map(([a, b]) => `<span>${a}</span><b>${b}</b>`).join('');
   requestAnimationFrame(loop);
 }
