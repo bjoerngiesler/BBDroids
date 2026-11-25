@@ -132,6 +132,14 @@
       driveAccelLimit: 1800, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max (firmware still 1200)
       faAccelToDome: 15,   // deg head (around the sphere center) per m/s^2 of commanded acceleration
       domeAccelTau: 0.5,   // s  low-pass on the commanded acceleration for the head
+      // EXPERIMENT (README 6.9): head follows the *static* attitude only, through a slow low-pass, so the coupling has
+      // no gain at the 1-3 Hz servo/frame/IMU loop that made direct IMU coupling oscillate (section 6.2).
+      //  pitch: dome += k * LPF(IMU pitch)            -> head stays upright on climbs (1 = upright, >1 = leans uphill)
+      //  roll:  dome += k * LPF(pendulum tilt command) -> head leans uphill on side slopes; only while |roll goal| < gate
+      faStaticPitchToDome: 0, faStaticRollToDome: 0, domeStaticTau: 2.0, staticRollGate: 1.0,
+      // EXPERIMENT: balance setpoint follows k * LPF(IMU pitch) (same slow filter), so a steady pendulum offset (slope,
+      // rolling resistance) no longer turns into a speed deduction; fast pendulum swings are still damped. 0 = off.
+      balStaticPitch: 0,
       autoShareClamp: true, // clamp the automatic head share to dome_pitch_range before subtracting it (dome_comp_remote_only)
       faDomeSPAccel: 0,    // servo deg per mm/s of (ramped speed setpoint - measured speed), like D-O's faNeckSPAccel. Uses the encoder -> feedback.
       rollReduction: 1.0,      // servo degrees per pendulum degree (firmware ROLL_REDUCTION, previously 80/22)
@@ -198,7 +206,9 @@
 
     reset() {
       const p = this.p;
-      this.t = 0; this.betaP = 0; this.betaR = 0;
+      this.t = 0; this.betaP = 0; this.betaR = 0; this.betaReady = false;
+      if (this.terrain === undefined) this.terrain = null;   // obstacle course (course.js), set by the page
+      if (this.terrainOffsetZ === undefined) this.terrainOffsetZ = 0;  // world Z of this droid's start (lanes on the comparison page)
       // Pitch plane: s=x, a1=theta (pendulum forward +), a2=alpha (head forward +)
       this.pq = [0, 0, 0]; this.pqd = [0, 0, 0];
       // Roll plane: s=y, a1=chi (pendulum towards +y), a2=zeta (head towards +y)
@@ -209,7 +219,7 @@
       // when released, the head offset is held for faDomeAnnealDelay and then annealed to 0 (BB8::stepDome()).
       this.input = { vel: 0, roll: 0, headP: 0, headR: 0, headHeld: true, driveOn: true };
       this.remoteP = 0; this.remoteR = 0; this.annealP = 0; this.annealR = 0; this.annealT = 0;
-      this.remPs = 0; this.remRs = 0; this.domeCenterP = 0; this.domeCenterR = 0;
+      this.remPs = 0; this.remRs = 0; this.domeCenterP = 0; this.domeCenterR = 0; this.staticP = 0; this.staticR = 0;
       this.shearP = this.shearR = this.shear = this.shearG = this.shearUse = this.shearPeak = 0;
       // Firmware state
       this.drive = new PID(); this.bal = new PID(); this.roll = new PID();
@@ -283,6 +293,11 @@
       this.encSpeedFilt = this.encSpeedF.filter(this.encSpeed);
       this.encPos = this.encPosF.filter(ticks * mmPerTick);
 
+      // --- slow static attitude for the head (experiment, README 6.9)
+      { const a = Math.min(1, dt / Math.max(dt, p.domeStaticTau));
+        this.staticP += (pitch - this.staticP) * a;
+        const gate = Math.abs(this.roll.goal) < p.staticRollGate;
+        this.staticR += ((gate ? this.tilt : 0) - this.staticR) * a; }
       // --- drive mode (BB8::incomingControlPacket / switchDrive)
       const key = inp.driveOn ? p.driveMode : 'off';
       if (key !== this.driveKey) { this.driveKey = key; this.switchDrive(key === 'off' ? 'off' : key === 'pos' ? 'pos' : 'vel'); }
@@ -319,12 +334,12 @@
       // Dome pitch compensation: balance setpoint = expected pendulum position for the measured dome pitch
       // Compensation only on the remote share of the head (measured position minus automatic shares)
       const autoP = p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * this.lastPitchCmd + p.faAccelToDome * p.domePitchReduction * this.accelCmdF
-        + p.faDomeSPAccel * this.speedErr;
+        + p.faDomeSPAccel * this.speedErr + p.faStaticPitchToDome * p.domePitchReduction * this.staticP;
       // The servo can only realize the automatic share up to its range; subtracting more would make a saturated
       // head look like a remote "head back" command and shift the balance setpoint the wrong way.
       const autoPReal = p.autoShareClamp ? Math.max(-p.domePitchRange, Math.min(p.domePitchRange, autoP)) : autoP;
       const domePitchMeas = ((this.domePServo.pos - 180) - (p.domeCompRemoteOnly ? autoPReal : 0)) / p.domePitchReduction;
-      this.bal.goal = p.faDomePitchToWeight * domePitchMeas;
+      this.bal.goal = p.faDomePitchToWeight * domePitchMeas + p.balStaticPitch * this.staticP;
       if (!inp.driveOn) {
         this.pwm = 0; this.bal.reset(); this.drive.reset(); this.speedSP = 0;
         this.imuPitchF.filter(pitch);
@@ -336,7 +351,7 @@
       }
 
       // --- stepRollMotor
-      const domeRollMeas = (this.domeRServo.pos - 180) / DOME_ROLL_REDUCTION; // measured dome roll position [deg]
+      const domeRollMeas = (this.domeRServo.pos - 180) / DOME_ROLL_REDUCTION - p.faStaticRollToDome * this.staticR; // measured dome roll [deg], minus the static (automatic) share
       this.headTilt = p.faDomeRollToWeight * domeRollMeas;
       // Setpoint shaping (shaper is in the firmware, the ramp is a simulation-only experiment)
       let g = inp.roll * p.rollAngleMax;
@@ -391,8 +406,9 @@
         this.remRs = (this.remRs || 0) + Math.max(-mR, Math.min(mR, this.remoteR - (this.remRs || 0))); }
       else { this.remPs = this.remoteP; this.remRs = this.remoteR; }
       this.domePGoal = 180 + this.remPs + p.faSpeedSPToDome * this.bal.offset + p.faPitchToDome * p.domePitchReduction * pitch
-        + p.faAccelToDome * p.domePitchReduction * this.accelCmdF + p.faDomeSPAccel * this.speedErr;
-      this.domeRGoal = 180 + this.remRs + p.faRollSPToDome * this.roll.goal;
+        + p.faAccelToDome * p.domePitchReduction * this.accelCmdF + p.faDomeSPAccel * this.speedErr
+        + p.faStaticPitchToDome * p.domePitchReduction * this.staticP;
+      this.domeRGoal = 180 + this.remRs + p.faRollSPToDome * this.roll.goal + p.faStaticRollToDome * DOME_ROLL_REDUCTION * this.staticR;
       // Dome shear limiter: keep the dome's apparent tilt (world angle minus the shear-free angle) within ±domeWorldMax.
       // Uses only signals the firmware has: dome goal, IMU pitch/roll, commanded acceleration, encoder speed.
       this.domeCenterP = this.domeCenterR = 0;
@@ -495,8 +511,20 @@
         this.aLat = v * this.psiDot;
         // Incline: world slope (inclineX uphill towards +X = initial forward, inclineY uphill towards +Z = initial right),
         // projected onto this droid's pitch plane (forward) and roll plane (right) with its current heading.
-        { const bx = p.inclineX * D2R, by = p.inclineY * D2R, c = Math.cos(this.psi), sn = Math.sin(this.psi);
-          this.betaP = bx * c + by * sn; this.betaR = -bx * sn + by * c; }
+        { let tx = Math.tan(p.inclineX * D2R), tz = Math.tan(p.inclineY * D2R);
+          // obstacle course (course.js): local surface gradient at the contact point, on top of the global incline
+          if (this.terrain) { const g = this.terrain.gradientAt(this.wX, this.wZ + this.terrainOffsetZ); tx += g.gx; tz += g.gz; }
+          const bx = Math.atan(tx), by = Math.atan(tz), c = Math.cos(this.psi), sn = Math.sin(this.psi);
+          const nP = bx * c + by * sn, nR = -bx * sn + by * c;
+          // When the slope under the droid changes (ramp edge, seesaw, turning on a slope), keep the world attitude of
+          // pendulum, head and sphere continuous: the state is in slope coordinates, so shift it by the change. The
+          // rolling coordinate moves by R*d (the sphere tips about the contact point), so the encoder does not jump.
+          if (this.betaReady) {
+            const dP = nP - this.betaP, dR = nR - this.betaR, Rs = p.R;
+            if (dP !== 0) { this.pq[0] += Rs * dP; this.pq[1] -= dP; this.pq[2] += dP; }
+            if (dR !== 0) { this.rq[0] += Rs * dR; this.rq[1] -= dR; this.rq[2] += dR; }
+          }
+          this.betaP = nP; this.betaR = nR; this.betaReady = true; }
         this.rk4(this.pq, this.pqd, this.forcesPitch, h, this.betaP);
         this.rk4(this.rq, this.rqd, this.forcesRoll, h, this.betaR);
         this.computeShear();

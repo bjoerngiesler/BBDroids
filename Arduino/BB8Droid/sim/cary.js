@@ -99,7 +99,9 @@
     constructor(params) { this.p = Object.assign(defaultParams(), params || {}); this.reset(); }
 
     reset() {
-      this.t = 0; this.betaP = 0; this.betaR = 0;
+      this.t = 0; this.betaP = 0; this.betaR = 0; this.betaReady = false;
+      if (this.terrain === undefined) this.terrain = null;   // obstacle course (course.js), set by the page
+      if (this.terrainOffsetZ === undefined) this.terrainOffsetZ = 0;  // world Z of this droid's start (lanes on the comparison page)
       this.pq = [0, 0, 0]; this.pqd = [0, 0, 0];   // pitch: x, theta (pendulum fwd +), alpha (head fwd +)
       this.rq = [0, 0, 0]; this.rqd = [0, 0, 0];   // roll:  y, chi (pendulum right +), zeta (head right +)
       this.wX = 0; this.wZ = 0; this.psi = 0; this.psiDot = 0; this.spinRate = 0; this.aLat = 0; this.trail = [[0, 0]]; this.trailAcc = 0;
@@ -251,8 +253,20 @@
         this.aLat = v * this.psiDot; // spin while driving curves the path as well
         // Incline: world slope (inclineX uphill towards +X = initial forward, inclineY uphill towards +Z = initial right),
         // projected onto this droid's pitch plane (forward) and roll plane (right) with its current heading.
-        { const bx = p.inclineX * D2R, by = p.inclineY * D2R, c = Math.cos(this.psi), sn = Math.sin(this.psi);
-          this.betaP = bx * c + by * sn; this.betaR = -bx * sn + by * c; }
+        { let tx = Math.tan(p.inclineX * D2R), tz = Math.tan(p.inclineY * D2R);
+          // obstacle course (course.js): local surface gradient at the contact point, on top of the global incline
+          if (this.terrain) { const g = this.terrain.gradientAt(this.wX, this.wZ + this.terrainOffsetZ); tx += g.gx; tz += g.gz; }
+          const bx = Math.atan(tx), by = Math.atan(tz), c = Math.cos(this.psi), sn = Math.sin(this.psi);
+          const nP = bx * c + by * sn, nR = -bx * sn + by * c;
+          // When the slope under the droid changes (ramp edge, seesaw, turning on a slope), keep the world attitude of
+          // pendulum, head and sphere continuous: the state is in slope coordinates, so shift it by the change. The
+          // rolling coordinate moves by R*d (the sphere tips about the contact point), so the encoder does not jump.
+          if (this.betaReady) {
+            const dP = nP - this.betaP, dR = nR - this.betaR, Rs = p.R;
+            if (dP !== 0) { this.pq[0] += Rs * dP; this.pq[1] -= dP; this.pq[2] += dP; }
+            if (dR !== 0) { this.rq[0] += Rs * dR; this.rq[1] -= dR; this.rq[2] += dR; }
+          }
+          this.betaP = nP; this.betaR = nR; this.betaReady = true; }
         this.rk4(this.pq, this.pqd, this.forcesPitch, h, this.betaP);
         this.rk4(this.rq, this.rqd, this.forcesRoll, h, this.betaR);
         this.computeShear();

@@ -36,6 +36,9 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:0 m
 .v3d canvas{display:block;width:100%;height:100%;border-radius:10px}
 .vlabel{position:absolute;left:12px;top:10px;font:600 13px "Barlow Semi Condensed",Barlow,system-ui,sans-serif;color:var(--mute);background:color-mix(in srgb,var(--panel) 80%,transparent);padding:2px 8px;border-radius:6px}
 .camb{position:absolute;left:10px;bottom:10px;min-height:36px;background:color-mix(in srgb,var(--panel) 85%,transparent)}
+.zoomb{position:absolute;right:10px;bottom:10px;display:flex;align-items:center;gap:8px;font:600 13px Barlow,system-ui,sans-serif;background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid var(--line);border-radius:8px;padding:4px 10px;z-index:2}
+.zoomb input{width:120px;accent-color:var(--or)}
+.zoomb b{font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
 .readout{position:absolute;right:10px;top:10px;display:grid;grid-template-columns:auto auto;gap:0 12px;font:500 13px Barlow,system-ui,sans-serif;background:color-mix(in srgb,var(--panel) 85%,transparent);padding:8px 12px;border-radius:8px;border:1px solid var(--line)}
 .readout b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .riss{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
@@ -98,7 +101,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
 <main>
   <div class="views">
     <div class="card v3d" id="v3d"><span class="vlabel">3D combined · BBDroids left lane, Cary right lane</span><span class="shearTag">Dome shear &gt; 70 %</span>
-      <div class="readout" id="readout"></div><button id="bCam" class="camb">Cameras: fixed</button></div>
+      <div class="readout" id="readout"></div><button id="bCam" class="camb">Cameras: fixed</button><label class="zoomb" title="Zoom (also mouse wheel / trackpad over the 3D views)">Zoom<input type="range" id="rZoom" min="0" max="1" step="0.005" aria-label="Zoom"><b id="zoomVal"></b></label></div>
     <div class="v3row">
       <div class="card v3d" id="v3dB"><span class="vlabel" style="color:var(--cB)">BBDroids, following</span><span class="shearTag">Dome shear &gt; 70 %</span></div>
       <div class="card v3d" id="v3dC"><span class="vlabel" style="color:var(--cC)">Cary V1, following</span><span class="shearTag">Dome shear &gt; 70 %</span></div>
@@ -131,6 +134,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       <div class="btns">
         <button id="bPause">Pause</button>
         <button id="bReset">Restart both</button>
+        <button id="bCourse">Load obstacle course</button>
         <select id="sSpeed" aria-label="Time scale"><option value="1">Real time</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option><option value="0.1">0.1×</option></select>
       </div>
       <div class="quick">
@@ -178,6 +182,9 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
 </main>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/*COURSEJS*/
+</script>
 <script>
 /*SIMJS*/
 </script>
@@ -263,6 +270,11 @@ const P_BB = [
   ['faAccelToDome','fa_accel_to_dome: head per commanded acceleration',0,40,0.5,'ctrl','°/(m/s²)'],
   ['domeAccelTau','dome_accel_tau: low-pass on head feedforward',0.05,2,0.05,'ctrl','s'],
   ['faDomeSPAccel','fa_dome_sp_accel: head per speed error (setpoint − measured), like D-O',-0.03,0.03,0.0005,'ctrl','°/(mm/s)'],
+  ['faStaticPitchToDome','Experiment: head follows slow IMU pitch (1 = upright on climbs; then fa_speed_sp_to_dome 0)',0,2,0.05,'ctrl','°/°'],
+  ['faStaticRollToDome','Experiment: head follows slow pendulum tilt on side slopes',0,2,0.05,'ctrl','°/°'],
+  ['balStaticPitch','Experiment: balance setpoint follows slow IMU pitch (no speed deduction on slopes)',0,1.5,0.05,'ctrl','°/°'],
+  ['domeStaticTau','Experiment: slow filter time constant',0.5,10,0.1,'ctrl','s'],
+  ['staticRollGate','Experiment: roll share only below this roll goal',0,10,0.5,'ctrl','°'],
   ['faDomeAnnealDelay','fa_dome_anneal_delay: hold head after release',0,3,0.05,'ctrl','s'],
   ['faDomeAnnealTime','fa_dome_anneal_time: return head to center',0.05,5,0.05,'ctrl','s'],
   ['driveDecelLimit','drive_decel_max: braking ramp (0 = same as drive_accel_max), not in firmware',0,5000,50,'ctrl','mm/s²'],
@@ -468,6 +480,14 @@ function togglePause() { paused = !paused; $('bPause').textContent = paused ? 'R
 $('bPause').onclick = togglePause;
 $('sSpeed').onchange = e => timeScale = +e.target.value;
 $('bCam').onclick = () => { camFollow = !camFollow; $('bCam').textContent = camFollow ? 'Cameras: behind' : 'Cameras: fixed'; };
+// Zoom: camera distance factor 0.5 ... 10 for all three views (log slider, mouse wheel over the 3D views), remembered per browser
+const ZMIN = 0.5, ZMAX = 10;
+let zoom = 1; try { zoom = Math.min(ZMAX, Math.max(ZMIN, +localStorage.getItem('bb8sim-zoom') || 1)); } catch (e) {}
+const setZoom = z => { zoom = Math.min(ZMAX, Math.max(ZMIN, z)); $('rZoom').value = Math.log(zoom / ZMIN) / Math.log(ZMAX / ZMIN); $('zoomVal').textContent = zoom.toFixed(1) + '×'; try { localStorage.setItem('bb8sim-zoom', String(zoom)); } catch (e) {} };
+$('rZoom').oninput = e => setZoom(ZMIN * Math.pow(ZMAX / ZMIN, +e.target.value));
+for (const id of ['v3d', 'v3dB', 'v3dC']) $(id).addEventListener('wheel', e => { e.preventDefault(); setZoom(zoom * Math.pow(1.0015, e.deltaY)); }, {passive: false});
+setZoom(zoom);
+
 
 // ------------------------------------------------------------ colours
 const probe = document.createElement('span'); probe.style.display = 'none'; document.body.appendChild(probe);
@@ -481,7 +501,7 @@ matchMedia('(prefers-color-scheme: dark)').addEventListener('change', readColors
 function makeView(id) {
   const host = $(id), renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
   renderer.setPixelRatio(Math.min(2, devicePixelRatio)); host.prepend(renderer.domElement);
-  const cam = new THREE.PerspectiveCamera(38, 1, 0.05, 200), v = {host, renderer, cam};
+  const cam = new THREE.PerspectiveCamera(38, 1, 0.05, 300), v = {host, renderer, cam};
   new ResizeObserver(() => { const w = host.clientWidth, h = host.clientHeight; renderer.setSize(w, h, false); cam.aspect = w / h; cam.updateProjectionMatrix(); }).observe(host);
   return v;
 }
@@ -493,8 +513,8 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(2, 4, 1
 const terrain = new THREE.Group(); scene.add(terrain);
 const setTerrainTilt = (ix, iy) => { terrain.rotation.set(-iy * Math.PI / 180, 0, ix * Math.PI / 180); terrain.updateMatrixWorld(true); };
 const toWorld = (x, y, z) => terrain.localToWorld(new THREE.Vector3(x, y, z));
-const grid = new THREE.GridHelper(80, 160, 0x8a939d, 0xb9c0c7); terrain.add(grid);
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshBasicMaterial({color: 0xdde1e5, transparent: true, opacity: 0.35}));
+const grid = new THREE.GridHelper(160, 320, 0x8a939d, 0xb9c0c7); terrain.add(grid);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.MeshBasicMaterial({color: 0xdde1e5, transparent: true, opacity: 0.35}));
 ground.rotation.x = -Math.PI / 2; ground.position.y = -0.001; terrain.add(ground);
 const LANE = 0.6; // lateral start offset of each droid
 function ballTexture(ring) {
@@ -537,11 +557,24 @@ function makeDroid(sim, ring, accent, label, lane) {
 }
 const dB = makeDroid(simB, '#e8742a', 0xe8742a, 'BBDroids', -LANE), dC = makeDroid(simC, '#2867c9', 0x2867c9, 'Cary V1', LANE);
 const up = new THREE.Vector3(0, 1, 0);
+// ---- Obstacle course (course.js): one row of slalom cones per lane, ramps and seesaw wide enough for both droids
+let course = null, courseView = null;
+function setCourse(on) {
+  if (courseView) { terrain.remove(courseView.group); courseView = null; }
+  course = on ? window.BB8COURSE.makeCourse({lanes: [dB.lane, dC.lane]}) : null;
+  for (const [sim, d] of [[simB, dB], [simC, dC]]) { sim.terrain = course; sim.terrainOffsetZ = d.lane; }
+  $('bReset').onclick();
+  if (course) { courseView = window.BB8COURSE.buildMeshes(THREE, course); terrain.add(courseView.group); }
+  $('bCourse').textContent = course ? 'Remove obstacle course' : 'Load obstacle course'; $('bCourse').classList.toggle('on', !!course);
+}
+$('bCourse').onclick = () => setCourse(!course);
+const heightAt = (x, z) => course ? course.heightAt(x, z) : 0;
 function updDroid(d) {
   const sim = d.sim, p = sim.p, R = p.R;
   const th = sim.pq[1], al = sim.pq[2], chi = sim.rq[1], ze = sim.rq[2], rho = sim.rq[0] / R;
   const X = sim.wX, Z = sim.wZ + d.lane, psi = sim.psi;
-  d.group.position.set(X, R, Z); d.group.rotation.set(0, -psi, 0); d.ball.position.set(X, R, Z);
+  const pose = window.BB8COURSE.droidPose(THREE, course, X, Z, R);   // standing on the surface (obstacle course)
+  d.group.position.copy(pose.center); d.group.quaternion.copy(pose.tilt).multiply(new THREE.Quaternion().setFromAxisAngle(up, -psi)); d.ball.position.copy(pose.center);
   const dx = X - d.lastX, dz = Z - d.lastZ; d.lastX = X; d.lastZ = Z;
   const dl = Math.hypot(dx, dz);
   if (dl > 1e-7 && dl < 1) d.quat.premultiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(dz / dl, 0, -dx / dl), dl / R));
@@ -555,10 +588,10 @@ function updDroid(d) {
   d.mast.quaternion.setFromUnitVectors(up, md); d.mast.scale.set(1, R * 0.95, 1); d.mast.position.copy(md).multiplyScalar(R * 0.475);
   const hd = new THREE.Vector3(Math.sin(al) * Math.cos(ze), Math.cos(al) * Math.cos(ze), Math.sin(ze)).normalize();
   d.dome.position.copy(hd).multiplyScalar(R - 0.004); d.dome.quaternion.setFromUnitVectors(up, hd); d.dome.visible = p.mh > 0.001;
-  d.label.position.set(X, 2 * R + 0.35, Z);
-  d.shadow.position.set(X, 0.002, Z);
+  d.label.position.set(X, pose.h + 2 * R + 0.35, Z);
+  d.shadow.position.set(X, pose.h + 0.004, Z); d.shadow.quaternion.copy(pose.tilt); d.shadow.rotateX(-Math.PI / 2);
   const tr = sim.trail, arr = d.trailGeo.attributes.position.array, n = Math.min(tr.length, 1200);
-  for (let i = 0; i < n; i++) { const q = tr[tr.length - n + i]; arr[3 * i] = q[0]; arr[3 * i + 1] = 0.004; arr[3 * i + 2] = q[1] + d.lane; }
+  for (let i = 0; i < n; i++) { const q = tr[tr.length - n + i]; arr[3 * i] = q[0]; arr[3 * i + 1] = heightAt(q[0], q[1] + d.lane) + 0.006; arr[3 * i + 2] = q[1] + d.lane; }
   arr[3 * (n - 1)] = X; arr[3 * (n - 1) + 2] = Z;
   d.trailGeo.setDrawRange(0, n); d.trailGeo.attributes.position.needsUpdate = true;
 }
@@ -567,9 +600,9 @@ function update3d() {
   updDroid(dB); updDroid(dC);
   const X = (simB.wX + simC.wX) / 2, Z = (simB.wZ - LANE + simC.wZ + LANE) / 2;
   const sep = Math.hypot(simB.wX - simC.wX, simB.wZ - LANE - simC.wZ - LANE);
-  const k = Math.max(1, sep / 1.6);
+  const k = Math.max(1, sep / 1.6) * zoom;
   const cam = vAll.cam;
-  const tgt = toWorld(X, 0.2, Z);   // midpoint in world coordinates (terrain may be tilted)
+  const tgt = toWorld(X, heightAt(X, Z) + 0.2, Z);   // midpoint in world coordinates (terrain may be tilted)
   if (camFollow) { const psi = (simB.psi + simC.psi) / 2, c = Math.cos(psi), s = Math.sin(psi), bx = -2.2 * k, bz = 0.6 * k; cam.position.set(tgt.x + bx * c - bz * s, tgt.y + 1.3 * k - 0.2, tgt.z + bx * s + bz * c); }
   else cam.position.set(tgt.x - 2.6 * k, tgt.y + 2.4 * k - 0.2, tgt.z + 2.0 * k);
   cam.lookAt(tgt);
@@ -582,9 +615,9 @@ function update3d() {
   // per-droid views: same camera offset as the single-droid pages, centred on that droid
   for (const [v, sim, d] of [[vB, simB, dB], [vC, simC, dC]]) {
     const x = sim.wX, z = sim.wZ + d.lane, R = sim.p.R;
-    const t2 = toWorld(x, R * 0.8, z);
-    if (camFollow) { const c = Math.cos(sim.psi), s = Math.sin(sim.psi), bx = -1.5, bz = 0.55; v.cam.position.set(t2.x + bx * c - bz * s, t2.y + 1.0 - R * 0.8, t2.z + bx * s + bz * c); }
-    else v.cam.position.set(t2.x - 2.0, t2.y + 2.0 - R * 0.8, t2.z + 1.6);
+    const t2 = toWorld(x, heightAt(x, z) + R * 0.8, z);
+    if (camFollow) { const c = Math.cos(sim.psi), s = Math.sin(sim.psi), bx = -1.5, bz = 0.55; v.cam.position.set(t2.x + (bx * c - bz * s) * zoom, t2.y + (1.0 - R * 0.8) * zoom, t2.z + (bx * s + bz * c) * zoom); }
+    else v.cam.position.set(t2.x - 2.0 * zoom, t2.y + (2.0 - R * 0.8) * zoom, t2.z + 1.6 * zoom);
     v.cam.lookAt(t2);
     grid.position.set(Math.round(x / 0.5) * 0.5, 0, Math.round(z / 0.5) * 0.5); ground.position.set(x, -0.001, z);
     v.renderer.render(scene, v.cam);
@@ -677,6 +710,7 @@ function drawPlot([id, , kB, kC, pos]) {
 
 // ------------------------------------------------------------ restart and main loop
 $('bReset').onclick = () => {
+  if (course) course.reset();
   simB.reset(); simC.reset(); Object.keys(stick).forEach(k => stick[k] = 0); LOG.length = 0;
   for (const d of [dB, dC]) { d.quat.identity(); d.lastX = 0; d.lastZ = d.lane; }
   syncQuick();
@@ -694,7 +728,11 @@ function loop(now) {
   simC.input.vel = stick.v; simC.input.roll = stick.r; simC.input.headP = stick.hp; simC.input.headR = stick.hr; simC.input.spin = spinBtn;
   if (!paused) {
     acc += dtReal * timeScale; const n = Math.floor(acc / 0.001);
-    if (n > 0) { simB.advance(n * 0.001); simC.advance(n * 0.001); acc -= n * 0.001; logSample(); }
+    if (n > 0) { simB.advance(n * 0.001); simC.advance(n * 0.001); acc -= n * 0.001; logSample();
+      if (course) {
+        course.update(n * 0.001, [[simB, dB], [simC, dC]].map(([s, d]) => ({x: s.wX, z: s.wZ + d.lane, m: s.p.ms + s.p.mp + s.p.mh})));
+        for (const [s, d] of [[simB, dB], [simC, dC]]) course.checkCones(s.wX, s.wZ + d.lane, s.p.R);
+      } }
   }
   for (const st of Object.values(padState)) {
     let x = stick[st.kx], y = stick[st.ky]; const mq = Math.max(Math.abs(x), Math.abs(y)), hq = Math.hypot(x, y); if (hq > 1e-9) { x *= mq / hq; y *= mq / hq; } st.knob.style.transform = `translate(${x * 118}%, ${-y * 118}%)`;
@@ -703,6 +741,7 @@ function loop(now) {
   const wB = simB.shearUse > SHEAR_WARN, wC = simC.shearUse > SHEAR_WARN;
   $('v3dB').classList.toggle('shear', wB); $('v3dC').classList.toggle('shear', wC); $('v3d').classList.toggle('shear', wB || wC);
   dB.domeMat.color.copy(wB ? RED : WHITE); dC.domeMat.color.copy(wC ? RED : WHITE);
+  if (courseView) courseView.update();
   update3d();
   drawRiss($('cSideB'), true, simB, 'BBDroids', C.cB); drawRiss($('cSideC'), true, simC, 'Cary V1', C.cC);
   drawRiss($('cFrontB'), false, simB, 'BBDroids', C.cB); drawRiss($('cFrontC'), false, simC, 'Cary V1', C.cC);
@@ -717,6 +756,7 @@ function loop(now) {
     ['Heading', hdg(simB), hdg(simC)],
     ['Curve radius', rad(simB), rad(simC)],
     ['Drive mode', modeName(simB), 'velocity (no position control)'],
+    ...(course ? [['Cones hit', `${course.cones.filter(c => c.hit && c.z === dB.lane).length} of 5`, `${course.cones.filter(c => c.hit && c.z === dC.lane).length} of 5`]] : []),
     ['Distance', `${simB.pq[0].toFixed(2)} m`, `${simC.pq[0].toFixed(2)} m`]];
   readout.innerHTML = rows.map((r, i) => i === 0 ? `<span></span><b class="hd">${r[1]}</b><b class="hd">${r[2]}</b>` : `<span>${r[0]}</span><b>${r[1]}</b><b>${r[2]}</b>`).join('') + `<span>Time</span><b>${simB.t.toFixed(1)} s</b><b></b>`;
   requestAnimationFrame(loop);

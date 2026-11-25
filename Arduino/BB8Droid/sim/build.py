@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Builds the simulation pages from their templates and the shared cores.
 
-  page.html         + sim.js           -> BB8-DriveSimulation[-online].html
-  compare-page.html + sim.js + cary.js -> BB8-DriveComparison[-online].html  (BBDroids vs Cary Christie V1)
+  page.html         + sim.js + course.js           -> BB8-DriveSimulation[-online].html
+  compare-page.html + sim.js + cary.js + course.js -> BB8-DriveComparison[-online].html  (BBDroids vs Cary Christie V1)
 
   python3 build.py            -> *-online.html (three.js from the CDN)
   python3 build.py --offline  -> three.js embedded; three.min.js r128 must be next to this script,
@@ -17,6 +17,7 @@ here = pathlib.Path(__file__).parent
 cores = {
     "/*SIMJS*/": (here / "sim.js").read_text(encoding="utf-8"),
     "/*CARYJS*/": (here / "cary.js").read_text(encoding="utf-8"),
+    "/*COURSEJS*/": (here / "course.js").read_text(encoding="utf-8"),
 }
 cdn = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>'
 offline = "--offline" in sys.argv
