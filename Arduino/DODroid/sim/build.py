@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Builds the D-O simulation page from its template and sources.
 
-  page.html + do-model.js + dosim.js -> DO-Drive-Simulation[-online].html
+  page.html + do-model.js + dosim.js + ../../BB8Droid/sim/course.js -> DO-Drive-Simulation[-online].html
 
   python3 build.py            -> DO-Drive-Simulation-online.html (three.js from the CDN)
   python3 build.py --offline  -> DO-Drive-Simulation.html (three.js embedded; three.min.js r128 must be next to
@@ -15,6 +15,8 @@ here = pathlib.Path(__file__).parent
 html = (here / "page.html").read_text(encoding="utf-8")
 html = html.replace("/*DOMODEL*/", (here / "do-model.js").read_text(encoding="utf-8"))
 html = html.replace("/*DOSIMJS*/", (here / "dosim.js").read_text(encoding="utf-8"))
+# obstacle course: shared with the BB-8 simulation (one source)
+html = html.replace("/*COURSEJS*/", (here / ".." / ".." / "BB8Droid" / "sim" / "course.js").read_text(encoding="utf-8"))
 cdn = '<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>'
 
 if "--offline" in sys.argv:

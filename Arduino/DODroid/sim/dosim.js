@@ -119,7 +119,9 @@
     }
 
     reset() {
-      this.t = 0; this.seq = 0;
+      this.t = 0; this.seq = 0; this.betaP = 0; this.betaReady = false;
+      if (this.terrain === undefined) this.terrain = null;            // obstacle course (BB8Droid/sim/course.js), set by the page
+      if (this.terrainOffsetZ === undefined) this.terrainOffsetZ = 0;
       this.q = [0, 0, 0]; this.qd = [0, 0, 0];        // x, th, phi
       this.psi = 0; this.psiDot = 0; this.wX = 0; this.wZ = 0; this.distL = 0; this.distR = 0; this.trail = [[0, 0]]; this.trailAcc = 0;
       this.input = { vel: 0, rot: 0, headP: 0, headH: 0, headR: 0, lean: 0, driveOn: true };
@@ -148,7 +150,8 @@
     }
 
     // derived
-    pitchDeg() { return -this.p.imuPitchSign * this.q[1] * R2D; }                     // IMU pitch: + = chassis top forward (nose down)
+    pitchDeg() { return -this.p.imuPitchSign * (this.q[1] + this.betaP) * R2D; }   // relative to true vertical (slopes)
+    neckAbsDeg() { return (this.q[2] - this.betaP) * R2D; }                         // neck, absolute (relative to true vertical)                     // IMU pitch: + = chassis top forward (nose down)
     neckRel() { return this.q[2] + this.q[1]; }                 // neck relative to chassis [rad], + = forward
     wheelRelL() { return (this.qd[0] + this.psiDot * this.p.b / 2) / this.p.r + this.qd[1]; } // wheel vs chassis [rad/s]
     wheelRelR() { return (this.qd[0] - this.psiDot * this.p.b / 2) / this.p.r + this.qd[1]; }
@@ -269,9 +272,12 @@
       const M00 = p.mw + Iw / (p.r * p.r) + p.mc + p.mHead, M01 = p.mc * p.lc * c1, M02 = Mn * c2;
       const M11 = p.Ic + p.mc * p.lc * p.lc, M22 = In;
       const Q0 = tau / p.r - p.cRoll * xd, Q1 = tau + tN, Q2 = tN;
-      const r0 = Q0 + p.mc * p.lc * s1 * thd * thd + Mn * s2 * phid * phid;
-      const r1 = Q1 - p.mc * G * p.lc * s1;
-      const r2 = Q2 + Mn * G * s2;
+      // Ground inclined by betaP along the heading (rising ahead). State in slope coordinates: th (chassis, hanging)
+      // and phi (neck, upright) from the slope normal; world angles th + beta and phi - beta. beta = 0: flat ground.
+      const b = this.betaP;
+      const r0 = Q0 + p.mc * p.lc * s1 * thd * thd + Mn * s2 * phid * phid - (p.mw + p.mc + p.mHead) * G * Math.sin(b);
+      const r1 = Q1 - p.mc * G * p.lc * Math.sin(th + b);
+      const r2 = Q2 + Mn * G * Math.sin(phi - b);
       const den = M00 - M01 * M01 / M11 - M02 * M02 / M22;
       const a0 = (r0 - M01 * r1 / M11 - M02 * r2 / M22) / den;
       const a1 = (r1 - M01 * a0) / M11, a2 = (r2 - M02 * a0) / M22;
@@ -286,6 +292,15 @@
       while (n-- > 0) {
         this.ctrlAcc += h;
         if (this.ctrlAcc >= ctrlDt - 1e-9) { this.ctrlAcc -= ctrlDt; this.controlTick(ctrlDt); if (this.seq % 2 === 1) this.logSample(); }
+        // Obstacle course: slope at the wheel contact along the heading. D-O has no roll plane in this model, so the
+        // sideways component of the slope is ignored. When the slope changes, shift the slope-frame state so chassis
+        // and neck keep their world attitude (the wheel tips about its contact point).
+        if (this.terrain) {
+          const g = this.terrain.gradientAt(this.wX, this.wZ + this.terrainOffsetZ);
+          const nb = Math.atan(g.gx) * Math.cos(this.psi) + Math.atan(g.gz) * Math.sin(this.psi);
+          if (this.betaReady) { const d = nb - this.betaP; if (d !== 0) { this.q[0] += this.p.r * d; this.q[1] -= d; this.q[2] += d; } }
+          this.betaP = nb; this.betaReady = true;
+        } else if (this.betaP !== 0) { const d = -this.betaP; this.q[0] += this.p.r * d; this.q[1] -= d; this.q[2] += d; this.betaP = 0; }
         const s = [...this.q, ...this.qd, this.psiDot];
         const add = (a, b, k) => a.map((v, i) => v + k * b[i]);
         const k1 = this.deriv(s), k2 = this.deriv(add(s, k1, h / 2)), k3 = this.deriv(add(s, k2, h / 2)), k4 = this.deriv(add(s, k3, h));
@@ -310,7 +325,7 @@
     logSample() {
       this.log.push({
         t: this.t, vSP: this.goalVel, vCmd: this.curVel, vGround: this.qd[0] * 1000, vEnc: (this.encL.filt + this.encR.filt) / 2,
-        pitch: this.pitchDeg(), neckRel: this.neckRel() * R2D, neckAbs: this.q[2] * R2D, pwmL: this.pwmL, pwmR: this.pwmR,
+        pitch: this.pitchDeg(), neckRel: this.neckRel() * R2D, neckAbs: this.neckAbsDeg(), pwmL: this.pwmL, pwmR: this.pwmR,
         rotSP: this.goalRot / (this.p.b * 500) * R2D, yawRate: this.psiDot * R2D, latA: this.lateralAccel(), latLim: this.lateralLimit(),
       });
       if (this.log.length > 1000) this.log.splice(0, this.log.length - 1000);

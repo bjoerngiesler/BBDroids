@@ -34,6 +34,9 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:0 m
 .readout b{font-weight:600;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .readout .warn{color:var(--red)}
 .camb{position:absolute;left:10px;bottom:10px;min-height:36px;background:color-mix(in srgb,var(--panel) 85%,transparent)}
+.zoomb{position:absolute;right:10px;bottom:10px;display:flex;align-items:center;gap:8px;font:600 13px Barlow,system-ui,sans-serif;background:color-mix(in srgb,var(--panel) 85%,transparent);border:1px solid var(--line);border-radius:8px;padding:4px 10px;z-index:2}
+.zoomb input{width:120px;accent-color:var(--ac,#2a7fd4)}
+.zoomb b{font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
 .riss{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
 .fig{position:relative;height:280px}.fig canvas{position:absolute;inset:0;width:100%;height:100%}
 .plots{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px}
@@ -76,7 +79,7 @@ summary{cursor:pointer;font:600 15px var(--fc);padding:4px 0;min-height:32px}
 <main>
   <div class="views">
     <div class="card v3d" id="v3d"><span class="vlabel">3D, oblique from above</span>
-      <div class="readout" id="readout"></div><button id="bCam" class="camb">Camera: fixed</button><button id="bModel" class="camb" style="left:150px">Model: your CAD</button></div>
+      <div class="readout" id="readout"></div><button id="bCam" class="camb">Camera: fixed</button><button id="bModel" class="camb" style="left:150px">Model: your CAD</button><label class="zoomb" title="Zoom (also mouse wheel / trackpad over the 3D view)">Zoom<input type="range" id="rZoom" min="0" max="1" step="0.005" aria-label="Zoom"><b id="zoomVal"></b></label></div>
     <div class="riss">
       <div class="card"><div class="fig"><canvas id="cSide"></canvas></div></div>
       <div class="card"><div class="fig"><canvas id="cFront"></canvas></div></div>
@@ -104,6 +107,7 @@ summary{cursor:pointer;font:600 15px var(--fc);padding:4px 0;min-height:32px}
         <button id="bDrive" class="on">Drive on</button>
         <button id="bPause">Pause</button>
         <button id="bReset">Restart</button>
+        <button id="bCourse">Load obstacle course</button>
         <select id="sMode" aria-label="Drive mode"><option value="vel">Drive mode: velocity</option><option value="pos">Drive mode: position</option><option value="autopos">Drive mode: auto position</option></select>
         <select id="sSpeed" aria-label="Time scale"><option value="1">Real time</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option><option value="0.1">0.1×</option></select>
       </div>
@@ -135,6 +139,9 @@ summary{cursor:pointer;font:600 15px var(--fc);padding:4px 0;min-height:32px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
 /*DOMODEL*/
+</script>
+<script>
+/*COURSEJS*/
 </script>
 <script>
 /*DOSIMJS*/
@@ -282,12 +289,30 @@ function updateKeys(dt) {
 let paused = false, timeScale = 1, camFollow = false;
 function togglePause() { paused = !paused; $('bPause').textContent = paused ? 'Resume' : 'Pause'; $('bPause').classList.toggle('on', paused); }
 $('bPause').onclick = togglePause;
-$('bReset').onclick = () => { sim.reset(); for (const k of Object.keys(stick)) stick[k] = 0; leanR.value = 0; leanN.value = '0.00'; quatL.identity(); quatR.identity(); };
+$('bReset').onclick = () => { if (course) course.reset(); sim.reset(); for (const k of Object.keys(stick)) stick[k] = 0; leanR.value = 0; leanN.value = '0.00'; quatL.identity(); quatR.identity(); };
 $('bDrive').onclick = () => { sim.input.driveOn = !sim.input.driveOn; $('bDrive').textContent = sim.input.driveOn ? 'Drive on' : 'Drive off'; $('bDrive').classList.toggle('on', sim.input.driveOn); };
 $('sMode').onchange = e => { sim.p.driveMode = e.target.value; save(); syncMode(); };
 syncMode();
 $('sSpeed').onchange = e => timeScale = +e.target.value;
 $('bCam').onclick = () => { camFollow = !camFollow; $('bCam').textContent = camFollow ? 'Camera: follows' : 'Camera: fixed'; };
+// Zoom: camera distance factor 0.5 ... 10 (log slider, mouse wheel over the 3D view), remembered per browser
+const ZMIN = 0.5, ZMAX = 10;
+let zoom = 1; try { zoom = Math.min(ZMAX, Math.max(ZMIN, +localStorage.getItem('dosim-zoom') || 1)); } catch (e) {}
+const setZoom = z => { zoom = Math.min(ZMAX, Math.max(ZMIN, z)); $('rZoom').value = Math.log(zoom / ZMIN) / Math.log(ZMAX / ZMIN); $('zoomVal').textContent = zoom.toFixed(1) + '×'; try { localStorage.setItem('dosim-zoom', String(zoom)); } catch (e) {} };
+$('rZoom').oninput = e => setZoom(ZMIN * Math.pow(ZMAX / ZMIN, +e.target.value));
+$('rZoom').closest('.v3d, .card').addEventListener('wheel', e => { e.preventDefault(); setZoom(zoom * Math.pow(1.0015, e.deltaY)); }, {passive: false});
+setZoom(zoom);
+// ---- Obstacle course (BB8Droid/sim/course.js): slalom, ramps 5 / 10 / 12.5 / 15 %, 10 % seesaw, straight ahead
+let course = null, courseView = null;
+function setCourse(on) {
+  if (courseView) { scene.remove(courseView.group); courseView = null; }
+  course = on ? window.BB8COURSE.makeCourse({lanes: [0]}) : null;
+  sim.terrain = course; $('bReset').onclick();
+  if (course) { courseView = window.BB8COURSE.buildMeshes(THREE, course); scene.add(courseView.group); if (!camFollow) $('bCam').click(); }
+  $('bCourse').textContent = course ? 'Remove obstacle course' : 'Load obstacle course'; $('bCourse').classList.toggle('on', !!course);
+}
+$('bCourse').onclick = () => setCourse(!course);
+const heightAt = (x, z) => course ? course.heightAt(x, z) : 0;
 
 // ------------------------------------------------------------ colours
 const probe = document.createElement('span'); probe.style.display = 'none'; document.body.appendChild(probe);
@@ -303,11 +328,11 @@ const isDark = () => document.documentElement.dataset.theme === 'dark' || (docum
 const host = $('v3d');
 const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
 renderer.setPixelRatio(Math.min(2, devicePixelRatio)); host.prepend(renderer.domElement);
-const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(38, 1, 0.02, 60);
+const scene = new THREE.Scene(), cam = new THREE.PerspectiveCamera(38, 1, 0.02, 300);
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.85));
 const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(2, 4, 1.5); scene.add(sun);
-const grid = new THREE.GridHelper(30, 120, 0x8a939d, 0xb9c0c7); scene.add(grid);
-const ground = new THREE.Mesh(new THREE.PlaneGeometry(30, 30), new THREE.MeshBasicMaterial({color: 0xdde1e5, transparent: true, opacity: 0.35}));
+const grid = new THREE.GridHelper(160, 160, 0x8a939d, 0xb9c0c7); scene.add(grid);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(160, 160), new THREE.MeshBasicMaterial({color: 0xdde1e5, transparent: true, opacity: 0.35}));
 ground.rotation.x = -Math.PI / 2; ground.position.y = -0.001; scene.add(ground);
 const TRAIL_N = 1200, trailGeo = new THREE.BufferGeometry(); trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(TRAIL_N * 3), 3));
 const trail = new THREE.Line(trailGeo, new THREE.LineBasicMaterial({color: 0x2a7fd4})); trail.frustumCulled = false; scene.add(trail);
@@ -388,7 +413,9 @@ if (!cad.head) $('bModel').style.display = 'none';
 applyModelChoice();
 function update3d() {
   const p = sim.p, R = p.r, X = sim.wX, Z = sim.wZ, psi = sim.psi, th = sim.q[1], phi = sim.q[2];
-  droid.position.set(X, R, Z); droid.rotation.set(0, -psi, 0);
+  // standing on the surface (obstacle course: height and tilt at the wheel contact)
+  const pose = window.BB8COURSE.droidPose(THREE, course, X, Z, R);
+  droid.position.copy(pose.center); droid.quaternion.copy(pose.tilt).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -psi));
   const halfW = 0.045;
   for (const [hold, w, z, q, d, last] of [[wheelLHold, wheelL, -p.b / 2, quatL, sim.distL, 'L'], [wheelRHold, wheelR, p.b / 2, quatR, sim.distR, 'R']]) {
     hold.position.set(0, 0, z); w.rotation.set(Math.PI / 2, 0, 0); w.scale.set(R, halfW, R);
@@ -411,14 +438,15 @@ function update3d() {
   wheelCadL.rotation.set(0, 0, -sim.distL / R); wheelCadR.rotation.set(0, 0, -sim.distR / R);
   tyres[0].position.set(0, 0, -0.05); tyres[1].position.set(0, 0, 0.05);
   for (const t of tyres) { t.rotation.set(Math.PI / 2, 0, 0); t.scale.set(R, 0.034, R); }
-  shadow.position.set(X, 0.002, Z); shadow.scale.set(0.3, 0.2, 1); shadow.rotation.z = -psi;
-  grid.position.set(Math.round(X / 0.25) * 0.25, 0, Math.round(Z / 0.25) * 0.25); ground.position.set(X, -0.001, Z);
+  shadow.position.set(X, pose.h + 0.003, Z); shadow.scale.set(0.3, 0.2, 1); shadow.quaternion.copy(pose.tilt); shadow.rotateX(-Math.PI / 2); shadow.rotateZ(-psi);
+  grid.position.set(Math.round(X), 0, Math.round(Z)); ground.position.set(X, -0.001, Z);
   const tr = sim.trail, arr = trailGeo.attributes.position.array, n = Math.min(tr.length, TRAIL_N);
-  for (let i = 0; i < n; i++) { const q = tr[tr.length - n + i]; arr[3 * i] = q[0]; arr[3 * i + 1] = 0.003; arr[3 * i + 2] = q[1]; }
+  for (let i = 0; i < n; i++) { const q = tr[tr.length - n + i]; arr[3 * i] = q[0]; arr[3 * i + 1] = heightAt(q[0], q[1]) + 0.005; arr[3 * i + 2] = q[1]; }
   arr[3 * (n - 1)] = X; arr[3 * (n - 1) + 2] = Z; trailGeo.setDrawRange(0, n); trailGeo.attributes.position.needsUpdate = true;
-  if (camFollow) { const c = Math.cos(psi), s = Math.sin(psi); cam.position.set(X - 0.9 * c - 0.35 * s, 0.6, Z - 0.9 * s + 0.35 * c); }
-  else cam.position.set(X - 0.8, 0.7, Z + 0.68);
-  cam.lookAt(X, 0.2, Z);
+  const hy = pose.h;   // camera follows the surface height (obstacle course); zoom scales the distance
+  if (camFollow) { const c = Math.cos(psi), s = Math.sin(psi); cam.position.set(X + (-0.9 * c - 0.35 * s) * zoom, hy + 0.2 + 0.4 * zoom, Z + (-0.9 * s + 0.35 * c) * zoom); }
+  else cam.position.set(X - 0.8 * zoom, hy + 0.2 + 0.5 * zoom, Z + 0.68 * zoom);
+  cam.lookAt(X, hy + 0.2, Z);
   ground.material.color.set(isDark() ? 0x2a3038 : 0xdde1e5);
   renderer.render(scene, cam);
 }
@@ -439,6 +467,7 @@ function drawSide() {
   const x = sim.q[0], th = sim.q[1], phi = sim.q[2];
   g.font = FONT_T; g.fillStyle = C.mute; g.textBaseline = 'top'; g.textAlign = 'left';
   g.fillText('Side elevation (from the right, forward →)', 10, 8);
+  g.save(); g.translate(cx, gy); g.rotate(-sim.betaP); g.translate(-cx, -gy);   // slope along the heading (obstacle course)
   g.strokeStyle = C.steel; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, gy); g.lineTo(W, gy); g.stroke();
   g.lineWidth = 1; g.strokeStyle = C.line; g.fillStyle = C.mute; g.font = FONT; g.textAlign = 'center';
   const span = W / s / 2 + 0.2;
@@ -472,8 +501,9 @@ function drawSide() {
   const [sx, sy] = P2(cu, cz);
   g.strokeStyle = C.blue; g.lineWidth = 1.5; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx, gy); g.stroke(); g.setLineDash([]);
   g.fillStyle = C.blue; g.beginPath(); g.arc(sx, sy, 5, 0, 7); g.fill(); g.fillStyle = C.panel; g.beginPath(); g.arc(sx, sy, 2, 0, 7); g.fill();
+  g.restore();
   g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.font = '500 13px Barlow,system-ui,sans-serif'; g.fillStyle = C.ink;
-  [`Chassis pitch ${sim.pitchDeg().toFixed(1)}°`, `Neck ${(phi * R2D).toFixed(1)}° abs.`, `v ${(sim.qd[0] * 1000).toFixed(0)} mm/s`].forEach((t, i) => g.fillText(t, 10, 42 + i * 17));
+  [`Chassis pitch ${sim.pitchDeg().toFixed(1)}°`, `Neck ${sim.neckAbsDeg().toFixed(1)}° abs.`, `v ${(sim.qd[0] * 1000).toFixed(0)} mm/s`].forEach((t, i) => g.fillText(t, 10, 42 + i * 17));
   g.font = FONT; g.fillStyle = C.blue; g.textAlign = 'right'; g.fillText('● centre of gravity', W - 10, gy - 8);
 }
 function drawFront() {
@@ -550,17 +580,19 @@ function loop(now) {
   updateKeys(dtReal);
   sim.input.vel = stick.v; sim.input.rot = stick.r; sim.input.lean = stick.lean;
   sim.input.headP = stick.hp * 45; sim.input.headH = stick.hh * 90;
-  if (!paused) { acc += dtReal * timeScale; const n = Math.floor(acc / 0.001); if (n > 0) { sim.advance(n * 0.001); acc -= n * 0.001; } }
+  if (!paused) { acc += dtReal * timeScale; const n = Math.floor(acc / 0.001); if (n > 0) { sim.advance(n * 0.001); acc -= n * 0.001;
+    if (course) { course.update(n * 0.001, [{x: sim.wX, z: sim.wZ, m: sim.p.mw + sim.p.mc + sim.p.mHead}]); course.checkCones(sim.wX, sim.wZ, 0.16); } } }
   for (const st of Object.values(padState)) {
     let x = stick[st.kx], y = stick[st.ky]; const mq = Math.max(Math.abs(x), Math.abs(y)), hq = Math.hypot(x, y);
     if (hq > 1e-9) { x *= mq / hq; y *= mq / hq; } st.knob.style.transform = `translate(${x * 118}%, ${-y * 118}%)`;
   }
   $('capV').textContent = stick.v.toFixed(2); $('capR').textContent = stick.r.toFixed(2);
   $('capHP').textContent = `${(stick.hp * 45).toFixed(0)}°`; $('capHH').textContent = `${(stick.hh * 90).toFixed(0)}°`;
+  if (courseView) courseView.update();
   update3d(); drawSide(); drawFront();
   if (frame++ % 2 === 0) PLOTS.forEach(drawPlot);
   const aL = sim.lateralAccel(), lim = sim.lateralLimit();
-  const rows = [['Mode', MODE_NAMES[sim.mode]], ['v over ground', `${(sim.qd[0] * 1000).toFixed(0)} mm/s`], ['v encoders', `${((sim.encL.filt + sim.encR.filt) / 2).toFixed(0)} mm/s`],
+  const rows = [...(course ? [['Cones hit', `${course.conesHit()} of ${course.cones.length}`]] : []), ['Mode', MODE_NAMES[sim.mode]], ['v over ground', `${(sim.qd[0] * 1000).toFixed(0)} mm/s`], ['v encoders', `${((sim.encL.filt + sim.encR.filt) / 2).toFixed(0)} mm/s`],
     ['Pitch (IMU)', `${sim.pitchDeg().toFixed(1)}°`], ['PWM L / R', `${sim.pwmL.toFixed(0)} / ${sim.pwmR.toFixed(0)}`], ['Yaw rate', `${(sim.psiDot * R2D).toFixed(0)}°/s`],
     ['Lateral accel.', `${aL.toFixed(2)} of ${lim.toFixed(1)} m/s²`], ['CoG vs axle', `${(sim.cogAboveAxle() * 1000).toFixed(0)} mm`], ['Time', `${sim.t.toFixed(1)} s`]];
   readout.innerHTML = rows.map(([a, b]) => `<span>${a}</span><b${a === 'Lateral accel.' && Math.abs(aL) > lim ? ' class="warn"' : ''}>${b}</b>`).join('');

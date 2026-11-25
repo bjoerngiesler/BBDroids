@@ -20,6 +20,13 @@ Selector in the remote panel, as in the firmware (`DODroid::switchDrive()`):
 
 Both position controllers use the average encoder position in mm (`DOPosControlInput`) and set the goal velocity (`DOPosControlOutput`).
 
+## Obstacle course and zoom
+
+- **Obstacle course** (button "Load obstacle course"): the same course as in the BB-8 simulations, from `../../BB8Droid/sim/course.js` (one source, inserted by `build.py`): 5-cone slalom, ramps at 5 / 10 / 12.5 / 15 %, 10 % seesaw that tips under the droid's weight, straight ahead from the start. Cone hits are counted.
+- The physics uses the slope at the wheel contact along the heading. When it changes (ramp edges, seesaw, turning on a slope), chassis and neck keep their world attitude (the slope-frame state is shifted). D-O has no roll plane in this model, so the sideways component of a slope is ignored.
+- In velocity mode D-O stalls on the steeper ramps at low speed (stick 0.3: start of the 10 % ramp; stick 0.6: rising half of the seesaw): the balance controller subtracts the chassis angle needed on the slope from the wheel speed setpoint, as on the BB-8.
+- **Zoom** slider (and mouse wheel) for the 3D view, 0.5 ... 10x.
+
 ## Changes against the first version (2026-11-25)
 
 - **Wheel speed controller gain:** LibBB multiplies the PID control term by the input's `controlGain()`. The wheel speed controllers take the encoders in mm, so that is 1/mmPerTick = `WHEEL_TICKS_PER_TURN` / `WHEEL_CIRCUMFERENCE` ≈ 7.3. The first version left it out, so its wheel loops were 7.3× softer than on the droid (same issue as found in the BB-8 simulation).
