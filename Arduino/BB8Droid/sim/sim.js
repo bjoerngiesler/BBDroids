@@ -107,7 +107,7 @@
       // Firmware parameters (BB8Params)
       driveSpeedKp: 0.05, driveSpeedKi: 0.2, driveSpeedKd: 0.0, driveIBound: 255,
       balKp: 25, balKi: 0, balKd: 0.2,
-      rollKp: 0.5, rollKi: 0.4, rollKd: 0.4, rollKff: 0.5, rollIMax: 50, // rollKff 0.5: dynamics proposal (README 6.6), firmware still 0
+      rollKp: 0.5, rollKi: 0.4, rollKd: 0.4, rollKff: 0.5, rollIMax: 50, // rollKff 0.5: README 6.6, firmware roll_kff
       rollDirect: false,
       driveSpeedMax: 2000, driveSpeedDeadband: 0.01, rollAngleMax: 20,
       bodyRollRange: 25, bodyRollVel: 500, bodyRollAccel: 60,
@@ -125,7 +125,7 @@
       domeHoldG: 1.2,      // magnet shear capacity in units of the shell's weight: 1.0 = holds exactly when the dome is at 90 deg.
                            // Björn's estimate: holds at 90 deg with a little to spare (a light push pops it off) -> 1.2 (ASSUMPTION, measure!)
       domePitchAccel: 0, domeRollAccel: 0, // DXL profile acceleration for the dome servos (0 = not set in firmware; sim uses 3000 °/s² as before)
-      domeRemoteRate: 60, // deg/s at the dome: slew limit on the remote head command (0 = off). Dynamics proposal, not in firmware yet
+      domeRemoteRate: 60, // deg/s at the dome: slew limit on the remote head command (0 = off), firmware dome_remote_rate
       domeWorldMax: 0,     // deg: limit on the dome's apparent tilt (0 = off)
       domeLeanCenter: true, // centre the limit window on the shear-free attitude atan(a/g) instead of vertical
       driveDecelLimit: 4500, // mm/s^2 separate ramp while braking (0 = same as driveAccelLimit), firmware drive_decel_max (firmware still 3000)

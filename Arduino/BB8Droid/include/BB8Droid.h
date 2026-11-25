@@ -128,6 +128,7 @@ protected:
   float posControllerZero_;
 
   float remoteP_, remoteH_, remoteR_;
+  float remotePSlewed_, remoteRSlewed_; // remote dome pitch/roll after the dome_remote_rate slew limit (servo degrees)
   float velGoal_, velRamped_, accelCmdFilt_; // speed setpoint from remote, ramped setpoint, low-passed commanded acceleration (m/s^2)
   float speedErr_;                           // ramped speed setpoint minus measured speed (mm/s), 0 with the drive off
   float annealP_, annealH_, annealR_, annealTime_;

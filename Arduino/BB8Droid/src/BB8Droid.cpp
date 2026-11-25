@@ -141,6 +141,7 @@ Result BB8::initialize() {
   addParameter("fa_dome_roll_to_weight", "Counterweight tilt per degree of measured dome roll, both around sphere center (0 = off)", params_.faDomeRollToWeight);
   addParameter("fa_accel_to_dome", "Dome pitch (deg around sphere center) per m/s^2 commanded acceleration (0 = off)", params_.faAccelToDome);
   addParameter("dome_accel_tau", "Low-pass time constant (s) on commanded acceleration for fa_accel_to_dome", params_.domeAccelTau);
+  addParameter("dome_remote_rate", "Slew limit on the remote dome pitch/roll command in deg/s around the sphere center (0 = off)", params_.domeRemoteRate);
   addParameter("fa_dome_sp_accel", "Dome pitch (servo deg) per mm/s of speed error, setpoint minus measured (0 = off)", params_.faDomeSPAccel);
   addParameter("dome_comp_remote_only", "fa_dome_pitch_to_weight acts only on the remote share of dome pitch", params_.domeCompRemoteOnly);
 
@@ -199,6 +200,7 @@ Result BB8::start(ConsoleStream *stream) {
 
   setControlParameters();
   annealH_ = annealP_ = annealR_ = 0;
+  remotePSlewed_ = remoteRSlewed_ = 0;
 
   bb::Servos::servos.setControlMode(BODY_ROLL_SERVO, bb::Servos::CONTROL_POSITION);
   bb::Servos::servos.switchTorque(bb::Servos::ID_ALL, true);
@@ -399,9 +401,21 @@ Result BB8::stepDome() {
 
   // Dome pitch feedforward from the (ramped) speed setpoint and the commanded acceleration only -
   // deliberately not from the IMU, which would close a loop via head reaction and pitch.
-  float domePitch = 180 + remoteP_ + params_.faSpeedSPToDome*balanceController_.controlOffset()
+  // Slew limit on the remote share of dome pitch and roll (pure feedforward on the stick signal, no IMU):
+  // a sharp head stick move otherwise shears the dome off its magnets (sim/README.md, 6.6).
+  if(params_.domeRemoteRate > 0) {
+    float dt = Runloop::runloop.cycleTimeSeconds();
+    float mP = params_.domeRemoteRate * DOME_PITCH_REDUCTION * dt, mR = params_.domeRemoteRate * DOME_ROLL_REDUCTION * dt;
+    remotePSlewed_ += constrain(remoteP_ - remotePSlewed_, -mP, mP);
+    remoteRSlewed_ += constrain(remoteR_ - remoteRSlewed_, -mR, mR);
+  } else {
+    remotePSlewed_ = remoteP_;
+    remoteRSlewed_ = remoteR_;
+  }
+
+  float domePitch = 180 + remotePSlewed_ + params_.faSpeedSPToDome*balanceController_.controlOffset()
                         + params_.faAccelToDome*DOME_PITCH_REDUCTION*accelCmdFilt_ + params_.faDomeSPAccel*speedErr_;
-  float domeRoll = 180 + remoteR_ + params_.faRollSPToDome*rollController_.rawGoal();
+  float domeRoll = 180 + remoteRSlewed_ + params_.faRollSPToDome*rollController_.rawGoal();
   float domeHeading = 180 + remoteH_;
 
   if(servosOK_) {

@@ -51,8 +51,8 @@ struct BB8Params {
   float rollKi             = 0.4;
   float rollKd             = 0.4;  // deg tilt per deg/s of measured roll rate
   float rollKdSpeed        = 1000; // mm/s, above this measured speed rollKd is scaled by rollKdSpeed/|speed| (0 = off)
-  float rollKff            = 0.0;  // 1.0 = same open-loop lean as roll_direct. Off by default because
-                                   // the right value depends on mass distribution - tune on hardware.
+  float rollKff            = 0.5;  // feedforward from the roll goal (1.0 = same open-loop lean as roll_direct). 0.5 turns in
+                                   // about 5x faster (sim/README.md, section 6.6); was 0. Tune on hardware.
 
   // Auto position control (DRIVE_AUTO_POS), (mm/s speed setpoint) per mm of encoder position. Tuned in the simulation
   // (sim/README.md, section 6.7): stops within ~12 mm after releasing the stick, holds on slopes. Was 0 (no hold).
@@ -99,6 +99,8 @@ struct BB8Params {
 
   float faDomeAnnealTime     = .5;     // Time it takes for all head axes ot return to 0 after control has been relinquished.
   float faDomeAnnealDelay    = .3;     // Delay before we anneal the head position if button is released
+  float domeRemoteRate       = 60;     // deg/s around the sphere center: slew limit on the remote dome pitch/roll command (0 = off).
+                                       // Limits dome shear from fast head stick moves, e.g. a full swing at speed (sim/README.md, 6.6).
   // Head compensation and feedforward: the "ideal" set from the simulation (sim/README.md, section 5/6), for
   // pendulum 4.5 kg @ 155 mm and the MEASURED head of 0.75 kg @ 295 mm. Signs are in the simulation's convention
   // and NOT verified on hardware - check them first (sim/README.md, section 8) and recompute if the head changes.

@@ -113,7 +113,7 @@ for (const [n, o] of [['current settings', MEAS], ['shear limiter proposal (+-70
 console.log('\n=== Acceleration and braking from about 2.1 m/s, measured head ===');
 for (const [n, mk] of [['Cary V1, speed level 3', () => new CarySim({speedLevel: 3})],
                        ['BBDroids 2450, ramps 1200 both ways (before)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450, driveAccelLimit: 1200, driveDecelLimit: 0, rollKff: 0, domeRemoteRate: 0})],
-                       ['BBDroids 2450, accel 1200 / decel 3000 (firmware)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450, driveAccelLimit: 1200, driveDecelLimit: 3000, rollKff: 0, domeRemoteRate: 0})],
+                       ['BBDroids 2450, accel 1200 / decel 3000 (firmware)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450, driveAccelLimit: 1200, driveDecelLimit: 3000})],
                        ['BBDroids 2450, proposal 1800 / 4500 (sim defaults)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450})]]) {
   const r = accelBrake(mk());
   console.log(`${n.padEnd(46)} top ${f(r.vMax * 1000, 0)} mm/s, 0->90% ${f(r.t90)} s | stop ${f(r.stopT)} s, ${f(r.dist, 2)} m | dome shear ${f(r.sA, 0)}% accel / ${f(r.sB, 0)}% brake | head max ${f(r.hd, 0)} deg`);

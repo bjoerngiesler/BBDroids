@@ -405,16 +405,16 @@ The default is now 1200: it removes most of the head drop for about 0.5 s more s
 With a separate braking ramp `drive_decel_max` of 3000 mm/s² (now the firmware default), the BB-8 stops in less distance than the Cary drive, at about the same dome shear as Cary, and the roll stability sweep still passes (0/594, measured head and 1 kg head). Exploratory runs from 1.7 m/s: decel 2000 → 1.74 m, 3000 → 1.49 m, 5000 → 1.31 m but 77% shear; no ramp at all → 1.04 m and 331% shear, so the dome would come off. Acceleration stays slower than Cary's, but the head stays much calmer (9–11° against 33°).
 
 
-### 6.6 Driving dynamics proposal (simulation defaults, not yet in the firmware)
+### 6.6 Driving dynamics proposal
 
-Goal: faster lean, stronger acceleration and braking, tighter turns, while the dome never pops off and the head stays calmer than on the Cary drive. The simulation defaults currently use this set; the firmware still has the previous values.
+Goal: faster lean, stronger acceleration and braking, tighter turns, while the dome never pops off and the head stays calmer than on the Cary drive. The simulation defaults use the whole set; the firmware has `roll_kff` and the head slew limit (`dome_remote_rate`), the stronger ramps are still simulation only.
 
 | Parameter | firmware | simulation default |
 |---|---|---|
-| `roll_kff` | 0 | **0.5** |
+| `roll_kff` | **0.5** (was 0) | **0.5** |
 | `drive_accel_max` | 1200 mm/s² | **1800** |
 | `drive_decel_max` | 3000 mm/s² | **4500** |
-| slew limit on the remote head command (`domeRemoteRate`) | – (not in firmware) | **60°/s** |
+| slew limit on the remote head command (`dome_remote_rate`) | **60°/s** (new) | **60°/s** |
 
 | | before | proposal | Cary V1 |
 |---|---|---|---|
@@ -488,6 +488,7 @@ Turn-in gets slower on carpet: leaning means the sphere rolls sideways, which ca
 | `BB8Droid.cpp` | setpoint ramp and commanded acceleration in `stepDriveMotor()`; balance setpoint = `fa_dome_pitch_to_weight` × `domePitchAngle()`; head feedforward in `stepDome()`; balance ramp 0; I bound of the speed controller on the I share in PWM, including `controlGain()` (`drive_speed_imax`); roll setpoint via `setRollGoal()`; measured encoder speed passed to the roll controller every cycle; `roll_direct` and `fa_roll_sp_to_dome` use the unshaped setpoint |
 | `BB8Droid.cpp` (section 6.4) | `domePitchAngle()` clamps the automatic head share to ±`dome_pitch_range` before subtracting it; speed error (ramped setpoint − measured speed) in `stepDriveMotor()` for `fa_dome_sp_accel`, added to the head command in `stepDome()` and to the automatic share; separate braking ramp `drive_decel_max` (section 6.5) |
 | `BB8Controllers.h`, `BB8Droid.cpp` (section 6.7) | `BB8PosCtrlInput` (encoder position in mm) for both position controllers; position controller before the balance controller; output and I bounded to `drive_speed_max`; auto position switch on `drive_speed_deadband`, `auto_pos_max_speed` and `auto_pos_max_wait`; `msSinceDriveInput_` as `unsigned long` |
+| `BB8Droid.cpp` (section 6.6) | slew limit `dome_remote_rate` on the remote share of dome pitch and roll in `stepDome()` |
 | `BB8Droid.cpp` (other fixes) | remote loss (> 500 ms) also returns the roll setpoint to 0 and releases the dome; `stop()` switches the drive and servo torque off; console `mode` goes through `setMode()` (`off` switches the drive and torque off, leaving `off` switches torque back on, no drive toggle in `MODE_OFF`); running status shows the last primary packet |
 
 ### 7.2 New and changed parameters
@@ -497,6 +498,7 @@ The head parameters are the simulation values for the default masses. Their **si
 | Parameter | Default | Previously | Sign depends on hardware |
 |---|---|---|---|
 | `roll_kp` / `roll_ki` / `roll_kd` | 0.5 / 0.4 / 0.4 | 0.3 / 0 / 0.1 | no |
+| `roll_kff` | 0.5 | 0 | no |
 | `roll_kd_speed` | 1000 mm/s | – | no |
 | `body_roll_accel` | 60 | 30 | no |
 | `roll_ibleed_tau` | 0.4 s | – | no |
@@ -512,6 +514,7 @@ The head parameters are the simulation values for the default masses. Their **si
 | `fa_dome_sp_accel` | 0 (off) | – | **yes** |
 | `fa_speed_sp_to_dome` | **+0.01** | −0.01 | **yes** |
 | `dome_comp_remote_only` | true | – | no |
+| `dome_remote_rate` | 60°/s (around the sphere center, pitch and roll) | – | no |
 | `auto_pos_kp` / `auto_pos_ki` | 3 / 0.5 | 0 / 0 | no |
 | `auto_pos_max_speed` / `auto_pos_max_wait` | 50 mm/s / 1 s | – | no |
 | `ROLL_REDUCTION` (constant) | 1.0 (or 100/70 with changed lever arms) | 80/22 | no |
