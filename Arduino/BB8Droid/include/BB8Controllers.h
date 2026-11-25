@@ -3,6 +3,19 @@
 
 #include <LibBB.h>
 
+// Position input for the position controllers: drive encoder position in mm, independent of the encoder's
+// input mode (the speed controller needs it in INPUT_SPEED). controlGain() stays 1, so the position gains are
+// in (mm/s speed setpoint) per mm, as on D-O (DOPosControlInput). Feeding the encoder itself in, as before,
+// made the position controllers control speed, scaled by the encoder's controlGain of 1/mmPerTick (~3).
+class BB8PosCtrlInput: public bb::ControlInput {
+public:
+  BB8PosCtrlInput(bb::Encoder& enc): enc_(enc) {}
+  virtual float present() { return enc_.presentPosition(); }
+  virtual bb::Result update() { return bb::RES_OK; } // the encoder is updated once per cycle in BB8::step()
+protected:
+  bb::Encoder& enc_;
+};
+
 class BB8PosCtrlOutput: public bb::ControlOutput {
 public:
   BB8PosCtrlOutput(bb::PIDController& balanceController): balanceController_(balanceController) {}

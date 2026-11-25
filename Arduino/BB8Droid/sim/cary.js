@@ -45,7 +45,7 @@
       // Masses (Björn: head ~0.9 kg, counterweight incl. batteries 5.6 kg at 200 mm)
       mp: 5.6, l: 0.20, mh: 0.9,
       // Further mechanics — kept identical to the BBDroids BB-8 sim so only the control differs
-      R: 0.254, ms: 3.0, L: 0.32, cRoll: 3.0, bBear: 0.05,
+      R: 0.254, ms: 3.0, L: 0.32, cRoll: 3.0, crr: 0, bBear: 0.05, inclineX: 0, inclineY: 0,   // crr/cRoll: ground, same model and presets as sim.js
       tauStall: 30, vNoLoad: 2600,     // drive motor at the shell, at full Sabertooth command
       // Hobby servos (assumptions): servo travel over 1000–2000 µs, gearing servo:joint
       tiltServoTravel: 90, tiltGear: 3, tiltServoStall: 3.4, tiltServoNoLoad: 67,
@@ -73,16 +73,23 @@
     };
   }
 
+  // Ground rolling resistance, identical to sim.js (presets there in GROUNDS)
+  function rollingResistance(p, v) { return p.crr * (p.ms + p.mp + p.mh) * G * Math.tanh(v / 0.02) + p.cRoll * v; }
+
   // ---- Planar dynamics (identical to BB-8 sim): q=[s,a1,a2]
-  function planarAcc(p, q, qd, Q) {
+  function planarAcc(p, q, qd, Q, beta) {
     const { mp, l, mh, L, ms, R } = p;
     const Is = 2 / 3 * ms * R * R, eps = 1e-4;
     const c1 = Math.cos(q[1]), s1 = Math.sin(q[1]), c2 = Math.cos(q[2]), s2 = Math.sin(q[2]);
     const M00 = ms + Is / (R * R) + mp + mh, M01 = mp * l * c1, M02 = mh * L * c2;
     const M11 = mp * l * l + eps, M22 = mh * L * L + eps;
-    const r0 = Q[0] + mp * l * s1 * qd[1] * qd[1] + mh * L * s2 * qd[2] * qd[2];
-    const r1 = Q[1] - mp * G * l * s1;
-    const r2 = Q[2] + mh * G * L * s2;
+    // Ground inclined by beta in this plane (rising towards +s). State is in the slope frame: s along the slope,
+    // a1 (pendulum, hanging convention) and a2 (head, upright convention) measured from the slope normal.
+    // World angle from vertical: pendulum a1 + beta, head a2 - beta. beta = 0 gives the flat-ground equations.
+    const b = beta || 0;
+    const r0 = Q[0] + mp * l * s1 * qd[1] * qd[1] + mh * L * s2 * qd[2] * qd[2] - (ms + mp + mh) * G * Math.sin(b);
+    const r1 = Q[1] - mp * G * l * Math.sin(q[1] + b);
+    const r2 = Q[2] + mh * G * L * Math.sin(q[2] - b);
     const den = M00 - M01 * M01 / M11 - M02 * M02 / M22;
     const a0 = (r0 - M01 * r1 / M11 - M02 * r2 / M22) / den;
     return [a0, (r1 - M01 * a0) / M11, (r2 - M02 * a0) / M22];
@@ -92,7 +99,7 @@
     constructor(params) { this.p = Object.assign(defaultParams(), params || {}); this.reset(); }
 
     reset() {
-      this.t = 0;
+      this.t = 0; this.betaP = 0; this.betaR = 0;
       this.pq = [0, 0, 0]; this.pqd = [0, 0, 0];   // pitch: x, theta (pendulum fwd +), alpha (head fwd +)
       this.rq = [0, 0, 0]; this.rqd = [0, 0, 0];   // roll:  y, chi (pendulum right +), zeta (head right +)
       this.wX = 0; this.wZ = 0; this.psi = 0; this.psiDot = 0; this.spinRate = 0; this.aLat = 0; this.trail = [[0, 0]]; this.trailAcc = 0;
@@ -119,8 +126,10 @@
     rampSpeed() { const p = this.p; return [p.ramping1, p.ramping2, p.ramping3][p.speedLevel - 1] || p.ramping1; }
     spinSpeed() { const p = this.p; return p.spinLevel === 2 ? p.spinSpeed2 : p.spinSpeed1; }
 
-    pitchDeg() { return this.pq[1] * R2D; }
-    leanDeg() { return this.rq[0] / this.p.R * R2D; }
+    pitchDeg() { return (this.pq[1] + this.betaP) * R2D; }   // IMU, relative to true vertical (incline, see sim.js)
+    leanDeg() { return (this.rq[0] / this.p.R - this.betaR) * R2D; }
+    headPitchDeg() { return (this.pq[2] - this.betaP) * R2D; }
+    headRollDeg() { return (this.rq[2] - this.betaR) * R2D; }
     rollTiltRel() { return this.rq[1] + this.rq[0] / this.p.R; }
     // Sabertooth: 1000..2000 µs -> -1..+1. VarSpeedServo degrees -> µs: 1000 + deg*1000/180
     driveU() { return clamp((this.drivePulse.v - 90) / 90, -1, 1); }
@@ -187,7 +196,7 @@
       const tauM = p.tauStall * (this.driveU() - wRel / w0) - p.bBear * wRel;
       const tauH = this.servoTorque(this.headJoint(this.panCmd.v), q[2] + q[1], qd[2] + qd[1], p.mh * p.L * p.L + 1e-3, p.headGear, p.headServoStall, p.headServoNoLoad);
       this.tauM = tauM;
-      return [tauM / R - p.cRoll * qd[0], tauM + tauH, tauH];
+      return [tauM / R - rollingResistance(p, qd[0]), tauM + tauH, tauH];
     }
     forcesRoll(q, qd) {
       const p = this.p, R = p.R;
@@ -196,23 +205,23 @@
       this.tauR = tauR;
       const a = p.turning ? this.aLat : 0;
       const fS = -(p.ms + p.mp + p.mh) * a, f1 = -p.mp * a * p.l * Math.cos(q[1]), f2 = -p.mh * a * p.L * Math.cos(q[2]);
-      return [tauR / R - tauD / R - p.cRoll * qd[0] + fS, tauR + f1, tauD + f2];
+      return [tauR / R - tauD / R - rollingResistance(p, qd[0]) + fS, tauR + f1, tauD + f2];
     }
     computeShear() {
       const p = this.p, m = p.domeShellMass, Lo = p.domeShellL, tauM = this.tauM, tauR = this.tauR;
-      const ap = planarAcc(p, this.pq, this.pqd, this.forcesPitch(this.pq, this.pqd));
-      const ar = planarAcc(p, this.rq, this.rqd, this.forcesRoll(this.rq, this.rqd));
+      const ap = planarAcc(p, this.pq, this.pqd, this.forcesPitch(this.pq, this.pqd), this.betaP);
+      const ar = planarAcc(p, this.rq, this.rqd, this.forcesRoll(this.rq, this.rqd), this.betaR);
       const al = this.pq[2], ze = this.rq[2], aLat = p.turning ? this.aLat : 0;
-      this.shearP = m * (ap[0] * Math.cos(al) + Lo * ap[2]) - m * G * Math.sin(al);
-      this.shearR = m * ((ar[0] + aLat) * Math.cos(ze) + Lo * ar[2]) - m * G * Math.sin(ze);
+      this.shearP = m * (ap[0] * Math.cos(al) + Lo * ap[2]) - m * G * Math.sin(al - this.betaP);   // gravity relative to the slope
+      this.shearR = m * ((ar[0] + aLat) * Math.cos(ze) + Lo * ar[2]) - m * G * Math.sin(ze - this.betaR);
       this.shear = Math.hypot(this.shearP, this.shearR);
       this.shearG = this.shear / (m * G);              // in units of the shell's weight (1 = holding it sideways, 90 deg)
       this.shearUse = this.shearG / p.domeHoldG;       // fraction of the magnet capacity
       this.shearPeak = Math.max(this.shearPeak, this.shearUse);
       this.tauM = tauM; this.tauR = tauR;              // forcesPitch/forcesRoll above overwrite these; keep the integrator's values
     }
-    rk4(q, qd, forces, h) {
-      const f = (q, qd) => planarAcc(this.p, q, qd, forces.call(this, q, qd));
+    rk4(q, qd, forces, h, beta) {
+      const f = (q, qd) => planarAcc(this.p, q, qd, forces.call(this, q, qd), beta);
       const add = (a, b, k) => a.map((v, i) => v + k * b[i]);
       const k1v = qd, k1a = f(q, qd);
       const q2 = add(q, k1v, h / 2), v2 = add(qd, k1a, h / 2), k2a = f(q2, v2);
@@ -240,8 +249,12 @@
         const turn = p.turning ? v / p.R * Math.sin(rho) : 0;
         this.psiDot = turn + this.spinRate;
         this.aLat = v * this.psiDot; // spin while driving curves the path as well
-        this.rk4(this.pq, this.pqd, this.forcesPitch, h);
-        this.rk4(this.rq, this.rqd, this.forcesRoll, h);
+        // Incline: world slope (inclineX uphill towards +X = initial forward, inclineY uphill towards +Z = initial right),
+        // projected onto this droid's pitch plane (forward) and roll plane (right) with its current heading.
+        { const bx = p.inclineX * D2R, by = p.inclineY * D2R, c = Math.cos(this.psi), sn = Math.sin(this.psi);
+          this.betaP = bx * c + by * sn; this.betaR = -bx * sn + by * c; }
+        this.rk4(this.pq, this.pqd, this.forcesPitch, h, this.betaP);
+        this.rk4(this.rq, this.rqd, this.forcesRoll, h, this.betaR);
         this.computeShear();
         this.tiltLoad = Math.abs(this.tauR || 0) / (p.tiltServoStall * p.tiltGear);
         this.tiltLoadPeak = Math.max(this.tiltLoadPeak, this.tiltLoad);
@@ -270,7 +283,7 @@
       this.log.push({
         t: this.t, vGround: this.pqd[0] * 1000,
         sp2: this.sp2 / 90 * 100, out2: this.out2 / 90 * 100, drv: this.driveU() * 100,
-        pitch: this.pitchDeg(), headP: this.pq[2] * R2D,
+        pitch: this.pitchDeg(), headP: this.headPitchDeg(),
         sp1: this.sp1, lean: this.leanDeg(), tilt: this.tiltJoint(this.tiltCmd.v) * R2D, ds,
       });
       if (this.log.length > 1500) this.log.splice(0, this.log.length - 1500);

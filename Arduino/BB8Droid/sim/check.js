@@ -112,8 +112,29 @@ for (const [n, o] of [['current settings', MEAS], ['shear limiter proposal (+-70
   console.log(`${n.padEnd(62)} standstill ${f(headSwingShear(o, 0), 0)}%, full stick ${f(headSwingShear({...o, driveSpeedMax: 2000}, 1), 0)}% of capacity`);
 console.log('\n=== Acceleration and braking from about 2.1 m/s, measured head ===');
 for (const [n, mk] of [['Cary V1, speed level 3', () => new CarySim({speedLevel: 3})],
-                       ['BBDroids 2450, ramps 1200 both ways (before)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450, driveDecelLimit: 0})],
-                       ['BBDroids 2450, accel 1200 / decel 3000 (defaults)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450})]]) {
+                       ['BBDroids 2450, ramps 1200 both ways (before)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450, driveAccelLimit: 1200, driveDecelLimit: 0, rollKff: 0, domeRemoteRate: 0})],
+                       ['BBDroids 2450, accel 1200 / decel 3000 (firmware)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450, driveAccelLimit: 1200, driveDecelLimit: 3000, rollKff: 0, domeRemoteRate: 0})],
+                       ['BBDroids 2450, proposal 1800 / 4500 (sim defaults)', () => new BB8Sim({...MEAS, driveSpeedMax: 2450})]]) {
   const r = accelBrake(mk());
   console.log(`${n.padEnd(46)} top ${f(r.vMax * 1000, 0)} mm/s, 0->90% ${f(r.t90)} s | stop ${f(r.stopT)} s, ${f(r.dist, 2)} m | dome shear ${f(r.sA, 0)}% accel / ${f(r.sB, 0)}% brake | head max ${f(r.hd, 0)} deg`);
 }
+
+// ---- Position control and slopes (README section 6.7)
+console.log('\n=== Slopes: standing still with the stick at 0 for 10 s ===');
+function slopeStand(o) { const s = new BB8Sim(o); for (let i = 0; i < 1000; i++) s.advance(0.01);
+  return `drift ${f(s.wX, 2)} m fwd / ${f(s.wZ, 2)} m right, speed ${f(Math.hypot(s.pqd[0], s.rqd[0]) * 1000, 0)} mm/s, lean ${f(s.leanDeg())} deg`; }
+for (const [ix, iy] of [[5, 0], [10, 0], [0, 5], [0, 10]]) {
+  console.log(`incline X ${ix} / Y ${iy} deg | velocity mode: ${slopeStand({inclineX: ix, inclineY: iy})} | auto position: ${slopeStand({inclineX: ix, inclineY: iy, driveMode: 'autopos'})}`);
+}
+console.log('\n=== Auto position: stick 0.5 for 3 s, then released ===');
+function autoPosRelease(o) { const s = new BB8Sim({driveMode: 'autopos', ...o}); let x0 = null, xMax = -1e9; const xs = [];
+  for (let i = 0; i < 1500; i++) { const t = i * 0.01; s.input.vel = (t >= 0.5 && t < 3.5) ? 0.5 : 0; s.advance(0.01);
+    if (t >= 3.5) { if (x0 === null) x0 = s.pq[0]; xs.push(s.pq[0]); xMax = Math.max(xMax, s.pq[0]); } }
+  const fin = xs[xs.length - 1]; let settle = 0; for (let i = 0; i < xs.length; i++) if (Math.abs(xs[i] - fin) > 0.02) settle = (i + 1) * 0.01;
+  return `stops ${f(fin - x0, 2)} m after release, overshoot ${f((xMax - fin) * 1000, 0)} mm, settled after ${f(settle)} s`; }
+for (const [n, o] of [['switch after 500 ms only (firmware before)', {autoPosMaxSpeed: 0}], ['switch below 50 mm/s, max wait 1 s (defaults)', {}]]) console.log(`${n.padEnd(48)} ${autoPosRelease(o)}`);
+console.log('\n=== Position mode: stick 0.5 = +500 mm ===');
+{ const s = new BB8Sim({driveMode: 'pos'}); let e0 = null, t90 = null, mx = -1e9;
+  for (let i = 0; i < 800; i++) { const t = i * 0.01; s.input.vel = t >= 1 ? 0.5 : 0; s.advance(0.01);
+    if (t >= 1) { if (e0 === null) e0 = s.encPos; const d = s.encPos - e0; mx = Math.max(mx, d); if (t90 === null && d >= 450) t90 = t - 1; } }
+  console.log(`pos_kp 1.2 / pos_ki 0.2: 90% after ${f(t90)} s, overshoot ${f(mx - 500, 0)} mm, final ${f(s.encPos - e0, 0)} mm`); }

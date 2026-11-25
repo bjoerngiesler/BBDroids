@@ -29,6 +29,10 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:0 m
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .views{display:grid;gap:14px;align-content:start}
 .v3d{position:relative;height:clamp(300px,46vh,500px);overflow:hidden}
+.v3d::after{content:"";position:absolute;inset:0;border-radius:10px;pointer-events:none;transition:box-shadow .15s}
+.v3d.shear::after{box-shadow:inset 0 0 0 4px #d62828,inset 0 0 90px rgba(214,40,40,.45)}
+.v3d .shearTag{position:absolute;left:50%;top:10px;transform:translateX(-50%);font:700 13px Barlow,system-ui,sans-serif;color:#fff;background:#d62828;padding:2px 10px;border-radius:6px;display:none;z-index:2}
+.v3d.shear .shearTag{display:block}
 .v3d canvas{display:block;width:100%;height:100%;border-radius:10px}
 .vlabel{position:absolute;left:12px;top:10px;font:600 13px "Barlow Semi Condensed",Barlow,system-ui,sans-serif;color:var(--mute);background:color-mix(in srgb,var(--panel) 80%,transparent);padding:2px 8px;border-radius:6px}
 .camb{position:absolute;left:10px;bottom:10px;min-height:36px;background:color-mix(in srgb,var(--panel) 85%,transparent)}
@@ -93,11 +97,11 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
 </header>
 <main>
   <div class="views">
-    <div class="card v3d" id="v3d"><span class="vlabel">3D combined · BBDroids left lane, Cary right lane</span>
+    <div class="card v3d" id="v3d"><span class="vlabel">3D combined · BBDroids left lane, Cary right lane</span><span class="shearTag">Dome shear &gt; 70 %</span>
       <div class="readout" id="readout"></div><button id="bCam" class="camb">Cameras: fixed</button></div>
     <div class="v3row">
-      <div class="card v3d" id="v3dB"><span class="vlabel" style="color:var(--cB)">BBDroids, following</span></div>
-      <div class="card v3d" id="v3dC"><span class="vlabel" style="color:var(--cC)">Cary V1, following</span></div>
+      <div class="card v3d" id="v3dB"><span class="vlabel" style="color:var(--cB)">BBDroids, following</span><span class="shearTag">Dome shear &gt; 70 %</span></div>
+      <div class="card v3d" id="v3dC"><span class="vlabel" style="color:var(--cC)">Cary V1, following</span><span class="shearTag">Dome shear &gt; 70 %</span></div>
     </div>
     <div class="riss4">
       <div class="card"><div class="fig"><canvas id="cSideB"></canvas></div></div>
@@ -133,6 +137,10 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         <label>BBDroids drive_speed_max [mm/s]<input type="number" id="qBBmax" min="200" max="3000" step="50"></label>
         <label>Cary speed level (R3)<select id="sLevel"><option value="1">1 (DRIVESPEED1)</option><option value="2">2 (DRIVESPEED2)</option><option value="3">3 (DRIVESPEED3)</option></select></label>
         <label>Keyboard stick travel [s, 0 → full]<input type="number" id="keySlew" min="0" max="3" step="0.05" value="0.25"></label>
+        <label>Ground (both droids)<select id="sGround" aria-label="Ground"><option value="smooth">Smooth hard floor</option><option value="office">Low-pile office carpet</option><option value="living">Medium-pile living-room carpet</option><option value="custom" disabled>Custom (sliders)</option></select></label>
+        <label>Incline X [° uphill towards the start direction, both droids]<input type="range" id="rIncX" min="-15" max="15" step="0.5" aria-label="Incline X"><input type="number" id="nIncX" min="-15" max="15" step="0.5"></label>
+        <label>Incline Y [° uphill towards the right, both droids]<input type="range" id="rIncY" min="-15" max="15" step="0.5" aria-label="Incline Y"><input type="number" id="nIncY" min="-15" max="15" step="0.5"></label>
+        <label>BBDroids drive mode<select id="sMode" aria-label="BBDroids drive mode"><option value="vel">Drive mode: velocity</option><option value="pos">Drive mode: position</option><option value="autopos">Drive mode: auto position</option></select></label>
         <label>Cary spin speed (X+A)<select id="sSpin"><option value="1">Spin speed 1</option><option value="2">Spin speed 2</option></select></label>
       </div>
       <div class="btns">
@@ -225,6 +233,8 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
     }
     reset() { this.lastErr = this.errI = this.lastErrD = this.lastControl = 0; this.dFilter.reset(); }
     setIBounds(a, b) { this.iBounded = true; this.iMin = a; this.iMax = b; }
+    setIUnbounded() { this.iBounded = false; }
+    setControlBounds(a, b) { this.cBounded = true; this.cMin = a; this.cMax = b; }
     // Returns the value the firmware passes to setControlOutput()
     update(present, dt) {
       const err = this.goal - present;
@@ -235,6 +245,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       const dF = this.dFilter.filter(this.lastErrD);
       this.lastControl = this.kp * err + this.ki * this.errI + this.kd * dF;
       this.lastControl *= this.gain;
+      if (this.cBounded) this.lastControl = Math.min(this.cMax, Math.max(this.cMin, this.lastControl));
       return this.lastControl + this.offset;
     }
   }
@@ -272,6 +283,9 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       ms: 3.0,          // kg   mass of the sphere shell (thin shell)
       L: 0.295,         // m    distance of the head CoM above the sphere center (measured)
       cRoll: 3.0,       // N/(m/s)   rolling resistance (viscous)
+      crr: 0,           //           rolling resistance coefficient (force = crr * weight), 0 = smooth floor; see GROUNDS
+      inclineX: 0,      // deg  ground incline, uphill towards +X (the start direction)
+      inclineY: 0,      // deg  ground incline, uphill towards +Z (right of the start direction)
       bBear: 0.05,      // Nm/(rad/s) bearing friction of the drive
       // Drive motor (referred to the output, sphere relative to pendulum)
       tauStall: 30,     // Nm
@@ -284,7 +298,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       // Firmware parameters (BB8Params)
       driveSpeedKp: 0.05, driveSpeedKi: 0.2, driveSpeedKd: 0.0, driveIBound: 255,
       balKp: 25, balKi: 0, balKd: 0.2,
-      rollKp: 0.5, rollKi: 0.4, rollKd: 0.4, rollKff: 0.0, rollIMax: 50,
+      rollKp: 0.5, rollKi: 0.4, rollKd: 0.4, rollKff: 0.5, rollIMax: 50, // rollKff 0.5: dynamics proposal (README 6.6), firmware still 0
       rollDirect: false,
       driveSpeedMax: 2000, driveSpeedDeadband: 0.01, rollAngleMax: 20,
       bodyRollRange: 25, bodyRollVel: 500, bodyRollAccel: 60,
@@ -302,11 +316,11 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       domeHoldG: 1.2,      // magnet shear capacity in units of the shell's weight: 1.0 = holds exactly when the dome is at 90 deg.
                            // Björn's estimate: holds at 90 deg with a little to spare (a light push pops it off) -> 1.2 (ASSUMPTION, measure!)
       domePitchAccel: 0, domeRollAccel: 0, // DXL profile acceleration for the dome servos (0 = not set in firmware; sim uses 3000 °/s² as before)
-      domeRemoteRate: 0,  // deg/s at the dome: slew limit on the remote head command (0 = off)
+      domeRemoteRate: 60, // deg/s at the dome: slew limit on the remote head command (0 = off). Dynamics proposal, not in firmware yet
       domeWorldMax: 0,     // deg: limit on the dome's apparent tilt (0 = off)
       domeLeanCenter: true, // centre the limit window on the shear-free attitude atan(a/g) instead of vertical
-      driveDecelLimit: 3000, // mm/s^2 separate ramp while braking (0 = same as driveAccelLimit), firmware drive_decel_max
-      driveAccelLimit: 1200, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max
+      driveDecelLimit: 4500, // mm/s^2 separate ramp while braking (0 = same as driveAccelLimit), firmware drive_decel_max (firmware still 3000)
+      driveAccelLimit: 1800, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max (firmware still 1200)
       faAccelToDome: 15,   // deg head (around the sphere center) per m/s^2 of commanded acceleration
       domeAccelTau: 0.5,   // s  low-pass on the commanded acceleration for the head
       autoShareClamp: true, // clamp the automatic head share to dome_pitch_range before subtracting it (dome_comp_remote_only)
@@ -319,6 +333,16 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       rollKiReturn: 0,     // >0: different K_i on the way back
       rollReturnWindow: 1.5, // s  the way back only counts for this long after a stick move towards center
       rollIBleed: 0.4,       // s  >0: bleed the I state on the way back with this time constant
+      // Drive mode as in BB8::switchDrive(): 'vel' (DRIVE_VEL), 'pos' (DRIVE_POS: stick = position offset
+      // around where the mode was entered) or 'autopos' (DRIVE_VEL while the stick is outside drive_speed_deadband,
+      // DRIVE_AUTO_POS after autoPosDelay without input). Firmware default is 'vel' (auto_pos_control false).
+      driveMode: 'vel',
+      posKp: 1.2, posKi: 0.2, posKd: 0,            // pos_k*: (mm/s) per mm, firmware defaults
+      autoPosKp: 3, autoPosKi: 0.5, autoPosKd: 0,  // auto_pos_k*: tuned in the simulation (README 6.7), firmware defaults
+      posStickRange: 1000,   // mm  position offset at full stick in 'pos' mode (firmware: axis * 1000)
+      autoPosDelay: 0.5,     // s   no stick input this long -> auto position mode (firmware: 500 ms)
+      autoPosMaxSpeed: 50,   // mm/s >0: also wait until the measured speed is below this before switching (firmware auto_pos_max_speed)
+      autoPosMaxWait: 1.0,   // s    ... but switch at the latest this long after autoPosDelay (on a slope the droid never gets slow in DRIVE_VEL), firmware auto_pos_max_wait
       rollKdSpeed: 1000,     // mm/s >0: above this measured speed, scale roll_kd by rollKdSpeed/|v| (cornering stiffens the roll plane, see README 3.7)
       rollRateCutoff: 15,
       imuFilterCutoff: 100,
@@ -330,16 +354,30 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
   const DXL_VEL = 0.229 * 6;               // Dynamixel unit -> deg/s
   const DXL_ACC = 214.577 * 360 / 3600;    // Dynamixel unit -> deg/s^2
 
+  // ---- Ground: rolling resistance of the shell on the floor (both planes, so sideways rocking is damped too).
+  // Constant part crr * weight (smoothed around v = 0) plus the viscous part cRoll * v. Presets are rough estimates
+  // for a ~0.5 m hard sphere; carpet values for wheels are higher, but a large radius sinks in less.
+  const GROUNDS = {
+    smooth: {label: 'Smooth hard floor', crr: 0, cRoll: 3.0},
+    office: {label: 'Low-pile office carpet', crr: 0.015, cRoll: 6.0},
+    living: {label: 'Medium-pile living-room carpet', crr: 0.035, cRoll: 10.0},
+  };
+  function rollingResistance(p, v) { return p.crr * (p.ms + p.mp + p.mh) * G * Math.tanh(v / 0.02) + p.cRoll * v; }
+
   // ---- Planar dynamics: q=[s,a1,a2], qd; Q generalized forces
-  function planarAcc(p, q, qd, Q) {
+  function planarAcc(p, q, qd, Q, beta) {
     const { mp, l, mh, L, ms, R } = p;
     const Is = 2 / 3 * ms * R * R, eps = 1e-4;
     const c1 = Math.cos(q[1]), s1 = Math.sin(q[1]), c2 = Math.cos(q[2]), s2 = Math.sin(q[2]);
     const M00 = ms + Is / (R * R) + mp + mh, M01 = mp * l * c1, M02 = mh * L * c2;
     const M11 = mp * l * l + eps, M22 = mh * L * L + eps;
-    const r0 = Q[0] + mp * l * s1 * qd[1] * qd[1] + mh * L * s2 * qd[2] * qd[2];
-    const r1 = Q[1] - mp * G * l * s1;
-    const r2 = Q[2] + mh * G * L * s2;
+    // Ground inclined by beta in this plane (rising towards +s). State is in the slope frame: s along the slope,
+    // a1 (pendulum, hanging convention) and a2 (head, upright convention) measured from the slope normal.
+    // World angle from vertical: pendulum a1 + beta, head a2 - beta. beta = 0 gives the flat-ground equations.
+    const b = beta || 0;
+    const r0 = Q[0] + mp * l * s1 * qd[1] * qd[1] + mh * L * s2 * qd[2] * qd[2] - (ms + mp + mh) * G * Math.sin(b);
+    const r1 = Q[1] - mp * G * l * Math.sin(q[1] + b);
+    const r2 = Q[2] + mh * G * L * Math.sin(q[2] - b);
     // M is "arrow" shaped -> solve directly
     const den = M00 - M01 * M01 / M11 - M02 * M02 / M22;
     const a0 = (r0 - M01 * r1 / M11 - M02 * r2 / M22) / den;
@@ -351,7 +389,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
 
     reset() {
       const p = this.p;
-      this.t = 0;
+      this.t = 0; this.betaP = 0; this.betaR = 0;
       // Pitch plane: s=x, a1=theta (pendulum forward +), a2=alpha (head forward +)
       this.pq = [0, 0, 0]; this.pqd = [0, 0, 0];
       // Roll plane: s=y, a1=chi (pendulum towards +y), a2=zeta (head towards +y)
@@ -370,6 +408,8 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       this.imuRollF = new LowPassFilter(p.imuFilterCutoff, 100);
       this.rateF = new LowPassFilter(p.rollRateCutoff, 104);
       this.encSpeedF = new LowPassFilter(25, 100);
+      this.encPosF = new LowPassFilter(25, 100); this.encPos = 0;   // filtered encoder position in mm (bb::Encoder filtPos_)
+      this.posCtl = new PID(); this.driveState = 'off'; this.driveKey = null; this.noInputT = 0; this.posZero = 0;
       this.encTicks = 0; this.encSpeed = 0; this.encSpeedFilt = 0;
       this.pwm = 0; this.speedSP = 0; this.tilt = 0; this.rate = 0; this.headTilt = 0;
       this.rollServo = new ServoProfile(); this.domePServo = new ServoProfile(); this.domeRServo = new ServoProfile();
@@ -392,11 +432,30 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       this.roll.setIBounds(-p.rollIMax, p.rollIMax);
       this.imuPitchF.setCutoff(p.imuFilterCutoff); this.imuRollF.setCutoff(p.imuFilterCutoff);
       this.rateF.setCutoff(p.rollRateCutoff);
+      if (this.posCtl) this.configPos();
+    }
+
+    // BB8::switchDrive(): reset the speed and balance controllers and the ramp, restart both position
+    // controllers at the present encoder position (setPresentAsGoal), and use the gains of the new mode.
+    switchDrive(state) {
+      const p = this.p;
+      this.drive.reset(); this.drive.goal = 0; this.bal.reset(); this.bal.offset = 0;
+      this.velRamped = this.accelCmdF = 0; this.noInputT = 0;
+      this.posCtl.reset(); this.posCtl.goal = this.encPos; this.posZero = this.encPos;
+      this.driveState = state; this.configPos();
+    }
+    configPos() {
+      const p = this.p, auto = this.driveState === 'autopos', c = this.posCtl;
+      c.kp = auto ? p.autoPosKp : p.posKp; c.ki = auto ? p.autoPosKi : p.posKi; c.kd = auto ? p.autoPosKd : p.posKd;
+      c.setControlBounds(-p.driveSpeedMax, p.driveSpeedMax);   // speed setpoint limited to drive_speed_max
+      if (c.ki > 0) c.setIBounds(-p.driveSpeedMax / c.ki, p.driveSpeedMax / c.ki); else c.setIUnbounded();
     }
 
     // derived quantities
-    pitchDeg() { return this.pq[1] * R2D; }                 // IMU pitch = frame/pendulum
-    leanDeg() { return this.rq[0] / this.p.R * R2D; }  // IMU roll = axle lean
+    pitchDeg() { return (this.pq[1] + this.betaP) * R2D; }  // IMU pitch = frame/pendulum, relative to true vertical
+    leanDeg() { return (this.rq[0] / this.p.R - this.betaR) * R2D; }  // IMU roll = axle lean, relative to true vertical
+    headPitchDeg() { return (this.pq[2] - this.betaP) * R2D; }  // head, absolute (relative to true vertical)
+    headRollDeg() { return (this.rq[2] - this.betaR) * R2D; }
     relDrive() { return this.pq[1] + this.pq[0] / this.p.R; }      // sphere rel. pendulum [rad]
     domePitchRel() { return this.pq[2] + this.pq[1]; }      // head rel. frame (pitch) [rad]
     rollTiltRel() { return this.rq[1] + this.rq[0] / this.p.R; }   // pendulum rel. axle [rad]
@@ -413,21 +472,37 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       const ticks = p.encoderQuantize ? Math.floor(relMM / mmPerTick) : relMM / mmPerTick;
       this.encSpeed = (ticks - this.encTicks) / dt * mmPerTick; this.encTicks = ticks;
       this.encSpeedFilt = this.encSpeedF.filter(this.encSpeed);
+      this.encPos = this.encPosF.filter(ticks * mmPerTick);
 
-      // --- stepDriveMotor (DRIVE_VEL)
-      let vel = inp.vel;
-      if (Math.abs(vel) <= p.driveSpeedDeadband) vel = 0; else vel *= p.driveSpeedMax;
-      // Setpoint ramp and commanded acceleration (pure feedforward, no feedback)
-      const velPrev = this.velRamped;
-      if (p.driveAccelLimit > 0) {
-        // braking (|setpoint| shrinking towards / through zero) uses driveDecelLimit if set
-        const braking = Math.abs(vel) < Math.abs(this.velRamped) || vel * this.velRamped < 0;
-        const lim = braking && p.driveDecelLimit > 0 ? p.driveDecelLimit : p.driveAccelLimit;
-        const m = lim * dt; this.velRamped += Math.max(-m, Math.min(m, vel - this.velRamped));
+      // --- drive mode (BB8::incomingControlPacket / switchDrive)
+      const key = inp.driveOn ? p.driveMode : 'off';
+      if (key !== this.driveKey) { this.driveKey = key; this.switchDrive(key === 'off' ? 'off' : key === 'pos' ? 'pos' : 'vel'); }
+      if (key === 'autopos') {
+        if (Math.abs(inp.vel) <= p.driveSpeedDeadband) { this.noInputT += dt; if (this.noInputT > p.autoPosDelay && this.driveState === 'vel' && !(p.autoPosMaxSpeed > 0 && Math.abs(this.encSpeedFilt) > p.autoPosMaxSpeed && this.noInputT < p.autoPosDelay + p.autoPosMaxWait)) this.switchDrive('autopos'); }
+        else { this.noInputT = 0; if (this.driveState === 'autopos') this.switchDrive('vel'); }
       }
-      else this.velRamped = vel;
-      vel = this.velRamped;
-      const aCmd = (this.velRamped - velPrev) / dt / 1000;
+      // --- stepDriveMotor
+      let vel, aCmd = 0;
+      if (this.driveState === 'pos' || this.driveState === 'autopos') {
+        // Position modes: the position controller (input: encoder position in mm) sets the speed setpoint
+        if (this.driveState === 'pos') this.posCtl.goal = this.posZero + inp.vel * p.posStickRange;
+        this.velRamped = this.posCtl.update(this.encPos, dt);
+        vel = this.velRamped;
+      } else {
+        vel = inp.vel;
+        if (Math.abs(vel) <= p.driveSpeedDeadband) vel = 0; else vel *= p.driveSpeedMax;
+        // Setpoint ramp and commanded acceleration (pure feedforward, no feedback)
+        const velPrev = this.velRamped;
+        if (p.driveAccelLimit > 0) {
+          // braking (|setpoint| shrinking towards / through zero) uses driveDecelLimit if set
+          const braking = Math.abs(vel) < Math.abs(this.velRamped) || vel * this.velRamped < 0;
+          const lim = braking && p.driveDecelLimit > 0 ? p.driveDecelLimit : p.driveAccelLimit;
+          const m = lim * dt; this.velRamped += Math.max(-m, Math.min(m, vel - this.velRamped));
+        }
+        else this.velRamped = vel;
+        vel = this.velRamped;
+        aCmd = (this.velRamped - velPrev) / dt / 1000;
+      }
       this.accelCmdF += (aCmd - this.accelCmdF) * Math.min(1, dt / Math.max(dt, p.domeAccelTau));
       this.bal.offset = vel;
       // Speed error as on D-O (faNeckSPAccel): how far the droid lags behind the ramped setpoint
@@ -542,11 +617,11 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
     // Tangential (shear) force the magnets must apply to the outer dome shell, both planes, in N.
     computeShear() {
       const p = this.p, m = p.domeShellMass, Lo = p.domeShellL, tauM = this.tauM, tauR = this.tauR;
-      const ap = planarAcc(p, this.pq, this.pqd, this.forcesPitch(this.pq, this.pqd));
-      const ar = planarAcc(p, this.rq, this.rqd, this.forcesRoll(this.rq, this.rqd));
+      const ap = planarAcc(p, this.pq, this.pqd, this.forcesPitch(this.pq, this.pqd), this.betaP);
+      const ar = planarAcc(p, this.rq, this.rqd, this.forcesRoll(this.rq, this.rqd), this.betaR);
       const al = this.pq[2], ze = this.rq[2], aLat = p.turning ? this.aLat : 0;
-      this.shearP = m * (ap[0] * Math.cos(al) + Lo * ap[2]) - m * G * Math.sin(al);
-      this.shearR = m * ((ar[0] + aLat) * Math.cos(ze) + Lo * ar[2]) - m * G * Math.sin(ze);
+      this.shearP = m * (ap[0] * Math.cos(al) + Lo * ap[2]) - m * G * Math.sin(al - this.betaP);   // gravity relative to the slope
+      this.shearR = m * ((ar[0] + aLat) * Math.cos(ze) + Lo * ar[2]) - m * G * Math.sin(ze - this.betaR);
       this.shear = Math.hypot(this.shearP, this.shearR);
       this.shearG = this.shear / (m * G);              // in units of the shell's weight (1 = holding it sideways, 90 deg)
       this.shearUse = this.shearG / p.domeHoldG;       // fraction of the magnet capacity
@@ -564,7 +639,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       const target = (this.domePServo.pos - 180) / p.domePitchReduction * D2R;
       const tauH = this.servoTorque(target, q[2] + q[1], qd[2] + qd[1], p.mh * p.L * p.L + 1e-3, p.domePitchReduction);
       this.tauM = tauM;
-      return [tauM / R - p.cRoll * qd[0], tauM + tauH, tauH];
+      return [tauM / R - rollingResistance(p, qd[0]), tauM + tauH, tauH];
     }
 
     forcesRoll(q, qd) {
@@ -577,11 +652,11 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       // Centrifugal force in the rotating frame (outwards = -aLat in y)
       const a = p.turning ? this.aLat : 0;
       const fS = -(p.ms + p.mp + p.mh) * a, f1 = -p.mp * a * p.l * Math.cos(q[1]), f2 = -p.mh * a * p.L * Math.cos(q[2]);
-      return [tauR / R - tauD / R - p.cRoll * qd[0] + fS, tauR + f1, tauD + f2];
+      return [tauR / R - tauD / R - rollingResistance(p, qd[0]) + fS, tauR + f1, tauD + f2];
     }
 
-    rk4(q, qd, forces, h) {
-      const f = (q, qd) => planarAcc(this.p, q, qd, forces.call(this, q, qd));
+    rk4(q, qd, forces, h, beta) {
+      const f = (q, qd) => planarAcc(this.p, q, qd, forces.call(this, q, qd), beta);
       const add = (a, b, k) => a.map((v, i) => v + k * b[i]);
       const k1v = qd, k1a = f(q, qd);
       const q2 = add(q, k1v, h / 2), v2 = add(qd, k1a, h / 2), k2a = f(q2, v2);
@@ -609,8 +684,12 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         const v = this.pqd[0], rho = this.rq[0] / p.R;
         this.psiDot = p.turning ? v / p.R * Math.sin(rho) : 0;
         this.aLat = v * this.psiDot;
-        this.rk4(this.pq, this.pqd, this.forcesPitch, h);
-        this.rk4(this.rq, this.rqd, this.forcesRoll, h);
+        // Incline: world slope (inclineX uphill towards +X = initial forward, inclineY uphill towards +Z = initial right),
+        // projected onto this droid's pitch plane (forward) and roll plane (right) with its current heading.
+        { const bx = p.inclineX * D2R, by = p.inclineY * D2R, c = Math.cos(this.psi), sn = Math.sin(this.psi);
+          this.betaP = bx * c + by * sn; this.betaR = -bx * sn + by * c; }
+        this.rk4(this.pq, this.pqd, this.forcesPitch, h, this.betaP);
+        this.rk4(this.rq, this.rqd, this.forcesRoll, h, this.betaR);
         this.computeShear();
         this.rollLoad = Math.abs(this.tauR || 0) / (p.servoStall * p.rollReduction);
         this.rollLoadPeak = Math.max(this.rollLoadPeak, this.rollLoad);
@@ -625,9 +704,9 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
 
     logSample() {
       this.log.push({
-        t: this.t, vSP: this.bal.offset, vCmd: this.speedSP, vGround: this.pqd[0] * 1000, vEnc: this.encSpeedFilt,
+        t: this.t, vSP: this.bal.offset, encPos: this.encPos, mode: this.driveState, vCmd: this.speedSP, vGround: this.pqd[0] * 1000, vEnc: this.encSpeedFilt,
         pitch: this.pitchDeg(), pwm: this.pwm, rollGoal: this.roll.goal, lean: this.leanDeg(), tilt: this.tilt,
-        headP: this.pq[2] * R2D, headR: this.rq[2] * R2D,
+        headP: this.headPitchDeg(), headR: this.headRollDeg(),
       });
       if (this.log.length > 2000) this.log.splice(0, this.log.length - 2000);
     }
@@ -641,7 +720,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
     idealDomePitchToWeight() { const p = this.p; return -(p.mh * p.L) / (p.mp * p.l - p.mh * p.L); }
   }
 
-  const api = { BB8Sim, defaultParams, LowPassFilter, PID, D2R, R2D, ROLL_REDUCTION };
+  const api = { BB8Sim, defaultParams, LowPassFilter, PID, D2R, R2D, ROLL_REDUCTION, GROUNDS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else global.BB8 = api;
 })(typeof window !== 'undefined' ? window : globalThis);
 
@@ -694,7 +773,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       // Masses (Björn: head ~0.9 kg, counterweight incl. batteries 5.6 kg at 200 mm)
       mp: 5.6, l: 0.20, mh: 0.9,
       // Further mechanics — kept identical to the BBDroids BB-8 sim so only the control differs
-      R: 0.254, ms: 3.0, L: 0.32, cRoll: 3.0, bBear: 0.05,
+      R: 0.254, ms: 3.0, L: 0.32, cRoll: 3.0, crr: 0, bBear: 0.05, inclineX: 0, inclineY: 0,   // crr/cRoll: ground, same model and presets as sim.js
       tauStall: 30, vNoLoad: 2600,     // drive motor at the shell, at full Sabertooth command
       // Hobby servos (assumptions): servo travel over 1000–2000 µs, gearing servo:joint
       tiltServoTravel: 90, tiltGear: 3, tiltServoStall: 3.4, tiltServoNoLoad: 67,
@@ -722,16 +801,23 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
     };
   }
 
+  // Ground rolling resistance, identical to sim.js (presets there in GROUNDS)
+  function rollingResistance(p, v) { return p.crr * (p.ms + p.mp + p.mh) * G * Math.tanh(v / 0.02) + p.cRoll * v; }
+
   // ---- Planar dynamics (identical to BB-8 sim): q=[s,a1,a2]
-  function planarAcc(p, q, qd, Q) {
+  function planarAcc(p, q, qd, Q, beta) {
     const { mp, l, mh, L, ms, R } = p;
     const Is = 2 / 3 * ms * R * R, eps = 1e-4;
     const c1 = Math.cos(q[1]), s1 = Math.sin(q[1]), c2 = Math.cos(q[2]), s2 = Math.sin(q[2]);
     const M00 = ms + Is / (R * R) + mp + mh, M01 = mp * l * c1, M02 = mh * L * c2;
     const M11 = mp * l * l + eps, M22 = mh * L * L + eps;
-    const r0 = Q[0] + mp * l * s1 * qd[1] * qd[1] + mh * L * s2 * qd[2] * qd[2];
-    const r1 = Q[1] - mp * G * l * s1;
-    const r2 = Q[2] + mh * G * L * s2;
+    // Ground inclined by beta in this plane (rising towards +s). State is in the slope frame: s along the slope,
+    // a1 (pendulum, hanging convention) and a2 (head, upright convention) measured from the slope normal.
+    // World angle from vertical: pendulum a1 + beta, head a2 - beta. beta = 0 gives the flat-ground equations.
+    const b = beta || 0;
+    const r0 = Q[0] + mp * l * s1 * qd[1] * qd[1] + mh * L * s2 * qd[2] * qd[2] - (ms + mp + mh) * G * Math.sin(b);
+    const r1 = Q[1] - mp * G * l * Math.sin(q[1] + b);
+    const r2 = Q[2] + mh * G * L * Math.sin(q[2] - b);
     const den = M00 - M01 * M01 / M11 - M02 * M02 / M22;
     const a0 = (r0 - M01 * r1 / M11 - M02 * r2 / M22) / den;
     return [a0, (r1 - M01 * a0) / M11, (r2 - M02 * a0) / M22];
@@ -741,7 +827,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
     constructor(params) { this.p = Object.assign(defaultParams(), params || {}); this.reset(); }
 
     reset() {
-      this.t = 0;
+      this.t = 0; this.betaP = 0; this.betaR = 0;
       this.pq = [0, 0, 0]; this.pqd = [0, 0, 0];   // pitch: x, theta (pendulum fwd +), alpha (head fwd +)
       this.rq = [0, 0, 0]; this.rqd = [0, 0, 0];   // roll:  y, chi (pendulum right +), zeta (head right +)
       this.wX = 0; this.wZ = 0; this.psi = 0; this.psiDot = 0; this.spinRate = 0; this.aLat = 0; this.trail = [[0, 0]]; this.trailAcc = 0;
@@ -768,8 +854,10 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
     rampSpeed() { const p = this.p; return [p.ramping1, p.ramping2, p.ramping3][p.speedLevel - 1] || p.ramping1; }
     spinSpeed() { const p = this.p; return p.spinLevel === 2 ? p.spinSpeed2 : p.spinSpeed1; }
 
-    pitchDeg() { return this.pq[1] * R2D; }
-    leanDeg() { return this.rq[0] / this.p.R * R2D; }
+    pitchDeg() { return (this.pq[1] + this.betaP) * R2D; }   // IMU, relative to true vertical (incline, see sim.js)
+    leanDeg() { return (this.rq[0] / this.p.R - this.betaR) * R2D; }
+    headPitchDeg() { return (this.pq[2] - this.betaP) * R2D; }
+    headRollDeg() { return (this.rq[2] - this.betaR) * R2D; }
     rollTiltRel() { return this.rq[1] + this.rq[0] / this.p.R; }
     // Sabertooth: 1000..2000 µs -> -1..+1. VarSpeedServo degrees -> µs: 1000 + deg*1000/180
     driveU() { return clamp((this.drivePulse.v - 90) / 90, -1, 1); }
@@ -836,7 +924,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       const tauM = p.tauStall * (this.driveU() - wRel / w0) - p.bBear * wRel;
       const tauH = this.servoTorque(this.headJoint(this.panCmd.v), q[2] + q[1], qd[2] + qd[1], p.mh * p.L * p.L + 1e-3, p.headGear, p.headServoStall, p.headServoNoLoad);
       this.tauM = tauM;
-      return [tauM / R - p.cRoll * qd[0], tauM + tauH, tauH];
+      return [tauM / R - rollingResistance(p, qd[0]), tauM + tauH, tauH];
     }
     forcesRoll(q, qd) {
       const p = this.p, R = p.R;
@@ -845,23 +933,23 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       this.tauR = tauR;
       const a = p.turning ? this.aLat : 0;
       const fS = -(p.ms + p.mp + p.mh) * a, f1 = -p.mp * a * p.l * Math.cos(q[1]), f2 = -p.mh * a * p.L * Math.cos(q[2]);
-      return [tauR / R - tauD / R - p.cRoll * qd[0] + fS, tauR + f1, tauD + f2];
+      return [tauR / R - tauD / R - rollingResistance(p, qd[0]) + fS, tauR + f1, tauD + f2];
     }
     computeShear() {
       const p = this.p, m = p.domeShellMass, Lo = p.domeShellL, tauM = this.tauM, tauR = this.tauR;
-      const ap = planarAcc(p, this.pq, this.pqd, this.forcesPitch(this.pq, this.pqd));
-      const ar = planarAcc(p, this.rq, this.rqd, this.forcesRoll(this.rq, this.rqd));
+      const ap = planarAcc(p, this.pq, this.pqd, this.forcesPitch(this.pq, this.pqd), this.betaP);
+      const ar = planarAcc(p, this.rq, this.rqd, this.forcesRoll(this.rq, this.rqd), this.betaR);
       const al = this.pq[2], ze = this.rq[2], aLat = p.turning ? this.aLat : 0;
-      this.shearP = m * (ap[0] * Math.cos(al) + Lo * ap[2]) - m * G * Math.sin(al);
-      this.shearR = m * ((ar[0] + aLat) * Math.cos(ze) + Lo * ar[2]) - m * G * Math.sin(ze);
+      this.shearP = m * (ap[0] * Math.cos(al) + Lo * ap[2]) - m * G * Math.sin(al - this.betaP);   // gravity relative to the slope
+      this.shearR = m * ((ar[0] + aLat) * Math.cos(ze) + Lo * ar[2]) - m * G * Math.sin(ze - this.betaR);
       this.shear = Math.hypot(this.shearP, this.shearR);
       this.shearG = this.shear / (m * G);              // in units of the shell's weight (1 = holding it sideways, 90 deg)
       this.shearUse = this.shearG / p.domeHoldG;       // fraction of the magnet capacity
       this.shearPeak = Math.max(this.shearPeak, this.shearUse);
       this.tauM = tauM; this.tauR = tauR;              // forcesPitch/forcesRoll above overwrite these; keep the integrator's values
     }
-    rk4(q, qd, forces, h) {
-      const f = (q, qd) => planarAcc(this.p, q, qd, forces.call(this, q, qd));
+    rk4(q, qd, forces, h, beta) {
+      const f = (q, qd) => planarAcc(this.p, q, qd, forces.call(this, q, qd), beta);
       const add = (a, b, k) => a.map((v, i) => v + k * b[i]);
       const k1v = qd, k1a = f(q, qd);
       const q2 = add(q, k1v, h / 2), v2 = add(qd, k1a, h / 2), k2a = f(q2, v2);
@@ -889,8 +977,12 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         const turn = p.turning ? v / p.R * Math.sin(rho) : 0;
         this.psiDot = turn + this.spinRate;
         this.aLat = v * this.psiDot; // spin while driving curves the path as well
-        this.rk4(this.pq, this.pqd, this.forcesPitch, h);
-        this.rk4(this.rq, this.rqd, this.forcesRoll, h);
+        // Incline: world slope (inclineX uphill towards +X = initial forward, inclineY uphill towards +Z = initial right),
+        // projected onto this droid's pitch plane (forward) and roll plane (right) with its current heading.
+        { const bx = p.inclineX * D2R, by = p.inclineY * D2R, c = Math.cos(this.psi), sn = Math.sin(this.psi);
+          this.betaP = bx * c + by * sn; this.betaR = -bx * sn + by * c; }
+        this.rk4(this.pq, this.pqd, this.forcesPitch, h, this.betaP);
+        this.rk4(this.rq, this.rqd, this.forcesRoll, h, this.betaR);
         this.computeShear();
         this.tiltLoad = Math.abs(this.tauR || 0) / (p.tiltServoStall * p.tiltGear);
         this.tiltLoadPeak = Math.max(this.tiltLoadPeak, this.tiltLoad);
@@ -919,7 +1011,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
       this.log.push({
         t: this.t, vGround: this.pqd[0] * 1000,
         sp2: this.sp2 / 90 * 100, out2: this.out2 / 90 * 100, drv: this.driveU() * 100,
-        pitch: this.pitchDeg(), headP: this.pq[2] * R2D,
+        pitch: this.pitchDeg(), headP: this.headPitchDeg(),
         sp1: this.sp1, lean: this.leanDeg(), tilt: this.tiltJoint(this.tiltCmd.v) * R2D, ds,
       });
       if (this.log.length > 1500) this.log.splice(0, this.log.length - 1500);
@@ -945,6 +1037,7 @@ const P_BB = [
   ['ms','Sphere shell mass',0.5,10,0.1,'mech','kg'],
   ['L','Head CoM distance above sphere center',0.26,0.45,0.005,'mech','m'],
   ['cRoll','Rolling resistance (viscous)',0,20,0.1,'mech','N/(m/s)'],
+  ['crr','Rolling resistance coefficient (× weight; ground presets)',0,0.1,0.001,'mech',''],
   ['bBear','Drive bearing friction',0,1,0.01,'mech','Nm/(rad/s)'],
   ['tauStall','Motor: stall torque at output',2,80,0.5,'mech','Nm'],
   ['vNoLoad','Motor: no-load speed at PWM 255',500,5000,50,'mech','mm/s'],
@@ -954,6 +1047,16 @@ const P_BB = [
   ['servoZeta','Servo damping ratio',0.1,2,0.05,'mech',''],
   ['domePitchReduction','Dome pitch servo reduction (assumption)',0.5,4,0.1,'mech','°/°'],
   ['imuFilterCutoff','IMUControlInput low-pass',5,100,1,'mech','Hz'],
+  ['#Position control (pos_*, auto_pos_*)'],
+  ['posKp','pos_kp',0,5,0.05,'ctrl','(mm/s)/mm'],
+  ['posKi','pos_ki',0,2,0.05,'ctrl','(mm/s)/(mm·s)'],
+  ['posKd','pos_kd',0,1,0.01,'ctrl',''],
+  ['posStickRange','Position mode: offset at full stick (firmware: 1000)',100,3000,50,'ctrl','mm'],
+  ['autoPosKp','auto_pos_kp',0,10,0.1,'ctrl','(mm/s)/mm'],
+  ['autoPosKi','auto_pos_ki',0,3,0.05,'ctrl','(mm/s)/(mm·s)'],
+  ['autoPosKd','auto_pos_kd',0,1,0.01,'ctrl',''],
+  ['autoPosMaxSpeed','auto_pos_max_speed: switch only below (0 = off)',0,300,5,'ctrl','mm/s'],
+  ['autoPosMaxWait','auto_pos_max_wait: switch at the latest after',0,3,0.1,'ctrl','s'],
   ['#Speed controller (drive_speed_*)'],
   ['driveSpeedKp','drive_speed_kp',0,0.5,0.005,'ctrl','PWM/(mm/s)'],
   ['driveSpeedKi','drive_speed_ki',0,2,0.01,'ctrl','PWM/mm'],
@@ -1024,6 +1127,7 @@ const P_CARY = [
   ['ms','Shell mass',0.5,10,0.1,'mech','kg'],
   ['L','Head CoG above ball centre',0.26,0.45,0.005,'mech','m'],
   ['cRoll','Rolling resistance (viscous)',0,20,0.1,'mech','N/(m/s)'],
+  ['crr','Rolling resistance coefficient (× weight; ground presets)',0,0.1,0.001,'mech',''],
   ['bBear','Drive bearing friction',0,1,0.01,'mech','Nm/(rad/s)'],
   ['tauStall','Drive motor: stall torque at the shell, full command',2,80,0.5,'mech','Nm'],
   ['vNoLoad','Drive motor: no-load speed at full command',500,5000,50,'mech','mm/s'],
@@ -1082,9 +1186,11 @@ const P_CARY = [
 // ------------------------------------------------------------ sims and parameter panels
 const load = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
 const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-const simB = new BB8Sim(load('sbs-bb8-v4') || {}); // defaults = firmware defaults, measured head
-const simC = new CarySim(load('sbs-cary-v2') || {speedLevel: 3});
-const saveB = () => store('sbs-bb8-v4', simB.p), saveC = () => store('sbs-cary-v2', simC.p);
+const simB = new BB8Sim(load('sbs-bb8-v8') || {}); // defaults = firmware defaults, measured head
+const simC = new CarySim(load('sbs-cary-v4') || {speedLevel: 3});
+const saveB = () => store('sbs-bb8-v8', simB.p), saveC = () => store('sbs-cary-v4', simC.p);
+// Ground presets (rolling resistance, sim.js GROUNDS): applied to both droids
+const groundOf = p => { for (const [k, g] of Object.entries(window.BB8.GROUNDS)) if (Math.abs(p.crr - g.crr) < 1e-9 && Math.abs(p.cRoll - g.cRoll) < 1e-9) return k; return 'custom'; };
 const fmt = (v, st) => { const d = st >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(st))); return (+v).toFixed(d); };
 
 function buildParams(P, sim, secs, save, pre) {
@@ -1120,6 +1226,7 @@ $('bDefC').onclick = () => { const d = window.CARY.defaultParams(); for (const e
 
 function syncQuick() {
   $('qBBmax').value = simB.p.driveSpeedMax; $('sLevel').value = String(simC.p.speedLevel); $('sSpin').value = String(simC.p.spinLevel);
+  const gB = groundOf(simB.p), gC = groundOf(simC.p); $('sGround').value = gB === gC ? gB : 'custom';
   const t = (id, on, a, b) => { $(id).textContent = on ? a : b; $(id).classList.toggle('on', !!on); };
   t('bDriveB', simB.input.driveOn, 'BBDroids: drive on', 'BBDroids: drive off');
   t('bDrive', simC.p.driveEnabled, 'Cary Start: drive on', 'Cary Start: drive off');
@@ -1130,6 +1237,22 @@ $('qBBmax').onchange = e => { const v = +e.target.value; if (isFinite(v) && v > 
 function setLevel(n) { simC.p.speedLevel = n; saveC(); syncQuick(); }
 $('sLevel').onchange = e => setLevel(+e.target.value);
 $('sSpin').onchange = e => { simC.p.spinLevel = +e.target.value; saveC(); };
+$('sGround').onchange = e => { const g = window.BB8.GROUNDS[e.target.value]; if (!g) return;
+  for (const sim of [simB, simC]) { sim.p.crr = g.crr; sim.p.cRoll = g.cRoll; sim.applyParams(); }
+  saveB(); saveC(); rebuildB(); rebuildC(); syncQuick(); };
+// Ground incline (both axes, world directions): sliders write inclineX / inclineY of both droids
+function bindIncline(key, rId, nId, sims, persist) {
+  const r = $(rId), n = $(nId), show = v => { r.value = v; n.value = (+v).toFixed(1); };
+  const set = v => { if (!isFinite(v)) return; v = Math.max(-15, Math.min(15, v)); for (const s of sims) s.p[key] = v; persist(); show(v); };
+  r.oninput = () => set(+r.value); n.onchange = () => set(+n.value); show(sims[0].p[key]);
+}
+// Drive mode (BB8 driveMode_): vel / pos / autopos
+const syncMode = () => { $('sMode').value = simB.p.driveMode; };
+$('sMode').onchange = e => { simB.p.driveMode = e.target.value; saveB(); syncMode(); };
+syncMode();
+const modeName = s => ({vel: 'velocity', pos: 'position', autopos: 'auto position', off: 'off'})[s.driveState] + (s.p.driveMode === 'autopos' && s.driveState === 'vel' ? ' (auto)' : '');
+bindIncline('inclineX', 'rIncX', 'nIncX', [simB, simC], () => { saveB(); saveC(); });
+bindIncline('inclineY', 'rIncY', 'nIncY', [simB, simC], () => { saveB(); saveC(); });
 $('bDriveB').onclick = () => { simB.input.driveOn = !simB.input.driveOn; syncQuick(); };
 $('bDrive').onclick = () => { simC.p.driveEnabled = !simC.p.driveEnabled; saveC(); syncQuick(); };
 $('bGyro').onclick = () => { simC.p.gyroEnabled = !simC.p.gyroEnabled; saveC(); syncQuick(); };
@@ -1206,9 +1329,13 @@ const vAll = makeView('v3d'), vB = makeView('v3dB'), vC = makeView('v3dC');
 const scene = new THREE.Scene();
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.85));
 const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(2, 4, 1.5); scene.add(sun);
-const grid = new THREE.GridHelper(80, 160, 0x8a939d, 0xb9c0c7); scene.add(grid);
+// The ground (and everything standing on it) sits in a tilted terrain group; physics state is in slope coordinates.
+const terrain = new THREE.Group(); scene.add(terrain);
+const setTerrainTilt = (ix, iy) => { terrain.rotation.set(-iy * Math.PI / 180, 0, ix * Math.PI / 180); terrain.updateMatrixWorld(true); };
+const toWorld = (x, y, z) => terrain.localToWorld(new THREE.Vector3(x, y, z));
+const grid = new THREE.GridHelper(80, 160, 0x8a939d, 0xb9c0c7); terrain.add(grid);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshBasicMaterial({color: 0xdde1e5, transparent: true, opacity: 0.35}));
-ground.rotation.x = -Math.PI / 2; ground.position.y = -0.001; scene.add(ground);
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.001; terrain.add(ground);
 const LANE = 0.6; // lateral start offset of each droid
 function ballTexture(ring) {
   const c = document.createElement('canvas'); c.width = 1024; c.height = 512; const g = c.getContext('2d');
@@ -1223,11 +1350,13 @@ function labelSprite(text, col) {
   g.lineWidth = 10; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.strokeText(text, 256, 64); g.fillStyle = col; g.fillText(text, 256, 64);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: new THREE.CanvasTexture(c), depthTest: false})); sp.scale.set(1.0, 0.25, 1); sp.renderOrder = 5; return sp;
 }
+const SHEAR_WARN = 0.7; // dome shear above 70 % of the magnet capacity: red view and red dome
+const RED = new THREE.Color(0xd62828), WHITE = new THREE.Color(0xf5f3ee);
 function makeDroid(sim, ring, accent, label, lane) {
   const d = {sim, lane, quat: new THREE.Quaternion(), lastX: 0, lastZ: lane};
-  d.group = new THREE.Group(); scene.add(d.group);
+  d.group = new THREE.Group(); terrain.add(d.group);
   d.ball = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), new THREE.MeshStandardMaterial({map: ballTexture(ring), transparent: true, opacity: 0.55, roughness: 0.5, depthWrite: false}));
-  d.ball.renderOrder = 2; scene.add(d.ball);
+  d.ball.renderOrder = 2; terrain.add(d.ball);
   const steel = new THREE.MeshStandardMaterial({color: 0x55606b});
   d.axle = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 12), steel); d.group.add(d.axle);
   d.rod = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 10), steel); d.group.add(d.rod);
@@ -1235,14 +1364,15 @@ function makeDroid(sim, ring, accent, label, lane) {
   d.mast = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 10), new THREE.MeshStandardMaterial({color: 0x8a949e})); d.group.add(d.mast);
   d.dome = new THREE.Group(); d.group.add(d.dome);
   const dr = 0.15;
-  d.dome.add(new THREE.Mesh(new THREE.SphereGeometry(dr, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({color: 0xf5f3ee, roughness: 0.45})));
+  d.domeMat = new THREE.MeshStandardMaterial({color: 0xf5f3ee, roughness: 0.45});
+  d.dome.add(new THREE.Mesh(new THREE.SphereGeometry(dr, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), d.domeMat));
   const band = new THREE.Mesh(new THREE.TorusGeometry(dr * 0.97, 0.012, 8, 48), new THREE.MeshStandardMaterial({color: accent})); band.rotation.x = Math.PI / 2; band.position.y = 0.035; d.dome.add(band);
   const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 20, 14), new THREE.MeshStandardMaterial({color: 0x15181c, roughness: 0.15})); eye.position.set(dr * 0.82, 0.075, 0); d.dome.add(eye);
-  d.label = labelSprite(label, ring); scene.add(d.label);
+  d.label = labelSprite(label, ring); terrain.add(d.label);
   d.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.24, 40), new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: 0.18}));
-  d.shadow.rotation.x = -Math.PI / 2; scene.add(d.shadow);
+  d.shadow.rotation.x = -Math.PI / 2; terrain.add(d.shadow);
   d.trailGeo = new THREE.BufferGeometry(); d.trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(1200 * 3), 3));
-  d.trail = new THREE.Line(d.trailGeo, new THREE.LineBasicMaterial({color: ring})); d.trail.frustumCulled = false; scene.add(d.trail);
+  d.trail = new THREE.Line(d.trailGeo, new THREE.LineBasicMaterial({color: ring})); d.trail.frustumCulled = false; terrain.add(d.trail);
   return d;
 }
 const dB = makeDroid(simB, '#e8742a', 0xe8742a, 'BBDroids', -LANE), dC = makeDroid(simC, '#2867c9', 0x2867c9, 'Cary V1', LANE);
@@ -1273,14 +1403,16 @@ function updDroid(d) {
   d.trailGeo.setDrawRange(0, n); d.trailGeo.attributes.position.needsUpdate = true;
 }
 function update3d() {
+  setTerrainTilt(simB.p.inclineX, simB.p.inclineY);
   updDroid(dB); updDroid(dC);
   const X = (simB.wX + simC.wX) / 2, Z = (simB.wZ - LANE + simC.wZ + LANE) / 2;
   const sep = Math.hypot(simB.wX - simC.wX, simB.wZ - LANE - simC.wZ - LANE);
   const k = Math.max(1, sep / 1.6);
   const cam = vAll.cam;
-  if (camFollow) { const psi = (simB.psi + simC.psi) / 2, c = Math.cos(psi), s = Math.sin(psi), bx = -2.2 * k, bz = 0.6 * k; cam.position.set(X + bx * c - bz * s, 1.3 * k, Z + bx * s + bz * c); }
-  else cam.position.set(X - 2.6 * k, 2.4 * k, Z + 2.0 * k);
-  cam.lookAt(X, 0.2, Z);
+  const tgt = toWorld(X, 0.2, Z);   // midpoint in world coordinates (terrain may be tilted)
+  if (camFollow) { const psi = (simB.psi + simC.psi) / 2, c = Math.cos(psi), s = Math.sin(psi), bx = -2.2 * k, bz = 0.6 * k; cam.position.set(tgt.x + bx * c - bz * s, tgt.y + 1.3 * k - 0.2, tgt.z + bx * s + bz * c); }
+  else cam.position.set(tgt.x - 2.6 * k, tgt.y + 2.4 * k - 0.2, tgt.z + 2.0 * k);
+  cam.lookAt(tgt);
   grid.position.set(Math.round(X / 0.5) * 0.5, 0, Math.round(Z / 0.5) * 0.5); ground.position.set(X, -0.001, Z);
   const dark = matchMedia('(prefers-color-scheme: dark)').matches;
   ground.material.color.set(dark ? 0x2a3038 : 0xdde1e5);
@@ -1290,9 +1422,10 @@ function update3d() {
   // per-droid views: same camera offset as the single-droid pages, centred on that droid
   for (const [v, sim, d] of [[vB, simB, dB], [vC, simC, dC]]) {
     const x = sim.wX, z = sim.wZ + d.lane, R = sim.p.R;
-    if (camFollow) { const c = Math.cos(sim.psi), s = Math.sin(sim.psi), bx = -1.5, bz = 0.55; v.cam.position.set(x + bx * c - bz * s, 1.0, z + bx * s + bz * c); }
-    else v.cam.position.set(x - 2.0, 2.0, z + 1.6);
-    v.cam.lookAt(x, R * 0.8, z);
+    const t2 = toWorld(x, R * 0.8, z);
+    if (camFollow) { const c = Math.cos(sim.psi), s = Math.sin(sim.psi), bx = -1.5, bz = 0.55; v.cam.position.set(t2.x + bx * c - bz * s, t2.y + 1.0 - R * 0.8, t2.z + bx * s + bz * c); }
+    else v.cam.position.set(t2.x - 2.0, t2.y + 2.0 - R * 0.8, t2.z + 1.6);
+    v.cam.lookAt(t2);
     grid.position.set(Math.round(x / 0.5) * 0.5, 0, Math.round(z / 0.5) * 0.5); ground.position.set(x, -0.001, z);
     v.renderer.render(scene, v.cam);
   }
@@ -1318,6 +1451,7 @@ function drawRiss(cv, side, sim, name, col) {
   g.font = '600 13px "Barlow Semi Condensed",Barlow,system-ui,sans-serif'; g.textBaseline = 'top'; g.textAlign = 'left';
   g.fillStyle = col; g.fillText(name, 10, 8);
   g.fillStyle = C.mute; g.fillText(side ? '· side (from the right, front →)' : '· front (droid’s right ←)', 10 + g.measureText(name).width + 4, 8);
+  { const b = side ? sim.betaP : sim.betaR; g.save(); g.translate(cx, gy); g.rotate(-flip * b); g.translate(-cx, -gy); } // incline: tilt ground and droid together
   g.strokeStyle = C.steel; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, gy); g.lineTo(W, gy); g.stroke();
   g.lineWidth = 1; g.strokeStyle = C.line; g.fillStyle = C.mute; g.font = '12px Barlow,system-ui,sans-serif'; g.textAlign = 'center';
   const span = W / s / 2 + 0.3;
@@ -1349,9 +1483,10 @@ function drawRiss(cv, side, sim, name, col) {
   const [sx, sy] = P2(cu, cz);
   g.strokeStyle = C.blue; g.lineWidth = 1.5; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx, gy); g.stroke(); g.setLineDash([]);
   g.fillStyle = C.blue; g.beginPath(); g.arc(sx, sy, 4, 0, 7); g.fill();
+  g.restore();
   g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.font = '500 13px Barlow,system-ui,sans-serif'; g.fillStyle = C.ink;
-  const lines = side ? [`Pendulum ${(th * R2D).toFixed(1)}°`, `Head ${(al * R2D).toFixed(1)}°`, `v ${(sim.pqd[0] * 1000).toFixed(0)} mm/s`]
-    : [`Lean ${sim.leanDeg().toFixed(1)}°`, `Pendulum rel. ${(sim.rollTiltRel() * R2D).toFixed(1)}°`, `Head ${(al * R2D).toFixed(1)}°`];
+  const lines = side ? [`Pendulum ${sim.pitchDeg().toFixed(1)}°`, `Head ${sim.headPitchDeg().toFixed(1)}°`, `v ${(sim.pqd[0] * 1000).toFixed(0)} mm/s`]
+    : [`Lean ${sim.leanDeg().toFixed(1)}°`, `Pendulum rel. ${(sim.rollTiltRel() * R2D).toFixed(1)}°`, `Head ${sim.headRollDeg().toFixed(1)}°`];
   lines.forEach((t, i) => g.fillText(t, 10, 40 + i * 16));
 }
 
@@ -1359,7 +1494,7 @@ function drawRiss(cv, side, sim, name, col) {
 const LOG = [];
 function logSample() {
   LOG.push({t: simB.t, vB: simB.pqd[0] * 1000, vC: simC.pqd[0] * 1000, pB: simB.pitchDeg(), pC: simC.pitchDeg(),
-    hB: simB.pq[2] * R2D, hC: simC.pq[2] * R2D, lB: simB.leanDeg(), lC: simC.leanDeg(), sB: simB.shearG, sC: simC.shearG});
+    hB: simB.headPitchDeg(), hC: simC.headPitchDeg(), lB: simB.leanDeg(), lC: simC.leanDeg(), sB: simB.shearG, sC: simC.shearG});
   while (LOG.length && LOG[LOG.length - 1].t - LOG[0].t > 12) LOG.shift();
 }
 const PLOTS = [['p0', 'leg0', 'vB', 'vC'], ['p1', 'leg1', 'pB', 'pC'], ['p2', 'leg2', 'hB', 'hC'], ['p3', 'leg3', 'lB', 'lC'], ['p4', 'leg4', 'sB', 'sC', true]];
@@ -1388,6 +1523,7 @@ $('bReset').onclick = () => {
 };
 const readout = $('readout');
 const hdg = s => `${(((s.psi * R2D) % 360 + 540) % 360 - 180).toFixed(0)}°`;
+const rad = s => Math.abs(s.psiDot) > 1e-3 ? `${Math.abs(s.pqd[0] / s.psiDot).toFixed(2)} m` : '–';
 let last = performance.now(), acc = 0, frame = 0;
 function loop(now) {
   const dtReal = Math.min(0.05, (now - last) / 1000); last = now;
@@ -1404,6 +1540,9 @@ function loop(now) {
     let x = stick[st.kx], y = stick[st.ky]; const mq = Math.max(Math.abs(x), Math.abs(y)), hq = Math.hypot(x, y); if (hq > 1e-9) { x *= mq / hq; y *= mq / hq; } st.knob.style.transform = `translate(${x * 118}%, ${-y * 118}%)`;
   }
   $('capV').textContent = stick.v.toFixed(2); $('capR').textContent = stick.r.toFixed(2); $('capHP').textContent = stick.hp.toFixed(2); $('capHR').textContent = stick.hr.toFixed(2);
+  const wB = simB.shearUse > SHEAR_WARN, wC = simC.shearUse > SHEAR_WARN;
+  $('v3dB').classList.toggle('shear', wB); $('v3dC').classList.toggle('shear', wC); $('v3d').classList.toggle('shear', wB || wC);
+  dB.domeMat.color.copy(wB ? RED : WHITE); dC.domeMat.color.copy(wC ? RED : WHITE);
   update3d();
   drawRiss($('cSideB'), true, simB, 'BBDroids', C.cB); drawRiss($('cSideC'), true, simC, 'Cary V1', C.cC);
   drawRiss($('cFrontB'), false, simB, 'BBDroids', C.cB); drawRiss($('cFrontC'), false, simC, 'Cary V1', C.cC);
@@ -1411,11 +1550,13 @@ function loop(now) {
   const rows = [['', '<span style="color:var(--cB)">BBDroids</span>', '<span style="color:var(--cC)">Cary</span>'],
     ['Speed', `${(simB.pqd[0] * 1000).toFixed(0)} mm/s`, `${(simC.pqd[0] * 1000).toFixed(0)} mm/s`],
     ['Pendulum', `${simB.pitchDeg().toFixed(1)}°`, `${simC.pitchDeg().toFixed(1)}°`],
-    ['Head pitch', `${(simB.pq[2] * R2D).toFixed(1)}°`, `${(simC.pq[2] * R2D).toFixed(1)}°`],
+    ['Head pitch', `${simB.headPitchDeg().toFixed(1)}°`, `${simC.headPitchDeg().toFixed(1)}°`],
     ['Lean', `${simB.leanDeg().toFixed(1)}°`, `${simC.leanDeg().toFixed(1)}°`],
     ['Roll servo load', `${(simB.rollLoad * 100).toFixed(0)} %`, `${(simC.tiltLoad * 100).toFixed(0)} %`],
     ['Dome shear / peak', `${((simB.shearUse || 0) * 100).toFixed(0)} / ${((simB.shearPeak || 0) * 100).toFixed(0)} %`, `${((simC.shearUse || 0) * 100).toFixed(0)} / ${((simC.shearPeak || 0) * 100).toFixed(0)} %`],
     ['Heading', hdg(simB), hdg(simC)],
+    ['Curve radius', rad(simB), rad(simC)],
+    ['Drive mode', modeName(simB), 'velocity (no position control)'],
     ['Distance', `${simB.pq[0].toFixed(2)} m`, `${simC.pq[0].toFixed(2)} m`]];
   readout.innerHTML = rows.map((r, i) => i === 0 ? `<span></span><b class="hd">${r[1]}</b><b class="hd">${r[2]}</b>` : `<span>${r[0]}</span><b>${r[1]}</b><b>${r[2]}</b>`).join('') + `<span>Time</span><b>${simB.t.toFixed(1)} s</b><b></b>`;
   requestAnimationFrame(loop);

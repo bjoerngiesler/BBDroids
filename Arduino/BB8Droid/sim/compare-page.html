@@ -29,6 +29,10 @@ main{display:grid;grid-template-columns:minmax(0,1fr) 370px;gap:14px;padding:0 m
 .card{background:var(--panel);border:1px solid var(--line);border-radius:10px}
 .views{display:grid;gap:14px;align-content:start}
 .v3d{position:relative;height:clamp(300px,46vh,500px);overflow:hidden}
+.v3d::after{content:"";position:absolute;inset:0;border-radius:10px;pointer-events:none;transition:box-shadow .15s}
+.v3d.shear::after{box-shadow:inset 0 0 0 4px #d62828,inset 0 0 90px rgba(214,40,40,.45)}
+.v3d .shearTag{position:absolute;left:50%;top:10px;transform:translateX(-50%);font:700 13px Barlow,system-ui,sans-serif;color:#fff;background:#d62828;padding:2px 10px;border-radius:6px;display:none;z-index:2}
+.v3d.shear .shearTag{display:block}
 .v3d canvas{display:block;width:100%;height:100%;border-radius:10px}
 .vlabel{position:absolute;left:12px;top:10px;font:600 13px "Barlow Semi Condensed",Barlow,system-ui,sans-serif;color:var(--mute);background:color-mix(in srgb,var(--panel) 80%,transparent);padding:2px 8px;border-radius:6px}
 .camb{position:absolute;left:10px;bottom:10px;min-height:36px;background:color-mix(in srgb,var(--panel) 85%,transparent)}
@@ -93,11 +97,11 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
 </header>
 <main>
   <div class="views">
-    <div class="card v3d" id="v3d"><span class="vlabel">3D combined · BBDroids left lane, Cary right lane</span>
+    <div class="card v3d" id="v3d"><span class="vlabel">3D combined · BBDroids left lane, Cary right lane</span><span class="shearTag">Dome shear &gt; 70 %</span>
       <div class="readout" id="readout"></div><button id="bCam" class="camb">Cameras: fixed</button></div>
     <div class="v3row">
-      <div class="card v3d" id="v3dB"><span class="vlabel" style="color:var(--cB)">BBDroids, following</span></div>
-      <div class="card v3d" id="v3dC"><span class="vlabel" style="color:var(--cC)">Cary V1, following</span></div>
+      <div class="card v3d" id="v3dB"><span class="vlabel" style="color:var(--cB)">BBDroids, following</span><span class="shearTag">Dome shear &gt; 70 %</span></div>
+      <div class="card v3d" id="v3dC"><span class="vlabel" style="color:var(--cC)">Cary V1, following</span><span class="shearTag">Dome shear &gt; 70 %</span></div>
     </div>
     <div class="riss4">
       <div class="card"><div class="fig"><canvas id="cSideB"></canvas></div></div>
@@ -133,6 +137,10 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         <label>BBDroids drive_speed_max [mm/s]<input type="number" id="qBBmax" min="200" max="3000" step="50"></label>
         <label>Cary speed level (R3)<select id="sLevel"><option value="1">1 (DRIVESPEED1)</option><option value="2">2 (DRIVESPEED2)</option><option value="3">3 (DRIVESPEED3)</option></select></label>
         <label>Keyboard stick travel [s, 0 → full]<input type="number" id="keySlew" min="0" max="3" step="0.05" value="0.25"></label>
+        <label>Ground (both droids)<select id="sGround" aria-label="Ground"><option value="smooth">Smooth hard floor</option><option value="office">Low-pile office carpet</option><option value="living">Medium-pile living-room carpet</option><option value="custom" disabled>Custom (sliders)</option></select></label>
+        <label>Incline X [° uphill towards the start direction, both droids]<input type="range" id="rIncX" min="-15" max="15" step="0.5" aria-label="Incline X"><input type="number" id="nIncX" min="-15" max="15" step="0.5"></label>
+        <label>Incline Y [° uphill towards the right, both droids]<input type="range" id="rIncY" min="-15" max="15" step="0.5" aria-label="Incline Y"><input type="number" id="nIncY" min="-15" max="15" step="0.5"></label>
+        <label>BBDroids drive mode<select id="sMode" aria-label="BBDroids drive mode"><option value="vel">Drive mode: velocity</option><option value="pos">Drive mode: position</option><option value="autopos">Drive mode: auto position</option></select></label>
         <label>Cary spin speed (X+A)<select id="sSpin"><option value="1">Spin speed 1</option><option value="2">Spin speed 2</option></select></label>
       </div>
       <div class="btns">
@@ -189,6 +197,7 @@ const P_BB = [
   ['ms','Sphere shell mass',0.5,10,0.1,'mech','kg'],
   ['L','Head CoM distance above sphere center',0.26,0.45,0.005,'mech','m'],
   ['cRoll','Rolling resistance (viscous)',0,20,0.1,'mech','N/(m/s)'],
+  ['crr','Rolling resistance coefficient (× weight; ground presets)',0,0.1,0.001,'mech',''],
   ['bBear','Drive bearing friction',0,1,0.01,'mech','Nm/(rad/s)'],
   ['tauStall','Motor: stall torque at output',2,80,0.5,'mech','Nm'],
   ['vNoLoad','Motor: no-load speed at PWM 255',500,5000,50,'mech','mm/s'],
@@ -198,6 +207,16 @@ const P_BB = [
   ['servoZeta','Servo damping ratio',0.1,2,0.05,'mech',''],
   ['domePitchReduction','Dome pitch servo reduction (assumption)',0.5,4,0.1,'mech','°/°'],
   ['imuFilterCutoff','IMUControlInput low-pass',5,100,1,'mech','Hz'],
+  ['#Position control (pos_*, auto_pos_*)'],
+  ['posKp','pos_kp',0,5,0.05,'ctrl','(mm/s)/mm'],
+  ['posKi','pos_ki',0,2,0.05,'ctrl','(mm/s)/(mm·s)'],
+  ['posKd','pos_kd',0,1,0.01,'ctrl',''],
+  ['posStickRange','Position mode: offset at full stick (firmware: 1000)',100,3000,50,'ctrl','mm'],
+  ['autoPosKp','auto_pos_kp',0,10,0.1,'ctrl','(mm/s)/mm'],
+  ['autoPosKi','auto_pos_ki',0,3,0.05,'ctrl','(mm/s)/(mm·s)'],
+  ['autoPosKd','auto_pos_kd',0,1,0.01,'ctrl',''],
+  ['autoPosMaxSpeed','auto_pos_max_speed: switch only below (0 = off)',0,300,5,'ctrl','mm/s'],
+  ['autoPosMaxWait','auto_pos_max_wait: switch at the latest after',0,3,0.1,'ctrl','s'],
   ['#Speed controller (drive_speed_*)'],
   ['driveSpeedKp','drive_speed_kp',0,0.5,0.005,'ctrl','PWM/(mm/s)'],
   ['driveSpeedKi','drive_speed_ki',0,2,0.01,'ctrl','PWM/mm'],
@@ -268,6 +287,7 @@ const P_CARY = [
   ['ms','Shell mass',0.5,10,0.1,'mech','kg'],
   ['L','Head CoG above ball centre',0.26,0.45,0.005,'mech','m'],
   ['cRoll','Rolling resistance (viscous)',0,20,0.1,'mech','N/(m/s)'],
+  ['crr','Rolling resistance coefficient (× weight; ground presets)',0,0.1,0.001,'mech',''],
   ['bBear','Drive bearing friction',0,1,0.01,'mech','Nm/(rad/s)'],
   ['tauStall','Drive motor: stall torque at the shell, full command',2,80,0.5,'mech','Nm'],
   ['vNoLoad','Drive motor: no-load speed at full command',500,5000,50,'mech','mm/s'],
@@ -326,9 +346,11 @@ const P_CARY = [
 // ------------------------------------------------------------ sims and parameter panels
 const load = k => { try { return JSON.parse(localStorage.getItem(k) || 'null'); } catch (e) { return null; } };
 const store = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} };
-const simB = new BB8Sim(load('sbs-bb8-v4') || {}); // defaults = firmware defaults, measured head
-const simC = new CarySim(load('sbs-cary-v2') || {speedLevel: 3});
-const saveB = () => store('sbs-bb8-v4', simB.p), saveC = () => store('sbs-cary-v2', simC.p);
+const simB = new BB8Sim(load('sbs-bb8-v8') || {}); // defaults = firmware defaults, measured head
+const simC = new CarySim(load('sbs-cary-v4') || {speedLevel: 3});
+const saveB = () => store('sbs-bb8-v8', simB.p), saveC = () => store('sbs-cary-v4', simC.p);
+// Ground presets (rolling resistance, sim.js GROUNDS): applied to both droids
+const groundOf = p => { for (const [k, g] of Object.entries(window.BB8.GROUNDS)) if (Math.abs(p.crr - g.crr) < 1e-9 && Math.abs(p.cRoll - g.cRoll) < 1e-9) return k; return 'custom'; };
 const fmt = (v, st) => { const d = st >= 1 ? 0 : Math.min(4, Math.ceil(-Math.log10(st))); return (+v).toFixed(d); };
 
 function buildParams(P, sim, secs, save, pre) {
@@ -364,6 +386,7 @@ $('bDefC').onclick = () => { const d = window.CARY.defaultParams(); for (const e
 
 function syncQuick() {
   $('qBBmax').value = simB.p.driveSpeedMax; $('sLevel').value = String(simC.p.speedLevel); $('sSpin').value = String(simC.p.spinLevel);
+  const gB = groundOf(simB.p), gC = groundOf(simC.p); $('sGround').value = gB === gC ? gB : 'custom';
   const t = (id, on, a, b) => { $(id).textContent = on ? a : b; $(id).classList.toggle('on', !!on); };
   t('bDriveB', simB.input.driveOn, 'BBDroids: drive on', 'BBDroids: drive off');
   t('bDrive', simC.p.driveEnabled, 'Cary Start: drive on', 'Cary Start: drive off');
@@ -374,6 +397,22 @@ $('qBBmax').onchange = e => { const v = +e.target.value; if (isFinite(v) && v > 
 function setLevel(n) { simC.p.speedLevel = n; saveC(); syncQuick(); }
 $('sLevel').onchange = e => setLevel(+e.target.value);
 $('sSpin').onchange = e => { simC.p.spinLevel = +e.target.value; saveC(); };
+$('sGround').onchange = e => { const g = window.BB8.GROUNDS[e.target.value]; if (!g) return;
+  for (const sim of [simB, simC]) { sim.p.crr = g.crr; sim.p.cRoll = g.cRoll; sim.applyParams(); }
+  saveB(); saveC(); rebuildB(); rebuildC(); syncQuick(); };
+// Ground incline (both axes, world directions): sliders write inclineX / inclineY of both droids
+function bindIncline(key, rId, nId, sims, persist) {
+  const r = $(rId), n = $(nId), show = v => { r.value = v; n.value = (+v).toFixed(1); };
+  const set = v => { if (!isFinite(v)) return; v = Math.max(-15, Math.min(15, v)); for (const s of sims) s.p[key] = v; persist(); show(v); };
+  r.oninput = () => set(+r.value); n.onchange = () => set(+n.value); show(sims[0].p[key]);
+}
+// Drive mode (BB8 driveMode_): vel / pos / autopos
+const syncMode = () => { $('sMode').value = simB.p.driveMode; };
+$('sMode').onchange = e => { simB.p.driveMode = e.target.value; saveB(); syncMode(); };
+syncMode();
+const modeName = s => ({vel: 'velocity', pos: 'position', autopos: 'auto position', off: 'off'})[s.driveState] + (s.p.driveMode === 'autopos' && s.driveState === 'vel' ? ' (auto)' : '');
+bindIncline('inclineX', 'rIncX', 'nIncX', [simB, simC], () => { saveB(); saveC(); });
+bindIncline('inclineY', 'rIncY', 'nIncY', [simB, simC], () => { saveB(); saveC(); });
 $('bDriveB').onclick = () => { simB.input.driveOn = !simB.input.driveOn; syncQuick(); };
 $('bDrive').onclick = () => { simC.p.driveEnabled = !simC.p.driveEnabled; saveC(); syncQuick(); };
 $('bGyro').onclick = () => { simC.p.gyroEnabled = !simC.p.gyroEnabled; saveC(); syncQuick(); };
@@ -450,9 +489,13 @@ const vAll = makeView('v3d'), vB = makeView('v3dB'), vC = makeView('v3dC');
 const scene = new THREE.Scene();
 scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 0.85));
 const sun = new THREE.DirectionalLight(0xffffff, 0.75); sun.position.set(2, 4, 1.5); scene.add(sun);
-const grid = new THREE.GridHelper(80, 160, 0x8a939d, 0xb9c0c7); scene.add(grid);
+// The ground (and everything standing on it) sits in a tilted terrain group; physics state is in slope coordinates.
+const terrain = new THREE.Group(); scene.add(terrain);
+const setTerrainTilt = (ix, iy) => { terrain.rotation.set(-iy * Math.PI / 180, 0, ix * Math.PI / 180); terrain.updateMatrixWorld(true); };
+const toWorld = (x, y, z) => terrain.localToWorld(new THREE.Vector3(x, y, z));
+const grid = new THREE.GridHelper(80, 160, 0x8a939d, 0xb9c0c7); terrain.add(grid);
 const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshBasicMaterial({color: 0xdde1e5, transparent: true, opacity: 0.35}));
-ground.rotation.x = -Math.PI / 2; ground.position.y = -0.001; scene.add(ground);
+ground.rotation.x = -Math.PI / 2; ground.position.y = -0.001; terrain.add(ground);
 const LANE = 0.6; // lateral start offset of each droid
 function ballTexture(ring) {
   const c = document.createElement('canvas'); c.width = 1024; c.height = 512; const g = c.getContext('2d');
@@ -467,11 +510,13 @@ function labelSprite(text, col) {
   g.lineWidth = 10; g.strokeStyle = 'rgba(255,255,255,0.9)'; g.strokeText(text, 256, 64); g.fillStyle = col; g.fillText(text, 256, 64);
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({map: new THREE.CanvasTexture(c), depthTest: false})); sp.scale.set(1.0, 0.25, 1); sp.renderOrder = 5; return sp;
 }
+const SHEAR_WARN = 0.7; // dome shear above 70 % of the magnet capacity: red view and red dome
+const RED = new THREE.Color(0xd62828), WHITE = new THREE.Color(0xf5f3ee);
 function makeDroid(sim, ring, accent, label, lane) {
   const d = {sim, lane, quat: new THREE.Quaternion(), lastX: 0, lastZ: lane};
-  d.group = new THREE.Group(); scene.add(d.group);
+  d.group = new THREE.Group(); terrain.add(d.group);
   d.ball = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 32), new THREE.MeshStandardMaterial({map: ballTexture(ring), transparent: true, opacity: 0.55, roughness: 0.5, depthWrite: false}));
-  d.ball.renderOrder = 2; scene.add(d.ball);
+  d.ball.renderOrder = 2; terrain.add(d.ball);
   const steel = new THREE.MeshStandardMaterial({color: 0x55606b});
   d.axle = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 1, 12), steel); d.group.add(d.axle);
   d.rod = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.01, 1, 10), steel); d.group.add(d.rod);
@@ -479,14 +524,15 @@ function makeDroid(sim, ring, accent, label, lane) {
   d.mast = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 1, 10), new THREE.MeshStandardMaterial({color: 0x8a949e})); d.group.add(d.mast);
   d.dome = new THREE.Group(); d.group.add(d.dome);
   const dr = 0.15;
-  d.dome.add(new THREE.Mesh(new THREE.SphereGeometry(dr, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({color: 0xf5f3ee, roughness: 0.45})));
+  d.domeMat = new THREE.MeshStandardMaterial({color: 0xf5f3ee, roughness: 0.45});
+  d.dome.add(new THREE.Mesh(new THREE.SphereGeometry(dr, 40, 20, 0, Math.PI * 2, 0, Math.PI / 2), d.domeMat));
   const band = new THREE.Mesh(new THREE.TorusGeometry(dr * 0.97, 0.012, 8, 48), new THREE.MeshStandardMaterial({color: accent})); band.rotation.x = Math.PI / 2; band.position.y = 0.035; d.dome.add(band);
   const eye = new THREE.Mesh(new THREE.SphereGeometry(0.035, 20, 14), new THREE.MeshStandardMaterial({color: 0x15181c, roughness: 0.15})); eye.position.set(dr * 0.82, 0.075, 0); d.dome.add(eye);
-  d.label = labelSprite(label, ring); scene.add(d.label);
+  d.label = labelSprite(label, ring); terrain.add(d.label);
   d.shadow = new THREE.Mesh(new THREE.CircleGeometry(0.24, 40), new THREE.MeshBasicMaterial({color: 0x000000, transparent: true, opacity: 0.18}));
-  d.shadow.rotation.x = -Math.PI / 2; scene.add(d.shadow);
+  d.shadow.rotation.x = -Math.PI / 2; terrain.add(d.shadow);
   d.trailGeo = new THREE.BufferGeometry(); d.trailGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(1200 * 3), 3));
-  d.trail = new THREE.Line(d.trailGeo, new THREE.LineBasicMaterial({color: ring})); d.trail.frustumCulled = false; scene.add(d.trail);
+  d.trail = new THREE.Line(d.trailGeo, new THREE.LineBasicMaterial({color: ring})); d.trail.frustumCulled = false; terrain.add(d.trail);
   return d;
 }
 const dB = makeDroid(simB, '#e8742a', 0xe8742a, 'BBDroids', -LANE), dC = makeDroid(simC, '#2867c9', 0x2867c9, 'Cary V1', LANE);
@@ -517,14 +563,16 @@ function updDroid(d) {
   d.trailGeo.setDrawRange(0, n); d.trailGeo.attributes.position.needsUpdate = true;
 }
 function update3d() {
+  setTerrainTilt(simB.p.inclineX, simB.p.inclineY);
   updDroid(dB); updDroid(dC);
   const X = (simB.wX + simC.wX) / 2, Z = (simB.wZ - LANE + simC.wZ + LANE) / 2;
   const sep = Math.hypot(simB.wX - simC.wX, simB.wZ - LANE - simC.wZ - LANE);
   const k = Math.max(1, sep / 1.6);
   const cam = vAll.cam;
-  if (camFollow) { const psi = (simB.psi + simC.psi) / 2, c = Math.cos(psi), s = Math.sin(psi), bx = -2.2 * k, bz = 0.6 * k; cam.position.set(X + bx * c - bz * s, 1.3 * k, Z + bx * s + bz * c); }
-  else cam.position.set(X - 2.6 * k, 2.4 * k, Z + 2.0 * k);
-  cam.lookAt(X, 0.2, Z);
+  const tgt = toWorld(X, 0.2, Z);   // midpoint in world coordinates (terrain may be tilted)
+  if (camFollow) { const psi = (simB.psi + simC.psi) / 2, c = Math.cos(psi), s = Math.sin(psi), bx = -2.2 * k, bz = 0.6 * k; cam.position.set(tgt.x + bx * c - bz * s, tgt.y + 1.3 * k - 0.2, tgt.z + bx * s + bz * c); }
+  else cam.position.set(tgt.x - 2.6 * k, tgt.y + 2.4 * k - 0.2, tgt.z + 2.0 * k);
+  cam.lookAt(tgt);
   grid.position.set(Math.round(X / 0.5) * 0.5, 0, Math.round(Z / 0.5) * 0.5); ground.position.set(X, -0.001, Z);
   const dark = matchMedia('(prefers-color-scheme: dark)').matches;
   ground.material.color.set(dark ? 0x2a3038 : 0xdde1e5);
@@ -534,9 +582,10 @@ function update3d() {
   // per-droid views: same camera offset as the single-droid pages, centred on that droid
   for (const [v, sim, d] of [[vB, simB, dB], [vC, simC, dC]]) {
     const x = sim.wX, z = sim.wZ + d.lane, R = sim.p.R;
-    if (camFollow) { const c = Math.cos(sim.psi), s = Math.sin(sim.psi), bx = -1.5, bz = 0.55; v.cam.position.set(x + bx * c - bz * s, 1.0, z + bx * s + bz * c); }
-    else v.cam.position.set(x - 2.0, 2.0, z + 1.6);
-    v.cam.lookAt(x, R * 0.8, z);
+    const t2 = toWorld(x, R * 0.8, z);
+    if (camFollow) { const c = Math.cos(sim.psi), s = Math.sin(sim.psi), bx = -1.5, bz = 0.55; v.cam.position.set(t2.x + bx * c - bz * s, t2.y + 1.0 - R * 0.8, t2.z + bx * s + bz * c); }
+    else v.cam.position.set(t2.x - 2.0, t2.y + 2.0 - R * 0.8, t2.z + 1.6);
+    v.cam.lookAt(t2);
     grid.position.set(Math.round(x / 0.5) * 0.5, 0, Math.round(z / 0.5) * 0.5); ground.position.set(x, -0.001, z);
     v.renderer.render(scene, v.cam);
   }
@@ -562,6 +611,7 @@ function drawRiss(cv, side, sim, name, col) {
   g.font = '600 13px "Barlow Semi Condensed",Barlow,system-ui,sans-serif'; g.textBaseline = 'top'; g.textAlign = 'left';
   g.fillStyle = col; g.fillText(name, 10, 8);
   g.fillStyle = C.mute; g.fillText(side ? '· side (from the right, front →)' : '· front (droid’s right ←)', 10 + g.measureText(name).width + 4, 8);
+  { const b = side ? sim.betaP : sim.betaR; g.save(); g.translate(cx, gy); g.rotate(-flip * b); g.translate(-cx, -gy); } // incline: tilt ground and droid together
   g.strokeStyle = C.steel; g.lineWidth = 1.5; g.beginPath(); g.moveTo(0, gy); g.lineTo(W, gy); g.stroke();
   g.lineWidth = 1; g.strokeStyle = C.line; g.fillStyle = C.mute; g.font = '12px Barlow,system-ui,sans-serif'; g.textAlign = 'center';
   const span = W / s / 2 + 0.3;
@@ -593,9 +643,10 @@ function drawRiss(cv, side, sim, name, col) {
   const [sx, sy] = P2(cu, cz);
   g.strokeStyle = C.blue; g.lineWidth = 1.5; g.setLineDash([4, 4]); g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx, gy); g.stroke(); g.setLineDash([]);
   g.fillStyle = C.blue; g.beginPath(); g.arc(sx, sy, 4, 0, 7); g.fill();
+  g.restore();
   g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.font = '500 13px Barlow,system-ui,sans-serif'; g.fillStyle = C.ink;
-  const lines = side ? [`Pendulum ${(th * R2D).toFixed(1)}°`, `Head ${(al * R2D).toFixed(1)}°`, `v ${(sim.pqd[0] * 1000).toFixed(0)} mm/s`]
-    : [`Lean ${sim.leanDeg().toFixed(1)}°`, `Pendulum rel. ${(sim.rollTiltRel() * R2D).toFixed(1)}°`, `Head ${(al * R2D).toFixed(1)}°`];
+  const lines = side ? [`Pendulum ${sim.pitchDeg().toFixed(1)}°`, `Head ${sim.headPitchDeg().toFixed(1)}°`, `v ${(sim.pqd[0] * 1000).toFixed(0)} mm/s`]
+    : [`Lean ${sim.leanDeg().toFixed(1)}°`, `Pendulum rel. ${(sim.rollTiltRel() * R2D).toFixed(1)}°`, `Head ${sim.headRollDeg().toFixed(1)}°`];
   lines.forEach((t, i) => g.fillText(t, 10, 40 + i * 16));
 }
 
@@ -603,7 +654,7 @@ function drawRiss(cv, side, sim, name, col) {
 const LOG = [];
 function logSample() {
   LOG.push({t: simB.t, vB: simB.pqd[0] * 1000, vC: simC.pqd[0] * 1000, pB: simB.pitchDeg(), pC: simC.pitchDeg(),
-    hB: simB.pq[2] * R2D, hC: simC.pq[2] * R2D, lB: simB.leanDeg(), lC: simC.leanDeg(), sB: simB.shearG, sC: simC.shearG});
+    hB: simB.headPitchDeg(), hC: simC.headPitchDeg(), lB: simB.leanDeg(), lC: simC.leanDeg(), sB: simB.shearG, sC: simC.shearG});
   while (LOG.length && LOG[LOG.length - 1].t - LOG[0].t > 12) LOG.shift();
 }
 const PLOTS = [['p0', 'leg0', 'vB', 'vC'], ['p1', 'leg1', 'pB', 'pC'], ['p2', 'leg2', 'hB', 'hC'], ['p3', 'leg3', 'lB', 'lC'], ['p4', 'leg4', 'sB', 'sC', true]];
@@ -632,6 +683,7 @@ $('bReset').onclick = () => {
 };
 const readout = $('readout');
 const hdg = s => `${(((s.psi * R2D) % 360 + 540) % 360 - 180).toFixed(0)}°`;
+const rad = s => Math.abs(s.psiDot) > 1e-3 ? `${Math.abs(s.pqd[0] / s.psiDot).toFixed(2)} m` : '–';
 let last = performance.now(), acc = 0, frame = 0;
 function loop(now) {
   const dtReal = Math.min(0.05, (now - last) / 1000); last = now;
@@ -648,6 +700,9 @@ function loop(now) {
     let x = stick[st.kx], y = stick[st.ky]; const mq = Math.max(Math.abs(x), Math.abs(y)), hq = Math.hypot(x, y); if (hq > 1e-9) { x *= mq / hq; y *= mq / hq; } st.knob.style.transform = `translate(${x * 118}%, ${-y * 118}%)`;
   }
   $('capV').textContent = stick.v.toFixed(2); $('capR').textContent = stick.r.toFixed(2); $('capHP').textContent = stick.hp.toFixed(2); $('capHR').textContent = stick.hr.toFixed(2);
+  const wB = simB.shearUse > SHEAR_WARN, wC = simC.shearUse > SHEAR_WARN;
+  $('v3dB').classList.toggle('shear', wB); $('v3dC').classList.toggle('shear', wC); $('v3d').classList.toggle('shear', wB || wC);
+  dB.domeMat.color.copy(wB ? RED : WHITE); dC.domeMat.color.copy(wC ? RED : WHITE);
   update3d();
   drawRiss($('cSideB'), true, simB, 'BBDroids', C.cB); drawRiss($('cSideC'), true, simC, 'Cary V1', C.cC);
   drawRiss($('cFrontB'), false, simB, 'BBDroids', C.cB); drawRiss($('cFrontC'), false, simC, 'Cary V1', C.cC);
@@ -655,11 +710,13 @@ function loop(now) {
   const rows = [['', '<span style="color:var(--cB)">BBDroids</span>', '<span style="color:var(--cC)">Cary</span>'],
     ['Speed', `${(simB.pqd[0] * 1000).toFixed(0)} mm/s`, `${(simC.pqd[0] * 1000).toFixed(0)} mm/s`],
     ['Pendulum', `${simB.pitchDeg().toFixed(1)}°`, `${simC.pitchDeg().toFixed(1)}°`],
-    ['Head pitch', `${(simB.pq[2] * R2D).toFixed(1)}°`, `${(simC.pq[2] * R2D).toFixed(1)}°`],
+    ['Head pitch', `${simB.headPitchDeg().toFixed(1)}°`, `${simC.headPitchDeg().toFixed(1)}°`],
     ['Lean', `${simB.leanDeg().toFixed(1)}°`, `${simC.leanDeg().toFixed(1)}°`],
     ['Roll servo load', `${(simB.rollLoad * 100).toFixed(0)} %`, `${(simC.tiltLoad * 100).toFixed(0)} %`],
     ['Dome shear / peak', `${((simB.shearUse || 0) * 100).toFixed(0)} / ${((simB.shearPeak || 0) * 100).toFixed(0)} %`, `${((simC.shearUse || 0) * 100).toFixed(0)} / ${((simC.shearPeak || 0) * 100).toFixed(0)} %`],
     ['Heading', hdg(simB), hdg(simC)],
+    ['Curve radius', rad(simB), rad(simC)],
+    ['Drive mode', modeName(simB), 'velocity (no position control)'],
     ['Distance', `${simB.pq[0].toFixed(2)} m`, `${simC.pq[0].toFixed(2)} m`]];
   readout.innerHTML = rows.map((r, i) => i === 0 ? `<span></span><b class="hd">${r[1]}</b><b class="hd">${r[2]}</b>` : `<span>${r[0]}</span><b>${r[1]}</b><b>${r[2]}</b>`).join('') + `<span>Time</span><b>${simB.t.toFixed(1)} s</b><b></b>`;
   requestAnimationFrame(loop);

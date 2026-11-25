@@ -54,9 +54,13 @@ struct BB8Params {
   float rollKff            = 0.0;  // 1.0 = same open-loop lean as roll_direct. Off by default because
                                    // the right value depends on mass distribution - tune on hardware.
 
-  float autoPosKp          = 0;
-  float autoPosKi          = 0;
+  // Auto position control (DRIVE_AUTO_POS), (mm/s speed setpoint) per mm of encoder position. Tuned in the simulation
+  // (sim/README.md, section 6.7): stops within ~12 mm after releasing the stick, holds on slopes. Was 0 (no hold).
+  float autoPosKp          = 3;
+  float autoPosKi          = 0.5;
   float autoPosKd          = 0;
+  float autoPosMaxSpeed    = 50;   // mm/s, switch to auto position only below this measured speed (0 = no condition) ...
+  float autoPosMaxWait     = 1.0;  // s, ... or at the latest this long after the 500 ms no-input delay
 
   float posKp             = 1.2;
   float posKi             = 0.2;

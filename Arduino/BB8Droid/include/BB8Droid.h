@@ -95,7 +95,7 @@ protected:
   uint8_t lastLeftSeqnum_, lastRightSeqnum_;
   unsigned long msLastLeftCtrlPacket_, msLastRightCtrlPacket_, msLastPrimaryCtrlPacket_;
   bb::ControlPacket lastPrimaryCtrlPacket_, lastSecondaryCtrlPacket_;
-  float msSinceDriveInput_;
+  unsigned long msSinceDriveInput_;
 
   DriveMode driveMode_;
 
@@ -122,6 +122,7 @@ protected:
   bb::ServoControlOutput rollOutput_;
   bb::PIDController driveController_, balanceController_;
   BB8RollController rollController_;
+  BB8PosCtrlInput posControlInput_;
   BB8PosCtrlOutput posControlOutput_;
   bb::PIDController autoPosController_, posController_; 
   float posControllerZero_;

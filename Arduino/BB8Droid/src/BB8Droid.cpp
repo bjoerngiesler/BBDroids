@@ -40,9 +40,10 @@ BB8::BB8():
     driveController_(driveEncoder_, driveMotor_),
     balanceController_(balanceInput_, driveController_),
     rollController_(rollInput_, rollOutput_, imu_),
+    posControlInput_(driveEncoder_),
     posControlOutput_(balanceController_),
-    autoPosController_(driveEncoder_, posControlOutput_),
-    posController_(driveEncoder_, posControlOutput_),
+    autoPosController_(posControlInput_, posControlOutput_),
+    posController_(posControlInput_, posControlOutput_),
     statusPixels_(3, P_STATUS_NEOPIXEL, NEO_GRB+NEO_KHZ800)
 {
   name_ = "bb8";
@@ -116,6 +117,8 @@ Result BB8::initialize() {
   addParameter("roll_inhibit", "Set to true to inhibit roll controller output (but continue updating, for debugging)", params_.rollInhibit);
   addParameter("roll_debug", "Set to true to debug roll controller", params_.rollDebug);
   addParameter("auto_pos_control", "Automatically switch to position control", params_.autoPosControl);
+  addParameter("auto_pos_max_speed", "Auto position: switch only below this measured speed in mm/s (0 = no condition)", params_.autoPosMaxSpeed);
+  addParameter("auto_pos_max_wait", "Auto position: switch at the latest this many seconds after the 500 ms delay", params_.autoPosMaxWait);
 
   addParameter("drive_speed_deadband", "Deadband for drive speed controller", params_.driveSpeedDeadband);
   addParameter("drive_accel_max", "Ramp on the remote speed setpoint in mm/s^2 (0 = off)", params_.driveAccelMax);
@@ -306,6 +309,10 @@ Result BB8::stepDriveMotor() {
     return RES_OK;
   }
 
+  // Position modes: the position controller sets the speed setpoint (balance controller offset) for this cycle.
+  if(driveMode_ == DRIVE_POS) posController_.update();
+  else if(driveMode_ == DRIVE_AUTO_POS) autoPosController_.update();
+
   // Speed setpoint ramp and commanded acceleration (pure feedforward from the remote, no IMU involved).
   float aCmd = 0;
   if(driveMode_ == DRIVE_VEL) {
@@ -335,8 +342,6 @@ Result BB8::stepDriveMotor() {
 
   balanceController_.update();
   driveController_.update();
-  if(driveMode_ == DRIVE_POS) posController_.update();
-  else if(driveMode_ == DRIVE_AUTO_POS) autoPosController_.update();
   return RES_OK;
 }
 
@@ -504,6 +509,16 @@ void BB8::setControlParameters() {
 
   autoPosController_.setControlParameters(params_.autoPosKp, params_.autoPosKi, params_.autoPosKd);
   posController_.setControlParameters(params_.posKp, params_.posKi, params_.posKd);
+  // Position controllers output a speed setpoint in mm/s: bound it to drive_speed_max, and bound the I share
+  // to the same, so a large position error (droid pushed away) does not command a dash or wind up.
+  for(bb::PIDController* pc: {&autoPosController_, &posController_}) {
+    pc->setAutoUpdate(false);
+    pc->setControlBounds(-params_.driveSpeedMax, params_.driveSpeedMax);
+  }
+  if(params_.autoPosKi > 0) autoPosController_.setIBounds(-params_.driveSpeedMax/params_.autoPosKi, params_.driveSpeedMax/params_.autoPosKi);
+  else autoPosController_.setIUnbounded();
+  if(params_.posKi > 0) posController_.setIBounds(-params_.driveSpeedMax/params_.posKi, params_.driveSpeedMax/params_.posKi);
+  else posController_.setIUnbounded();
 }
 
 void BB8::setServoParameters() {
@@ -754,9 +769,15 @@ Result BB8::incomingControlPacket(const HWAddress& srcAddr, PacketSource source,
       float vel = packet.getAxis(1);
 
       // In DRIVE_VEL, if no drive input for a while, switch to AUTO_POS if enabled
-      if(EPSILON(vel) && params_.autoPosControl == true) { 
-        if(WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX) > 500 && 
-           driveMode_ == DRIVE_VEL) {
+      // No drive input = stick within drive_speed_deadband (exact zero rarely happens with a real stick)
+      if(fabs(vel) <= params_.driveSpeedDeadband && params_.autoPosControl == true) { 
+        // Switch 500 ms after the last input, but only once the droid has (nearly) stopped: the goal is the
+        // position at the switch, so switching while still rolling makes it overshoot and pull back (about
+        // 220 mm from 0.86 m/s in the simulation). On a slope DRIVE_VEL never gets slow, hence the max wait.
+        unsigned long msNoInput = WRAPPEDDIFF(millis(), msSinceDriveInput_, ULONG_MAX);
+        bool slow = params_.autoPosMaxSpeed <= 0 || fabs(driveEncoder_.presentSpeed()) <= params_.autoPosMaxSpeed ||
+                    msNoInput > 500 + (unsigned long)(params_.autoPosMaxWait * 1000);
+        if(msNoInput > 500 && slow && driveMode_ == DRIVE_VEL) {
           switchDrive(DRIVE_AUTO_POS);
         }
       } else { // We have drive input - switch to velocity control mode

@@ -123,7 +123,7 @@ The results depend most on the pendulum moment m_p·l, the head moment m_h·L, a
 7. **`ROLL_REDUCTION` = 80/22** was a leftover. The servo is coupled 1:1. At 1:1 the pendulum only gets 4.1 Nm instead of 14.9 Nm, which explains the earlier emergency shutdowns with `roll_direct` (section 3.4).
 8. **`body_roll_vel` = 500** corresponds to about 687°/s at the servo. The XM430-W350 only manages about 276°/s at 12 V, so the profile limit never kicks in.
 9. **Roll defaults (0.3 / 0 / 0.1):** without an I term and with `roll_kff` = 0, the droid only reaches about 2–4° of a 10° setpoint.
-10. **The position controllers control speed (confirmed by reading the code).** `posController_` and `autoPosController_` use `driveEncoder_` as their input, `Encoder::present()` returns whatever the encoder's mode is, and `setControlParameters()` forces `INPUT_SPEED`. The console command `drive position` has the reverse problem: it switches the encoder to position mode while the speed loop keeps running on it.
+10. **The position controllers controlled speed** (fixed, section 6.7). `posController_` and `autoPosController_` use `driveEncoder_` as their input, `Encoder::present()` returns whatever the encoder's mode is, and `setControlParameters()` forces `INPUT_SPEED`. The console command `drive position` has the reverse problem: it switches the encoder to position mode while the speed loop keeps running on it.
 11. **The roll loop swings up when cornering at speed** (found after the first version of this document). At full speed, moving the head to one side and then to the other makes the lean oscillate with growing amplitude until the roll servo saturates, and the droid falls over on the subsequent stop. Fixed with speed-scheduled gyro damping and `body_roll_accel` 60, see section 3.7.
 
 ---
@@ -404,6 +404,76 @@ The default is now 1200: it removes most of the head drop for about 0.5 s more s
 
 With a separate braking ramp `drive_decel_max` of 3000 mm/s² (now the firmware default), the BB-8 stops in less distance than the Cary drive, at about the same dome shear as Cary, and the roll stability sweep still passes (0/594, measured head and 1 kg head). Exploratory runs from 1.7 m/s: decel 2000 → 1.74 m, 3000 → 1.49 m, 5000 → 1.31 m but 77% shear; no ramp at all → 1.04 m and 331% shear, so the dome would come off. Acceleration stays slower than Cary's, but the head stays much calmer (9–11° against 33°).
 
+
+### 6.6 Driving dynamics proposal (simulation defaults, not yet in the firmware)
+
+Goal: faster lean, stronger acceleration and braking, tighter turns, while the dome never pops off and the head stays calmer than on the Cary drive. The simulation defaults currently use this set; the firmware still has the previous values.
+
+| Parameter | firmware | simulation default |
+|---|---|---|
+| `roll_kff` | 0 | **0.5** |
+| `drive_accel_max` | 1200 mm/s² | **1800** |
+| `drive_decel_max` | 3000 mm/s² | **4500** |
+| slew limit on the remote head command (`domeRemoteRate`) | – (not in firmware) | **60°/s** |
+
+| | before | proposal | Cary V1 |
+|---|---|---|---|
+| Turn-in at 0.9 / 1.7 m/s | 3.2 s / 2.3 s | 0.6 s / 0.5 s | 0.7 s / 0.5 s |
+| Tightest radius at 0.9 / 1.7 m/s | 1.13 m / 2.33 m | 0.98 m / 1.68 m | 3.15 m / 5.42 m |
+| 0 → 90% speed | 2.6 s | 2.1 s | 2.0 s |
+| Stop from 2.1 m/s | 2.00 m | 1.79 m | 2.48 m |
+| Head swing when accelerating and braking | 11° | 22° | 33° |
+| Worst case for the dome: full head swing at speed | 1.14 × shell weight (95% of capacity) | 0.86 (72%) | – |
+
+- **`roll_kff` 0.5** is the big lever for turn-in: the counterweight starts leaning right away instead of waiting for the error to build up. With `body_roll_accel` 60 and the gyro damping it no longer excites rocking.
+- **The head slew limit** matters for safety regardless of the rest: with the old settings a full head swing at speed already used 95% of the estimated 4-magnet capacity. It acts only on the stick signal, so there is no IMU feedback.
+- **Limits:** straight-line acceleration is capped by the pendulum moment (4.5 kg × 155 mm, about 1.8 m/s² with the pendulum under 45°); Cary's counterweight has 1.6× the moment. With all 6 magnets (about 1.8 × shell weight) the worst dome case would be at 48% of capacity.
+- **Roll stability sweep:** 0/594 with mass variants around the measured head; with the standard variants two cases reach 81–83% servo load (1.3 kg head variant at standstill, head swing plus slalom).
+- The Cary turning figures depend on its assumed tilt geometry (±5° body tilt), which is not verified.
+
+### 6.7 Position control and slopes
+
+**Bug (fixed):** both position controllers (`posController_`, `autoPosController_`) used `driveEncoder_` directly as input. The encoder runs in `INPUT_SPEED` for the speed controller, so they controlled speed, not position, and inherited its `controlGain()` of about 3. They now use `BB8PosCtrlInput`, which returns the encoder position in mm with gain 1, as `DOPosControlInput` does on D-O. In addition:
+
+- The position controller now runs before the balance controller, so its speed setpoint takes effect in the same cycle.
+- Its output is bounded to ±`drive_speed_max`, its I share to the same.
+- "No stick input" means within `drive_speed_deadband` instead of exactly zero.
+- `msSinceDriveInput_` is an `unsigned long` now (was a `float`, which loses millisecond resolution after about 4.6 hours).
+
+**Switching to auto position.** The goal is the encoder position at the moment of the switch. With the firmware's 500 ms rule alone, the BB-8 is often still rolling then (braking takes longer than on D-O because the balance controller holds back while the pendulum swings back), so it overshoots and pulls back: 218 mm after releasing from 0.86 m/s. Now it switches only once the measured speed is below `auto_pos_max_speed` (50 mm/s), or at the latest `auto_pos_max_wait` (1 s) after the 500 ms; on a slope the droid never gets slow in velocity mode.
+
+| Release from 0.86 m/s, auto position | stops after | overshoot | settled after |
+|---|---|---|---|
+| switch after 500 ms only (before) | 0.27 m | 218 mm | 7.3 s |
+| **below 50 mm/s, max wait 1 s** | 0.53 m | 12 mm | 1.0 s |
+
+**Gains:** `auto_pos_kp` 3, `auto_pos_ki` 0.5 (were 0, i.e. no hold at all). Higher I settles faster on slopes but sways more. The manual position mode keeps `pos_kp` 1.2 / `pos_ki` 0.2: a +500 mm step reaches 90% after 1.8 s with 148 mm overshoot. `auto_pos_control` stays off by default until it has been tested on the droid.
+
+**Slopes** (simulation incline sliders; standing still with the stick at 0 for 10 s):
+
+| | velocity mode | auto position |
+|---|---|---|
+| 5° uphill ahead | drives 4.3 m downhill (0.46 m/s) | 0.51 m, then holds |
+| 10° uphill ahead | drives 9.0 m downhill | 1.1 m, still converging |
+| 5° sideways | holds (2 cm) | holds |
+| 10° sideways | rolls away and tips over | same |
+
+- **In velocity mode the BB-8 drives downhill, faster than with the drive off.** Standing on a slope needs the pendulum offset uphill permanently, and the balance controller turns that offset into a speed command (`bal_kp` × pitch, about −460 mm/s at 5°). The auto position controller's I term builds up exactly that speed to cancel it.
+- **Sideways** the roll controller holds the lean relative to true vertical, which also holds the position. The limit is about 8°: steeper, the pendulum would have to lean more than `body_roll_range` (25°).
+- The encoder measures the sphere relative to the pendulum, so a steady pendulum angle θ shows up as R·θ of position (about 96 mm at 22°); the controller holds the encoder position, not the ground position.
+
+### 6.8 Ground: smooth floor and carpet
+
+Rolling resistance of the shell in both planes: `crr` × weight (smoothed around v = 0) plus `cRoll` × v. The sideways part damps the wobble, because rocking is the sphere rolling sideways. Presets (rough estimates for a ~0.5 m hard sphere, both droids):
+
+| Ground | `crr` | `cRoll` | BB-8 top speed | stop | turn-in | free rocking after a 10° tip |
+|---|---|---|---|---|---|---|
+| Smooth floor (default) | 0 | 3 | 1714 mm/s | 1.34 m | 0.6 s | 6 swings, settled after 11.5 s |
+| Low-pile office carpet | 0.015 | 6 | 1354 mm/s | 0.88 m | 2.2 s | 1 swing, 2.2 s |
+| Medium-pile living-room carpet | 0.035 | 10 | 1004 mm/s | 0.57 m | 2.6 s | no swing, creeps in over 4.5 s |
+
+Turn-in gets slower on carpet: leaning means the sphere rolls sideways, which carpet resists like rolling forward, and the constant part eats small lean commands. Real values would come from a coast-down test on each surface.
+
 ---
 
 ## 7. Firmware changes
@@ -417,6 +487,7 @@ With a separate braking ramp `drive_decel_max` of 3000 mm/s² (now the firmware 
 | `BB8Droid.h` | members `velGoal_`, `velRamped_`, `accelCmdFilt_`, `speedErr_`; method `domePitchAngle()` |
 | `BB8Droid.cpp` | setpoint ramp and commanded acceleration in `stepDriveMotor()`; balance setpoint = `fa_dome_pitch_to_weight` × `domePitchAngle()`; head feedforward in `stepDome()`; balance ramp 0; I bound of the speed controller on the I share in PWM, including `controlGain()` (`drive_speed_imax`); roll setpoint via `setRollGoal()`; measured encoder speed passed to the roll controller every cycle; `roll_direct` and `fa_roll_sp_to_dome` use the unshaped setpoint |
 | `BB8Droid.cpp` (section 6.4) | `domePitchAngle()` clamps the automatic head share to ±`dome_pitch_range` before subtracting it; speed error (ramped setpoint − measured speed) in `stepDriveMotor()` for `fa_dome_sp_accel`, added to the head command in `stepDome()` and to the automatic share; separate braking ramp `drive_decel_max` (section 6.5) |
+| `BB8Controllers.h`, `BB8Droid.cpp` (section 6.7) | `BB8PosCtrlInput` (encoder position in mm) for both position controllers; position controller before the balance controller; output and I bounded to `drive_speed_max`; auto position switch on `drive_speed_deadband`, `auto_pos_max_speed` and `auto_pos_max_wait`; `msSinceDriveInput_` as `unsigned long` |
 | `BB8Droid.cpp` (other fixes) | remote loss (> 500 ms) also returns the roll setpoint to 0 and releases the dome; `stop()` switches the drive and servo torque off; console `mode` goes through `setMode()` (`off` switches the drive and torque off, leaving `off` switches torque back on, no drive toggle in `MODE_OFF`); running status shows the last primary packet |
 
 ### 7.2 New and changed parameters
@@ -441,6 +512,8 @@ The head parameters are the simulation values for the default masses. Their **si
 | `fa_dome_sp_accel` | 0 (off) | – | **yes** |
 | `fa_speed_sp_to_dome` | **+0.01** | −0.01 | **yes** |
 | `dome_comp_remote_only` | true | – | no |
+| `auto_pos_kp` / `auto_pos_ki` | 3 / 0.5 | 0 / 0 | no |
+| `auto_pos_max_speed` / `auto_pos_max_wait` | 50 mm/s / 1 s | – | no |
 | `ROLL_REDUCTION` (constant) | 1.0 (or 100/70 with changed lever arms) | 80/22 | no |
 
 The compensation factors depend directly on m_h·L. Recompute them after weighing the head:
@@ -468,7 +541,7 @@ The defaults now contain compensation values whose signs come from the simulatio
 
 ## 9. What has been checked and what hasn't
 
-- **Simulation core:** step responses, robustness over mass variants and servo load by script. `check.js` reproduces the tables in sections 3.2, 3.5, 3.7 (Björn's scenario), 4, 5, 6.3 and 6.5; `robustness.js` the sweep in section 3.7. Figures marked as exploratory come from earlier runs.
+- **Simulation core:** step responses, robustness over mass variants and servo load by script. `check.js` reproduces the tables in sections 3.2, 3.5, 3.7 (Björn's scenario), 4, 5, 6.3, 6.5 and 6.7; `robustness.js` the sweep in section 3.7. Figures marked as exploratory come from earlier runs.
 - **UI:** tested in headless Chrome during development (desktop and phone, light and dark; keyboard, sticks, cornering). After the translation into English, only the script syntax was checked, not the page in a browser.
 - **Firmware:**
   - The complete firmware builds with `pio run` (MKR WiFi 1010) without warnings in the changed code.
@@ -489,7 +562,7 @@ The defaults now contain compensation values whose signs come from the simulatio
 2. Measure the dome pitch servo reduction (`DOME_PITCH_REDUCTION`).
 3. Motor data of the drive (stall torque, no-load speed at the output).
 4. Measure rolling resistance (coast-down test). Afterwards, optionally add a speed-dependent feedforward on the balance setpoint (section 4).
-5. Fix the position controllers (section 2, item 10).
+5. ~~Fix the position controllers~~ (done, section 6.7). Still open: test auto position on the droid, then consider `auto_pos_control` on by default.
 6. Set `body_roll_vel` to a realistic value (XM430-W350: about 200 units ≈ 275°/s).
 7. Head drops back when pulling away hard (section 6.4): check on the hardware whether `drive_accel_max` 1200 is enough, and whether `fa_dome_sp_accel` helps. Measure `DOME_PITCH_REDUCTION`, which sets how far the head can actually go.
 8. Verify roll stability at speed on the hardware (section 3.7, commissioning step 4). If needed, model the yaw-into-roll-gyro coupling and retune `roll_kd_speed`.
@@ -505,6 +578,8 @@ The defaults now contain compensation values whose signs come from the simulatio
   - "Roll set ZVD + I bleed"
   - "Ideal head compensation for these masses": recomputes the compensation for the masses entered and sets the feedforward
   - "Defaults": the controller parameters as in the firmware
+- **Drive mode** (velocity / position / auto position), **ground** (smooth floor and two carpets) and **incline** X/Y (±15°) in the remote panel; on the comparison page they apply to both droids (drive mode: BB-8 only).
+- **Red 3D view and dome:** the dome shear is above 70% of the magnet capacity.
 - **Head stick:** pressing the right pad counts as holding button 3. After release, the head is held for `fa_dome_anneal_delay` and then returns to center over `fa_dome_anneal_time`, as in the firmware.
 - **Simulation-only parameters** (not in the firmware): `fa_pitch_to_dome` (rejected, section 6.2), `roll_kp` on the way back, the roll setpoint ramp, `drive_decel_max` and the dome shear group (shell, capacity, shear limiter, remote slew limit, dome profile accelerations, section 6.5).
 - **Reproduce the figures:** `node check.js` and `node robustness.js`, or `./check-jsc.sh` and `./check-jsc.sh robustness.js` on a Mac without Node.

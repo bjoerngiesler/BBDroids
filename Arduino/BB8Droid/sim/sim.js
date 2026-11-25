@@ -42,6 +42,8 @@
     }
     reset() { this.lastErr = this.errI = this.lastErrD = this.lastControl = 0; this.dFilter.reset(); }
     setIBounds(a, b) { this.iBounded = true; this.iMin = a; this.iMax = b; }
+    setIUnbounded() { this.iBounded = false; }
+    setControlBounds(a, b) { this.cBounded = true; this.cMin = a; this.cMax = b; }
     // Returns the value the firmware passes to setControlOutput()
     update(present, dt) {
       const err = this.goal - present;
@@ -52,6 +54,7 @@
       const dF = this.dFilter.filter(this.lastErrD);
       this.lastControl = this.kp * err + this.ki * this.errI + this.kd * dF;
       this.lastControl *= this.gain;
+      if (this.cBounded) this.lastControl = Math.min(this.cMax, Math.max(this.cMin, this.lastControl));
       return this.lastControl + this.offset;
     }
   }
@@ -89,6 +92,9 @@
       ms: 3.0,          // kg   mass of the sphere shell (thin shell)
       L: 0.295,         // m    distance of the head CoM above the sphere center (measured)
       cRoll: 3.0,       // N/(m/s)   rolling resistance (viscous)
+      crr: 0,           //           rolling resistance coefficient (force = crr * weight), 0 = smooth floor; see GROUNDS
+      inclineX: 0,      // deg  ground incline, uphill towards +X (the start direction)
+      inclineY: 0,      // deg  ground incline, uphill towards +Z (right of the start direction)
       bBear: 0.05,      // Nm/(rad/s) bearing friction of the drive
       // Drive motor (referred to the output, sphere relative to pendulum)
       tauStall: 30,     // Nm
@@ -101,7 +107,7 @@
       // Firmware parameters (BB8Params)
       driveSpeedKp: 0.05, driveSpeedKi: 0.2, driveSpeedKd: 0.0, driveIBound: 255,
       balKp: 25, balKi: 0, balKd: 0.2,
-      rollKp: 0.5, rollKi: 0.4, rollKd: 0.4, rollKff: 0.0, rollIMax: 50,
+      rollKp: 0.5, rollKi: 0.4, rollKd: 0.4, rollKff: 0.5, rollIMax: 50, // rollKff 0.5: dynamics proposal (README 6.6), firmware still 0
       rollDirect: false,
       driveSpeedMax: 2000, driveSpeedDeadband: 0.01, rollAngleMax: 20,
       bodyRollRange: 25, bodyRollVel: 500, bodyRollAccel: 60,
@@ -119,11 +125,11 @@
       domeHoldG: 1.2,      // magnet shear capacity in units of the shell's weight: 1.0 = holds exactly when the dome is at 90 deg.
                            // Björn's estimate: holds at 90 deg with a little to spare (a light push pops it off) -> 1.2 (ASSUMPTION, measure!)
       domePitchAccel: 0, domeRollAccel: 0, // DXL profile acceleration for the dome servos (0 = not set in firmware; sim uses 3000 °/s² as before)
-      domeRemoteRate: 0,  // deg/s at the dome: slew limit on the remote head command (0 = off)
+      domeRemoteRate: 60, // deg/s at the dome: slew limit on the remote head command (0 = off). Dynamics proposal, not in firmware yet
       domeWorldMax: 0,     // deg: limit on the dome's apparent tilt (0 = off)
       domeLeanCenter: true, // centre the limit window on the shear-free attitude atan(a/g) instead of vertical
-      driveDecelLimit: 3000, // mm/s^2 separate ramp while braking (0 = same as driveAccelLimit), firmware drive_decel_max
-      driveAccelLimit: 1200, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max
+      driveDecelLimit: 4500, // mm/s^2 separate ramp while braking (0 = same as driveAccelLimit), firmware drive_decel_max (firmware still 3000)
+      driveAccelLimit: 1800, // mm/s^2 ramp on the speed setpoint from the stick (0 = off), firmware drive_accel_max (firmware still 1200)
       faAccelToDome: 15,   // deg head (around the sphere center) per m/s^2 of commanded acceleration
       domeAccelTau: 0.5,   // s  low-pass on the commanded acceleration for the head
       autoShareClamp: true, // clamp the automatic head share to dome_pitch_range before subtracting it (dome_comp_remote_only)
@@ -136,6 +142,16 @@
       rollKiReturn: 0,     // >0: different K_i on the way back
       rollReturnWindow: 1.5, // s  the way back only counts for this long after a stick move towards center
       rollIBleed: 0.4,       // s  >0: bleed the I state on the way back with this time constant
+      // Drive mode as in BB8::switchDrive(): 'vel' (DRIVE_VEL), 'pos' (DRIVE_POS: stick = position offset
+      // around where the mode was entered) or 'autopos' (DRIVE_VEL while the stick is outside drive_speed_deadband,
+      // DRIVE_AUTO_POS after autoPosDelay without input). Firmware default is 'vel' (auto_pos_control false).
+      driveMode: 'vel',
+      posKp: 1.2, posKi: 0.2, posKd: 0,            // pos_k*: (mm/s) per mm, firmware defaults
+      autoPosKp: 3, autoPosKi: 0.5, autoPosKd: 0,  // auto_pos_k*: tuned in the simulation (README 6.7), firmware defaults
+      posStickRange: 1000,   // mm  position offset at full stick in 'pos' mode (firmware: axis * 1000)
+      autoPosDelay: 0.5,     // s   no stick input this long -> auto position mode (firmware: 500 ms)
+      autoPosMaxSpeed: 50,   // mm/s >0: also wait until the measured speed is below this before switching (firmware auto_pos_max_speed)
+      autoPosMaxWait: 1.0,   // s    ... but switch at the latest this long after autoPosDelay (on a slope the droid never gets slow in DRIVE_VEL), firmware auto_pos_max_wait
       rollKdSpeed: 1000,     // mm/s >0: above this measured speed, scale roll_kd by rollKdSpeed/|v| (cornering stiffens the roll plane, see README 3.7)
       rollRateCutoff: 15,
       imuFilterCutoff: 100,
@@ -147,16 +163,30 @@
   const DXL_VEL = 0.229 * 6;               // Dynamixel unit -> deg/s
   const DXL_ACC = 214.577 * 360 / 3600;    // Dynamixel unit -> deg/s^2
 
+  // ---- Ground: rolling resistance of the shell on the floor (both planes, so sideways rocking is damped too).
+  // Constant part crr * weight (smoothed around v = 0) plus the viscous part cRoll * v. Presets are rough estimates
+  // for a ~0.5 m hard sphere; carpet values for wheels are higher, but a large radius sinks in less.
+  const GROUNDS = {
+    smooth: {label: 'Smooth hard floor', crr: 0, cRoll: 3.0},
+    office: {label: 'Low-pile office carpet', crr: 0.015, cRoll: 6.0},
+    living: {label: 'Medium-pile living-room carpet', crr: 0.035, cRoll: 10.0},
+  };
+  function rollingResistance(p, v) { return p.crr * (p.ms + p.mp + p.mh) * G * Math.tanh(v / 0.02) + p.cRoll * v; }
+
   // ---- Planar dynamics: q=[s,a1,a2], qd; Q generalized forces
-  function planarAcc(p, q, qd, Q) {
+  function planarAcc(p, q, qd, Q, beta) {
     const { mp, l, mh, L, ms, R } = p;
     const Is = 2 / 3 * ms * R * R, eps = 1e-4;
     const c1 = Math.cos(q[1]), s1 = Math.sin(q[1]), c2 = Math.cos(q[2]), s2 = Math.sin(q[2]);
     const M00 = ms + Is / (R * R) + mp + mh, M01 = mp * l * c1, M02 = mh * L * c2;
     const M11 = mp * l * l + eps, M22 = mh * L * L + eps;
-    const r0 = Q[0] + mp * l * s1 * qd[1] * qd[1] + mh * L * s2 * qd[2] * qd[2];
-    const r1 = Q[1] - mp * G * l * s1;
-    const r2 = Q[2] + mh * G * L * s2;
+    // Ground inclined by beta in this plane (rising towards +s). State is in the slope frame: s along the slope,
+    // a1 (pendulum, hanging convention) and a2 (head, upright convention) measured from the slope normal.
+    // World angle from vertical: pendulum a1 + beta, head a2 - beta. beta = 0 gives the flat-ground equations.
+    const b = beta || 0;
+    const r0 = Q[0] + mp * l * s1 * qd[1] * qd[1] + mh * L * s2 * qd[2] * qd[2] - (ms + mp + mh) * G * Math.sin(b);
+    const r1 = Q[1] - mp * G * l * Math.sin(q[1] + b);
+    const r2 = Q[2] + mh * G * L * Math.sin(q[2] - b);
     // M is "arrow" shaped -> solve directly
     const den = M00 - M01 * M01 / M11 - M02 * M02 / M22;
     const a0 = (r0 - M01 * r1 / M11 - M02 * r2 / M22) / den;
@@ -168,7 +198,7 @@
 
     reset() {
       const p = this.p;
-      this.t = 0;
+      this.t = 0; this.betaP = 0; this.betaR = 0;
       // Pitch plane: s=x, a1=theta (pendulum forward +), a2=alpha (head forward +)
       this.pq = [0, 0, 0]; this.pqd = [0, 0, 0];
       // Roll plane: s=y, a1=chi (pendulum towards +y), a2=zeta (head towards +y)
@@ -187,6 +217,8 @@
       this.imuRollF = new LowPassFilter(p.imuFilterCutoff, 100);
       this.rateF = new LowPassFilter(p.rollRateCutoff, 104);
       this.encSpeedF = new LowPassFilter(25, 100);
+      this.encPosF = new LowPassFilter(25, 100); this.encPos = 0;   // filtered encoder position in mm (bb::Encoder filtPos_)
+      this.posCtl = new PID(); this.driveState = 'off'; this.driveKey = null; this.noInputT = 0; this.posZero = 0;
       this.encTicks = 0; this.encSpeed = 0; this.encSpeedFilt = 0;
       this.pwm = 0; this.speedSP = 0; this.tilt = 0; this.rate = 0; this.headTilt = 0;
       this.rollServo = new ServoProfile(); this.domePServo = new ServoProfile(); this.domeRServo = new ServoProfile();
@@ -209,11 +241,30 @@
       this.roll.setIBounds(-p.rollIMax, p.rollIMax);
       this.imuPitchF.setCutoff(p.imuFilterCutoff); this.imuRollF.setCutoff(p.imuFilterCutoff);
       this.rateF.setCutoff(p.rollRateCutoff);
+      if (this.posCtl) this.configPos();
+    }
+
+    // BB8::switchDrive(): reset the speed and balance controllers and the ramp, restart both position
+    // controllers at the present encoder position (setPresentAsGoal), and use the gains of the new mode.
+    switchDrive(state) {
+      const p = this.p;
+      this.drive.reset(); this.drive.goal = 0; this.bal.reset(); this.bal.offset = 0;
+      this.velRamped = this.accelCmdF = 0; this.noInputT = 0;
+      this.posCtl.reset(); this.posCtl.goal = this.encPos; this.posZero = this.encPos;
+      this.driveState = state; this.configPos();
+    }
+    configPos() {
+      const p = this.p, auto = this.driveState === 'autopos', c = this.posCtl;
+      c.kp = auto ? p.autoPosKp : p.posKp; c.ki = auto ? p.autoPosKi : p.posKi; c.kd = auto ? p.autoPosKd : p.posKd;
+      c.setControlBounds(-p.driveSpeedMax, p.driveSpeedMax);   // speed setpoint limited to drive_speed_max
+      if (c.ki > 0) c.setIBounds(-p.driveSpeedMax / c.ki, p.driveSpeedMax / c.ki); else c.setIUnbounded();
     }
 
     // derived quantities
-    pitchDeg() { return this.pq[1] * R2D; }                 // IMU pitch = frame/pendulum
-    leanDeg() { return this.rq[0] / this.p.R * R2D; }  // IMU roll = axle lean
+    pitchDeg() { return (this.pq[1] + this.betaP) * R2D; }  // IMU pitch = frame/pendulum, relative to true vertical
+    leanDeg() { return (this.rq[0] / this.p.R - this.betaR) * R2D; }  // IMU roll = axle lean, relative to true vertical
+    headPitchDeg() { return (this.pq[2] - this.betaP) * R2D; }  // head, absolute (relative to true vertical)
+    headRollDeg() { return (this.rq[2] - this.betaR) * R2D; }
     relDrive() { return this.pq[1] + this.pq[0] / this.p.R; }      // sphere rel. pendulum [rad]
     domePitchRel() { return this.pq[2] + this.pq[1]; }      // head rel. frame (pitch) [rad]
     rollTiltRel() { return this.rq[1] + this.rq[0] / this.p.R; }   // pendulum rel. axle [rad]
@@ -230,21 +281,37 @@
       const ticks = p.encoderQuantize ? Math.floor(relMM / mmPerTick) : relMM / mmPerTick;
       this.encSpeed = (ticks - this.encTicks) / dt * mmPerTick; this.encTicks = ticks;
       this.encSpeedFilt = this.encSpeedF.filter(this.encSpeed);
+      this.encPos = this.encPosF.filter(ticks * mmPerTick);
 
-      // --- stepDriveMotor (DRIVE_VEL)
-      let vel = inp.vel;
-      if (Math.abs(vel) <= p.driveSpeedDeadband) vel = 0; else vel *= p.driveSpeedMax;
-      // Setpoint ramp and commanded acceleration (pure feedforward, no feedback)
-      const velPrev = this.velRamped;
-      if (p.driveAccelLimit > 0) {
-        // braking (|setpoint| shrinking towards / through zero) uses driveDecelLimit if set
-        const braking = Math.abs(vel) < Math.abs(this.velRamped) || vel * this.velRamped < 0;
-        const lim = braking && p.driveDecelLimit > 0 ? p.driveDecelLimit : p.driveAccelLimit;
-        const m = lim * dt; this.velRamped += Math.max(-m, Math.min(m, vel - this.velRamped));
+      // --- drive mode (BB8::incomingControlPacket / switchDrive)
+      const key = inp.driveOn ? p.driveMode : 'off';
+      if (key !== this.driveKey) { this.driveKey = key; this.switchDrive(key === 'off' ? 'off' : key === 'pos' ? 'pos' : 'vel'); }
+      if (key === 'autopos') {
+        if (Math.abs(inp.vel) <= p.driveSpeedDeadband) { this.noInputT += dt; if (this.noInputT > p.autoPosDelay && this.driveState === 'vel' && !(p.autoPosMaxSpeed > 0 && Math.abs(this.encSpeedFilt) > p.autoPosMaxSpeed && this.noInputT < p.autoPosDelay + p.autoPosMaxWait)) this.switchDrive('autopos'); }
+        else { this.noInputT = 0; if (this.driveState === 'autopos') this.switchDrive('vel'); }
       }
-      else this.velRamped = vel;
-      vel = this.velRamped;
-      const aCmd = (this.velRamped - velPrev) / dt / 1000;
+      // --- stepDriveMotor
+      let vel, aCmd = 0;
+      if (this.driveState === 'pos' || this.driveState === 'autopos') {
+        // Position modes: the position controller (input: encoder position in mm) sets the speed setpoint
+        if (this.driveState === 'pos') this.posCtl.goal = this.posZero + inp.vel * p.posStickRange;
+        this.velRamped = this.posCtl.update(this.encPos, dt);
+        vel = this.velRamped;
+      } else {
+        vel = inp.vel;
+        if (Math.abs(vel) <= p.driveSpeedDeadband) vel = 0; else vel *= p.driveSpeedMax;
+        // Setpoint ramp and commanded acceleration (pure feedforward, no feedback)
+        const velPrev = this.velRamped;
+        if (p.driveAccelLimit > 0) {
+          // braking (|setpoint| shrinking towards / through zero) uses driveDecelLimit if set
+          const braking = Math.abs(vel) < Math.abs(this.velRamped) || vel * this.velRamped < 0;
+          const lim = braking && p.driveDecelLimit > 0 ? p.driveDecelLimit : p.driveAccelLimit;
+          const m = lim * dt; this.velRamped += Math.max(-m, Math.min(m, vel - this.velRamped));
+        }
+        else this.velRamped = vel;
+        vel = this.velRamped;
+        aCmd = (this.velRamped - velPrev) / dt / 1000;
+      }
       this.accelCmdF += (aCmd - this.accelCmdF) * Math.min(1, dt / Math.max(dt, p.domeAccelTau));
       this.bal.offset = vel;
       // Speed error as on D-O (faNeckSPAccel): how far the droid lags behind the ramped setpoint
@@ -359,11 +426,11 @@
     // Tangential (shear) force the magnets must apply to the outer dome shell, both planes, in N.
     computeShear() {
       const p = this.p, m = p.domeShellMass, Lo = p.domeShellL, tauM = this.tauM, tauR = this.tauR;
-      const ap = planarAcc(p, this.pq, this.pqd, this.forcesPitch(this.pq, this.pqd));
-      const ar = planarAcc(p, this.rq, this.rqd, this.forcesRoll(this.rq, this.rqd));
+      const ap = planarAcc(p, this.pq, this.pqd, this.forcesPitch(this.pq, this.pqd), this.betaP);
+      const ar = planarAcc(p, this.rq, this.rqd, this.forcesRoll(this.rq, this.rqd), this.betaR);
       const al = this.pq[2], ze = this.rq[2], aLat = p.turning ? this.aLat : 0;
-      this.shearP = m * (ap[0] * Math.cos(al) + Lo * ap[2]) - m * G * Math.sin(al);
-      this.shearR = m * ((ar[0] + aLat) * Math.cos(ze) + Lo * ar[2]) - m * G * Math.sin(ze);
+      this.shearP = m * (ap[0] * Math.cos(al) + Lo * ap[2]) - m * G * Math.sin(al - this.betaP);   // gravity relative to the slope
+      this.shearR = m * ((ar[0] + aLat) * Math.cos(ze) + Lo * ar[2]) - m * G * Math.sin(ze - this.betaR);
       this.shear = Math.hypot(this.shearP, this.shearR);
       this.shearG = this.shear / (m * G);              // in units of the shell's weight (1 = holding it sideways, 90 deg)
       this.shearUse = this.shearG / p.domeHoldG;       // fraction of the magnet capacity
@@ -381,7 +448,7 @@
       const target = (this.domePServo.pos - 180) / p.domePitchReduction * D2R;
       const tauH = this.servoTorque(target, q[2] + q[1], qd[2] + qd[1], p.mh * p.L * p.L + 1e-3, p.domePitchReduction);
       this.tauM = tauM;
-      return [tauM / R - p.cRoll * qd[0], tauM + tauH, tauH];
+      return [tauM / R - rollingResistance(p, qd[0]), tauM + tauH, tauH];
     }
 
     forcesRoll(q, qd) {
@@ -394,11 +461,11 @@
       // Centrifugal force in the rotating frame (outwards = -aLat in y)
       const a = p.turning ? this.aLat : 0;
       const fS = -(p.ms + p.mp + p.mh) * a, f1 = -p.mp * a * p.l * Math.cos(q[1]), f2 = -p.mh * a * p.L * Math.cos(q[2]);
-      return [tauR / R - tauD / R - p.cRoll * qd[0] + fS, tauR + f1, tauD + f2];
+      return [tauR / R - tauD / R - rollingResistance(p, qd[0]) + fS, tauR + f1, tauD + f2];
     }
 
-    rk4(q, qd, forces, h) {
-      const f = (q, qd) => planarAcc(this.p, q, qd, forces.call(this, q, qd));
+    rk4(q, qd, forces, h, beta) {
+      const f = (q, qd) => planarAcc(this.p, q, qd, forces.call(this, q, qd), beta);
       const add = (a, b, k) => a.map((v, i) => v + k * b[i]);
       const k1v = qd, k1a = f(q, qd);
       const q2 = add(q, k1v, h / 2), v2 = add(qd, k1a, h / 2), k2a = f(q2, v2);
@@ -426,8 +493,12 @@
         const v = this.pqd[0], rho = this.rq[0] / p.R;
         this.psiDot = p.turning ? v / p.R * Math.sin(rho) : 0;
         this.aLat = v * this.psiDot;
-        this.rk4(this.pq, this.pqd, this.forcesPitch, h);
-        this.rk4(this.rq, this.rqd, this.forcesRoll, h);
+        // Incline: world slope (inclineX uphill towards +X = initial forward, inclineY uphill towards +Z = initial right),
+        // projected onto this droid's pitch plane (forward) and roll plane (right) with its current heading.
+        { const bx = p.inclineX * D2R, by = p.inclineY * D2R, c = Math.cos(this.psi), sn = Math.sin(this.psi);
+          this.betaP = bx * c + by * sn; this.betaR = -bx * sn + by * c; }
+        this.rk4(this.pq, this.pqd, this.forcesPitch, h, this.betaP);
+        this.rk4(this.rq, this.rqd, this.forcesRoll, h, this.betaR);
         this.computeShear();
         this.rollLoad = Math.abs(this.tauR || 0) / (p.servoStall * p.rollReduction);
         this.rollLoadPeak = Math.max(this.rollLoadPeak, this.rollLoad);
@@ -442,9 +513,9 @@
 
     logSample() {
       this.log.push({
-        t: this.t, vSP: this.bal.offset, vCmd: this.speedSP, vGround: this.pqd[0] * 1000, vEnc: this.encSpeedFilt,
+        t: this.t, vSP: this.bal.offset, encPos: this.encPos, mode: this.driveState, vCmd: this.speedSP, vGround: this.pqd[0] * 1000, vEnc: this.encSpeedFilt,
         pitch: this.pitchDeg(), pwm: this.pwm, rollGoal: this.roll.goal, lean: this.leanDeg(), tilt: this.tilt,
-        headP: this.pq[2] * R2D, headR: this.rq[2] * R2D,
+        headP: this.headPitchDeg(), headR: this.headRollDeg(),
       });
       if (this.log.length > 2000) this.log.splice(0, this.log.length - 2000);
     }
@@ -458,6 +529,6 @@
     idealDomePitchToWeight() { const p = this.p; return -(p.mh * p.L) / (p.mp * p.l - p.mh * p.L); }
   }
 
-  const api = { BB8Sim, defaultParams, LowPassFilter, PID, D2R, R2D, ROLL_REDUCTION };
+  const api = { BB8Sim, defaultParams, LowPassFilter, PID, D2R, R2D, ROLL_REDUCTION, GROUNDS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api; else global.BB8 = api;
 })(typeof window !== 'undefined' ? window : globalThis);
