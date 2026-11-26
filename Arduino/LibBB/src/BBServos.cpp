@@ -118,6 +118,9 @@ Result bb::Servos::start(ConsoleStream* stream) {
   if (isStarted()) return RES_SUBSYS_ALREADY_STARTED;
 
   Runloop::runloop.excuseOverrun();
+  // The sync buffers point into servos_. Free them before servos_ is rebuilt, otherwise a start() after a
+  // failed start() would keep the stale pointers (setupSyncBuffers() returns early if they are set).
+  teardownSyncBuffers();
   servos_.clear();
 
   dxl_.setPortProtocolVersion(2.0);
@@ -206,7 +209,10 @@ Result bb::Servos::start(ConsoleStream* stream) {
     if(res == RES_OK) break;
     delay(5);
   }
-  if(res != RES_OK) return res;
+  if(res != RES_OK) {
+    teardownSyncBuffers();
+    return res;
+  }
 
   for (auto& s : servos_) {
     dxl_.setOperatingMode(s.id, OP_POSITION);
@@ -264,7 +270,7 @@ Result bb::Servos::step() {
   for(auto& s: servos_) {
     int maxload = (int)(1193.0*0.8);
     if(s.load > maxload || s.load < -maxload) {
-      Console::console.printfBroadcast("Warning - servo %d load %d exceeds 80\%!\n", s.id, s.load);
+      Console::console.printfBroadcast("Warning - servo %d load %d exceeds 80%%!\n", s.id, s.load);
     }
   }
 
@@ -569,7 +575,8 @@ bool bb::Servos::setRange(uint8_t id, float min, float max, ValueType t) {
     s->min = computeRawValue(max, t);
   }
 
-  setGoalPos(id, constrain(s->goalPos, s->min, s->max), VALUE_RAW);
+  // s->goalPos already contains the offset; setGoalPos() adds it, so pass the logical goal.
+  setGoalPos(id, (int32_t)s->goalPos - s->offset, VALUE_RAW);
 
   return true;
 }
@@ -668,8 +675,12 @@ bool bb::Servos::setGoalPos(uint8_t id, float goalPos, ValueType t) {
 
   Servo *s = servoWithID(id);
   if (s == NULL) return false;
-  uint32_t g = computeRawValue(goalPos, t);
-  s->goalPos = constrain(g, s->min, s->max) + s->offset; // FIXME - s->offset can be negative, is this safe?
+  // Range (min/max) is in logical coordinates (e.g. 180 +- range), the offset is a calibration on top of it.
+  // So clamp to the range first, then add the offset, then clamp to what the servo can do - in signed
+  // arithmetic, so a negative offset can't wrap around.
+  int32_t g = (int32_t)computeRawValue(goalPos, t);
+  g = constrain(g, (int32_t)s->min, (int32_t)s->max) + s->offset;
+  s->goalPos = (uint32_t)constrain(g, (int32_t)0, (int32_t)4095);
   //if(s->id == 4) Console::console.printfBroadcast("Goal: %d Min: %d Max: %d Final: %d\n", g, s->min, s->max, s->goal);
   swGoalPosInfos.is_info_changed = true;
 
@@ -772,9 +783,11 @@ uint32_t bb::Servos::computeRawValue(float val, ValueType t) {
       retval = val;
   }
 
-  if (retval < 0 && retval > 4096) {
-    Console::console.printfBroadcast("Capping %d (computed from %f) to [0..4096]!", retval, val);
-    retval = constrain(retval, 0, 4096);
+  // Must clamp before the cast to uint32_t: a negative value would otherwise become a huge number
+  // and end up at the upper limit.
+  if (retval < 0 || retval > 4095) {
+    Console::console.printfBroadcast("Capping %d (computed from %f) to [0..4095]!\n", retval, val);
+    retval = constrain(retval, (int32_t)0, (int32_t)4095);
   }
 
   return (uint32_t)retval;
@@ -949,17 +962,17 @@ void bb::Servos::setupSyncBuffers() {
 }
 
 void bb::Servos::teardownSyncBuffers() {
-  delete infoXelsSrPresent;
+  delete[] infoXelsSrPresent;
   infoXelsSrPresent = NULL;
-  delete infoXelsSrLoad;
+  delete[] infoXelsSrLoad;
   infoXelsSrLoad = NULL;
-  delete infoXelsSwGoalPos;
+  delete[] infoXelsSwGoalPos;
   infoXelsSwGoalPos = NULL;
-  delete infoXelsSwPrfVel;
+  delete[] infoXelsSwPrfVel;
   infoXelsSwPrfVel = NULL;
-  delete infoXelsSwGoalVel;
+  delete[] infoXelsSwGoalVel;
   infoXelsSwGoalVel = NULL;
-  delete infoXelsSwGoalCur;
+  delete[] infoXelsSwGoalCur;
   infoXelsSwGoalCur = NULL;
 
   srPresentInfos.p_xels = NULL;

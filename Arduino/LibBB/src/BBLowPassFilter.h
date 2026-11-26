@@ -20,6 +20,7 @@ public:
 	void setAdaptive(bool adaptive);
 
 	float filter(float xn);
+	void reset(); // clear the filter history (output starts again from 0)
 protected:
 	void computeBase();
 	void computeCoefficients();

@@ -120,6 +120,7 @@ protected:
 	bool atmode_, stayInAT_;
 	HardwareSerial* uart_;
 	int currentBPS_;
+	static const uint16_t MAX_FRAME_LENGTH = 256; // 802.15.4 API frames are <= ~111 bytes
 	bool apiMode_;
 
 	typedef struct {

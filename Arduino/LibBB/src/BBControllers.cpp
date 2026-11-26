@@ -20,6 +20,7 @@ bb::PIDController::PIDController(ControlInput& input, ControlOutput& output):
   setControlUnbounded();
 
   goal_ = 0;
+  curSetpoint_ = 0;
   deadbandMin_ = deadbandMax_ = 0;
   errDeadbandMin_ = errDeadbandMax_ = 0;
   controlOffset_ = 0;
@@ -28,7 +29,9 @@ bb::PIDController::PIDController(ControlInput& input, ControlOutput& output):
 }
 
 void bb::PIDController::reset() {
-  lastErr_ = errI_ = lastErrD_ = lastControl_ = 0.0f;
+  lastErr_ = errI_ = lastErrD_ = lastErrDFiltered_ = lastControl_ = 0.0f;
+  differentialFilter_.reset();
+  firstCycle_ = true;
   lastCycleUS_ = micros();
 }
 
@@ -45,6 +48,10 @@ void bb::PIDController::update(void) {
   if(autoupdate_) input_.update();
 
   float dt = timediffUS / 1e6; 
+  if(dt <= 0) return; // called twice in the same microsecond - nothing to do, and no division by zero
+  // Not updated for a long time (controller was off)? Then dt is meaningless - restart instead of
+  // integrating err*dt in one go.
+  if(dt > MAX_DT) firstCycle_ = true;
 
   if(!EPSILON(ramp_) && !EPSILON(curSetpoint_ - goal_)) {
     if(curSetpoint_ < goal_) {
@@ -72,14 +79,18 @@ void bb::PIDController::update(void) {
   } 
   if(err > errDeadbandMin_ && err < errDeadbandMax_) err = 0;
 
-  errI_ += err * dt;
+  // No integration while inhibited (the output isn't applied, so the I term would only wind up)
+  // and none on the first cycle after a reset or pause.
+  if(!inhibit_ && !firstCycle_) errI_ += err * dt;
   if(iBounded_) {
     errI_ = constrain(errI_, iMin_, iMax_);
   }
 
-  lastErrD_ = (err - lastErr_)/dt;
+  // First cycle: there is no previous error to differentiate against (lastErr_ is 0 after reset()).
+  lastErrD_ = firstCycle_ ? 0.0f : (err - lastErr_)/dt;
   lastErr_ = err;
   lastErrDFiltered_ = differentialFilter_.filter(lastErrD_);
+  firstCycle_ = false;
 
   lastControl_ = kp_ * lastErr_ + ki_ * errI_ + kd_ * lastErrDFiltered_;
   lastControl_ *= input_.controlGain();

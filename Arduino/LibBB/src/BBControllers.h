@@ -24,7 +24,6 @@ class PIDController: public ControlOutput {
 public:
   PIDController(ControlInput& input, ControlOutput& output);
 
-  void initialize();
 
   void reset(); // reset aggregated errors
   
@@ -93,6 +92,8 @@ protected:
   float errDeadbandMin_, errDeadbandMax_;
   float goal_, ramp_, curSetpoint_;
   unsigned long lastCycleUS_;
+  static constexpr float MAX_DT = 0.5; // s
+  bool firstCycle_; // first update() after reset() or a long pause: no I, no D
   float controlOffset_;
   bb::LowPassFilter differentialFilter_;
 };

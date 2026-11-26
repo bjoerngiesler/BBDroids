@@ -58,6 +58,7 @@ protected:
   bb::LowPassFilter filtSpeed_, filtPos_;
 
   float mmPT_;
+  static const unsigned long MIN_UPDATE_US = 500;
   long lastCycleTicks_;
   unsigned long lastCycleUS_;
   long presentPos_;    // internally always in encoder ticks

@@ -37,7 +37,10 @@ public:
 	}
 
 	int vprintf(const char* format, va_list args) {
-		int len = vsnprintf(NULL, 0, format, args) + 1;
+		va_list args2;
+		va_copy(args2, args); // a va_list may only be consumed once
+		int len = vsnprintf(NULL, 0, format, args2) + 1;
+		va_end(args2);
 		char *buf = new char[len];
 		vsnprintf(buf, len, format, args);
 		printfFinal(buf);

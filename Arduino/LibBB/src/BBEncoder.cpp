@@ -152,18 +152,17 @@ bb::Result bb::Encoder::update() {
   unsigned long ticks = enc_.read();
 #endif
 
+  unsigned long us = micros();
+  unsigned long dt = us - lastCycleUS_; // unsigned subtraction handles the wrap
+  // A second update() within the same cycle (e.g. two auto-updating controllers on one encoder) would
+  // compute the speed from a few microseconds - inf or huge spikes that poison the filter. Ignore it;
+  // the ticks are picked up by the next regular update.
+  if(dt < MIN_UPDATE_US) return RES_OK;
+  lastCycleUS_ = us;
+
   lastCycleTicks_ = ticks - presentPos_; // FIXME compensate for wrap?
   presentPos_ = ticks;
   presentPosFiltered_ = filtPos_.filter(presentPos_);
-
-  unsigned long us = micros();
-  unsigned long dt;
-  if (us < lastCycleUS_) {
-    dt = (ULONG_MAX - lastCycleUS_) + us;
-  } else {
-    dt = us - lastCycleUS_;
-  }
-  lastCycleUS_ = us;
 
   presentSpeed_ = ((double)lastCycleTicks_ / (double)dt)*1e6;
   presentSpeedFiltered_ = filtSpeed_.filter(presentSpeed_);

@@ -30,6 +30,7 @@ const std::vector<bb::Subsystem*>& bb::SubsystemManager::subsystems() {
 }
 
 bb::Result bb::Subsystem::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
+	if(words.size() == 0) return RES_CMD_UNKNOWN_COMMAND;
 	if(words[0] == "help") {
 		if(words.size() != 1) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		printHelp(stream);

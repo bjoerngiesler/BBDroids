@@ -565,7 +565,11 @@ bb::Result bb::XBee::discoverNodes(std::vector<bb::XBee::Node>& nodes) {
 			n.rssi = r->rssi;
 			memset(n.name, 0, sizeof(n.name));
 			if(length > APIFrame::ATResponseNDMinLength) {
-				strncpy(n.name, r->name, strlen(r->name));
+				// NI string: bounded by the frame and by n.name (NUL-terminated by the memset above)
+				size_t nl = length - APIFrame::ATResponseNDMinLength;
+				if(nl > sizeof(n.name)-1) nl = sizeof(n.name)-1;
+				size_t k;
+				for(k=0; k<nl && r->name[k] != 0; k++) n.name[k] = r->name[k];
 			}
 
 			Console::console.printfBroadcast("Discovered station at address 0x%lx:%lx, RSSI %d, name \"%s\"\n", n.address.addrHi, n.address.addrLo, n.rssi, n.name);
@@ -1017,7 +1021,7 @@ static uint8_t *allocBlock(uint32_t size, const char *loc="unknown") {
 }
 
 static void freeBlock(uint8_t *block, uint32_t size, const char *loc="unknown") {
-	delete block;
+	delete[] block;
 	total -= size;
 #if defined(MEMDEBUG)
 	bb::Console::console.printfBroadcast("Deleted block 0x%x, size %d, total %d from \"%s\"\n", block, size, total, loc);
@@ -1182,11 +1186,6 @@ static inline int writeEscapedByte(HardwareSerial* uart, uint8_t byte) {
 	return sent;
 }
 
-static inline uint8_t readEscapedByte(HardwareSerial* uart) {
-	uint8_t byte = uart->read();
-	if(byte != 0x7d) return byte;
-	return (uart->read()^0x20);
-}
 
 bb::Result bb::XBee::send(const APIFrame& frame) {
 	if(apiMode_ == false) return RES_SUBSYS_WRONG_MODE;
@@ -1219,14 +1218,25 @@ bb::Result bb::XBee::send(const APIFrame& frame) {
 }
 
 
-static bool waitfor(std::function<bool(void)> fn, uint8_t timeout) {
-	while(fn() == false && timeout>0) {
+// Waits up to timeoutUS microseconds for fn() to become true.
+static bool waitfor(std::function<bool(void)> fn, unsigned long timeoutUS) {
+	unsigned long start = micros();
+	while(fn() == false) {
+		if(micros() - start > timeoutUS) return false;
 		delayMicroseconds(1);
-		timeout = timeout - 1;
 	}
-	//bb::printf("remaining: %d\n", timeout);
-	if(timeout > 0) return true;
-	return false;
+	return true;
+}
+
+// Reads one byte, resolving the 0x7d escape. The byte following the escape may not have arrived yet,
+// so it is waited for as well. Returns false on timeout.
+static bool readEscapedByte(HardwareSerial* uart, uint8_t& byte, unsigned long timeoutUS) {
+	if(!waitfor([uart]()->bool {return uart->available();}, timeoutUS)) return false;
+	byte = uart->read();
+	if(byte != 0x7d) return true;
+	if(!waitfor([uart]()->bool {return uart->available();}, timeoutUS)) return false;
+	byte = uart->read() ^ 0x20;
+	return true;
 }
 
 bb::Result bb::XBee::receive(APIFrame& frame) {
@@ -1243,16 +1253,14 @@ bb::Result bb::XBee::receive(APIFrame& frame) {
 	if(byte != 0x7e) {
 		return RES_SUBSYS_COMM_ERROR;
 	}
-//	Console::console.printfBroadcast("Start delimiter found\n");
 
-	//if(!uart_->available()) delayMicroseconds(200);
-	//if(!uart_->available()) return RES_SUBSYS_COMM_ERROR;	
-	if(waitfor([this]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
-	uint8_t lengthMSB = readEscapedByte(uart_);
-	if(waitfor([this]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
-	//if(!uart_->available()) delayMicroseconds(200);
-	//if(!uart_->available()) return RES_SUBSYS_COMM_ERROR;	
-	uint8_t lengthLSB = readEscapedByte(uart_);
+	// Per-byte timeout: 3 byte times at the current rate (10 bits per byte), at least 500us.
+	unsigned long timeoutUS = 500;
+	if(currentBPS_ > 0) timeoutUS = max(500UL, 30000000UL / (unsigned long)currentBPS_);
+
+	uint8_t lengthMSB, lengthLSB;
+	if(!readEscapedByte(uart_, lengthMSB, timeoutUS)) return RES_SUBSYS_COMM_ERROR;
+	if(!readEscapedByte(uart_, lengthLSB, timeoutUS)) return RES_SUBSYS_COMM_ERROR;
 
 	if(lengthLSB == 0x7e || lengthMSB == 0x7e) {
 		Console::console.printfBroadcast("Extra start delimiter found\n");
@@ -1260,19 +1268,18 @@ bb::Result bb::XBee::receive(APIFrame& frame) {
 	}
 
 	uint16_t length = (lengthMSB << 8) | lengthLSB;
+	// 802.15.4 API frames are at most ~111 bytes. A larger length means we lost sync - don't allocate it.
+	if(length == 0 || length > MAX_FRAME_LENGTH) return RES_SUBSYS_COMM_ERROR;
+
 	frame = APIFrame(length);
 	uint8_t *buf = frame.data();
 	for(uint16_t i=0; i<length; i++) {
-		//Console::console.printfBroadcast("Reading byte %d of %d\n", i, length);
-		if(waitfor([this]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
-		//if(!uart_->available()) delayMicroseconds(200);
-		buf[i] = readEscapedByte(uart_);
+		if(!readEscapedByte(uart_, buf[i], timeoutUS)) return RES_SUBSYS_COMM_ERROR;
 	}
 	frame.calcChecksum();
 
-	if(waitfor([this]()->bool {return uart_->available();}, 200) == false) return RES_SUBSYS_COMM_ERROR;
-	//if(!uart_->available()) delayMicroseconds(200);
-	uint8_t checksum = readEscapedByte(uart_);
+	uint8_t checksum;
+	if(!readEscapedByte(uart_, checksum, timeoutUS)) return RES_SUBSYS_COMM_ERROR;
 
 	if(frame.verifyChecksum(checksum) == false) {
 		//Console::console.printfBroadcast("Checksum invalid - expected 0x%x, got 0x%x\n", frame.checksum(), checksum);

@@ -55,6 +55,13 @@ void bb::LowPassFilter::computeCoefficients() {
     a_[1] = -(beta[0]*alphaSq - 2*beta[1]*alpha + 4*beta[2])/D;      
 }
 
+void bb::LowPassFilter::reset() {
+	for(int k = 0; k < 3; k++) {
+		x_[k] = 0;
+		y_[k] = 0;
+	}
+}
+
 float bb::LowPassFilter::filter(float xn) {
 	// Provide me with the current raw value: x
 	// I will give you the current filtered value: y

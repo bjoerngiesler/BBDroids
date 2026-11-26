@@ -122,6 +122,7 @@ bb::Result bb::Runloop::step() {
 }
 
 bb::Result bb::Runloop::handleConsoleCommand(const std::vector<String>& words, ConsoleStream *stream) {
+	if(words.size() == 0) return RES_CMD_UNKNOWN_COMMAND;
 	if(words[0] == "running_status") {
 		if(words.size() != 2) return RES_CMD_INVALID_ARGUMENT_COUNT;
 		runningStatus_ = words[1] == "on" ? true : false;

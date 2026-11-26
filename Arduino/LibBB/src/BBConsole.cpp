@@ -63,7 +63,7 @@ bool bb::SerialConsoleStream::readStringUntil(HWSERIAL_CLASS& ser, char c, Strin
 	if(ser.available() == false) return false;
 
 	while(ser.available()) {
-		unsigned char input = Serial.read();
+		unsigned char input = ser.read();
 
 		if(Console::console.lineMode() == false) {
 			if(input == '\b') {
@@ -201,16 +201,18 @@ void bb::Console::handleStreamInput(ConsoleStream* stream) {
 	} else {
 		words = split(str);
 		str = "";
+		if(words.size() == 0) return;
 	}
 
 	Result res = firstResponder_->handleConsoleCommand(words, stream);
 	if(res != RES_OK) {
-		stream->printf(errorMessage(res)); // doesn't end with a newline so have to add one
+		stream->printf("%s", errorMessage(res)); // doesn't end with a newline so have to add one
 		stream->printf(".\n> ");
 	} else stream->printf("> "); // We expect that all direct results will end with a newline.
 }
 
 bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, ConsoleStream* stream) {
+	if(words.size() == 0) return RES_CMD_UNKNOWN_COMMAND;
 
 	if(words[0] == "help") {
 		bb::Runloop::runloop.excuseOverrun();
@@ -288,6 +290,8 @@ bb::Result bb::Console::handleConsoleCommand(const std::vector<String>& words, C
 		if(subsys != NULL) {
 			std::vector<String> wordsminusone = words;
 			wordsminusone.erase(wordsminusone.begin());
+			// only the subsystem name given -> show its help (subsystems index words[0] unchecked)
+			if(wordsminusone.size() == 0) wordsminusone.push_back("help");
 			return subsys->handleConsoleCommand(wordsminusone, stream);
 		}
 	}
@@ -301,13 +305,10 @@ void bb::Console::printfBroadcast(const char* format, ...) {
 
 	va_list args;
 	va_start(args, format);
-	int len = vsnprintf(NULL, 0, format, args)+1;
-	if(len > PRINTF_MAXLEN) len = PRINTF_MAXLEN;
-	memset(str, 0, len);
-	vsnprintf(str, len, format, args);
+	vsnprintf(str, sizeof(str), format, args); // truncates safely, always terminates
 	va_end(args);
 	for(auto& s: streams_) {
-		s->printf(str);
+		s->printfFinal(str); // already formatted - must not be used as a format string again
 	}
 }
 
