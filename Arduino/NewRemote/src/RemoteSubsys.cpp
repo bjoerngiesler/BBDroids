@@ -27,9 +27,17 @@ static const char *HELP =
 "\tcommit_storage                       Write storage to flash\n";
 
 
-bool RemoteSubsys::memoryRead(ProtocolStorage& storage) {
+// One NVS key per storage item: "proto_dir" for the directory, "proto_<n>" for the block in slot n.
+static void storageKey(uint8_t index, char key[NVS_KEY_NAME_MAX_SIZE]) {
+    if(index == ProtocolFactory::STORAGE_DIRECTORY_INDEX) snprintf(key, NVS_KEY_NAME_MAX_SIZE, "proto_dir");
+    else snprintf(key, NVS_KEY_NAME_MAX_SIZE, "proto_%u", (unsigned int)index);
+}
+
+bool RemoteSubsys::memoryRead(uint8_t index, void* data, size_t size) {
     nvs_handle_t handle;
     esp_err_t err;
+    char key[NVS_KEY_NAME_MAX_SIZE];
+    storageKey(index, key);
 
     err = nvs_open(STORAGE_NAMESPACE, NVS_READONLY, &handle);
     if (err != ESP_OK) {
@@ -37,24 +45,25 @@ bool RemoteSubsys::memoryRead(ProtocolStorage& storage) {
         return false;
     }
 
-    // Write blob
-    bb::printf("Retrieving protocol storage data blob... ");
-    size_t size;
-    err = nvs_get_blob(handle, "proto_s", (void*)&storage, &size);
+    size_t storedSize = size; // in: buffer size, out: stored size
+    err = nvs_get_blob(handle, key, data, &storedSize);
+    nvs_close(handle);
     if (err != ESP_OK) {
-        bb::printf("Error %s!\n", esp_err_to_name(err));
-        nvs_close(handle);
+        bb::printf("Reading %s: %s\n", key, esp_err_to_name(err));
         return false;
     }
-
-    bb::printf("OK.\n");
-    nvs_close(handle);
+    if (storedSize != size) {
+        bb::printf("Reading %s: stored size %d, expected %d\n", key, storedSize, size);
+        return false;
+    }
     return true;
 }
 
-bool RemoteSubsys::memoryWrite(const ProtocolStorage& storage) {
+bool RemoteSubsys::memoryWrite(uint8_t index, const void* data, size_t size) {
     nvs_handle_t handle;
     esp_err_t err;
+    char key[NVS_KEY_NAME_MAX_SIZE];
+    storageKey(index, key);
 
     err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &handle);
     if (err != ESP_OK) {
@@ -62,26 +71,35 @@ bool RemoteSubsys::memoryWrite(const ProtocolStorage& storage) {
         return false;
     }
 
-    // Write blob
-    bb::printf("Saving %d bytes of protocol storage data blob (name max %d)...\n", sizeof(ProtocolStorage), NVS_KEY_NAME_MAX_SIZE);
-    err = nvs_set_blob(handle, "proto_s", &storage, sizeof(ProtocolStorage));
+    bb::printf("Saving %d bytes to %s...\n", size, key);
+    err = nvs_set_blob(handle, key, data, size);
     if (err != ESP_OK) {
-        bb::printf("Failed to write protocol storage data blob (%s)!\n", esp_err_to_name(err));
+        bb::printf("Failed to write %s (%s)!\n", key, esp_err_to_name(err));
         nvs_close(handle);
         return false;
     }
 
-    // Commit
     err = nvs_commit(handle);
     if (err != ESP_OK) {
-        bb::printf("Failed to commit data\n");
+        bb::printf("Failed to commit %s (%s)\n", key, esp_err_to_name(err));
+        nvs_close(handle);
+        return false;
     }
-
-    bb::printf("1s safety break\n");
-    delay(1000);
 
     nvs_close(handle);
     return true;
+}
+
+// Storage used to be one big blob under "proto_s" (up to ~90 KB). Remove it so it doesn't occupy NVS space
+// next to the per-block keys. Its contents can't be read by the per-block format anyway.
+static void removeLegacyStorage() {
+    nvs_handle_t handle;
+    if(nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &handle) != ESP_OK) return;
+    if(nvs_erase_key(handle, "proto_s") == ESP_OK) {
+        nvs_commit(handle);
+        bb::printf("Removed legacy protocol storage blob\n");
+    }
+    nvs_close(handle);
 }
 
 
@@ -91,6 +109,7 @@ Result RemoteSubsys::initialize() {
         return RES_SUBSYS_ALREADY_INITIALIZED;
     }
 
+    removeLegacyStorage();
     ProtocolFactory::setMemoryReadFunction(memoryRead);
     ProtocolFactory::setMemoryWriteFunction(memoryWrite);
     Protocol::setTransmitFrequencyHz(25);
