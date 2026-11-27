@@ -191,6 +191,16 @@ void RemoteVisWidget::selectPot2() {
     potSelected_ = POT2_SELECTED;
 }
 
+// Battery bars: the first 6*battery bars green, the rest red. The old loops indexed batteryState_[-1]
+// for battery < 1/6 (e.g. running on USB without battery -> crash) and repainted the last green bar red.
+void RemoteVisWidget::showBattery(float battery) {
+    float batt = 6*battery;
+    int full = (batt > 0) ? int(batt) : 0; // also maps NaN to 0
+    for(int i=0; i<4; i++) {
+        batteryState_[i]->setBackgroundColor(i < full ? Display::LIGHTGREEN1 : Display::LIGHTRED1);
+    }
+}
+
 Result RemoteVisWidget::visualizeFromInput() {
     crosshair_->setHorVer(Input::inst.joyH, Input::inst.joyV);
     if(EPSILON(Input::inst.joyH) && EPSILON(Input::inst.joyV)) {
@@ -204,9 +214,7 @@ Result RemoteVisWidget::visualizeFromInput() {
     pot1_->setAngle(Input::inst.pot1*360.0);
     pot2_->setAngle(Input::inst.pot2*360.0);
 
-    float batt = 6*Input::inst.battery;
-    for(int i=1; i<=batt&&i<=4; i++) batteryState_[i-1]->setBackgroundColor(Display::LIGHTGREEN1);
-    for(int i=batt; i<=4; i++) batteryState_[i-1]->setBackgroundColor(Display::LIGHTRED1);
+    showBattery(Input::inst.battery);
     
     for(int i=0; i<4; i++) {
         if(Input::inst.buttons[(Input::Button)i] == true) {
@@ -246,9 +254,7 @@ Result RemoteVisWidget::visualizeFromControlPacket(const bb::rmt::MControlPacket
     pot1_->setAngle(packet.getAxis(8, UNIT_DEGREES));
     pot2_->setAngle(packet.getAxis(9, UNIT_DEGREES));
 
-    float batt = 6*(packet.getAxis(10, UNIT_UNITY));
-    for(int i=1; i<=batt&&i<=4; i++) batteryState_[i-1]->setBackgroundColor(Display::LIGHTGREEN1);
-    for(int i=batt; i<=4; i++) batteryState_[i-1]->setBackgroundColor(Display::LIGHTRED1);
+    showBattery(packet.getAxis(10, UNIT_UNITY));
 
     if(packet.getAxis(11, UNIT_UNITY)>0) {
         mainBtns_[0]->setBackgroundColor(Display::LIGHTRED1);

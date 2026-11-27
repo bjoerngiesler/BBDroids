@@ -36,6 +36,7 @@ protected:
     shared_ptr<Label> mainBtns_[4];
     shared_ptr<Label> topButtons_[3];
     shared_ptr<Label> batteryState_[4];
+    void showBattery(float battery); // 0..1
     bool left_;
     uint8_t bodyWidth_, bodyHeight_;
     shared_ptr<RoundScaleWidget> pot1_, pot2_;
