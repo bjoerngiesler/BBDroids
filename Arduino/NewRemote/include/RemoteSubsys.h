@@ -40,8 +40,8 @@ public:
 protected:
     Protocol *current_, *interremote_;
     MaxlenString currentName_;
-    static bool memoryRead(ProtocolStorage& storage);
-    static bool memoryWrite(const ProtocolStorage& storage);
+    static bool memoryRead(uint8_t index, void* data, size_t size);
+    static bool memoryWrite(uint8_t index, const void* data, size_t size);
 
     bool initialized_ = false;
     std::function<void(Protocol*)> currentChangedCB_ = nullptr;
