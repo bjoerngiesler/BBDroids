@@ -86,9 +86,6 @@ bool RemoteSubsys::memoryWrite(uint8_t index, const void* data, size_t size) {
         return false;
     }
 
-    bb::printf("1s safety break\n");
-    delay(1000);
-
     nvs_close(handle);
     return true;
 }
