@@ -114,6 +114,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         <button id="bPause">Pause</button>
         <button id="bReset">Restart</button>
         <button id="bCourse">Load obstacle course</button>
+        <button id="bRemote" title="Control the sim with a physical remote via a SimBridge board (BBRemotes/examples/SimBridge) on USB. Chrome / Edge only.">Connect remote</button>
         <select id="sSpeed" aria-label="Time scale"><option value="1">Real time</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option><option value="0.1">0.1×</option></select>
         <select id="sGround" aria-label="Ground"><option value="smooth">Smooth hard floor</option><option value="office">Low-pile office carpet</option><option value="living">Medium-pile living-room carpet</option><option value="custom" disabled>Custom (sliders)</option></select>
         <select id="sMode" aria-label="BBDroids drive mode"><option value="vel">Drive mode: velocity</option><option value="pos">Drive mode: position</option><option value="autopos">Drive mode: auto position</option></select>
@@ -1048,6 +1049,67 @@ function updateKeys(dt) {
   keyAxis('r', 'KeyD', 'KeyA', 2.0, dt);           // lean: full deflection in 0.5 s
 }
 
+// ------------------------------------------------------------ physical remote (SimBridge over Web Serial)
+// A SimBridge board (BBRemotes/examples/SimBridge) is a real BBRemotes receiver: the remote pairs with it and it
+// prints the mixed inputs as lines "BBR vel=... turn=... headP=... headR=... headH=...". Mapping for BB-8:
+// vel -> drive, turn -> body lean, headP/headR -> dome (unscaled, +-1 = +-180 deg as in the firmware). While the
+// remote is live the dome follows it continuously (button 3 held). If the data goes stale, drive and lean stop.
+const remote = {vals: {}, t: 0, connected: false, writer: null};
+const clamp1 = v => Math.max(-1, Math.min(1, isFinite(v) ? v : 0));
+const remoteFresh = () => remote.connected && performance.now() - remote.t < 500;
+function parseRemoteLine(line) {
+  if (!line.startsWith('BBR ')) return;
+  if (line === 'BBR timeout') { remote.t = 0; return; }
+  for (const kv of line.slice(4).split(' ')) { const i = kv.indexOf('='); if (i > 0) remote.vals[kv.slice(0, i)] = +kv.slice(i + 1); }
+  remote.t = performance.now();
+}
+function updateRemoteButton() {
+  const b = $('bRemote');
+  b.textContent = !remote.connected ? 'Connect remote' : remoteFresh() ? 'Remote: live' : 'Remote: no data';
+  b.classList.toggle('on', remoteFresh());
+}
+async function connectRemote() {
+  if (remote.connected) return;
+  if (!('serial' in navigator)) { alert('Connecting a remote needs the Web Serial API -- use Chrome or Edge.'); return; }
+  let port;
+  try {
+    port = await navigator.serial.requestPort({filters: [{usbVendorId: 0x303a}]}); // Espressif USB
+    await port.open({baudRate: 115200});
+  } catch (e) { console.warn('Remote:', e); return; }
+  remote.connected = true;
+  try { remote.writer = port.writable.getWriter(); } catch (e) { remote.writer = null; }
+  try {
+    const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
+    let buf = '';
+    for (;;) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) { parseRemoteLine(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
+    }
+  } catch (e) { console.warn('Remote disconnected:', e); }
+  remote.connected = false; remote.t = 0;
+  if (remote.writer) { try { remote.writer.releaseLock(); } catch (e) {} remote.writer = null; }
+}
+// Telemetry back to the remote: SimBridge forwards "TEL ..." lines as Monaco state packets (10 Hz).
+const telEncoder = new TextEncoder();
+let lastTelemetry = 0;
+function sendTelemetry(now) {
+  if (!remote.writer || now - lastTelemetry < 100) return;
+  lastTelemetry = now;
+  const mode = ({off: 0, vel: 1, autopos: 2, pos: 3})[sim.driveState] ?? 0;
+  const heading = ((sim.psi * R2D) % 360 + 360) % 360;
+  const line = `TEL speed=${(sim.encSpeedFilt / 1000).toFixed(3)} pitch=${sim.pitchDeg().toFixed(1)} roll=${sim.leanDeg().toFixed(1)} heading=${heading.toFixed(1)} mode=${mode}\n`;
+  remote.writer.write(telEncoder.encode(line)).catch(() => {});
+}
+$('bRemote').onclick = connectRemote;
+function applyRemote() {
+  if (!remote.connected) return;
+  if (!remoteFresh()) { stick.v = 0; stick.r = 0; return; }
+  stick.v = clamp1(remote.vals.vel); stick.r = clamp1(remote.vals.turn);
+}
+
 let paused = false, timeScale = 1;
 function togglePause() { paused = !paused; $('bPause').textContent = paused ? 'Resume' : 'Pause'; $('bPause').classList.toggle('on', paused); }
 $('bPause').onclick = togglePause;
@@ -1301,9 +1363,14 @@ let last = performance.now(), acc = 0, frame = 0;
 function loop(now) {
   const dtReal = Math.min(0.05, (now - last) / 1000); last = now;
   updateKeys(dtReal);
+  applyRemote(); updateRemoteButton();
   sim.input.vel = stick.v; sim.input.roll = stick.r;
   sim.input.headP = stick.hp * sim.p.domePitchRange; sim.input.headR = stick.hr * sim.p.domeRollRange;
   sim.input.headHeld = padState.padHead.active || $('latch').checked; // head pad pressed = button3 held
+  if (remoteFresh()) { // like the firmware: remote inputs are unscaled angles, +-1 = +-180 deg; the servos clamp to their range
+    sim.input.headP = clamp1(remote.vals.headP) * 180; sim.input.headR = clamp1(remote.vals.headR) * 180; sim.input.headHeld = true;
+  }
+  sendTelemetry(now);
   if (!paused) {
     acc += dtReal * timeScale; const n = Math.floor(acc / 0.001);
     if (n > 0) { sim.advance(n * 0.001); acc -= n * 0.001;
