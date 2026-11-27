@@ -105,6 +105,7 @@ summary{cursor:pointer;font:600 15px var(--fc);padding:4px 0;min-height:32px}
       <label class="chk"><input type="checkbox" id="latch"> Sticks latch (no spring return)</label>
       <div class="btns">
         <button id="bDrive" class="on">Drive on</button>
+        <button id="bRemote" title="Control the sim with a physical remote via a SimBridge board (BBRemotes/examples/SimBridge) on USB. Chrome / Edge only.">Connect remote</button>
         <button id="bPause">Pause</button>
         <button id="bReset">Restart</button>
         <button id="bCourse">Load obstacle course</button>
@@ -757,6 +758,56 @@ function updateKeys(dt) {
     if (!keys.has('KeyQ') && !keys.has('KeyE') && Math.abs(stick.lean) < 1e-3) { stick.lean = 0; leanKeyUsed = false; } }
 }
 
+// ------------------------------------------------------------ physical remote (SimBridge over Web Serial)
+// A SimBridge board (BBRemotes/examples/SimBridge) is a real BBRemotes receiver: the remote pairs with it like
+// with D-O, and it prints the mixed inputs as lines "BBR vel=... turn=... headP=... headH=... nod=...".
+// While fresh data arrives it overrides the on-screen sticks and keys; if it goes stale, drive stops (like the
+// firmware's comm timeout watchdog).
+const remote = {vals: {}, t: 0, connected: false};
+const clamp1 = v => Math.max(-1, Math.min(1, isFinite(v) ? v : 0));
+const remoteFresh = () => remote.connected && performance.now() - remote.t < 500;
+function parseRemoteLine(line) {
+  if (!line.startsWith('BBR ')) return;
+  if (line === 'BBR timeout') { remote.t = 0; return; }
+  for (const kv of line.slice(4).split(' ')) { const i = kv.indexOf('='); if (i > 0) remote.vals[kv.slice(0, i)] = +kv.slice(i + 1); }
+  remote.t = performance.now();
+}
+function updateRemoteButton() {
+  const b = $('bRemote');
+  b.textContent = !remote.connected ? 'Connect remote' : remoteFresh() ? 'Remote: live' : 'Remote: no data';
+  b.classList.toggle('on', remoteFresh());
+}
+async function connectRemote() {
+  if (remote.connected) return;
+  if (!('serial' in navigator)) { alert('Connecting a remote needs the Web Serial API -- use Chrome or Edge.'); return; }
+  let port;
+  try {
+    port = await navigator.serial.requestPort({filters: [{usbVendorId: 0x303a}]}); // Espressif USB
+    await port.open({baudRate: 115200});
+  } catch (e) { console.warn('Remote:', e); return; }
+  remote.connected = true;
+  try {
+    const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
+    let buf = '';
+    for (;;) {
+      const {value, done} = await reader.read();
+      if (done) break;
+      buf += value;
+      let i;
+      while ((i = buf.indexOf('\n')) >= 0) { parseRemoteLine(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
+    }
+  } catch (e) { console.warn('Remote disconnected:', e); }
+  remote.connected = false; remote.t = 0;
+}
+$('bRemote').onclick = connectRemote;
+function applyRemote() {
+  if (!remote.connected) return;
+  if (!remoteFresh()) { stick.v = 0; stick.r = 0; return; }
+  const r = remote.vals;
+  stick.v = clamp1(r.vel); stick.r = clamp1(r.turn); stick.hp = clamp1(r.headP); stick.hh = clamp1(r.headH);
+  if ('nod' in r) { stick.lean = clamp1(r.nod); leanR.value = stick.lean; leanN.value = stick.lean.toFixed(2); }
+}
+
 let paused = false, timeScale = 1, camFollow = false;
 function togglePause() { paused = !paused; $('bPause').textContent = paused ? 'Resume' : 'Pause'; $('bPause').classList.toggle('on', paused); }
 $('bPause').onclick = togglePause;
@@ -1049,6 +1100,7 @@ let last = performance.now(), acc = 0, frame = 0;
 function loop(now) {
   const dtReal = Math.min(0.05, (now - last) / 1000); last = now;
   updateKeys(dtReal);
+  applyRemote(); updateRemoteButton();
   sim.input.vel = stick.v; sim.input.rot = stick.r; sim.input.lean = stick.lean;
   sim.input.headP = stick.hp * 45; sim.input.headH = stick.hh * 90;
   if (!paused) { acc += dtReal * timeScale; const n = Math.floor(acc / 0.001); if (n > 0) { sim.advance(n * 0.001); acc -= n * 0.001;

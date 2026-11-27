@@ -33,3 +33,12 @@ Both position controllers use the average encoder position in mm (`DOPosControlI
 - **Firmware encoder scale:** the firmware converts ticks with `WHEEL_CIRCUMFERENCE` = 722.566 mm (r = 0.115 m), the physics uses the CAD radius 0.126 m. The simulated encoders now report what the firmware sees, so firmware speeds and positions are about 9% smaller than the real ones.
 - Effect, full stick and release: top speed 961 → 1023 mm/s, PWM max 171 → 213, standstill sway in auto position 2.1° → 1.8°; stable.
 - Drive mode selector and the manual position mode `DRIVE_POS` added; the `auto_pos_control` checkbox is replaced by the selector (saved settings with it switched off load as velocity mode).
+
+## Physical remote
+
+The sim can be driven by a real remote through a **SimBridge** board (an ESP32-S3 running
+`BBRemotes/examples/SimBridge`): pair the remote with "SimBridge" like with a droid (ESP-NOW), plug the
+board into the PC via USB, and click **Connect remote** (Chrome or Edge -- it uses the Web Serial API).
+The bridge uses D-O's input names and default mixes: speed and turn from the joystick, head pitch and
+heading from the remote's orientation, neck lean from the secondary remote. While data arrives, the remote
+overrides the on-screen sticks and keys; if data stops for 0.5 s, drive stops, like the firmware's watchdog.
