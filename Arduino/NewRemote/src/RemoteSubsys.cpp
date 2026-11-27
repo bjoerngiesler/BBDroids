@@ -1,5 +1,7 @@
 #include "RemoteSubsys.h"
 #include "BuilderID.h"
+#include "Secrets.h"
+#include <WiFi.h>
 #include "nvs_flash.h"
 #include "nvs.h"
 
@@ -90,6 +92,40 @@ bool RemoteSubsys::memoryWrite(uint8_t index, const void* data, size_t size) {
     return true;
 }
 
+// Brings up WiFi for Monaco/UDP (called by MUDPProtocol::init(), see Secrets.h). Blocks up to 15 s while joining.
+static bool udpNetworkSetup(MUDPProtocol& proto) {
+    if(BBR_WIFI_AP_MODE) {
+        if((WiFi.getMode() & WIFI_AP) == 0) {
+            WiFi.mode(WIFI_AP_STA); // keep the station interface, ESP-NOW uses it
+            if(!WiFi.softAP(BBR_WIFI_SSID, BBR_WIFI_PASSWORD)) {
+                bb::printf("Could not start access point \"%s\"\n", BBR_WIFI_SSID);
+                return false;
+            }
+            bb::printf("Access point \"%s\" started at %s\n", BBR_WIFI_SSID, WiFi.softAPIP().toString().c_str());
+        }
+        proto.setInterface(WiFi.softAPIP().toString().c_str());
+        return true;
+    }
+
+    if(WiFi.status() != WL_CONNECTED) {
+        if(strlen(BBR_WIFI_SSID) == 0) {
+            bb::printf("No WiFi configured -- set BBR_WIFI_SSID in include/Secrets.h\n");
+            return false;
+        }
+        bb::printf("Joining WiFi \"%s\"...", BBR_WIFI_SSID);
+        WiFi.mode(WIFI_STA);
+        WiFi.begin(BBR_WIFI_SSID, BBR_WIFI_PASSWORD);
+        for(int i=0; i<150 && WiFi.status() != WL_CONNECTED; i++) delay(100);
+        if(WiFi.status() != WL_CONNECTED) {
+            bb::printf(" failed (status %d)\n", WiFi.status());
+            return false;
+        }
+        bb::printf(" connected, IP %s\n", WiFi.localIP().toString().c_str());
+    }
+    proto.setInterface(WiFi.localIP().toString().c_str());
+    return true;
+}
+
 // Storage used to be one big blob under "proto_s" (up to ~90 KB). Remove it so it doesn't occupy NVS space
 // next to the per-block keys. Its contents can't be read by the per-block format anyway.
 static void removeLegacyStorage() {
@@ -110,6 +146,7 @@ Result RemoteSubsys::initialize() {
     }
 
     removeLegacyStorage();
+    MUDPProtocol::setNetworkSetupCallback(udpNetworkSetup);
     ProtocolFactory::setMemoryReadFunction(memoryRead);
     ProtocolFactory::setMemoryWriteFunction(memoryWrite);
     Protocol::setTransmitFrequencyHz(25);
