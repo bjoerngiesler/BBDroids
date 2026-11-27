@@ -763,7 +763,7 @@ function updateKeys(dt) {
 // with D-O, and it prints the mixed inputs as lines "BBR vel=... turn=... headP=... headH=... nod=...".
 // While fresh data arrives it overrides the on-screen sticks and keys; if it goes stale, drive stops (like the
 // firmware's comm timeout watchdog).
-const remote = {vals: {}, t: 0, connected: false};
+const remote = {vals: {}, t: 0, connected: false, writer: null};
 const clamp1 = v => Math.max(-1, Math.min(1, isFinite(v) ? v : 0));
 const remoteFresh = () => remote.connected && performance.now() - remote.t < 500;
 function parseRemoteLine(line) {
@@ -786,6 +786,7 @@ async function connectRemote() {
     await port.open({baudRate: 115200});
   } catch (e) { console.warn('Remote:', e); return; }
   remote.connected = true;
+  try { remote.writer = port.writable.getWriter(); } catch (e) { remote.writer = null; }
   try {
     const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
     let buf = '';
@@ -798,6 +799,19 @@ async function connectRemote() {
     }
   } catch (e) { console.warn('Remote disconnected:', e); }
   remote.connected = false; remote.t = 0;
+  if (remote.writer) { try { remote.writer.releaseLock(); } catch (e) {} remote.writer = null; }
+}
+// Telemetry back to the remote: SimBridge forwards "TEL ..." lines as Monaco state packets (10 Hz).
+const telEncoder = new TextEncoder();
+let lastTelemetry = 0;
+function sendTelemetry(now) {
+  if (!remote.writer || now - lastTelemetry < 100) return;
+  lastTelemetry = now;
+  const deg = 180 / Math.PI;
+  const mode = !sim.input.driveOn ? 0 : ({vel: 1, autopos: 2, pos: 3}[sim.p.driveMode] ?? 1);
+  const heading = ((sim.psi * deg) % 360 + 360) % 360;
+  const line = `TEL speed=${sim.qd[0].toFixed(3)} pitch=${(sim.q[1] * deg).toFixed(1)} roll=0 heading=${heading.toFixed(1)} mode=${mode}\n`;
+  remote.writer.write(telEncoder.encode(line)).catch(() => {});
 }
 $('bRemote').onclick = connectRemote;
 function applyRemote() {
@@ -1102,7 +1116,12 @@ function loop(now) {
   updateKeys(dtReal);
   applyRemote(); updateRemoteButton();
   sim.input.vel = stick.v; sim.input.rot = stick.r; sim.input.lean = stick.lean;
-  sim.input.headP = stick.hp * 45; sim.input.headH = stick.hh * 90;
+  sim.input.headP = stick.hp * 45; sim.input.headH = stick.hh * 90; sim.input.headR = 0;
+  if (remoteFresh()) { // like the firmware: remote inputs are unscaled angles, +-1 = +-180 deg
+    const r = remote.vals;
+    sim.input.headP = clamp1(r.headP) * 180; sim.input.headH = clamp1(r.headH) * 180; sim.input.headR = clamp1(r.headR) * 180;
+  }
+  sendTelemetry(now);
   if (!paused) { acc += dtReal * timeScale; const n = Math.floor(acc / 0.001); if (n > 0) { sim.advance(n * 0.001); acc -= n * 0.001;
     if (course) { course.update(n * 0.001, [{x: sim.wX, z: sim.wZ, m: sim.p.mw + sim.p.mc + sim.p.mHead}]); course.checkCones(sim.wX, sim.wZ, 0.16); } } }
   for (const st of Object.values(padState)) {
@@ -1110,7 +1129,7 @@ function loop(now) {
     if (hq > 1e-9) { x *= mq / hq; y *= mq / hq; } st.knob.style.transform = `translate(${x * 118}%, ${-y * 118}%)`;
   }
   $('capV').textContent = stick.v.toFixed(2); $('capR').textContent = stick.r.toFixed(2);
-  $('capHP').textContent = `${(stick.hp * 45).toFixed(0)}°`; $('capHH').textContent = `${(stick.hh * 90).toFixed(0)}°`;
+  $('capHP').textContent = `${sim.input.headP.toFixed(0)}°`; $('capHH').textContent = `${sim.input.headH.toFixed(0)}°`;
   if (courseView) courseView.update();
   update3d(); drawSide(); drawFront();
   if (frame++ % 2 === 0) PLOTS.forEach(drawPlot);

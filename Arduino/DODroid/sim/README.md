@@ -42,3 +42,6 @@ board into the PC via USB, and click **Connect remote** (Chrome or Edge -- it us
 The bridge uses D-O's input names and default mixes: speed and turn from the joystick, head pitch and
 heading from the remote's orientation, neck lean from the secondary remote. While data arrives, the remote
 overrides the on-screen sticks and keys; if data stops for 0.5 s, drive stops, like the firmware's watchdog.
+Head angles from the remote are unscaled (+-1 = +-180 deg, as in the firmware), head roll included. The sim
+sends telemetry back (speed, body pitch, heading, drive mode at 10 Hz), which SimBridge forwards to the
+remote as Monaco state packets.
