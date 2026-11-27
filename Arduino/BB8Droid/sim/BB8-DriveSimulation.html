@@ -106,7 +106,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         <div><div class="pad" id="padDrive"><div class="knob"></div></div>
           <div class="padcap">Drive <b id="capV">0.00</b> · lean <b id="capR">0.00</b></div></div>
         <div><div class="pad" id="padHead"><div class="knob"></div></div>
-          <div class="padcap">Head fwd <b id="capHP">0°</b> · side <b id="capHR">0°</b></div></div>
+          <div class="padcap">Head fwd <b id="capHP">0°</b> · side <b id="capHR">0°</b> · turn <b id="capHH">0°</b></div></div>
       </div>
       <label class="chk"><input type="checkbox" id="latch"> Sticks latch (no spring return)</label>
       <div class="btns">
@@ -1052,8 +1052,10 @@ function updateKeys(dt) {
 // ------------------------------------------------------------ physical remote (SimBridge over Web Serial)
 // A SimBridge board (BBRemotes/examples/SimBridge) is a real BBRemotes receiver: the remote pairs with it and it
 // prints the mixed inputs as lines "BBR vel=... turn=... headP=... headR=... headH=...". Mapping for BB-8:
-// vel -> drive, turn -> body lean, headP/headR -> dome (unscaled, +-1 = +-180 deg as in the firmware). While the
-// remote is live the dome follows it continuously (button 3 held). If the data goes stale, drive and lean stop.
+// vel -> drive, turn -> body lean, headP/headR -> dome pitch/roll (unscaled, +-1 = +-180 deg as in the firmware),
+// headH -> dome rotation (cosmetic only, the sim has no dome spin). Pitch and turn are negated: the bridge uses D-O's
+// sign conventions. While the remote is live the dome follows it continuously (button 3 held). If the data goes
+// stale, drive and lean stop and the dome turns back to the front.
 const remote = {vals: {}, t: 0, connected: false, writer: null};
 const clamp1 = v => Math.max(-1, Math.min(1, isFinite(v) ? v : 0));
 const remoteFresh = () => remote.connected && performance.now() - remote.t < 500;
@@ -1104,10 +1106,14 @@ function sendTelemetry(now) {
   remote.writer.write(telEncoder.encode(line)).catch(() => {});
 }
 $('bRemote').onclick = connectRemote;
+let domeH = 0; // dome rotation in degrees, positive = to the left (cosmetic)
+const remoteHead = () => ({p: -clamp1(remote.vals.headP) * 180, r: clamp1(remote.vals.headR) * 180, h: clamp1(remote.vals.headH) * 180});
 function applyRemote() {
   if (!remote.connected) return;
-  if (!remoteFresh()) { stick.v = 0; stick.r = 0; return; }
-  stick.v = clamp1(remote.vals.vel); stick.r = clamp1(remote.vals.turn);
+  if (!remoteFresh()) { stick.v = 0; stick.r = 0; domeH = 0; return; }
+  stick.v = clamp1(remote.vals.vel); stick.r = -clamp1(remote.vals.turn);
+  const h = remoteHead(); // head pad shows the remote's command relative to the servo ranges
+  stick.hp = clamp1(h.p / sim.p.domePitchRange); stick.hr = clamp1(h.r / sim.p.domeRollRange); domeH = h.h;
 }
 
 let paused = false, timeScale = 1;
@@ -1223,7 +1229,7 @@ function update3d() {
   const md = new THREE.Vector3(-Math.sin(th), Math.cos(th) * Math.cos(rho), Math.sin(rho)).normalize();
   mast.quaternion.setFromUnitVectors(up, md); mast.scale.set(1, R * 0.95, 1); mast.position.copy(md).multiplyScalar(R * 0.475);
   const hd = new THREE.Vector3(Math.sin(al) * Math.cos(ze), Math.cos(al) * Math.cos(ze), Math.sin(ze)).normalize();
-  dome.position.copy(hd).multiplyScalar(R - 0.004); dome.quaternion.setFromUnitVectors(up, hd);
+  dome.position.copy(hd).multiplyScalar(R - 0.004); dome.quaternion.setFromUnitVectors(up, hd).multiply(new THREE.Quaternion().setFromAxisAngle(up, domeH * D2R)); // dome rotation (cosmetic)
   dome.visible = p.mh > 0.001;
   shadow.position.set(X, pose.h + 0.004, Z); shadow.quaternion.copy(pose.tilt); shadow.rotateX(-Math.PI / 2);
   grid.position.set(Math.round(X / 0.5) * 0.5, 0, Math.round(Z / 0.5) * 0.5);
@@ -1368,7 +1374,7 @@ function loop(now) {
   sim.input.headP = stick.hp * sim.p.domePitchRange; sim.input.headR = stick.hr * sim.p.domeRollRange;
   sim.input.headHeld = padState.padHead.active || $('latch').checked; // head pad pressed = button3 held
   if (remoteFresh()) { // like the firmware: remote inputs are unscaled angles, +-1 = +-180 deg; the servos clamp to their range
-    sim.input.headP = clamp1(remote.vals.headP) * 180; sim.input.headR = clamp1(remote.vals.headR) * 180; sim.input.headHeld = true;
+    const h = remoteHead(); sim.input.headP = h.p; sim.input.headR = h.r; sim.input.headHeld = true;
   }
   sendTelemetry(now);
   if (!paused) {
@@ -1381,7 +1387,7 @@ function loop(now) {
     let x = stick[st.kx], y = stick[st.ky]; const mq = Math.max(Math.abs(x), Math.abs(y)), hq = Math.hypot(x, y); if (hq > 1e-9) { x *= mq / hq; y *= mq / hq; } st.knob.style.transform = `translate(${x * 118}%, ${-y * 118}%)`;
   }
   $('capV').textContent = stick.v.toFixed(2); $('capR').textContent = stick.r.toFixed(2);
-  $('capHP').textContent = `${sim.remoteP.toFixed(0)}°`; $('capHR').textContent = `${sim.remoteR.toFixed(0)}°`;
+  $('capHP').textContent = `${sim.remoteP.toFixed(0)}°`; $('capHR').textContent = `${sim.remoteR.toFixed(0)}°`; $('capHH').textContent = `${domeH.toFixed(0)}°`;
   const warn = sim.shearUse > SHEAR_WARN; host.classList.toggle('shear', warn); domeMat.color.copy(warn ? RED : WHITE);
   if (courseView) courseView.update();
   update3d();
