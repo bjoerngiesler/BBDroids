@@ -360,7 +360,7 @@ function updateKeys(dt) {
 // A SimBridge board (BBRemotes/examples/SimBridge) is a real BBRemotes receiver: the remote pairs with it and it
 // prints the mixed inputs as lines "BBR vel=... turn=... headP=... headR=... headH=...". Mapping for BB-8:
 // vel -> drive, turn -> body lean, headP/headR -> dome pitch/roll (unscaled, +-1 = +-180 deg as in the firmware),
-// headH -> dome rotation (cosmetic only, the sim has no dome spin). Pitch and turn are negated: the bridge uses D-O's
+// headH -> dome rotation (cosmetic only, the sim has no dome spin). Pitch, roll and turn are negated: the bridge uses D-O's
 // sign conventions. While the remote is live the dome follows it continuously (button 3 held). If the data goes
 // stale, drive and lean stop and the dome turns back to the front.
 const remote = {vals: {}, t: 0, connected: false, writer: null};
@@ -414,7 +414,7 @@ function sendTelemetry(now) {
 }
 $('bRemote').onclick = connectRemote;
 let domeH = 0; // dome rotation in degrees, positive = to the left (cosmetic)
-const remoteHead = () => ({p: -clamp1(remote.vals.headP) * 180, r: clamp1(remote.vals.headR) * 180, h: clamp1(remote.vals.headH) * 180});
+const remoteHead = () => ({p: -clamp1(remote.vals.headP) * 180, r: -clamp1(remote.vals.headR) * 180, h: clamp1(remote.vals.headH) * 180});
 function applyRemote() {
   if (!remote.connected) return;
   if (!remoteFresh()) { stick.v = 0; stick.r = 0; domeH = 0; return; }
