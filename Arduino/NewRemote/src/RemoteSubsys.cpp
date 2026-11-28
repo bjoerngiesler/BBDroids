@@ -155,21 +155,29 @@ Result RemoteSubsys::initialize() {
     current_ = nullptr;
 
     // first setup interremote
-    bb::printf("Loading protocol \"%s\"\n", INTERREMOTE_PROTOCOL_NAME);
+    bb::printf("Loading protocol \"%s\"\n", INTERREMOTE_PROTOCOL_NAME.c_str());
     interremote_ = ProtocolFactory::loadProtocol(INTERREMOTE_PROTOCOL_NAME);
     if(interremote_ == nullptr) {
         bb::printf("Loading failed, creating new\n");
         interremote_ = ProtocolFactory::getOrCreateProtocol(MONACO_XBEE);
+        if(interremote_ == nullptr) {
+            bb::printf("Couldn't load, get, or create protocol of type %c\n", MONACO_XBEE);
+            return RES_SUBSYS_HW_DEPENDENCY_MISSING;
+        }
         interremote_->setPairingCallback([this](Protocol* p,const NodeDescription& n) {this->protocolPairedCB(p, n);});
-    }
 
-    if(interremote_ == nullptr) {
-        bb::printf("Couldn't load, get, or create protocol of type %c\n", MONACO_XBEE);
-        return RES_SUBSYS_HW_DEPENDENCY_MISSING;
-    } 
-        
-    bb::printf("Initializing interremote protocol at 0x%x\n", interremote_);
-    interremote_->init(isLeftRemote ? "LeftRemote" : "RightRemote");
+        // loadProtocol() may already have created this protocol and failed in init() -- typically because
+        // XBee auto-detection found nothing. getOrCreateProtocol() then returns that same object. Don't run
+        // the (slow) auto-detection a second time. init() sets the node name before it does any work, so a
+        // non-empty node name means init() has been tried.
+        if(interremote_->nodeName().empty()) {
+            bb::printf("Initializing interremote protocol at 0x%x\n", interremote_);
+            interremote_->init(isLeftRemote ? "LeftRemote" : "RightRemote");
+        } else {
+            bb::printf("Interremote protocol init already failed during loading, not retrying\n");
+        }
+    }
+    // else: loadProtocol() only returns protocols that it has initialized successfully.
 
 
     if(ProtocolFactory::lastUsedProtocolName() != INTERREMOTE_PROTOCOL_NAME && ProtocolFactory::lastUsedProtocolName() != "") {
