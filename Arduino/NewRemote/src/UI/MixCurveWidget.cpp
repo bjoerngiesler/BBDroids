@@ -1,33 +1,62 @@
 #include "UI/MixCurveWidget.h"
+#include "UI/Display.h"
 
 void MixCurveWidget::setInterpolator(const Interpolator& inter) {
     inter_ = inter;
     setNeedsFullRedraw();
 }
 
+int8_t MixCurveWidget::pointValue(uint8_t num) {
+    switch(num) {
+    case 0: return inter_.i0;
+    case 1: return inter_.i25;
+    case 2: return inter_.i50;
+    case 3: return inter_.i75;
+    default: return inter_.i100;
+    }
+}
+
+void MixCurveWidget::setPointValue(uint8_t num, int value) {
+    if(value < MIN_VALUE) value = MIN_VALUE;
+    if(value > MAX_VALUE) value = MAX_VALUE;
+    switch(num) {
+    case 0: inter_.i0 = value; break;
+    case 1: inter_.i25 = value; break;
+    case 2: inter_.i50 = value; break;
+    case 3: inter_.i75 = value; break;
+    default: inter_.i100 = value; break;
+    }
+    setNeedsFullRedraw();
+}
+
+// The points sit 4 pixels inside the frame so the node boxes (+-3) stay inside it.
+int MixCurveWidget::pointX(unsigned int num) {
+    float innerW = width_-8;
+    return x_ + 4 + int(rintf((innerW/(NUM_POINTS-1))*num));
+}
+
+int MixCurveWidget::pointY(int value) {
+    float innerH = height_-8;
+    return y_ + height_/2 - int(rintf((innerH/(MAX_VALUE-MIN_VALUE))*value));
+}
 
 Result MixCurveWidget::draw() {
     if(needsFullRedraw_) {
-        //bb::rmt::printf("Dimensions: %dx%d+%d+%d\n", width_, height_, x_, y_);
         setNeedsContentsRedraw();
         Display::display.rect(x_, y_, x_+width_-1, y_+height_-1, bgCol_, true);
-        Display::display.rect(x_, y_, x_+width_-1, y_+height_-1, fgCol_, false);
+        Display::display.rect(x_, y_, x_+width_-1, y_+height_-1, highlighted_ ? hlCol_ : fgCol_, false);
         needsFullRedraw_ = false;
     }
 
     if(needsContentsRedraw_) {
         drawCalibLines();
-
-        drawNode(0, inter_.i0);
-        drawNode(1, inter_.i25);
-        drawNode(2, inter_.i50);
-        drawNode(3, inter_.i75);
-        drawNode(4, inter_.i100);
-        drawLineFrom(0, inter_.i0, inter_.i25);
-        drawLineFrom(1, inter_.i25, inter_.i50);
-        drawLineFrom(2, inter_.i50, inter_.i75);
-        drawLineFrom(3, inter_.i75, inter_.i100);
-
+        for(unsigned int i=0; i<NUM_POINTS-1; i++) {
+            Display::display.line(pointX(i), pointY(pointValue(i)), pointX(i+1), pointY(pointValue(i+1)), fgCol_);
+        }
+        // Nodes after lines, so the cursor node isn't overdrawn.
+        for(unsigned int i=0; i<NUM_POINTS; i++) {
+            drawNode(i, pointValue(i));
+        }
         needsContentsRedraw_ = false;
     }
 
@@ -35,35 +64,21 @@ Result MixCurveWidget::draw() {
 }
 
 void MixCurveWidget::drawNode(unsigned int num, int8_t position) {
-    float innerW = width_-8, innerH = height_-8;
-    unsigned int xpos = x_+int(rintf((innerW/4)*num))+4;
-    unsigned int ypos = y_+height_/2-int(rintf((innerH/251)*position));
-
-    //bb::rmt::printf("Position for point %d (%d): %d,%d\n", num, position, xpos, ypos);
+    int xpos = pointX(num), ypos = pointY(position);
 
     if(showsCursor_ && cursor_ == num) {
-        Display::display.rect(xpos-3, ypos-3, xpos+3, ypos+3, hlCol_, true);
+        uint8_t col = editing_ ? Display::YELLOW : hlCol_;
+        Display::display.rect(xpos-3, ypos-3, xpos+3, ypos+3, col, true);
     } else {
         Display::display.rect(xpos-2, ypos-2, xpos+2, ypos+2, fgCol_, false);
     }
 }
 
-void MixCurveWidget::drawLineFrom(unsigned int num, int8_t pos1, int8_t pos2) {
-    float innerW = width_-8, innerH = height_-8;
-    unsigned int x1 = x_+int(rintf((innerW/4)*num))+4;
-    unsigned int x2 = x_+int(rintf((innerW/4)*(num+1)))+4;
-    unsigned int y1 = y_+height_/2-int(rintf((innerH/251)*pos1));
-    unsigned int y2 = y_+height_/2-int(rintf((innerH/251)*pos2));
-    Display::display.line(x1, y1, x2, y2, fgCol_);
-}
-
 void MixCurveWidget::drawCalibLines() {
-    float innerW = width_-8, innerH = height_-8;
-    Display::display.line(x_, y_+height_/2, x_+width_-1, y_+height_/2, Display::LIGHTBLUE2);
-    unsigned int y1 = y_+int(rintf((innerH/251)*100))+height_/2;
-    unsigned int y2 = y_-int(rintf((innerH/251)*100))+height_/2;
-    Display::display.line(x_, y1, x_+width_-1, y1, Display::LIGHTRED1);
-    Display::display.line(x_, y2, x_+width_-1, y2, Display::LIGHTRED1);
+    // zero line, and +-100% lines
+    Display::display.line(x_+1, pointY(0), x_+width_-2, pointY(0), Display::LIGHTBLUE2);
+    Display::display.line(x_+1, pointY(100), x_+width_-2, pointY(100), Display::LIGHTRED1);
+    Display::display.line(x_+1, pointY(-100), x_+width_-2, pointY(-100), Display::LIGHTRED1);
 }
 
 void MixCurveWidget::setShowsCursor(bool shows) {
@@ -73,7 +88,14 @@ void MixCurveWidget::setShowsCursor(bool shows) {
 }
 
 void MixCurveWidget::setCursor(uint8_t cursor) {
+    cursor %= NUM_POINTS;
     if(cursor_ == cursor) return;
-    cursor_ = cursor % 5;
+    cursor_ = cursor;
+    setNeedsFullRedraw();
+}
+
+void MixCurveWidget::setEditing(bool editing) {
+    if(editing_ == editing) return;
+    editing_ = editing;
     setNeedsFullRedraw();
 }

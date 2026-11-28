@@ -391,8 +391,19 @@ void UI::populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* 
     interp1Menu->addEntry("LinCtr", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
     interp1Menu->addEntry("LinCtrInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
     interp1Menu->addEntry("LinPos", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp1Menu->addEntry("LinPosInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); }, true);
-    interp1Menu->addEntry("Custom...", [mix,mgr,inp,this,c](Widget* w) { showMessage("Custom mix curves not implemented", 2000); }, true);
+    interp1Menu->addEntry("LinPosInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    // Not backAfterCB: going back would take the input focus away from the dialog. The dialog's callbacks
+    // go back instead, which also repopulates this menu so the "Ip1:" title is current.
+    Menu* ip1MenuPtr = interp1Menu.get();
+    interp1Menu->addEntry("Custom...", [mix,mgr,inp,c,ip1MenuPtr,this](Widget* w) {
+        mixCurveDialog_->setInterpolator(mix.interp1);
+        mixCurveDialog_->setCancelCallback([ip1MenuPtr](MixCurveDialog* d) { ip1MenuPtr->back(); });
+        mixCurveDialog_->setOKCallback([mix,mgr,inp,c,ip1MenuPtr](MixCurveDialog* d) {
+            AxisMix m = mix; m.interp1 = d->interpolator(); mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes();
+            ip1MenuPtr->back();
+        });
+        showDialog(mixCurveDialog_.get());
+    });
 
     std::shared_ptr<Menu> axis2Menu = menu->addSubmenu(String("Ax2: ") + (mix.axis2 == AXIS_INVALID ? "-" : tx->axisName(mix.axis2).c_str()));
     w = axis2Menu->addEntry("-", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.axis2 = AXIS_INVALID; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
@@ -417,8 +428,19 @@ void UI::populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* 
     interp2Menu->addEntry("LinCtr", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
     interp2Menu->addEntry("LinCtrInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
     interp2Menu->addEntry("LinPos", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp2Menu->addEntry("LinPosInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp2Menu->addEntry("Custom...", [mix,mgr,inp,c,this](Widget* w) { showMessage("Custom mix curves not implemented", 2000); }, true);
+    interp2Menu->addEntry("LinPosInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
+    // Not backAfterCB: going back would take the input focus away from the dialog. The dialog's callbacks
+    // go back instead, which also repopulates this menu so the "Ip2:" title is current.
+    Menu* ip2MenuPtr = interp2Menu.get();
+    interp2Menu->addEntry("Custom...", [mix,mgr,inp,c,ip2MenuPtr,this](Widget* w) {
+        mixCurveDialog_->setInterpolator(mix.interp2);
+        mixCurveDialog_->setCancelCallback([ip2MenuPtr](MixCurveDialog* d) { ip2MenuPtr->back(); });
+        mixCurveDialog_->setOKCallback([mix,mgr,inp,c,ip2MenuPtr](MixCurveDialog* d) {
+            AxisMix m = mix; m.interp2 = d->interpolator(); mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes();
+            ip2MenuPtr->back();
+        });
+        showDialog(mixCurveDialog_.get());
+    });
 
     String mixStr = "Mix: ";
     switch(mix.mixType) {

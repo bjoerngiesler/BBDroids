@@ -1,7 +1,10 @@
-#include "UI/MixCurveDialog.h"    
+#include "UI/MixCurveDialog.h"
 #include "UI/UI.h"
 
-MixCurveDialog::MixCurveDialog() {    
+static const int SMALL_STEP = 5, LARGE_STEP = 25;
+static const float ENC_STEP = 10.0;
+
+MixCurveDialog::MixCurveDialog() {
     titleLabel_ = make_shared<Label>();
     mix_ = make_shared<MixCurveWidget>();
     okLabel_ = make_shared<Label>();
@@ -23,8 +26,6 @@ MixCurveDialog::MixCurveDialog() {
     reposition();
 
     focusedWidget_ = mix_.get();
-    focusedWidget_->setHighlighted(true);
-
     titleLabel_->setTitle("Mix");
 
     setDrawsFrame();
@@ -35,28 +36,47 @@ MixCurveDialog::MixCurveDialog() {
     currentEnc_ = 0;
 }
 
-void MixCurveDialog::takeInputFocus() {
-    focusedWidget_ = mix_.get();
-    focusedWidget_->setHighlighted(true);
-    mix_->setCursor(0);
-    mix_->setShowsCursor(true);
+void MixCurveDialog::setInterpolator(const Interpolator& inter) {
+    mix_->setInterpolator(inter);
+    updateTitle();
+}
 
+void MixCurveDialog::takeInputFocus() {
+    okLabel_->setHighlighted(false);
+    cancelLabel_->setHighlighted(false);
+    focusedWidget_ = mix_.get();
+    mix_->setHighlighted(true);
+    mix_->setCursor(0);
+    mix_->setEditing(false);
+    mix_->setShowsCursor(true);
+    currentEnc_ = 0;
     updateTitle();
 
     Input::inst.clearCallbacks();
-    Input::inst.setConfirmShortPressCallback([this](){focusedWidget_->triggerAction();});
-    Input::inst.setLeftPressCallback([this](){focusPrev();});
-    Input::inst.setRightPressCallback([this](){focusNext();});
+    Input::inst.setConfirmShortPressCallback([this](){confirm();});
+    Input::inst.setLeftShortPressCallback([this](){ if(mix_->editing()) changeValue(-SMALL_STEP); else focusPrev(); });
+    Input::inst.setRightShortPressCallback([this](){ if(mix_->editing()) changeValue(SMALL_STEP); else focusNext(); });
+    Input::inst.setLeftLongPressCallback([this](){ if(mix_->editing()) changeValue(-LARGE_STEP); });
+    Input::inst.setRightLongPressCallback([this](){ if(mix_->editing()) changeValue(LARGE_STEP); });
     Input::inst.setEncTurnCallback([this](float enc){encInput(enc);});
 }
 
+void MixCurveDialog::confirm() {
+    if(focusedWidget_ == mix_.get()) {
+        mix_->setEditing(!mix_->editing());
+        currentEnc_ = 0;
+        updateTitle();
+    } else {
+        focusedWidget_->triggerAction();
+    }
+}
+
+// Order: P0..P4 -> OK -> Cancel -> P0
 void MixCurveDialog::focusNext() {
     if(focusedWidget_ == mix_.get()) {
-        if(mix_->cursor() < 4) {
+        if(mix_->cursor() < MixCurveWidget::NUM_POINTS-1) {
             mix_->setCursor(mix_->cursor()+1);
-            mix_->setShowsCursor();
             updateTitle();
-
             return;
         }
         mix_->setHighlighted(false);
@@ -80,9 +100,7 @@ void MixCurveDialog::focusPrev() {
     if(focusedWidget_ == mix_.get()) {
         if(mix_->cursor() > 0) {
             mix_->setCursor(mix_->cursor()-1);
-            mix_->setShowsCursor();
             updateTitle();
-
             return;
         }
         mix_->setHighlighted(false);
@@ -94,10 +112,16 @@ void MixCurveDialog::focusPrev() {
     } else {
         focusedWidget_->setHighlighted(false);
         focusedWidget_ = mix_.get();
-        mix_->setCursor(4);
+        mix_->setCursor(MixCurveWidget::NUM_POINTS-1);
         mix_->setShowsCursor();
     }
     focusedWidget_->setHighlighted(true);
+    updateTitle();
+}
+
+void MixCurveDialog::changeValue(int delta) {
+    if(focusedWidget_ != mix_.get()) return;
+    mix_->setPointValue(mix_->cursor(), mix_->pointValue(mix_->cursor()) + delta);
     updateTitle();
 }
 
@@ -113,52 +137,26 @@ void MixCurveDialog::reposition() {
     setSize(Display::MAIN_WIDTH-4, Display::MAIN_HEIGHT-20);
     centerOnMain();
 
-    titleLabel_->setPosition(x()+1, y()+1);
-    titleLabel_->setSize(width_-2, Display::CHAR_HEIGHT+2);
+    titleLabel_->setPosition(x()+2, y()+2);
+    titleLabel_->setSize(width_-4, Display::CHAR_HEIGHT+2);
 
-    mix_->setSize(width_-4, width_-4);
-    mix_->setPosition(4, titleLabel_->y()+titleLabel_->height()+2);
-    
     okLabel_->setPosition(x() + 2, y() + height() - okLabel_->height() - 2);
     cancelLabel_->setPosition(x() + width() - cancelLabel_->width() - 2, okLabel_->y());
+
+    int curveY = titleLabel_->y() + titleLabel_->height() + 2;
+    mix_->setPosition(x()+2, curveY);
+    mix_->setSize(width_-4, okLabel_->y() - curveY - 2);
 }
 
 void MixCurveDialog::encInput(float enc) {
-    if(focusedWidget_ != mix_.get()) return;
-
-    Interpolator inter = mix_->interpolator();
-    int8_t v;
-    switch(mix_->cursor()) {
-        case 0: v = inter.i0; break;
-        case 1: v = inter.i25; break;
-        case 2: v = inter.i50; break;
-        case 3: v = inter.i75; break;
-        case 4: default: v = inter.i100; break;
-    }
+    if(focusedWidget_ != mix_.get() || !mix_->editing()) return;
 
     currentEnc_ += enc;
-    while(currentEnc_ > 10.0) {
-        v++;
-        if(v > 125) v = 125;
-        currentEnc_ -= 10.0;
-    }
-    while(currentEnc_ < -10.0) {
-        v--;
-        if(v < -125) v = -125;
-        currentEnc_ += 10.0;
-    }
-
-    switch(mix_->cursor()) {
-        case 0: inter.i0 = v; break;
-        case 1: inter.i25 = v; break;
-        case 2: inter.i50 = v; break;
-        case 3: inter.i75 = v; break;
-        case 4: inter.i100 = v; break;
-    }
-    mix_->setInterpolator(inter);
-    updateTitle();
+    int delta = 0;
+    while(currentEnc_ > ENC_STEP) { delta++; currentEnc_ -= ENC_STEP; }
+    while(currentEnc_ < -ENC_STEP) { delta--; currentEnc_ += ENC_STEP; }
+    if(delta != 0) changeValue(delta);
 }
-
 
 void MixCurveDialog::ok(Widget* w) {
     if(okCallback_ != nullptr) okCallback_(this);
@@ -172,29 +170,14 @@ void MixCurveDialog::cancel(Widget* w) {
 
 void MixCurveDialog::updateTitle() {
     if(focusedWidget_ != mix_.get()) {
-        titleLabel_->setTitle("Mix");
+        titleLabel_->setTitle("Mix curve");
         return;
     }
 
-    char buf[255];
-    Interpolator interp = mix_->interpolator();
-
-    switch(mix_->cursor()) {
-    case 0:
-        sprintf(buf, "Mix 0%%>%d%%", interp.i0);
-        break;
-    case 1:
-        sprintf(buf, "Mix 25%%>%d%%", interp.i25);
-        break;
-    case 2:
-        sprintf(buf, "Mix 50%%>%d%%", interp.i50);
-        break;
-    case 3:
-        sprintf(buf, "Mix 75%%>%d%%", interp.i75);
-        break;
-    case 4: default: 
-        sprintf(buf, "Mix 100%%>%d%%", interp.i100);
-        break;
-    }
+    static const char* inPct[] = {"0", "25", "50", "75", "100"};
+    char buf[32];
+    uint8_t c = mix_->cursor();
+    if(mix_->editing()) snprintf(buf, sizeof(buf), "%s>[%d]", inPct[c], mix_->pointValue(c));
+    else snprintf(buf, sizeof(buf), "%s>%d%%", inPct[c], mix_->pointValue(c));
     titleLabel_->setTitle(buf);
 }
