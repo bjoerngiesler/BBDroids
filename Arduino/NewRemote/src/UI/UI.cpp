@@ -64,6 +64,7 @@ UI::UI() {
     valueDialog_->setRange(0, 10);  
 
     mixCurveDialog_ = make_shared<MixCurveDialog>();
+    mixDiagram_ = make_shared<MixDiagramWidget>();
 }
 
 void UI::start() {
@@ -355,115 +356,15 @@ void UI::populateMappingMenu(Menu* menu, const NodeDescription& n) {
             title = title + "*";
         }
 
-        std::shared_ptr<Menu> sub = menu->addSubmenu(title, [n, tx, mgr, i](Menu* m) {UI::ui.populateMappingMenu(m, n, tx, mgr, i);});
+        String inputName = current->inputName(n.addr, i).c_str();
+        menu->addEntry(title, [this, menu, current, tx, mgr, i, inputName](Widget* w) {
+            mixDiagram_->setup(menu, current, tx, mgr, i, inputName);
+            setMainWidget(mixDiagram_.get());
+            setTopTitle(inputName);
+        });
     }
 }
 
-void UI::populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* tx, MixManager* mgr, InputID inp) {
-    menu->clear();
-
-    AxisMix mix = mgr->mixForInput(inp);
-    shared_ptr<Widget> w;
-    Protocol *c = RemoteSubsys::inst.currentProtocol();
-
-    String axis1Title = String("Ax1: ") + (mix.axis1 == AXIS_INVALID ? "-" : tx->axisName(mix.axis1).c_str());
-    std::shared_ptr<Menu> axis1Menu = menu->addSubmenu(axis1Title);
-    w = axis1Menu->addEntry("-", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.axis1 = AXIS_INVALID; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    if(mix.axis1 == AXIS_INVALID) w->setHighlighted(true);
-    else w->setHighlighted(false);
-    for(AxisID a=0; a<tx->numAxes(); a++) {
-        if(a == mix.axis2) continue;
-        w = axis1Menu->addEntry(tx->axisName(a).c_str(), [mix,mgr,inp,a,c](Widget* w) { AxisMix m = mix; m.axis1 = a; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-        if(mix.axis1 == a) w->setHighlighted(true);
-        else w->setHighlighted(false);
-    }
-
-    std::string interpStr;
-    if(mix.interp1 == INTERP_LIN_CENTERED) interpStr = "LinCtr";
-    else if(mix.interp1 == INTERP_LIN_CENTERED_INV) interpStr = "LinCtrInv";
-    else if(mix.interp1 == INTERP_LIN_POSITIVE) interpStr = "LinPos";
-    else if(mix.interp1 == INTERP_LIN_POSITIVE_INV) interpStr = "LinPosInv";
-    else if(mix.interp1 == INTERP_ZERO) interpStr = "Zero";
-    else interpStr = "Custom";
-
-    std::shared_ptr<Menu> interp1Menu = menu->addSubmenu(String("Ip1: ")+ interpStr.c_str());
-    interp1Menu->addEntry("Zero", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_ZERO; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp1Menu->addEntry("LinCtr", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp1Menu->addEntry("LinCtrInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp1Menu->addEntry("LinPos", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp1Menu->addEntry("LinPosInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp1 = INTERP_LIN_POSITIVE_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    // Not backAfterCB: going back would take the input focus away from the dialog. The dialog's callbacks
-    // go back instead, which also repopulates this menu so the "Ip1:" title is current.
-    Menu* ip1MenuPtr = interp1Menu.get();
-    interp1Menu->addEntry("Custom...", [mix,mgr,inp,c,ip1MenuPtr,this](Widget* w) {
-        mixCurveDialog_->setInterpolator(mix.interp1);
-        mixCurveDialog_->setCancelCallback([ip1MenuPtr](MixCurveDialog* d) { ip1MenuPtr->back(); });
-        mixCurveDialog_->setOKCallback([mix,mgr,inp,c,ip1MenuPtr](MixCurveDialog* d) {
-            AxisMix m = mix; m.interp1 = d->interpolator(); mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes();
-            ip1MenuPtr->back();
-        });
-        showDialog(mixCurveDialog_.get());
-    });
-
-    std::shared_ptr<Menu> axis2Menu = menu->addSubmenu(String("Ax2: ") + (mix.axis2 == AXIS_INVALID ? "-" : tx->axisName(mix.axis2).c_str()));
-    w = axis2Menu->addEntry("-", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.axis2 = AXIS_INVALID; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    if(mix.axis2 == AXIS_INVALID) w->setHighlighted(true);
-    else w->setHighlighted(false);
-    for(AxisID a=0; a<tx->numAxes(); a++) {
-        if(a == mix.axis1) continue;
-        shared_ptr<Widget> w = axis2Menu->addEntry(tx->axisName(a).c_str(), [mix,mgr,inp,a,c](Widget* w) {AxisMix m = mix; m.axis2 = a; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-        if(mix.axis2 == a) w->setHighlighted(true);
-        else w->setHighlighted(false);
-    }
-
-    if(mix.interp2 == INTERP_LIN_CENTERED) interpStr = "LinCtr";
-    else if(mix.interp2 == INTERP_LIN_CENTERED_INV) interpStr = "LinCtrInv";
-    else if(mix.interp2 == INTERP_LIN_POSITIVE) interpStr = "LinPos";
-    else if(mix.interp2 == INTERP_LIN_POSITIVE_INV) interpStr = "LinPosInv";
-    else if(mix.interp2 == INTERP_ZERO) interpStr = "Zero";
-    else interpStr = "Custom";
-
-    std::shared_ptr<Menu> interp2Menu = menu->addSubmenu(String("Ip2: ")+ interpStr.c_str());
-    interp2Menu->addEntry("Zero", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_ZERO; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp2Menu->addEntry("LinCtr", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp2Menu->addEntry("LinCtrInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_CENTERED_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp2Menu->addEntry("LinPos", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    interp2Menu->addEntry("LinPosInv", [mix,mgr,inp,c](Widget* w) { AxisMix m = mix; m.interp2 = INTERP_LIN_POSITIVE_INV; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    // Not backAfterCB: going back would take the input focus away from the dialog. The dialog's callbacks
-    // go back instead, which also repopulates this menu so the "Ip2:" title is current.
-    Menu* ip2MenuPtr = interp2Menu.get();
-    interp2Menu->addEntry("Custom...", [mix,mgr,inp,c,ip2MenuPtr,this](Widget* w) {
-        mixCurveDialog_->setInterpolator(mix.interp2);
-        mixCurveDialog_->setCancelCallback([ip2MenuPtr](MixCurveDialog* d) { ip2MenuPtr->back(); });
-        mixCurveDialog_->setOKCallback([mix,mgr,inp,c,ip2MenuPtr](MixCurveDialog* d) {
-            AxisMix m = mix; m.interp2 = d->interpolator(); mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes();
-            ip2MenuPtr->back();
-        });
-        showDialog(mixCurveDialog_.get());
-    });
-
-    String mixStr = "Mix: ";
-    switch(mix.mixType) {
-    case MIX_ADD: 
-        mixStr += "Add";
-        break;
-    case MIX_MULT:
-        mixStr += "Mult";
-        break;
-    default:
-        mixStr += "None";
-    }
-
-    std::shared_ptr<Menu> mixMenu = menu->addSubmenu(mixStr);
-    w = mixMenu->addEntry("Add", [mix,mgr,inp,c](Widget* w) {AxisMix m = mix; m.mixType = MIX_ADD; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    if(mix.mixType == MIX_ADD) w->setHighlighted(true); else w->setHighlighted(false);
-    w = mixMenu->addEntry("Mult", [mix,mgr,inp,c](Widget* w) {AxisMix m = mix; m.mixType = MIX_MULT; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    if(mix.mixType == MIX_MULT) w->setHighlighted(true); else w->setHighlighted(false);
-    w = mixMenu->addEntry("None", [mix,mgr,inp,c](Widget* w) {AxisMix m = mix; m.mixType = MIX_NONE; mgr->setMix(inp, m); if(c->receiverSideMixing()) c->sendMixes(); }, true);
-    if(mix.mixType == MIX_NONE) w->setHighlighted(true); else w->setHighlighted(false);
-}
-
-  
 void UI::showMenu(const shared_ptr<Menu>& menu) {
     setMainWidget(menu.get());
     menu->resetCursor();
@@ -668,6 +569,13 @@ void UI::showDialog(Widget* dialog) {
     dialog_->takeInputFocus();
 }
   
+void UI::showMixCurveDialog(const Interpolator& inter, std::function<void(const Interpolator&)> onOK) {
+    mixCurveDialog_->setInterpolator(inter);
+    mixCurveDialog_->setCancelCallback(nullptr);
+    mixCurveDialog_->setOKCallback([onOK](MixCurveDialog* d) { if(onOK) onOK(d->interpolator()); });
+    showDialog(mixCurveDialog_.get());
+}
+
 void UI::hideDialog() {
     dialog_ = nullptr;
     if(mainWidget_ != nullptr) {

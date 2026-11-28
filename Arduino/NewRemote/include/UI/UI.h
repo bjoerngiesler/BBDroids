@@ -19,6 +19,7 @@
 #include "UI/Dialog.h"
 #include "UI/Button.h"
 #include "UI/MixCurveDialog.h"
+#include "UI/MixDiagramWidget.h"
 
 using namespace bb;
 using namespace bb::rmt;
@@ -37,7 +38,6 @@ public:
     void populatePairRemoteMenu(Menu* menu);
     void populateMappingMenu(Menu* menu);
     void populateMappingMenu(Menu* menu, const NodeDescription& n);
-    void populateMappingMenu(Menu* menu, const NodeDescription& n, Transmitter* tx, MixManager* mgr, InputID inp);
 
     void showMenu(const shared_ptr<Menu>& menu);
     void showMain();
@@ -55,6 +55,8 @@ public:
 
     void showMessage(const String& str, unsigned int delayms=0, uint8_t color=Display::WHITE);
     void showDialog(Widget* dialog);
+    //! Show the mix curve dialog for inter. onOK is called with the edited curve; Cancel does nothing.
+    void showMixCurveDialog(const Interpolator& inter, std::function<void(const Interpolator&)> onOK);
     void hideDialog();
     
     void showLEDBrightnessDialog();
@@ -88,6 +90,7 @@ protected:
     shared_ptr<MessageWidget> message_;
     shared_ptr<Dialog> valueDialog_;
     shared_ptr<MixCurveDialog> mixCurveDialog_;
+    shared_ptr<MixDiagramWidget> mixDiagram_;
     
     bool dialogActive_;
     Widget *dialog_;

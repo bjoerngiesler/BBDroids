@@ -7,7 +7,8 @@
 
 //! Dialog for editing an Interpolator.
 //!
-//! Navigation: Left/Right move through the points P0..P4, then OK and Cancel. Confirm on a point enters edit
+//! Navigation: Left/Right move through Preset, the points P0..P4, then OK and Cancel. Confirm on Preset loads the
+//! next preset; the row shows the preset the curve matches, or "Custom". Confirm on a point enters edit
 //! mode (point drawn yellow): Left/Right short press changes the value by -/+5, long press by -/+25, the encoder
 //! by 1. Confirm leaves edit mode. Confirm on OK/Cancel closes the dialog.
 class MixCurveDialog: public MultiWidget {
@@ -29,11 +30,13 @@ protected:
     void confirm();
     void changeValue(int delta);
     void updateTitle();
+    void updatePresetLabel();
+    void nextPreset();
     void encInput(float enc);
     void ok(Widget* w);
     void cancel(Widget* w);
 
-    shared_ptr<Label> titleLabel_;
+    shared_ptr<Label> titleLabel_, presetLabel_;
     shared_ptr<Label> okLabel_, cancelLabel_;
     shared_ptr<MixCurveWidget> mix_;
     Widget* focusedWidget_;

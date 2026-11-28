@@ -42,6 +42,8 @@ public:
   void setEnterCallback(std::function<void(Menu*)> enterCB) { enterCB_ = enterCB; }
   void setLeaveCallback(std::function<void(Menu*)> leaveCB) { leaveCB_ = leaveCB; }
   void setParent(Menu* parent) { parent_ = parent; }
+  //! If set, Back calls this instead of entering the parent menu (or the main screen, if there is no parent).
+  void setBackCallback(std::function<void()> backCB) { backCB_ = backCB; }
   Menu* parent() { return parent_; }
 
   virtual void setSize(uint8_t w, uint8_t h);
@@ -60,6 +62,7 @@ protected:
   std::shared_ptr<PercentageBar> scrollBar_;
 
   Menu* parent_ = nullptr;
+  std::function<void()> backCB_ = nullptr;
 
   static const uint8_t SCROLLBAR_WIDTH = 4;
 };

@@ -4,8 +4,21 @@
 static const int SMALL_STEP = 5, LARGE_STEP = 25;
 static const float ENC_STEP = 10.0;
 
+struct Preset { const char* name; Interpolator inter; };
+static const Preset PRESETS[] = {
+    {"LinCtr", INTERP_LIN_CENTERED},
+    {"LinCtrInv", INTERP_LIN_CENTERED_INV},
+    {"LinPos", INTERP_LIN_POSITIVE},
+    {"LinPosInv", INTERP_LIN_POSITIVE_INV},
+    {"Zero", INTERP_ZERO},
+};
+static const int NUM_PRESETS = sizeof(PRESETS)/sizeof(PRESETS[0]);
+
 MixCurveDialog::MixCurveDialog() {
     titleLabel_ = make_shared<Label>();
+    presetLabel_ = make_shared<Label>();
+    presetLabel_->setDrawsFrame();
+    presetLabel_->setAction([this](Widget* w) { nextPreset(); });
     mix_ = make_shared<MixCurveWidget>();
     okLabel_ = make_shared<Label>();
     cancelLabel_ = make_shared<Label>();
@@ -20,6 +33,7 @@ MixCurveDialog::MixCurveDialog() {
     cancelLabel_->setAction([this](Widget* w) { cancel(w); });
 
     addWidget(titleLabel_);
+    addWidget(presetLabel_);
     addWidget(mix_);
     addWidget(okLabel_);
     addWidget(cancelLabel_);
@@ -39,11 +53,13 @@ MixCurveDialog::MixCurveDialog() {
 void MixCurveDialog::setInterpolator(const Interpolator& inter) {
     mix_->setInterpolator(inter);
     updateTitle();
+    updatePresetLabel();
 }
 
 void MixCurveDialog::takeInputFocus() {
     okLabel_->setHighlighted(false);
     cancelLabel_->setHighlighted(false);
+    presetLabel_->setHighlighted(false);
     focusedWidget_ = mix_.get();
     mix_->setHighlighted(true);
     mix_->setCursor(0);
@@ -85,6 +101,9 @@ void MixCurveDialog::focusNext() {
     } else if(focusedWidget_ == okLabel_.get()) {
         focusedWidget_->setHighlighted(false);
         focusedWidget_ = cancelLabel_.get();
+    } else if(focusedWidget_ == cancelLabel_.get()) {
+        focusedWidget_->setHighlighted(false);
+        focusedWidget_ = presetLabel_.get();
     } else {
         focusedWidget_->setHighlighted(false);
         focusedWidget_ = mix_.get();
@@ -105,6 +124,9 @@ void MixCurveDialog::focusPrev() {
         }
         mix_->setHighlighted(false);
         mix_->setShowsCursor(false);
+        focusedWidget_ = presetLabel_.get();
+    } else if(focusedWidget_ == presetLabel_.get()) {
+        focusedWidget_->setHighlighted(false);
         focusedWidget_ = cancelLabel_.get();
     } else if(focusedWidget_ == cancelLabel_.get()) {
         focusedWidget_->setHighlighted(false);
@@ -123,6 +145,7 @@ void MixCurveDialog::changeValue(int delta) {
     if(focusedWidget_ != mix_.get()) return;
     mix_->setPointValue(mix_->cursor(), mix_->pointValue(mix_->cursor()) + delta);
     updateTitle();
+    updatePresetLabel();
 }
 
 void MixCurveDialog::setOKCallback(std::function<void(MixCurveDialog*)> cb) {
@@ -143,7 +166,10 @@ void MixCurveDialog::reposition() {
     okLabel_->setPosition(x() + 2, y() + height() - okLabel_->height() - 2);
     cancelLabel_->setPosition(x() + width() - cancelLabel_->width() - 2, okLabel_->y());
 
-    int curveY = titleLabel_->y() + titleLabel_->height() + 2;
+    presetLabel_->setPosition(x()+2, titleLabel_->y() + titleLabel_->height() + 1);
+    presetLabel_->setSize(width_-4, Display::CHAR_HEIGHT+3);
+
+    int curveY = presetLabel_->y() + presetLabel_->height() + 2;
     mix_->setPosition(x()+2, curveY);
     mix_->setSize(width_-4, okLabel_->y() - curveY - 2);
 }
@@ -180,4 +206,24 @@ void MixCurveDialog::updateTitle() {
     if(mix_->editing()) snprintf(buf, sizeof(buf), "%s>[%d]", inPct[c], mix_->pointValue(c));
     else snprintf(buf, sizeof(buf), "%s>%d%%", inPct[c], mix_->pointValue(c));
     titleLabel_->setTitle(buf);
+}
+
+void MixCurveDialog::updatePresetLabel() {
+    Interpolator cur = mix_->interpolator();
+    const char* name = "Custom";
+    for(int i=0; i<NUM_PRESETS; i++) {
+        if(PRESETS[i].inter == cur) { name = PRESETS[i].name; break; }
+    }
+    presetLabel_->setTitle(name);   // "Pre:" prefix would overflow the 72px row for LinCtrInv
+}
+
+// Load the preset after the one the curve currently matches (or the first, if it matches none).
+void MixCurveDialog::nextPreset() {
+    Interpolator cur = mix_->interpolator();
+    int idx = -1;
+    for(int i=0; i<NUM_PRESETS; i++) {
+        if(PRESETS[i].inter == cur) { idx = i; break; }
+    }
+    mix_->setInterpolator(PRESETS[(idx + 1) % NUM_PRESETS].inter);
+    updatePresetLabel();
 }

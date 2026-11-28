@@ -512,7 +512,7 @@ Result Input::setupAxesFromTransmitter(Transmitter* trans) {
   battAxis = AXIS_INVALID;
 
   uint8_t axis = 0, numAxes = trans->numAxes();
-  #define MAPAXIS(here, minbits, maxbits, name) { if(axis < numAxes && trans->bitDepthForAxis(axis) >= minbits) {here = axis; bb::printf("Mapped %s to %s\n", name, trans->axisName(axis).c_str()); axis++;} else if(trans->canAddAxes()) { here = axis; trans->addAxis(name, maxbits); bb::printf("Mapped %s to new axis\n", name); axis++; } else {bb::printf("Not mapped %s\n", name);} }
+  #define MAPAXIS(here, minbits, maxbits, name) { if(axis < numAxes && trans->bitDepthForAxis(axis) >= minbits) {here = axis; bb::printf("Mapped %s to %s\n", name, trans->axisName(axis).c_str()); trans->setAxisName(axis, name); axis++;} else if(trans->canAddAxes()) { here = axis; trans->addAxis(name, maxbits); bb::printf("Mapped %s to new axis\n", name); axis++; } else {bb::printf("Not mapped %s\n", name);} }
 
   MAPAXIS(joyHAxis, 4, 12, "JoyH");
   MAPAXIS(joyVAxis, 4, 12, "JoyV");

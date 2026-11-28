@@ -111,6 +111,7 @@ void Menu::enter() {
 }
 
 void Menu::back(Widget* w) {
+  if(backCB_) { backCB_(); return; }
   if(parent_ != nullptr) parent_->enter();
   else UI::ui.showMain();
 }

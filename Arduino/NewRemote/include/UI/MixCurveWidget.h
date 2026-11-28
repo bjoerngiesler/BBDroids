@@ -27,6 +27,8 @@ public:
     virtual uint8_t cursor() { return cursor_; }
     virtual void setEditing(bool editing=true);
     virtual bool editing() { return editing_; }
+    //! Draw the node boxes. Off for small thumbnails.
+    virtual void setShowsNodes(bool shows=true) { showsNodes_ = shows; setNeedsFullRedraw(); }
 
 protected:
     int pointX(unsigned int num);
@@ -38,6 +40,7 @@ protected:
     uint8_t cursor_ = 0;
     bool showsCursor_ = false;
     bool editing_ = false;
+    bool showsNodes_ = true;
 };
 
 #endif // MIXCURVEWIDGET_H

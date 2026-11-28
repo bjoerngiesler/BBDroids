@@ -54,8 +54,10 @@ Result MixCurveWidget::draw() {
             Display::display.line(pointX(i), pointY(pointValue(i)), pointX(i+1), pointY(pointValue(i+1)), fgCol_);
         }
         // Nodes after lines, so the cursor node isn't overdrawn.
-        for(unsigned int i=0; i<NUM_POINTS; i++) {
-            drawNode(i, pointValue(i));
+        if(showsNodes_) {
+            for(unsigned int i=0; i<NUM_POINTS; i++) {
+                drawNode(i, pointValue(i));
+            }
         }
         needsContentsRedraw_ = false;
     }
