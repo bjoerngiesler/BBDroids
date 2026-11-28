@@ -115,6 +115,7 @@ summary{cursor:pointer;font:600 15px "Barlow Semi Condensed",Barlow,system-ui,sa
         <button id="bReset">Restart</button>
         <button id="bCourse">Load obstacle course</button>
         <button id="bRemote" title="Control the sim with a physical remote via a SimBridge board (BBRemotes/examples/SimBridge) on USB. Chrome / Edge only.">Connect remote</button>
+        <button id="bNetRemote" title="Control the sim with a remote over WiFi/UDP via udp_simbridge running on this computer (BBRemotes/examples/HostUDP). Shift-click to change the address.">Network remote</button>
         <select id="sSpeed" aria-label="Time scale"><option value="1">Real time</option><option value="0.5">0.5×</option><option value="0.25">0.25×</option><option value="0.1">0.1×</option></select>
         <select id="sGround" aria-label="Ground"><option value="smooth">Smooth hard floor</option><option value="office">Low-pile office carpet</option><option value="living">Medium-pile living-room carpet</option><option value="custom" disabled>Custom (sliders)</option></select>
         <select id="sMode" aria-label="BBDroids drive mode"><option value="vel">Drive mode: velocity</option><option value="pos">Drive mode: position</option><option value="autopos">Drive mode: auto position</option></select>
@@ -1056,7 +1057,7 @@ function updateKeys(dt) {
 // headH -> dome rotation (cosmetic only, the sim has no dome spin). Pitch, roll and heading are negated: the bridge uses D-O's
 // sign conventions. While the remote is live the dome follows it continuously (button 3 held). If the data goes
 // stale, drive and lean stop and the dome turns back to the front.
-const remote = {vals: {}, t: 0, connected: false, writer: null};
+const remote = {vals: {}, t: 0, connected: false, writer: null, send: null, kind: null};
 const clamp1 = v => Math.max(-1, Math.min(1, isFinite(v) ? v : 0));
 const remoteFresh = () => remote.connected && performance.now() - remote.t < 500;
 function parseRemoteLine(line) {
@@ -1066,9 +1067,11 @@ function parseRemoteLine(line) {
   remote.t = performance.now();
 }
 function updateRemoteButton() {
-  const b = $('bRemote');
-  b.textContent = !remote.connected ? 'Connect remote' : remoteFresh() ? 'Remote: live' : 'Remote: no data';
-  b.classList.toggle('on', remoteFresh());
+  for (const [id, kind, idle] of [['bRemote', 'serial', 'Connect remote'], ['bNetRemote', 'net', 'Network remote']]) {
+    const b = $(id), mine = remote.connected && remote.kind === kind;
+    b.textContent = !mine ? idle : remoteFresh() ? 'Remote: live' : 'Remote: no data';
+    b.classList.toggle('on', mine && remoteFresh());
+  }
 }
 async function connectRemote() {
   if (remote.connected) return;
@@ -1078,8 +1081,9 @@ async function connectRemote() {
     port = await navigator.serial.requestPort({filters: [{usbVendorId: 0x303a}]}); // Espressif USB
     await port.open({baudRate: 115200});
   } catch (e) { console.warn('Remote:', e); return; }
-  remote.connected = true;
+  remote.connected = true; remote.kind = 'serial';
   try { remote.writer = port.writable.getWriter(); } catch (e) { remote.writer = null; }
+  if (remote.writer) remote.send = line => remote.writer.write(telEncoder.encode(line)).catch(() => {});
   try {
     const reader = port.readable.pipeThrough(new TextDecoderStream()).getReader();
     let buf = '';
@@ -1091,21 +1095,39 @@ async function connectRemote() {
       while ((i = buf.indexOf('\n')) >= 0) { parseRemoteLine(buf.slice(0, i).trim()); buf = buf.slice(i + 1); }
     }
   } catch (e) { console.warn('Remote disconnected:', e); }
-  remote.connected = false; remote.t = 0;
+  remote.connected = false; remote.t = 0; remote.send = null;
   if (remote.writer) { try { remote.writer.releaseLock(); } catch (e) {} remote.writer = null; }
 }
 // Telemetry back to the remote: SimBridge forwards "TEL ..." lines as Monaco state packets (10 Hz).
 const telEncoder = new TextEncoder();
 let lastTelemetry = 0;
 function sendTelemetry(now) {
-  if (!remote.writer || now - lastTelemetry < 100) return;
+  if (!remote.send || now - lastTelemetry < 100) return;
   lastTelemetry = now;
   const mode = ({off: 0, vel: 1, autopos: 2, pos: 3})[sim.driveState] ?? 0;
   const heading = ((sim.psi * R2D) % 360 + 360) % 360;
   const line = `TEL speed=${(sim.encSpeedFilt / 1000).toFixed(3)} pitch=${sim.pitchDeg().toFixed(1)} roll=${sim.leanDeg().toFixed(1)} heading=${heading.toFixed(1)} mode=${mode}\n`;
-  remote.writer.write(telEncoder.encode(line)).catch(() => {});
+  remote.send(line);
 }
 $('bRemote').onclick = connectRemote;
+
+// Network remote: udp_simbridge (BBRemotes/examples/HostUDP) receives the remote over Monaco/UDP and serves the
+// same BBR/TEL lines over a local WebSocket. Shift-click the button to change the address.
+function connectNetRemote(ev) {
+  if (remote.connected) return;
+  let url = localStorage.getItem('bbrSimBridgeWs') || 'ws://localhost:7702';
+  if (ev && ev.shiftKey) { url = prompt('udp_simbridge WebSocket address:', url); if (!url) return; localStorage.setItem('bbrSimBridgeWs', url); }
+  let ws, opened = false;
+  try { ws = new WebSocket(url); } catch (e) { alert(`Invalid address ${url}`); return; }
+  remote.connected = true; remote.kind = 'net';
+  ws.onopen = () => { opened = true; remote.send = line => { if (ws.readyState === 1) ws.send(line); }; };
+  ws.onmessage = e => { for (const l of String(e.data).split('\n')) parseRemoteLine(l.trim()); };
+  ws.onclose = () => {
+    remote.connected = false; remote.t = 0; remote.send = null;
+    if (!opened) alert(`Could not connect to ${url} -- is udp_simbridge running? (BBRemotes/examples/HostUDP)`);
+  };
+}
+$('bNetRemote').onclick = connectNetRemote;
 let domeH = 0; // dome rotation in degrees, positive = to the left (cosmetic)
 const remoteHead = () => ({p: -clamp1(remote.vals.headP) * 180, r: -clamp1(remote.vals.headR) * 180, h: -clamp1(remote.vals.headH) * 180});
 function applyRemote() {

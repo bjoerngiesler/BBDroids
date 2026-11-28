@@ -45,3 +45,7 @@ overrides the on-screen sticks and keys; if data stops for 0.5 s, drive stops, l
 Head angles from the remote are unscaled (+-1 = +-180 deg, as in the firmware), head roll included. The sim
 sends telemetry back (speed, body pitch, heading, drive mode at 10 Hz), which SimBridge forwards to the
 remote as Monaco state packets.
+
+**Without the extra board:** with the remote on Monaco/UDP (WiFi), run `udp_simbridge` from
+`BBRemotes/examples/HostUDP` on the same computer and click **Network remote** instead (any browser; it
+connects to `ws://localhost:7702`, shift-click to change). Same inputs, mixes and telemetry as SimBridge.
