@@ -178,6 +178,16 @@ void UI::populateConfigMenu(Menu* menu) {
             UI::ui.showMessage("Failed to create Monaco/ESPNow protocol", 2000, Display::LIGHTRED1);
         }
     }, true);
+    newMenu->addEntry("Monaco/UDP", [menu](Widget* w){
+        bb::printf("New Monaco/UDP config\n");
+        Protocol *p = RemoteSubsys::inst.createProtocol(ProtocolType::MONACO_UDP);
+        if(p != nullptr) {
+            UI::ui.showMessage("Created Monaco/UDP protocol", 2000, Display::LIGHTGREEN1);
+            menu->setName(String("Cur:") + String(p->storageName().c_str()) + " " + char(p->protocolType()));
+        } else {
+            UI::ui.showMessage("Failed to create Monaco/UDP protocol", 2000, Display::LIGHTRED1);
+        }
+    }, true);
     newMenu->addEntry("DroidDepot", [menu](Widget* w){bb::printf("New DroidDepot config\n");
         Protocol *p = RemoteSubsys::inst.createProtocol(ProtocolType::DROIDDEPOT_BLE);
         if(p != nullptr) {
